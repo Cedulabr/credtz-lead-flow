@@ -1,0 +1,306 @@
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  User, 
+  Phone, 
+  CreditCard, 
+  DollarSign, 
+  FileText,
+  Camera,
+  CheckCircle,
+  Send
+} from "lucide-react";
+
+export function IndicateClient() {
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    cpf: "",
+    phone: "",
+    income: "",
+    benefitType: "",
+    observations: ""
+  });
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const formatCPF = (value: string) => {
+    const numericValue = value.replace(/\D/g, "");
+    return numericValue
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})/, "$1-$2")
+      .substring(0, 14);
+  };
+
+  const formatPhone = (value: string) => {
+    const numericValue = value.replace(/\D/g, "");
+    return numericValue
+      .replace(/(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{5})(\d{1,4})/, "$1-$2")
+      .substring(0, 15);
+  };
+
+  const formatCurrency = (value: string) => {
+    const numericValue = value.replace(/\D/g, "");
+    const numberValue = parseInt(numericValue) / 100;
+    return numberValue.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL"
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      toast({
+        title: "Cliente indicado com sucesso! 🎉",
+        description: "Sua indicação foi enviada para análise. Você receberá atualizações em breve.",
+        variant: "default",
+      });
+
+      // Reset form
+      setFormData({
+        name: "",
+        cpf: "",
+        phone: "",
+        income: "",
+        benefitType: "",
+        observations: ""
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao enviar indicação",
+        description: "Tente novamente em alguns instantes.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const benefitTypes = [
+    { value: "inss", label: "INSS - Aposentado" },
+    { value: "inss_pensionista", label: "INSS - Pensionista" },
+    { value: "siape", label: "SIAPE - Servidor Federal" },
+    { value: "estado", label: "Servidor Estadual" },
+    { value: "municipal", label: "Servidor Municipal" },
+    { value: "militar", label: "Militar" },
+    { value: "clt", label: "CLT - Carteira Assinada" },
+    { value: "outros", label: "Outros" }
+  ];
+
+  const isFormValid = formData.name && formData.cpf && formData.phone && formData.income && formData.benefitType;
+
+  return (
+    <div className="p-4 md:p-6 pb-20 md:pb-6">
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+            Indicar Cliente
+          </h1>
+          <p className="text-muted-foreground">
+            Preencha os dados do cliente interessado em crédito
+          </p>
+        </div>
+
+        {/* Form Card */}
+        <Card className="bg-gradient-to-br from-card to-muted/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5 text-primary" />
+              Dados do Cliente
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Personal Info */}
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Nome Completo *</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Ex: João Silva Santos"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange("name", e.target.value)}
+                    className="mt-2"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="cpf">CPF *</Label>
+                    <Input
+                      id="cpf"
+                      type="text"
+                      placeholder="000.000.000-00"
+                      value={formData.cpf}
+                      onChange={(e) => handleInputChange("cpf", formatCPF(e.target.value))}
+                      className="mt-2"
+                      maxLength={14}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="phone">Telefone/WhatsApp *</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="(11) 99999-9999"
+                      value={formData.phone}
+                      onChange={(e) => handleInputChange("phone", formatPhone(e.target.value))}
+                      className="mt-2"
+                      maxLength={15}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Financial Info */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="income">Renda Aproximada *</Label>
+                    <Input
+                      id="income"
+                      type="text"
+                      placeholder="R$ 0,00"
+                      value={formData.income}
+                      onChange={(e) => {
+                        const formatted = formatCurrency(e.target.value);
+                        handleInputChange("income", formatted);
+                      }}
+                      className="mt-2"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="benefitType">Tipo de Benefício *</Label>
+                    <Select
+                      value={formData.benefitType}
+                      onValueChange={(value) => handleInputChange("benefitType", value)}
+                      required
+                    >
+                      <SelectTrigger className="mt-2">
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {benefitTypes.map((benefit) => (
+                          <SelectItem key={benefit.value} value={benefit.value}>
+                            {benefit.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Info */}
+              <div>
+                <Label htmlFor="observations">Observações (Opcional)</Label>
+                <Textarea
+                  id="observations"
+                  placeholder="Informações adicionais sobre o cliente, urgência, preferências..."
+                  value={formData.observations}
+                  onChange={(e) => handleInputChange("observations", e.target.value)}
+                  className="mt-2 min-h-[100px]"
+                  maxLength={500}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.observations.length}/500 caracteres
+                </p>
+              </div>
+
+              {/* Document Upload Section */}
+              <Card className="bg-muted/20 border-dashed">
+                <CardContent className="p-4">
+                  <div className="text-center space-y-3">
+                    <Camera className="h-8 w-8 text-muted-foreground mx-auto" />
+                    <div>
+                      <p className="text-sm font-medium">Documentos (Opcional)</p>
+                      <p className="text-xs text-muted-foreground">
+                        Foto do RG, CPF ou comprovante de renda
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Adicionar Foto
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Submit Button */}
+              <Button
+                type="submit"
+                disabled={!isFormValid || isSubmitting}
+                className="w-full bg-gradient-to-r from-primary to-success hover:from-primary-dark hover:to-success disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Enviando Indicação...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Send className="h-4 w-4" />
+                    Enviar Indicação
+                  </div>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Info Cards */}
+        <div className="grid md:grid-cols-2 gap-4">
+          <Card className="bg-success/5 border-success/20">
+            <CardContent className="p-4 text-center">
+              <CheckCircle className="h-6 w-6 text-success mx-auto mb-2" />
+              <h3 className="font-semibold text-sm">Comissão Garantida</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Receba até 3% sobre o valor aprovado
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="p-4 text-center">
+              <FileText className="h-6 w-6 text-primary mx-auto mb-2" />
+              <h3 className="font-semibold text-sm">Acompanhamento</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Receba atualizações sobre o status da proposta
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
