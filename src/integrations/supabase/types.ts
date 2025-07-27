@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      announcements: {
+        Row: {
+          content: string
+          created_at: string | null
+          created_by_id: string | null
+          id: number
+          is_active: boolean | null
+          organization_id: number | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          created_by_id?: string | null
+          id?: number
+          is_active?: boolean | null
+          organization_id?: number | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          created_by_id?: string | null
+          id?: number
+          is_active?: boolean | null
+          organization_id?: number | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       banks: {
         Row: {
           created_at: string | null
@@ -116,6 +149,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      commission_rules: {
+        Row: {
+          commission_percentage: number
+          created_at: string | null
+          created_by_id: string | null
+          description: string | null
+          id: number
+          is_active: boolean | null
+          minimum_value: number | null
+          organization_id: number | null
+          product_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          commission_percentage: number
+          created_at?: string | null
+          created_by_id?: string | null
+          description?: string | null
+          id?: number
+          is_active?: boolean | null
+          minimum_value?: number | null
+          organization_id?: number | null
+          product_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          commission_percentage?: number
+          created_at?: string | null
+          created_by_id?: string | null
+          description?: string | null
+          id?: number
+          is_active?: boolean | null
+          minimum_value?: number | null
+          organization_id?: number | null
+          product_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       convenios: {
         Row: {
@@ -542,6 +614,81 @@ export type Database = {
           },
         ]
       }
+      webhooks: {
+        Row: {
+          created_at: string | null
+          created_by_id: string | null
+          description: string | null
+          id: number
+          is_active: boolean | null
+          name: string
+          organization_id: number | null
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by_id?: string | null
+          description?: string | null
+          id?: number
+          is_active?: boolean | null
+          name: string
+          organization_id?: number | null
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by_id?: string | null
+          description?: string | null
+          id?: number
+          is_active?: boolean | null
+          name?: string
+          organization_id?: number | null
+          updated_at?: string | null
+          url?: string
+        }
+        Relationships: []
+      }
+      withdrawal_requests: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: number
+          organization_id: number | null
+          processed_at: string | null
+          processed_by_id: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+          webhook_sent_at: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: number
+          organization_id?: number | null
+          processed_at?: string | null
+          processed_by_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          webhook_sent_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: number
+          organization_id?: number | null
+          processed_at?: string | null
+          processed_by_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          webhook_sent_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -550,6 +697,13 @@ export type Database = {
       get_complete_schema: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      has_role: {
+        Args: {
+          _user_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
       }
     }
     Enums: {
