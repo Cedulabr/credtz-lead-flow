@@ -1,0 +1,626 @@
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
+import { Badge } from "./ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { 
+  Settings, 
+  Webhook, 
+  Megaphone, 
+  Percent, 
+  Plus,
+  Edit,
+  Trash2,
+  Save,
+  X
+} from "lucide-react";
+
+interface Webhook {
+  id: number;
+  name: string;
+  url: string;
+  description: string;
+  is_active: boolean;
+}
+
+interface Announcement {
+  id: number;
+  title: string;
+  content: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+interface CommissionRule {
+  id: number;
+  product_name: string;
+  commission_percentage: number;
+  minimum_value: number;
+  description: string;
+  is_active: boolean;
+}
+
+export function AdminPanel() {
+  const { toast } = useToast();
+  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("webhooks");
+
+  // Estados para formulários
+  const [webhookForm, setWebhookForm] = useState({
+    name: "",
+    url: "",
+    description: ""
+  });
+
+  const [announcementForm, setAnnouncementForm] = useState({
+    title: "",
+    content: ""
+  });
+
+  const [commissionForm, setCommissionForm] = useState({
+    product_name: "",
+    commission_percentage: "",
+    minimum_value: "50.00",
+    description: ""
+  });
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [webhooksRes, announcementsRes, commissionsRes] = await Promise.all([
+        supabase.from('webhooks').select('*').order('created_at', { ascending: false }),
+        supabase.from('announcements').select('*').order('created_at', { ascending: false }),
+        supabase.from('commission_rules').select('*').order('created_at', { ascending: false })
+      ]);
+
+      if (webhooksRes.data) setWebhooks(webhooksRes.data);
+      if (announcementsRes.data) setAnnouncements(announcementsRes.data);
+      if (commissionsRes.data) setCommissionRules(commissionsRes.data);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+    }
+  };
+
+  const handleSaveWebhook = async () => {
+    try {
+      if (editingItem) {
+        const { error } = await supabase
+          .from('webhooks')
+          .update(webhookForm)
+          .eq('id', editingItem.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('webhooks')
+          .insert([webhookForm]);
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Webhook salvo com sucesso!",
+        description: "As configurações foram atualizadas.",
+      });
+
+      setWebhookForm({ name: "", url: "", description: "" });
+      setEditingItem(null);
+      setIsDialogOpen(false);
+      loadData();
+    } catch (error) {
+      console.error('Erro ao salvar webhook:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar webhook.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveAnnouncement = async () => {
+    try {
+      if (editingItem) {
+        const { error } = await supabase
+          .from('announcements')
+          .update(announcementForm)
+          .eq('id', editingItem.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('announcements')
+          .insert([announcementForm]);
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Aviso salvo com sucesso!",
+        description: "O aviso foi publicado para os usuários.",
+      });
+
+      setAnnouncementForm({ title: "", content: "" });
+      setEditingItem(null);
+      setIsDialogOpen(false);
+      loadData();
+    } catch (error) {
+      console.error('Erro ao salvar aviso:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar aviso.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveCommission = async () => {
+    try {
+      const commissionData = {
+        ...commissionForm,
+        commission_percentage: parseFloat(commissionForm.commission_percentage),
+        minimum_value: parseFloat(commissionForm.minimum_value)
+      };
+
+      if (editingItem) {
+        const { error } = await supabase
+          .from('commission_rules')
+          .update(commissionData)
+          .eq('id', editingItem.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('commission_rules')
+          .insert([commissionData]);
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Regra de comissão salva!",
+        description: "As regras foram atualizadas.",
+      });
+
+      setCommissionForm({
+        product_name: "",
+        commission_percentage: "",
+        minimum_value: "50.00",
+        description: ""
+      });
+      setEditingItem(null);
+      setIsDialogOpen(false);
+      loadData();
+    } catch (error) {
+      console.error('Erro ao salvar regra:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar regra de comissão.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleActive = async (table: 'webhooks' | 'announcements' | 'commission_rules', id: number, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from(table)
+        .update({ is_active: !currentStatus })
+        .eq('id', id);
+
+      if (error) throw error;
+      loadData();
+    } catch (error) {
+      console.error('Erro ao alterar status:', error);
+    }
+  };
+
+  const deleteItem = async (table: 'webhooks' | 'announcements' | 'commission_rules', id: number) => {
+    try {
+      const { error } = await supabase
+        .from(table)
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      toast({
+        title: "Item excluído",
+        description: "O item foi removido com sucesso.",
+      });
+      loadData();
+    } catch (error) {
+      console.error('Erro ao excluir:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir item.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const startEdit = (item: any, type: string) => {
+    setEditingItem(item);
+    if (type === 'webhook') {
+      setWebhookForm({
+        name: item.name,
+        url: item.url,
+        description: item.description
+      });
+      setActiveTab('webhooks');
+    } else if (type === 'announcement') {
+      setAnnouncementForm({
+        title: item.title,
+        content: item.content
+      });
+      setActiveTab('announcements');
+    } else if (type === 'commission') {
+      setCommissionForm({
+        product_name: item.product_name,
+        commission_percentage: item.commission_percentage.toString(),
+        minimum_value: item.minimum_value.toString(),
+        description: item.description
+      });
+      setActiveTab('commissions');
+    }
+    setIsDialogOpen(true);
+  };
+
+  return (
+    <div className="p-4 md:p-6 space-y-6 pb-20 md:pb-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+            Painel Administrativo
+          </h1>
+          <p className="text-muted-foreground">
+            Gerencie webhooks, avisos e comissões do sistema
+          </p>
+        </div>
+        <Settings className="h-8 w-8 text-primary" />
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
+          <TabsTrigger value="announcements">Avisos</TabsTrigger>
+          <TabsTrigger value="commissions">Comissões</TabsTrigger>
+        </TabsList>
+
+        {/* Webhooks Tab */}
+        <TabsContent value="webhooks" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Webhooks</h2>
+            <Dialog open={isDialogOpen && activeTab === 'webhooks'} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={() => {
+                  setEditingItem(null);
+                  setWebhookForm({ name: "", url: "", description: "" });
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Webhook
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingItem ? 'Editar Webhook' : 'Novo Webhook'}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="webhook-name">Nome *</Label>
+                    <Input
+                      id="webhook-name"
+                      placeholder="withdrawal_request, client_indication..."
+                      value={webhookForm.name}
+                      onChange={(e) => setWebhookForm({ ...webhookForm, name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="webhook-url">URL *</Label>
+                    <Input
+                      id="webhook-url"
+                      placeholder="https://..."
+                      value={webhookForm.url}
+                      onChange={(e) => setWebhookForm({ ...webhookForm, url: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="webhook-desc">Descrição</Label>
+                    <Textarea
+                      id="webhook-desc"
+                      placeholder="Descrição do webhook..."
+                      value={webhookForm.description}
+                      onChange={(e) => setWebhookForm({ ...webhookForm, description: e.target.value })}
+                    />
+                  </div>
+                  <Button onClick={handleSaveWebhook} className="w-full">
+                    <Save className="h-4 w-4 mr-2" />
+                    Salvar
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <div className="grid gap-4">
+            {webhooks.map((webhook) => (
+              <Card key={webhook.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Webhook className="h-4 w-4 text-primary" />
+                        <h3 className="font-medium">{webhook.name}</h3>
+                        <Badge variant={webhook.is_active ? "default" : "secondary"}>
+                          {webhook.is_active ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-1">{webhook.url}</p>
+                      {webhook.description && (
+                        <p className="text-xs text-muted-foreground">{webhook.description}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => startEdit(webhook, 'webhook')}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={webhook.is_active ? "secondary" : "default"}
+                        onClick={() => toggleActive('webhooks', webhook.id, webhook.is_active)}
+                      >
+                        {webhook.is_active ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => deleteItem('webhooks', webhook.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Announcements Tab */}
+        <TabsContent value="announcements" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Avisos</h2>
+            <Dialog open={isDialogOpen && activeTab === 'announcements'} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={() => {
+                  setEditingItem(null);
+                  setAnnouncementForm({ title: "", content: "" });
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Aviso
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingItem ? 'Editar Aviso' : 'Novo Aviso'}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="announcement-title">Título *</Label>
+                    <Input
+                      id="announcement-title"
+                      placeholder="Título do aviso..."
+                      value={announcementForm.title}
+                      onChange={(e) => setAnnouncementForm({ ...announcementForm, title: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="announcement-content">Conteúdo *</Label>
+                    <Textarea
+                      id="announcement-content"
+                      placeholder="Conteúdo do aviso..."
+                      value={announcementForm.content}
+                      onChange={(e) => setAnnouncementForm({ ...announcementForm, content: e.target.value })}
+                      className="min-h-[120px]"
+                    />
+                  </div>
+                  <Button onClick={handleSaveAnnouncement} className="w-full">
+                    <Save className="h-4 w-4 mr-2" />
+                    Salvar
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <div className="grid gap-4">
+            {announcements.map((announcement) => (
+              <Card key={announcement.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Megaphone className="h-4 w-4 text-primary" />
+                        <h3 className="font-medium">{announcement.title}</h3>
+                        <Badge variant={announcement.is_active ? "default" : "secondary"}>
+                          {announcement.is_active ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-2">{announcement.content}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(announcement.created_at).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => startEdit(announcement, 'announcement')}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={announcement.is_active ? "secondary" : "default"}
+                        onClick={() => toggleActive('announcements', announcement.id, announcement.is_active)}
+                      >
+                        {announcement.is_active ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => deleteItem('announcements', announcement.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Commissions Tab */}
+        <TabsContent value="commissions" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Regras de Comissão</h2>
+            <Dialog open={isDialogOpen && activeTab === 'commissions'} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={() => {
+                  setEditingItem(null);
+                  setCommissionForm({
+                    product_name: "",
+                    commission_percentage: "",
+                    minimum_value: "50.00",
+                    description: ""
+                  });
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nova Regra
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingItem ? 'Editar Regra' : 'Nova Regra de Comissão'}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="product-name">Produto *</Label>
+                    <Input
+                      id="product-name"
+                      placeholder="Nome do produto..."
+                      value={commissionForm.product_name}
+                      onChange={(e) => setCommissionForm({ ...commissionForm, product_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="commission-pct">Comissão (%) *</Label>
+                      <Input
+                        id="commission-pct"
+                        type="number"
+                        step="0.01"
+                        placeholder="3.00"
+                        value={commissionForm.commission_percentage}
+                        onChange={(e) => setCommissionForm({ ...commissionForm, commission_percentage: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="min-value">Valor Mínimo</Label>
+                      <Input
+                        id="min-value"
+                        type="number"
+                        step="0.01"
+                        placeholder="50.00"
+                        value={commissionForm.minimum_value}
+                        onChange={(e) => setCommissionForm({ ...commissionForm, minimum_value: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="commission-desc">Descrição</Label>
+                    <Textarea
+                      id="commission-desc"
+                      placeholder="Descrição da regra..."
+                      value={commissionForm.description}
+                      onChange={(e) => setCommissionForm({ ...commissionForm, description: e.target.value })}
+                    />
+                  </div>
+                  <Button onClick={handleSaveCommission} className="w-full">
+                    <Save className="h-4 w-4 mr-2" />
+                    Salvar
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <div className="grid gap-4">
+            {commissionRules.map((rule) => (
+              <Card key={rule.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Percent className="h-4 w-4 text-primary" />
+                        <h3 className="font-medium">{rule.product_name}</h3>
+                        <Badge variant={rule.is_active ? "default" : "secondary"}>
+                          {rule.is_active ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-1">
+                        Comissão: {rule.commission_percentage}% | Mínimo: R$ {rule.minimum_value}
+                      </p>
+                      {rule.description && (
+                        <p className="text-xs text-muted-foreground">{rule.description}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => startEdit(rule, 'commission')}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={rule.is_active ? "secondary" : "default"}
+                        onClick={() => toggleActive('commission_rules', rule.id, rule.is_active)}
+                      >
+                        {rule.is_active ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => deleteItem('commission_rules', rule.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

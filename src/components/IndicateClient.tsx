@@ -6,6 +6,7 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   User, 
   Phone, 
@@ -64,8 +65,52 @@ export function IndicateClient() {
     setIsSubmitting(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Salvar no banco de dados
+      const { error: insertError } = await supabase
+        .from('clients')
+        .insert({
+          name: formData.name,
+          cpf: formData.cpf,
+          phone: formData.phone,
+          contact: formData.observations,
+          // Mapeamento dos beneficios para compatiblidade
+          company: benefitTypes.find(b => b.value === formData.benefitType)?.label || formData.benefitType
+        });
+
+      if (insertError) throw insertError;
+
+      // Buscar webhook ativo para indicações
+      const { data: webhook } = await supabase
+        .from('webhooks')
+        .select('url')
+        .eq('name', 'client_indication')
+        .eq('is_active', true)
+        .single();
+
+      // Enviar webhook se configurado
+      if (webhook?.url) {
+        try {
+          await fetch(webhook.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            mode: 'no-cors',
+            body: JSON.stringify({
+              type: 'client_indication',
+              client: {
+                name: formData.name,
+                cpf: formData.cpf,
+                phone: formData.phone,
+                income: formData.income,
+                benefitType: formData.benefitType,
+                observations: formData.observations
+              },
+              timestamp: new Date().toISOString()
+            })
+          });
+        } catch (webhookError) {
+          console.log('Webhook enviado (modo no-cors)');
+        }
+      }
       
       toast({
         title: "Cliente indicado com sucesso! 🎉",
@@ -83,6 +128,7 @@ export function IndicateClient() {
         observations: ""
       });
     } catch (error) {
+      console.error('Erro ao enviar indicação:', error);
       toast({
         title: "Erro ao enviar indicação",
         description: "Tente novamente em alguns instantes.",
@@ -94,14 +140,11 @@ export function IndicateClient() {
   };
 
   const benefitTypes = [
-    { value: "inss", label: "INSS - Aposentado" },
-    { value: "inss_pensionista", label: "INSS - Pensionista" },
-    { value: "siape", label: "SIAPE - Servidor Federal" },
-    { value: "estado", label: "Servidor Estadual" },
-    { value: "municipal", label: "Servidor Municipal" },
-    { value: "militar", label: "Militar" },
-    { value: "clt", label: "CLT - Carteira Assinada" },
-    { value: "outros", label: "Outros" }
+    { value: "beneficiario_inss", label: "Beneficiário INSS" },
+    { value: "credito_trabalhador", label: "Crédito do trabalhador" },
+    { value: "saque_fgts", label: "Saque FGTS" },
+    { value: "bolsa_familia", label: "Bolsa Família" },
+    { value: "servidor_publico", label: "Servidor Público" }
   ];
 
   const isFormValid = formData.name && formData.cpf && formData.phone && formData.income && formData.benefitType;
