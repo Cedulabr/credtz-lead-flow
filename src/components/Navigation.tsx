@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { Home, Users, TrendingUp, DollarSign, Bell, Menu, X } from "lucide-react";
+import { Home, Users, TrendingUp, DollarSign, Bell, Menu, X, LogOut, User } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 import credtzLogo from "@/assets/credtz-logo.png";
 
 interface NavigationProps {
@@ -19,6 +21,12 @@ const navItems = [
 
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, profile, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success("Signed out successfully");
+  };
 
   return (
     <>
@@ -104,15 +112,32 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         </nav>
 
         <div className="p-4 border-t">
-          <div className="bg-gradient-to-r from-primary/10 to-success/10 rounded-lg p-4">
-            <p className="text-sm font-medium text-foreground">Seja Premium</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Acesse leads exclusivos
-            </p>
-            <Button size="sm" className="mt-3 w-full">
-              Upgrade
-            </Button>
-          </div>
+          {user && (
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2 text-sm">
+                <User className="h-4 w-4" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">
+                    {profile?.name || user.email}
+                  </p>
+                  {profile?.role && (
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {profile.role}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSignOut}
+                className="w-full justify-start"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 

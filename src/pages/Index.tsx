@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Navigation } from "@/components/Navigation";
 import { Dashboard } from "@/components/Dashboard";
 import { IndicateClient } from "@/components/IndicateClient";
@@ -6,12 +7,49 @@ import { LeadsManagement } from "@/components/LeadsManagement";
 import { Commissions } from "@/components/Commissions";
 import { Notifications } from "@/components/Notifications";
 import { Button } from "@/components/ui/button";
-import { Database } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Database, LogIn } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/auth");
+    }
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
+          <p className="text-lg text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl font-bold text-foreground">
+            Welcome to <span className="text-primary">Credtz</span>
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Please sign in to access your dashboard
+          </p>
+          <Button onClick={() => navigate("/auth")} className="mt-4">
+            <LogIn className="mr-2 h-4 w-4" />
+            Sign In
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const renderActiveComponent = () => {
     switch (activeTab) {
