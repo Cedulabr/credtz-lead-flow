@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import credtzLogo from '@/assets/credtz-logo.png';
 
 const Auth = () => {
@@ -44,18 +45,29 @@ const Auth = () => {
     setLoading(false);
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleInvitationRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    const { error } = await signUp(email, password, name);
-    
-    if (error) {
+    try {
+      const { error } = await supabase.functions.invoke('send-invitation-request', {
+        body: {
+          name,
+          email,
+          company: password, // Using password field for company
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success('Invitation request sent successfully! You will be contacted soon.');
+      setName('');
+      setEmail('');
+      setPassword('');
+    } catch (error: any) {
       setError(error.message);
-      toast.error('Registration failed: ' + error.message);
-    } else {
-      toast.success('Registration successful! Please check your email to confirm your account.');
+      toast.error('Failed to send invitation request: ' + error.message);
     }
     
     setLoading(false);
@@ -89,8 +101,8 @@ const Auth = () => {
           <CardContent>
             <Tabs defaultValue="signin" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+                <TabsTrigger value="signin">Login</TabsTrigger>
+                <TabsTrigger value="invitation">Request Invitation</TabsTrigger>
               </TabsList>
               
               <TabsContent value="signin" className="space-y-4">
@@ -130,23 +142,24 @@ const Auth = () => {
                 </form>
               </TabsContent>
               
-              <TabsContent value="signup" className="space-y-4">
-                <form onSubmit={handleSignUp} className="space-y-4">
+              <TabsContent value="invitation" className="space-y-4">
+                <form onSubmit={handleInvitationRequest} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-name">Full Name</Label>
+                    <Label htmlFor="invitation-name">Full Name</Label>
                     <Input
-                      id="signup-name"
+                      id="invitation-name"
                       type="text"
                       placeholder="Enter your full name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
+                      required
                       disabled={loading}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
+                    <Label htmlFor="invitation-email">Email</Label>
                     <Input
-                      id="signup-email"
+                      id="invitation-email"
                       type="email"
                       placeholder="Enter your email"
                       value={email}
@@ -156,14 +169,13 @@ const Auth = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
+                    <Label htmlFor="invitation-company">Company/Organization</Label>
                     <Input
-                      id="signup-password"
-                      type="password"
-                      placeholder="Create a password"
+                      id="invitation-company"
+                      type="text"
+                      placeholder="Enter your company name"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      required
                       disabled={loading}
                     />
                   </div>
@@ -173,10 +185,10 @@ const Auth = () => {
                     </Alert>
                   )}
                   <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? 'Creating account...' : 'Sign Up'}
+                    {loading ? 'Sending request...' : 'Request Invitation'}
                   </Button>
                   <p className="text-xs text-muted-foreground text-center">
-                    Registration requires a valid invitation. Contact your administrator if you don't have access.
+                    Your invitation request will be reviewed by an administrator.
                   </p>
                 </form>
               </TabsContent>
