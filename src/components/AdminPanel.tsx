@@ -7,7 +7,9 @@ import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Settings, 
@@ -18,7 +20,8 @@ import {
   Edit,
   Trash2,
   Save,
-  X
+  X,
+  Users
 } from "lucide-react";
 
 interface Webhook {
@@ -48,6 +51,7 @@ interface CommissionRule {
 
 export function AdminPanel() {
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
@@ -72,6 +76,15 @@ export function AdminPanel() {
     commission_percentage: "",
     minimum_value: "50.00",
     description: ""
+  });
+
+  const [userForm, setUserForm] = useState({
+    company: "",
+    level: "home_office_junior",
+    name: "",
+    email: "",
+    password: "",
+    pix_key: "",
   });
 
   useEffect(() => {
@@ -285,12 +298,13 @@ export function AdminPanel() {
         <Settings className="h-8 w-8 text-primary" />
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
-          <TabsTrigger value="announcements">Avisos</TabsTrigger>
-          <TabsTrigger value="commissions">Comissões</TabsTrigger>
-        </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'}`}>
+            <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
+            <TabsTrigger value="announcements">Avisos</TabsTrigger>
+            <TabsTrigger value="commissions">Comissões</TabsTrigger>
+            {isAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
+          </TabsList>
 
         {/* Webhooks Tab */}
         <TabsContent value="webhooks" className="space-y-4">
@@ -620,6 +634,110 @@ export function AdminPanel() {
             ))}
           </div>
         </TabsContent>
+
+        {/* Users Management Tab */}
+        {isAdmin && (
+          <TabsContent value="users" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" /> Gerenciar Usuários
+              </h2>
+            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Criar novo usuário</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Empresa</Label>
+                    <Input
+                      placeholder="Nome da empresa"
+                      value={userForm.company}
+                      onChange={(e) => setUserForm({ ...userForm, company: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Nível da empresa</Label>
+                    <Select
+                      value={userForm.level}
+                      onValueChange={(val) => setUserForm({ ...userForm, level: val })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o nível" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="home_office_senior">Home office Senior</SelectItem>
+                        <SelectItem value="home_office_junior">Home office Junior</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Nome do usuário</Label>
+                    <Input
+                      placeholder="Nome completo"
+                      value={userForm.name}
+                      onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      placeholder="email@exemplo.com"
+                      value={userForm.email}
+                      onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Senha</Label>
+                    <Input
+                      type="password"
+                      placeholder="Defina uma senha temporária"
+                      value={userForm.password}
+                      onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Chave Pix</Label>
+                    <Input
+                      placeholder="Informe a chave Pix"
+                      value={userForm.pix_key}
+                      onChange={(e) => setUserForm({ ...userForm, pix_key: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <Button
+                  onClick={async () => {
+                    try {
+                      const { error } = await supabase.functions.invoke('admin-create-user', {
+                        body: {
+                          company: userForm.company,
+                          level: userForm.level,
+                          name: userForm.name,
+                          email: userForm.email,
+                          password: userForm.password,
+                          pix_key: userForm.pix_key,
+                        },
+                      });
+                      if (error) throw error;
+                      toast({
+                        title: 'Usuário criado com sucesso!',
+                        description: 'O novo usuário já pode acessar a plataforma.',
+                      });
+                      setUserForm({ company: '', level: 'home_office_junior', name: '', email: '', password: '', pix_key: '' });
+                    } catch (err: any) {
+                      console.error('Erro ao criar usuário:', err);
+                      toast({ title: 'Erro', description: err.message || 'Não foi possível criar o usuário.', variant: 'destructive' });
+                    }
+                  }}
+                >
+                  Criar usuário
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

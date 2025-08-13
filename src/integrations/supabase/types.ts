@@ -335,6 +335,207 @@ export type Database = {
           },
         ]
       }
+      invitation_requests: {
+        Row: {
+          company: string | null
+          created_at: string
+          email: string
+          id: string
+          name: string
+          processed_at: string | null
+          processed_by_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          processed_at?: string | null
+          processed_by_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          processed_at?: string | null
+          processed_by_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      invitations: {
+        Row: {
+          accepted_at: string | null
+          email: string
+          expires_at: string | null
+          id: string
+          invited_at: string | null
+          invited_by: string | null
+          is_used: boolean | null
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          accepted_at?: string | null
+          email: string
+          expires_at?: string | null
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          is_used?: boolean | null
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          accepted_at?: string | null
+          email?: string
+          expires_at?: string | null
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          is_used?: boolean | null
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_activities: {
+        Row: {
+          activity_type: string
+          created_at: string | null
+          created_by: string | null
+          description: string
+          id: string
+          lead_id: string
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string | null
+          created_by?: string | null
+          description: string
+          id?: string
+          lead_id: string
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string
+          id?: string
+          lead_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_activities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_attachments: {
+        Row: {
+          created_at: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          lead_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          lead_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          lead_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_attachments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          assigned_to: string | null
+          banco_operacao: string | null
+          cpf: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          name: string
+          origem_lead: string | null
+          phone: string
+          priority: string | null
+          stage: string | null
+          updated_at: string | null
+          valor_operacao: number | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          banco_operacao?: string | null
+          cpf: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          name: string
+          origem_lead?: string | null
+          phone: string
+          priority?: string | null
+          stage?: string | null
+          updated_at?: string | null
+          valor_operacao?: number | null
+        }
+        Update: {
+          assigned_to?: string | null
+          banco_operacao?: string | null
+          cpf?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          name?: string
+          origem_lead?: string | null
+          phone?: string
+          priority?: string | null
+          stage?: string | null
+          updated_at?: string | null
+          valor_operacao?: number | null
+        }
+        Relationships: []
+      }
       organizations: {
         Row: {
           address: string | null
@@ -403,28 +604,40 @@ export type Database = {
       }
       profiles: {
         Row: {
+          company: string | null
           created_at: string | null
+          email: string | null
           id: string
+          level: Database["public"]["Enums"]["user_level"] | null
           name: string | null
           organization_id: number | null
+          pix_key: string | null
           role: Database["public"]["Enums"]["app_role"]
           sector: string | null
           updated_at: string | null
         }
         Insert: {
+          company?: string | null
           created_at?: string | null
+          email?: string | null
           id: string
+          level?: Database["public"]["Enums"]["user_level"] | null
           name?: string | null
           organization_id?: number | null
+          pix_key?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           sector?: string | null
           updated_at?: string | null
         }
         Update: {
+          company?: string | null
           created_at?: string | null
+          email?: string | null
           id?: string
+          level?: Database["public"]["Enums"]["user_level"] | null
           name?: string | null
           organization_id?: number | null
+          pix_key?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           sector?: string | null
           updated_at?: string | null
@@ -441,6 +654,7 @@ export type Database = {
           cpf: string | null
           created_at: string | null
           created_by_id: string | null
+          data_criacao: string | null
           id: number
           installments: number | null
           "Nome do cliente": string | null
@@ -463,6 +677,7 @@ export type Database = {
           cpf?: string | null
           created_at?: string | null
           created_by_id?: string | null
+          data_criacao?: string | null
           id?: number
           installments?: number | null
           "Nome do cliente"?: string | null
@@ -485,6 +700,7 @@ export type Database = {
           cpf?: string | null
           created_at?: string | null
           created_by_id?: string | null
+          data_criacao?: string | null
           id?: number
           installments?: number | null
           "Nome do cliente"?: string | null
@@ -694,6 +910,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_admin_profile: {
+        Args: { user_email: string; user_name?: string }
+        Returns: string
+      }
       get_complete_schema: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -708,6 +928,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "partner"
+      user_level: "home_office_senior" | "home_office_junior"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -836,6 +1057,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "partner"],
+      user_level: ["home_office_senior", "home_office_junior"],
     },
   },
 } as const
