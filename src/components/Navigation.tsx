@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, Users, TrendingUp, DollarSign, Bell, Menu, X, LogOut, User } from "lucide-react";
+import { Home, Users, TrendingUp, DollarSign, Bell, Menu, X, LogOut, User, Settings } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,7 +21,7 @@ const navItems = [
 
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, isAdmin } = useAuth();
 
   const handleSignOut = async () => {
     await signOut();
@@ -74,6 +74,18 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                 </button>
               );
             })}
+            {isAdmin && (
+              <button
+                onClick={() => {
+                  window.location.href = '/admin';
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-muted-foreground hover:bg-muted"
+              >
+                <Settings size={20} />
+                <span>Admin</span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -109,6 +121,16 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
               </Button>
             );
           })}
+          {isAdmin && (
+            <Button
+              variant="ghost"
+              onClick={() => window.location.href = '/admin'}
+              className="w-full justify-start space-x-3"
+            >
+              <Settings size={20} />
+              <span>Admin</span>
+            </Button>
+          )}
         </nav>
 
         <div className="p-4 border-t">
