@@ -6,6 +6,7 @@ import { IndicateClient } from "@/components/IndicateClient";
 import { LeadsManagement } from "@/components/LeadsManagement";
 import { Commissions } from "@/components/Commissions";
 import { Notifications } from "@/components/Notifications";
+import { AdminTest } from "@/components/AdminTest";
 import { Button } from "@/components/ui/button";
 import { Database, LogIn } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -76,6 +77,9 @@ const Index = () => {
           {renderActiveComponent()}
         </main>
       </div>
+      
+      {/* Admin Test Panel - visible on main page for debugging */}
+      <AdminTest />
       
       {/* Botão flutuante para teste do banco */}
       <div className="fixed bottom-20 md:bottom-6 right-6 z-40">
