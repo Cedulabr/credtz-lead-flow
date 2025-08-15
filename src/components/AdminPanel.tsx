@@ -55,6 +55,7 @@ export function AdminPanel() {
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
+  const [banks, setBanks] = useState<any[]>([]);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("webhooks");
@@ -72,6 +73,7 @@ export function AdminPanel() {
   });
 
   const [commissionForm, setCommissionForm] = useState({
+    bank_name: "",
     product_name: "",
     commission_percentage: "",
     minimum_value: "50.00",
@@ -93,15 +95,17 @@ export function AdminPanel() {
 
   const loadData = async () => {
     try {
-      const [webhooksRes, announcementsRes, commissionsRes] = await Promise.all([
+      const [webhooksRes, announcementsRes, commissionsRes, banksRes] = await Promise.all([
         supabase.from('webhooks').select('*').order('created_at', { ascending: false }),
         supabase.from('announcements').select('*').order('created_at', { ascending: false }),
-        supabase.from('commission_rules').select('*').order('created_at', { ascending: false })
+        supabase.from('commission_rules').select('*').order('created_at', { ascending: false }),
+        supabase.from('banks').select('*').order('name')
       ]);
 
       if (webhooksRes.data) setWebhooks(webhooksRes.data);
       if (announcementsRes.data) setAnnouncements(announcementsRes.data);
       if (commissionsRes.data) setCommissionRules(commissionsRes.data);
+      if (banksRes.data) setBanks(banksRes.data);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     }
@@ -202,6 +206,7 @@ export function AdminPanel() {
       });
 
       setCommissionForm({
+        bank_name: "",
         product_name: "",
         commission_percentage: "",
         minimum_value: "50.00",
@@ -274,6 +279,7 @@ export function AdminPanel() {
       setActiveTab('announcements');
     } else if (type === 'commission') {
       setCommissionForm({
+        bank_name: item.bank_name || "",
         product_name: item.product_name,
         commission_percentage: item.commission_percentage.toString(),
         minimum_value: item.minimum_value.toString(),
@@ -517,6 +523,7 @@ export function AdminPanel() {
                 <Button onClick={() => {
                   setEditingItem(null);
                   setCommissionForm({
+                    bank_name: "",
                     product_name: "",
                     commission_percentage: "",
                     minimum_value: "50.00",
@@ -534,6 +541,21 @@ export function AdminPanel() {
                   </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="bank-name">Banco *</Label>
+                    <Select value={commissionForm.bank_name} onValueChange={(value) => setCommissionForm({ ...commissionForm, bank_name: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o banco" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {banks.map(bank => (
+                          <SelectItem key={bank.id} value={bank.name}>
+                            {bank.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div>
                     <Label htmlFor="product-name">Produto *</Label>
                     <Select value={commissionForm.product_name} onValueChange={(value) => setCommissionForm({ ...commissionForm, product_name: value })}>
