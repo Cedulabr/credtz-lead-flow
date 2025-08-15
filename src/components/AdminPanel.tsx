@@ -536,12 +536,18 @@ export function AdminPanel() {
                 <div className="space-y-4">
                   <div>
                     <Label htmlFor="product-name">Produto *</Label>
-                    <Input
-                      id="product-name"
-                      placeholder="Nome do produto..."
-                      value={commissionForm.product_name}
-                      onChange={(e) => setCommissionForm({ ...commissionForm, product_name: e.target.value })}
-                    />
+                    <Select value={commissionForm.product_name} onValueChange={(value) => setCommissionForm({ ...commissionForm, product_name: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o produto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['Novo', 'Refinanciamento', 'Portabilidade', 'Refinanciamento da Portabilidade', 'Cartão de Crédito', 'Saque Complementar'].map(product => (
+                          <SelectItem key={product} value={product}>
+                            {product}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
