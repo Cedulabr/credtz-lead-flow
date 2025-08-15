@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { AdminCommissionEdit } from "./AdminCommissionEdit";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -377,77 +378,7 @@ export function Commissions() {
         </Card>
       </div>
 
-      {/* Seleção de Banco e Produto */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            Parâmetros de Comissão
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <Label htmlFor="bank">Banco/Instituição</Label>
-              <Select value={selectedBank} onValueChange={setSelectedBank}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o banco" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from(new Set(banksProducts.map(bp => bp.bank_name))).map(bank => (
-                    <SelectItem key={bank} value={bank}>{bank}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="product">Produto</Label>
-              <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={!selectedBank}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o produto" />
-                </SelectTrigger>
-                <SelectContent>
-                  {banksProducts
-                    .filter(bp => bp.bank_name === selectedBank)
-                    .map(bp => (
-                      <SelectItem key={bp.id} value={bp.product_name}>
-                        {bp.product_name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          {selectedBank && selectedProduct && (
-            <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-              {banksProducts
-                .filter(bp => bp.bank_name === selectedBank && bp.product_name === selectedProduct)
-                .map(bp => (
-                  <div key={bp.id} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">Prazo:</span>
-                      <span>{bp.term}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">Comissão Base:</span>
-                      <span>{bp.base_commission_percentage}%</span>
-                    </div>
-                    {selectedBank === 'Banco BRB' && (
-                      <div className="mt-2 p-2 bg-primary/10 rounded">
-                        <p className="text-sm text-primary-foreground">
-                          <strong>Banco BRB:</strong> Modalidades INSS e SIAPE disponíveis
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Action Buttons */}
+      {/* Action Buttons - Moved above Commission Parameters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <Dialog open={isWithdrawalDialogOpen} onOpenChange={setIsWithdrawalDialogOpen}>
           <DialogTrigger asChild>
@@ -497,19 +428,12 @@ export function Commissions() {
                 disabled={isSubmittingWithdrawal}
                 className="w-full"
               >
-                {isSubmittingWithdrawal ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Enviando...
-                  </div>
-                ) : (
-                  "Solicitar Saque"
-                )}
+                {isSubmittingWithdrawal ? "Processando..." : "Solicitar Saque"}
               </Button>
             </div>
           </DialogContent>
         </Dialog>
-        
+
         <Dialog open={isExtractDialogOpen} onOpenChange={setIsExtractDialogOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" className="flex-1">
@@ -547,19 +471,77 @@ export function Commissions() {
                 disabled={isSubmittingExtract}
                 className="w-full"
               >
-                {isSubmittingExtract ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Enviando...
-                  </div>
-                ) : (
-                  "Gerar Extrato"
-                )}
+                {isSubmittingExtract ? "Processando..." : "Solicitar Extrato"}
               </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Seleção de Banco e Produto */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Parâmetros de Comissão
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <Label htmlFor="bank">Banco/Instituição</Label>
+              <Select value={selectedBank} onValueChange={setSelectedBank}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o banco" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from(new Set(banksProducts.map(bp => bp.bank_name))).map(bank => (
+                    <SelectItem key={bank} value={bank}>{bank}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="product">Produto</Label>
+              <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={!selectedBank}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o produto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {banksProducts
+                    .filter(bp => bp.bank_name === selectedBank)
+                    .map(bp => (
+                      <SelectItem key={bp.id} value={bp.product_name}>
+                        {bp.product_name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {selectedBank && selectedProduct && (
+            <AdminCommissionEdit 
+              selectedBank={selectedBank}
+              selectedProduct={selectedProduct}
+              banksProducts={banksProducts}
+              onUpdate={() => {
+                // Recarregar dados após atualização
+                const loadData = async () => {
+                  const { data: banksProductsData } = await supabase
+                    .from('banks_products')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('bank_name, product_name');
+                  if (banksProductsData) setBanksProducts(banksProductsData);
+                };
+                loadData();
+              }}
+            />
+          )}
+        </CardContent>
+      </Card>
+
 
       {/* Commissions Table */}
       <Card>
