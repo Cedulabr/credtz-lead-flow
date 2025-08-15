@@ -25,8 +25,7 @@ export function IndicateClient() {
     name: "",
     cpf: "",
     phone: "",
-    income: "",
-    benefitType: "",
+    convenio: "",
     observations: ""
   });
 
@@ -73,8 +72,7 @@ export function IndicateClient() {
           cpf: formData.cpf,
           phone: formData.phone,
           contact: formData.observations,
-          // Mapeamento dos beneficios para compatiblidade
-          company: benefitTypes.find(b => b.value === formData.benefitType)?.label || formData.benefitType
+          convenio: formData.convenio
         });
 
       if (insertError) throw insertError;
@@ -100,8 +98,7 @@ export function IndicateClient() {
                 name: formData.name,
                 cpf: formData.cpf,
                 phone: formData.phone,
-                income: formData.income,
-                benefitType: formData.benefitType,
+                convenio: formData.convenio,
                 observations: formData.observations
               },
               timestamp: new Date().toISOString()
@@ -123,8 +120,7 @@ export function IndicateClient() {
         name: "",
         cpf: "",
         phone: "",
-        income: "",
-        benefitType: "",
+        convenio: "",
         observations: ""
       });
     } catch (error) {
@@ -147,7 +143,7 @@ export function IndicateClient() {
     { value: "servidor_publico", label: "Servidor Público" }
   ];
 
-  const isFormValid = formData.name && formData.cpf && formData.phone && formData.income && formData.benefitType;
+  const isFormValid = formData.name && formData.cpf && formData.phone;
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6">
@@ -218,44 +214,25 @@ export function IndicateClient() {
                 </div>
               </div>
 
-              {/* Financial Info */}
+              {/* Convenio Info */}
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="income">Renda Aproximada *</Label>
-                    <Input
-                      id="income"
-                      type="text"
-                      placeholder="R$ 0,00"
-                      value={formData.income}
-                      onChange={(e) => {
-                        const formatted = formatCurrency(e.target.value);
-                        handleInputChange("income", formatted);
-                      }}
-                      className="mt-2"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="benefitType">Tipo de Benefício *</Label>
-                    <Select
-                      value={formData.benefitType}
-                      onValueChange={(value) => handleInputChange("benefitType", value)}
-                      required
-                    >
-                      <SelectTrigger className="mt-2">
-                        <SelectValue placeholder="Selecione o tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {benefitTypes.map((benefit) => (
-                          <SelectItem key={benefit.value} value={benefit.value}>
-                            {benefit.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div>
+                  <Label htmlFor="convenio">Convênio (Opcional)</Label>
+                  <Select
+                    value={formData.convenio}
+                    onValueChange={(value) => handleInputChange("convenio", value)}
+                  >
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Selecione o convênio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {benefitTypes.map((benefit) => (
+                        <SelectItem key={benefit.value} value={benefit.value}>
+                          {benefit.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

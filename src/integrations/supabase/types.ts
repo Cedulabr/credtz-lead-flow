@@ -80,49 +80,49 @@ export type Database = {
       clients: {
         Row: {
           birth_date: string | null
-          company: string | null
           contact: string | null
+          convenio: string | null
           convenio_id: number | null
-          cpf: string | null
+          cpf: string
           created_at: string | null
           created_by_id: string | null
           email: string | null
           id: number
           name: string
           organization_id: number | null
-          phone: string | null
+          phone: string
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
           birth_date?: string | null
-          company?: string | null
           contact?: string | null
+          convenio?: string | null
           convenio_id?: number | null
-          cpf?: string | null
+          cpf: string
           created_at?: string | null
           created_by_id?: string | null
           email?: string | null
           id?: number
           name: string
           organization_id?: number | null
-          phone?: string | null
+          phone: string
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
           birth_date?: string | null
-          company?: string | null
           contact?: string | null
+          convenio?: string | null
           convenio_id?: number | null
-          cpf?: string | null
+          cpf?: string
           created_at?: string | null
           created_by_id?: string | null
           email?: string | null
           id?: number
           name?: string
           organization_id?: number | null
-          phone?: string | null
+          phone?: string
           updated_at?: string | null
           user_id?: string | null
         }
