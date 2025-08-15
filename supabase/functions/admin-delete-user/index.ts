@@ -53,6 +53,30 @@ serve(async (req: Request) => {
     // Use service role to delete user
     const adminClient = createClient(supabaseUrl, serviceKey);
 
+    // First, update all related records to remove references to this user
+    // Update leads where this user is referenced
+    await adminClient
+      .from('leads')
+      .update({ created_by: null, assigned_to: null })
+      .or(`created_by.eq.${payload.user_id},assigned_to.eq.${payload.user_id}`);
+
+    // Update commissions where this user is referenced
+    await adminClient
+      .from('commissions')
+      .update({ user_id: null })
+      .eq('user_id', payload.user_id);
+
+    // Update other tables that might reference this user
+    await adminClient
+      .from('lead_activities')
+      .update({ created_by: null })
+      .eq('created_by', payload.user_id);
+
+    await adminClient
+      .from('lead_attachments')
+      .update({ uploaded_by: null })
+      .eq('uploaded_by', payload.user_id);
+
     // Delete user from auth (this will cascade to profiles table)
     const { error: deleteErr } = await adminClient.auth.admin.deleteUser(payload.user_id);
 
