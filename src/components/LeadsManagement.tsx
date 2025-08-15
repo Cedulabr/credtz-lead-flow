@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   Search, 
   Filter, 
@@ -18,149 +21,332 @@ import {
   DollarSign,
   Target,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Plus,
+  Users,
+  User
 } from "lucide-react";
+
+interface Lead {
+  id: string;
+  name: string;
+  cpf: string;
+  phone: string;
+  convenio: string;
+  status: string;
+  created_at: string;
+  assigned_to?: string;
+  created_by?: string;
+}
+
+interface LeadRequest {
+  convenio: string;
+  banco: string;
+  produto: string;
+  count: number;
+}
 
 export function LeadsManagement() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [priorityFilter, setPriorityFilter] = useState("all");
-
-  const [leads, setLeads] = useState([
-    {
-      id: 1,
-      name: "Maria Silva",
-      phone: "(11) 98765-4321",
-      city: "São Paulo - SP",
-      creditType: "Crédito Consignado INSS",
-      value: "R$ 15.000",
-      commission: "R$ 450",
-      status: "new",
-      priority: "alta",
-      deadline: "2 dias",
-      income: "R$ 3.200",
-      createdAt: "2024-01-15"
-    },
-    {
-      id: 2,
-      name: "João Santos",
-      phone: "(21) 99876-5432",
-      city: "Rio de Janeiro - RJ",
-      creditType: "Empréstimo Pessoal",
-      value: "R$ 8.000",
-      commission: "R$ 240",
-      status: "contacted",
-      priority: "média",
-      deadline: "1 dia",
-      income: "R$ 2.800",
-      createdAt: "2024-01-14"
-    },
-    {
-      id: 3,
-      name: "Ana Costa",
-      phone: "(31) 97654-3210",
-      city: "Belo Horizonte - MG",
-      creditType: "Crédito Imobiliário",
-      value: "R$ 120.000",
-      commission: "R$ 2.400",
-      status: "proposal_sent",
-      priority: "alta",
-      deadline: "5 dias",
-      income: "R$ 8.500",
-      createdAt: "2024-01-13"
-    },
-    {
-      id: 4,
-      name: "Carlos Oliveira",
-      phone: "(85) 96543-2109",
-      city: "Fortaleza - CE",
-      creditType: "Crédito Consignado",
-      value: "R$ 25.000",
-      commission: "R$ 750",
-      status: "approved",
-      priority: "alta",
-      deadline: "Finalizado",
-      income: "R$ 4.200",
-      createdAt: "2024-01-10"
-    },
-    {
-      id: 5,
-      name: "Lucia Ferreira",
-      phone: "(62) 95432-1098",
-      city: "Goiânia - GO",
-      creditType: "Empréstimo Pessoal",
-      value: "R$ 12.000",
-      commission: "R$ 360",
-      status: "rejected",
-      priority: "baixa",
-      deadline: "Finalizado",
-      income: "R$ 2.100",
-      createdAt: "2024-01-08"
-    }
-  ]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [dailyLimit, setDailyLimit] = useState(30);
+  const [remainingLeads, setRemainingLeads] = useState(30);
+  const [showRequestDialog, setShowRequestDialog] = useState(false);
+  const [leadRequest, setLeadRequest] = useState<LeadRequest>({
+    convenio: "",
+    banco: "",
+    produto: "",
+    count: 10
+  });
 
   const statusConfig = {
-    new: { label: "Novo", color: "bg-blue-500", textColor: "text-blue-700", bgColor: "bg-blue-50" },
-    contacted: { label: "Contatado", color: "bg-yellow-500", textColor: "text-yellow-700", bgColor: "bg-yellow-50" },
-    proposal_sent: { label: "Proposta Enviada", color: "bg-purple-500", textColor: "text-purple-700", bgColor: "bg-purple-50" },
-    approved: { label: "Aprovado", color: "bg-green-500", textColor: "text-green-700", bgColor: "bg-green-50" },
-    rejected: { label: "Recusado", color: "bg-red-500", textColor: "text-red-700", bgColor: "bg-red-50" }
+    new_lead: { label: "Novo Lead", color: "bg-blue-500", textColor: "text-blue-700", bgColor: "bg-blue-50" },
+    em_andamento: { label: "Em Andamento", color: "bg-yellow-500", textColor: "text-yellow-700", bgColor: "bg-yellow-50" },
+    aguardando_retorno: { label: "Aguardando Retorno", color: "bg-purple-500", textColor: "text-purple-700", bgColor: "bg-purple-50" },
+    cliente_fechado: { label: "Cliente Fechado", color: "bg-green-500", textColor: "text-green-700", bgColor: "bg-green-50" },
+    recusou_oferta: { label: "Recusou Oferta", color: "bg-red-500", textColor: "text-red-700", bgColor: "bg-red-50" },
+    contato_futuro: { label: "Contato Futuro", color: "bg-gray-500", textColor: "text-gray-700", bgColor: "bg-gray-50" }
   };
 
-  const priorityConfig = {
-    alta: { label: "Alta", color: "border-red-500 text-red-700" },
-    média: { label: "Média", color: "border-yellow-500 text-yellow-700" },
-    baixa: { label: "Baixa", color: "border-green-500 text-green-700" }
+  const conveniOptions = ["INSS", "SIAPE", "GOV BA"];
+  const bancoOptions = ["C6", "PAN", "Itaú", "Safra", "BMG", "Santander"];
+  const produtoOptions = ["Portabilidade", "Refinanciamento"];
+
+  useEffect(() => {
+    if (user) {
+      fetchLeads();
+      checkDailyLimit();
+    }
+  }, [user]);
+
+  const fetchLeads = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setLeads(data || []);
+    } catch (error) {
+      console.error('Error fetching leads:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar leads",
+        variant: "destructive",
+      });
+    }
   };
 
-  const updateLeadStatus = (leadId: number, newStatus: string) => {
-    setLeads(prev => prev.map(lead => 
-      lead.id === leadId ? { ...lead, status: newStatus } : lead
-    ));
+  const checkDailyLimit = async () => {
+    try {
+      const { data, error } = await supabase
+        .rpc('check_daily_lead_limit', { user_id_param: user?.id });
 
-    toast({
-      title: "Status atualizado!",
-      description: `Lead atualizado para: ${statusConfig[newStatus as keyof typeof statusConfig].label}`,
-    });
+      if (error) throw error;
+      setRemainingLeads(data || 0);
+    } catch (error) {
+      console.error('Error checking daily limit:', error);
+    }
+  };
+
+  const requestLeads = async () => {
+    if (!user) return;
+
+    if (leadRequest.count > remainingLeads) {
+      toast({
+        title: "Limite excedido",
+        description: `Você só pode solicitar ${remainingLeads} leads hoje.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .rpc('request_leads', {
+          convenio_filter: leadRequest.convenio || null,
+          banco_filter: leadRequest.banco || null,
+          produto_filter: leadRequest.produto || null,
+          leads_requested: leadRequest.count
+        });
+
+      if (error) throw error;
+
+      // Convert the returned leads to our format and insert into leads table
+      if (data && data.length > 0) {
+        const leadsToInsert = data.map((lead: any) => ({
+          name: lead.name,
+          cpf: lead.cpf,
+          phone: lead.phone,
+          convenio: lead.convenio,
+          status: 'new_lead',
+          created_by: user.id,
+          assigned_to: user.id,
+          origem_lead: 'Sistema - Solicitação',
+          banco_operacao: lead.banco,
+          valor_operacao: null
+        }));
+
+        const { error: insertError } = await supabase
+          .from('leads')
+          .insert(leadsToInsert);
+
+        if (insertError) throw insertError;
+
+        toast({
+          title: "Leads solicitados!",
+          description: `${data.length} leads foram adicionados à sua lista.`,
+        });
+
+        setShowRequestDialog(false);
+        fetchLeads();
+        checkDailyLimit();
+        
+        // Reset form
+        setLeadRequest({
+          convenio: "",
+          banco: "",
+          produto: "",
+          count: 10
+        });
+      } else {
+        toast({
+          title: "Nenhum lead encontrado",
+          description: "Não há leads disponíveis com esses filtros.",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Error requesting leads:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao solicitar leads",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateLeadStatus = async (leadId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ status: newStatus })
+        .eq('id', leadId);
+
+      if (error) throw error;
+
+      setLeads(prev => prev.map(lead => 
+        lead.id === leadId ? { ...lead, status: newStatus } : lead
+      ));
+
+      toast({
+        title: "Status atualizado!",
+        description: `Lead atualizado para: ${statusConfig[newStatus as keyof typeof statusConfig].label}`,
+      });
+    } catch (error) {
+      console.error('Error updating lead status:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar status do lead",
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredLeads = leads.filter(lead => {
     const matchesSearch = lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lead.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lead.creditType.toLowerCase().includes(searchTerm.toLowerCase());
+                         lead.cpf.includes(searchTerm) ||
+                         lead.phone.includes(searchTerm) ||
+                         lead.convenio.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || lead.status === statusFilter;
-    const matchesPriority = priorityFilter === "all" || lead.priority === priorityFilter;
     
-    return matchesSearch && matchesStatus && matchesPriority;
+    return matchesSearch && matchesStatus;
   });
 
   const stats = {
     total: leads.length,
-    new: leads.filter(l => l.status === "new").length,
-    inProgress: leads.filter(l => ["contacted", "proposal_sent"].includes(l.status)).length,
-    completed: leads.filter(l => ["approved", "rejected"].includes(l.status)).length,
-    totalCommission: leads
-      .filter(l => l.status === "approved")
-      .reduce((sum, lead) => sum + parseFloat(lead.commission.replace("R$ ", "").replace(".", "")), 0)
+    new: leads.filter(l => l.status === "new_lead").length,
+    inProgress: leads.filter(l => ["em_andamento", "aguardando_retorno"].includes(l.status)).length,
+    completed: leads.filter(l => ["cliente_fechado", "recusou_oferta"].includes(l.status)).length,
+    remaining: remainingLeads
   };
 
   return (
     <div className="p-4 md:p-6 space-y-6 pb-20 md:pb-6">
       {/* Header */}
       <div className="flex flex-col space-y-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-            Gerenciar Leads
-          </h1>
-          <p className="text-muted-foreground">
-            Acompanhe e gerencie suas oportunidades de negócio
-          </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              Gerenciar Leads
+            </h1>
+            <p className="text-muted-foreground">
+              Acompanhe e gerencie suas oportunidades de negócio
+            </p>
+          </div>
+          
+          <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
+            <DialogTrigger asChild>
+              <Button className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Solicitar Leads
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Solicitar Novos Leads</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="text-sm text-muted-foreground">
+                  Leads restantes hoje: <span className="font-semibold">{remainingLeads}</span>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Convênio</label>
+                  <Select value={leadRequest.convenio} onValueChange={(value) => 
+                    setLeadRequest(prev => ({ ...prev, convenio: value }))
+                  }>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o convênio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {conveniOptions.map(option => (
+                        <SelectItem key={option} value={option}>{option}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Banco</label>
+                  <Select value={leadRequest.banco} onValueChange={(value) => 
+                    setLeadRequest(prev => ({ ...prev, banco: value }))
+                  }>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o banco" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bancoOptions.map(option => (
+                        <SelectItem key={option} value={option}>{option}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Produto</label>
+                  <Select value={leadRequest.produto} onValueChange={(value) => 
+                    setLeadRequest(prev => ({ ...prev, produto: value }))
+                  }>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o produto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {produtoOptions.map(option => (
+                        <SelectItem key={option} value={option}>{option}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Quantidade</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max={remainingLeads}
+                    value={leadRequest.count}
+                    onChange={(e) => setLeadRequest(prev => ({ 
+                      ...prev, 
+                      count: Math.min(Number(e.target.value), remainingLeads) 
+                    }))}
+                    placeholder="Número de leads"
+                  />
+                </div>
+
+                <Button 
+                  onClick={requestLeads} 
+                  disabled={isLoading || remainingLeads === 0}
+                  className="w-full"
+                >
+                  {isLoading ? "Solicitando..." : "Solicitar Leads"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
             <CardContent className="p-4 text-center">
               <Target className="h-6 w-6 text-primary mx-auto mb-2" />
@@ -187,11 +373,17 @@ export function LeadsManagement() {
 
           <Card className="bg-gradient-to-br from-success/10 to-success/5">
             <CardContent className="p-4 text-center">
-              <DollarSign className="h-6 w-6 text-success mx-auto mb-2" />
-              <p className="text-2xl font-bold text-foreground">
-                R$ {stats.totalCommission.toLocaleString("pt-BR")}
-              </p>
-              <p className="text-sm text-muted-foreground">Comissões</p>
+              <CheckCircle className="h-6 w-6 text-success mx-auto mb-2" />
+              <p className="text-2xl font-bold text-foreground">{stats.completed}</p>
+              <p className="text-sm text-muted-foreground">Finalizados</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5">
+            <CardContent className="p-4 text-center">
+              <Users className="h-6 w-6 text-purple-600 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-foreground">{stats.remaining}</p>
+              <p className="text-sm text-muted-foreground">Restantes Hoje</p>
             </CardContent>
           </Card>
         </div>
@@ -205,7 +397,7 @@ export function LeadsManagement() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por nome, cidade ou tipo de crédito..."
+                  placeholder="Buscar por nome, CPF, telefone ou convênio..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -215,28 +407,17 @@ export function LeadsManagement() {
             
             <div className="flex gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-48">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os Status</SelectItem>
-                  <SelectItem value="new">Novos</SelectItem>
-                  <SelectItem value="contacted">Contatados</SelectItem>
-                  <SelectItem value="proposal_sent">Proposta Enviada</SelectItem>
-                  <SelectItem value="approved">Aprovados</SelectItem>
-                  <SelectItem value="rejected">Recusados</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Prioridade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="alta">Alta</SelectItem>
-                  <SelectItem value="média">Média</SelectItem>
-                  <SelectItem value="baixa">Baixa</SelectItem>
+                  <SelectItem value="new_lead">Novo Lead</SelectItem>
+                  <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                  <SelectItem value="aguardando_retorno">Aguardando Retorno</SelectItem>
+                  <SelectItem value="cliente_fechado">Cliente Fechado</SelectItem>
+                  <SelectItem value="recusou_oferta">Recusou Oferta</SelectItem>
+                  <SelectItem value="contato_futuro">Contato Futuro</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -248,7 +429,6 @@ export function LeadsManagement() {
       <div className="space-y-4">
         {filteredLeads.map((lead) => {
           const status = statusConfig[lead.status as keyof typeof statusConfig];
-          const priority = priorityConfig[lead.priority as keyof typeof priorityConfig];
           
           return (
             <Card key={lead.id} className="hover:shadow-md transition-shadow">
@@ -262,47 +442,23 @@ export function LeadsManagement() {
                           {lead.name}
                         </h3>
                         <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                          <MapPin className="h-4 w-4" />
-                          {lead.city}
+                          <User className="h-4 w-4" />
+                          CPF: {lead.cpf}
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Badge variant="outline" className={priority.color}>
-                          {priority.label}
-                        </Badge>
-                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${status.textColor} ${status.bgColor}`}>
-                          {status.label}
-                        </div>
+                      <div className={`px-2 py-1 rounded-full text-xs font-medium ${status?.textColor} ${status?.bgColor}`}>
+                        {status?.label}
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                       <div>
-                        <p className="text-muted-foreground">Tipo de Crédito</p>
-                        <p className="font-medium">{lead.creditType}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Valor Solicitado</p>
-                        <p className="font-medium">{lead.value}</p>
+                        <p className="text-muted-foreground">Convênio</p>
+                        <p className="font-medium">{lead.convenio}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Comissão</p>
-                        <p className="font-medium text-success">{lead.commission}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Phone className="h-4 w-4" />
-                        {lead.phone}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4" />
-                        Renda: {lead.income}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        {lead.deadline}
+                        <p className="text-muted-foreground">Telefone</p>
+                        <p className="font-medium">{lead.phone}</p>
                       </div>
                     </div>
                   </div>
@@ -329,25 +485,19 @@ export function LeadsManagement() {
                       WhatsApp
                     </Button>
 
-                    {lead.status === "new" && (
-                      <Button
-                        size="sm"
-                        onClick={() => updateLeadStatus(lead.id, "contacted")}
-                        className="flex-1 md:w-32"
-                      >
-                        Marcar Contatado
-                      </Button>
-                    )}
-
-                    {lead.status === "contacted" && (
-                      <Button
-                        size="sm"
-                        onClick={() => updateLeadStatus(lead.id, "proposal_sent")}
-                        className="flex-1 md:w-32"
-                      >
-                        Proposta Enviada
-                      </Button>
-                    )}
+                    <Select value={lead.status} onValueChange={(value) => updateLeadStatus(lead.id, value)}>
+                      <SelectTrigger className="flex-1 md:w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="new_lead">Novo Lead</SelectItem>
+                        <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                        <SelectItem value="aguardando_retorno">Aguardando Retorno</SelectItem>
+                        <SelectItem value="cliente_fechado">Cliente Fechado</SelectItem>
+                        <SelectItem value="recusou_oferta">Recusou Oferta</SelectItem>
+                        <SelectItem value="contato_futuro">Contato Futuro</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </CardContent>
@@ -363,9 +513,12 @@ export function LeadsManagement() {
             <h3 className="text-lg font-semibold text-foreground mb-2">
               Nenhum lead encontrado
             </h3>
-            <p className="text-muted-foreground">
-              Tente ajustar os filtros ou aguarde novos leads serem atribuídos.
+            <p className="text-muted-foreground mb-4">
+              Tente ajustar os filtros ou solicitar novos leads.
             </p>
+            <Button onClick={() => setShowRequestDialog(true)}>
+              Solicitar Leads
+            </Button>
           </CardContent>
         </Card>
       )}
