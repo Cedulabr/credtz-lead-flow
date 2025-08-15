@@ -77,6 +77,39 @@ export type Database = {
         }
         Relationships: []
       }
+      banks_products: {
+        Row: {
+          bank_name: string
+          base_commission_percentage: number
+          created_at: string
+          id: string
+          is_active: boolean | null
+          product_name: string
+          term: string | null
+          updated_at: string
+        }
+        Insert: {
+          bank_name: string
+          base_commission_percentage: number
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          product_name: string
+          term?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bank_name?: string
+          base_commission_percentage?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          product_name?: string
+          term?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           birth_date: string | null
@@ -186,6 +219,57 @@ export type Database = {
           organization_id?: number | null
           product_name?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      commissions: {
+        Row: {
+          bank_name: string
+          client_name: string
+          commission_amount: number
+          commission_percentage: number
+          created_at: string
+          credit_value: number
+          id: string
+          payment_date: string | null
+          payment_method: string | null
+          product_type: string
+          proposal_date: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bank_name: string
+          client_name: string
+          commission_amount: number
+          commission_percentage: number
+          created_at?: string
+          credit_value: number
+          id?: string
+          payment_date?: string | null
+          payment_method?: string | null
+          product_type: string
+          proposal_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bank_name?: string
+          client_name?: string
+          commission_amount?: number
+          commission_percentage?: number
+          created_at?: string
+          credit_value?: number
+          id?: string
+          payment_date?: string | null
+          payment_method?: string | null
+          product_type?: string
+          proposal_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -872,6 +956,44 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_commission_config: {
+        Row: {
+          bank_product_id: string
+          commission_percentage: number
+          created_at: string
+          created_by: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bank_product_id: string
+          commission_percentage: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bank_product_id?: string
+          commission_percentage?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_commission_config_bank_product_id_fkey"
+            columns: ["bank_product_id"]
+            isOneToOne: false
+            referencedRelation: "banks_products"
             referencedColumns: ["id"]
           },
         ]
