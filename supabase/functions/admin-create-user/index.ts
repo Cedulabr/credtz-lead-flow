@@ -13,6 +13,8 @@ interface CreateUserPayload {
   email: string;
   password: string;
   pix_key: string;
+  cpf: string;
+  phone: string;
 }
 
 serve(async (req: Request) => {
@@ -80,6 +82,8 @@ serve(async (req: Request) => {
         company: payload.company,
         level: payload.level as any,
         pix_key: payload.pix_key,
+        cpf: payload.cpf,
+        phone: payload.phone,
       });
 
     if (profileErr) throw new Error(profileErr.message);

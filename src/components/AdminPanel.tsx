@@ -97,6 +97,8 @@ export function AdminPanel() {
     email: "",
     password: "",
     pix_key: "",
+    cpf: "",
+    phone: "",
   });
 
   useEffect(() => {
@@ -781,6 +783,22 @@ export function AdminPanel() {
                     />
                   </div>
                   <div>
+                    <Label>CPF</Label>
+                    <Input
+                      placeholder="000.000.000-00"
+                      value={userForm.cpf}
+                      onChange={(e) => setUserForm({ ...userForm, cpf: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Telefone</Label>
+                    <Input
+                      placeholder="(00) 00000-0000"
+                      value={userForm.phone}
+                      onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
+                    />
+                  </div>
+                  <div>
                     <Label>Chave Pix</Label>
                     <Input
                       placeholder="Informe a chave Pix"
@@ -800,6 +818,8 @@ export function AdminPanel() {
                           email: userForm.email,
                           password: userForm.password,
                           pix_key: userForm.pix_key,
+                          cpf: userForm.cpf,
+                          phone: userForm.phone,
                         },
                       });
                       if (error) throw error;
@@ -807,7 +827,7 @@ export function AdminPanel() {
                         title: 'Usuário criado com sucesso!',
                         description: 'O novo usuário já pode acessar a plataforma.',
                       });
-                      setUserForm({ company: '', level: 'home_office_junior', name: '', email: '', password: '', pix_key: '' });
+                      setUserForm({ company: '', level: 'home_office_junior', name: '', email: '', password: '', pix_key: '', cpf: '', phone: '' });
                     } catch (err: any) {
                       console.error('Erro ao criar usuário:', err);
                       toast({ title: 'Erro', description: err.message || 'Não foi possível criar o usuário.', variant: 'destructive' });
