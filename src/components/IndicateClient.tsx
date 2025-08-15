@@ -71,6 +71,7 @@ export function IndicateClient() {
           name: formData.name,
           cpf: formData.cpf,
           phone: formData.phone,
+          convenio: formData.convenio,
           origem_lead: formData.observations,
           created_by: (await supabase.auth.getUser()).data.user?.id
         });

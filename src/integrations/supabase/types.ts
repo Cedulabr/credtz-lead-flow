@@ -492,6 +492,7 @@ export type Database = {
         Row: {
           assigned_to: string | null
           banco_operacao: string | null
+          convenio: string | null
           cpf: string
           created_at: string | null
           created_by: string | null
@@ -507,6 +508,7 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           banco_operacao?: string | null
+          convenio?: string | null
           cpf: string
           created_at?: string | null
           created_by?: string | null
@@ -522,6 +524,7 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           banco_operacao?: string | null
+          convenio?: string | null
           cpf?: string
           created_at?: string | null
           created_by?: string | null
