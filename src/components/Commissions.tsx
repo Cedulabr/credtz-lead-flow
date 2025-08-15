@@ -29,6 +29,7 @@ export function Commissions() {
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [pixKey, setPixKey] = useState("");
   const [commissions, setCommissions] = useState<any[]>([]);
+  const [commissionRules, setCommissionRules] = useState<any[]>([]);
   const [banksProducts, setBanksProducts] = useState<any[]>([]);
   const [selectedBank, setSelectedBank] = useState("");
   const [selectedProduct, setSelectedProduct] = useState("");
@@ -106,9 +107,17 @@ export function Commissions() {
           .eq('is_active', true)
           .order('created_at', { ascending: false });
 
+        // Carregar regras de comissão
+        const { data: commissionRulesData } = await supabase
+          .from('commission_rules')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false });
+
         if (userCommissions) setCommissions(userCommissions);
         if (banksProductsData) setBanksProducts(banksProductsData);
         if (commissionTableResponse) setCommissionTableData(commissionTableResponse);
+        if (commissionRulesData) setCommissionRules(commissionRulesData);
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
       }
@@ -506,7 +515,7 @@ export function Commissions() {
                   <SelectValue placeholder="Selecione o banco" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Array.from(new Set(banksProducts.map(bp => bp.bank_name))).map(bank => (
+                  {Array.from(new Set(commissionRules.map(cr => cr.bank_name).filter(Boolean))).map(bank => (
                     <SelectItem key={bank} value={bank}>{bank}</SelectItem>
                   ))}
                 </SelectContent>
@@ -530,28 +539,36 @@ export function Commissions() {
           </div>
           
           {selectedBank && selectedProduct && (
-            <AdminCommissionEdit 
-              selectedBank={selectedBank}
-              selectedProduct={selectedProduct}
-              banksProducts={banksProducts}
-              onUpdate={async () => {
-                // Recarregar dados após atualização
-                const { data: banksProductsData } = await supabase
-                  .from('banks_products')
-                  .select('*')
-                  .eq('is_active', true)
-                  .order('bank_name, product_name');
-                  
-                const { data: commissionTableResponse } = await supabase
-                  .from('commission_table')
-                  .select('*')
-                  .eq('is_active', true)
-                  .order('created_at', { ascending: false });
-                
-                if (banksProductsData) setBanksProducts(banksProductsData);
-                if (commissionTableResponse) setCommissionTableData(commissionTableResponse);
-              }}
-            />
+            <div className="mt-4 p-4 bg-muted/30 rounded-lg">
+              <h4 className="font-semibold mb-3">Regras de Comissão Disponíveis</h4>
+              <div className="space-y-2">
+                {commissionRules
+                  .filter(rule => rule.bank_name === selectedBank && rule.product_name === selectedProduct)
+                  .map((rule) => (
+                    <div key={rule.id} className="flex justify-between items-center p-3 bg-background rounded border">
+                      <div>
+                        <p className="font-medium">{rule.bank_name} - {rule.product_name}</p>
+                        {rule.description && (
+                          <p className="text-sm text-muted-foreground">{rule.description}</p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-primary">
+                          Repasse: {rule.commission_percentage}%
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Mínimo: {formatCurrency(Number(rule.minimum_value))}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                {commissionRules.filter(rule => rule.bank_name === selectedBank && rule.product_name === selectedProduct).length === 0 && (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <p>Nenhuma regra de comissão encontrada para esta combinação.</p>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

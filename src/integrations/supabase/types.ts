@@ -185,6 +185,7 @@ export type Database = {
       }
       commission_rules: {
         Row: {
+          bank_name: string | null
           commission_percentage: number
           created_at: string | null
           created_by_id: string | null
@@ -197,6 +198,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          bank_name?: string | null
           commission_percentage: number
           created_at?: string | null
           created_by_id?: string | null
@@ -209,6 +211,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          bank_name?: string | null
           commission_percentage?: number
           created_at?: string | null
           created_by_id?: string | null
