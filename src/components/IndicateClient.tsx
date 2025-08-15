@@ -64,15 +64,15 @@ export function IndicateClient() {
     setIsSubmitting(true);
 
     try {
-      // Salvar no banco de dados
+      // Salvar no banco de dados na tabela leads
       const { error: insertError } = await supabase
-        .from('clients')
+        .from('leads')
         .insert({
           name: formData.name,
           cpf: formData.cpf,
           phone: formData.phone,
-          contact: formData.observations,
-          convenio: formData.convenio
+          origem_lead: formData.observations,
+          created_by: (await supabase.auth.getUser()).data.user?.id
         });
 
       if (insertError) throw insertError;
@@ -143,7 +143,7 @@ export function IndicateClient() {
     { value: "servidor_publico", label: "Servidor Público" }
   ];
 
-  const isFormValid = formData.name && formData.cpf && formData.phone;
+  const isFormValid = formData.name && formData.cpf && formData.phone && formData.convenio;
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6">
@@ -217,7 +217,7 @@ export function IndicateClient() {
               {/* Convenio Info */}
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="convenio">Convênio (Opcional)</Label>
+                  <Label htmlFor="convenio">Convênio *</Label>
                   <Select
                     value={formData.convenio}
                     onValueChange={(value) => handleInputChange("convenio", value)}
@@ -252,29 +252,6 @@ export function IndicateClient() {
                 </p>
               </div>
 
-              {/* Document Upload Section */}
-              <Card className="bg-muted/20 border-dashed">
-                <CardContent className="p-4">
-                  <div className="text-center space-y-3">
-                    <Camera className="h-8 w-8 text-muted-foreground mx-auto" />
-                    <div>
-                      <p className="text-sm font-medium">Documentos (Opcional)</p>
-                      <p className="text-xs text-muted-foreground">
-                        Foto do RG, CPF ou comprovante de renda
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                    >
-                      <Camera className="h-4 w-4 mr-2" />
-                      Adicionar Foto
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
 
               {/* Submit Button */}
               <Button
@@ -303,9 +280,9 @@ export function IndicateClient() {
           <Card className="bg-success/5 border-success/20">
             <CardContent className="p-4 text-center">
               <CheckCircle className="h-6 w-6 text-success mx-auto mb-2" />
-              <h3 className="font-semibold text-sm">Comissão Garantida</h3>
+              <h3 className="font-semibold text-sm">Sua Renda</h3>
               <p className="text-xs text-muted-foreground mt-1">
-                Receba até 3% sobre o valor aprovado
+                Seu esforço vale ouro! Indique clientes e aumente sua renda.
               </p>
             </CardContent>
           </Card>
