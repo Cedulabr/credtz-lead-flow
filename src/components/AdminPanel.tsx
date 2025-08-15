@@ -548,11 +548,16 @@ export function AdminPanel() {
                         <SelectValue placeholder="Selecione o banco" />
                       </SelectTrigger>
                       <SelectContent>
-                        {banks.map(bank => (
-                          <SelectItem key={bank.id} value={bank.name}>
-                            {bank.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="Banco BRB">Banco BRB</SelectItem>
+                        <SelectItem value="Credtz Serviços">Credtz Serviços</SelectItem>
+                        <SelectItem value="Happy">Happy</SelectItem>
+                        <SelectItem value="Picpay">Picpay</SelectItem>
+                        <SelectItem value="QualiBank">QualiBank</SelectItem>
+                        <SelectItem value="Facta">Facta</SelectItem>
+                        <SelectItem value="Mercantil">Mercantil</SelectItem>
+                        <SelectItem value="PAN">PAN</SelectItem>
+                        <SelectItem value="Safra">Safra</SelectItem>
+                        <SelectItem value="Digio">Digio</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
