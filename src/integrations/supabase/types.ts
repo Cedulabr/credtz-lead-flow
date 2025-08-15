@@ -809,12 +809,14 @@ export type Database = {
       profiles: {
         Row: {
           company: string | null
+          cpf: string | null
           created_at: string | null
           email: string | null
           id: string
           level: Database["public"]["Enums"]["user_level"] | null
           name: string | null
           organization_id: number | null
+          phone: string | null
           pix_key: string | null
           role: Database["public"]["Enums"]["app_role"]
           sector: string | null
@@ -822,12 +824,14 @@ export type Database = {
         }
         Insert: {
           company?: string | null
+          cpf?: string | null
           created_at?: string | null
           email?: string | null
           id: string
           level?: Database["public"]["Enums"]["user_level"] | null
           name?: string | null
           organization_id?: number | null
+          phone?: string | null
           pix_key?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           sector?: string | null
@@ -835,12 +839,14 @@ export type Database = {
         }
         Update: {
           company?: string | null
+          cpf?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
           level?: Database["public"]["Enums"]["user_level"] | null
           name?: string | null
           organization_id?: number | null
+          phone?: string | null
           pix_key?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           sector?: string | null

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { PaymentLaunch } from "./PaymentLaunch";
 import { PaymentManagement } from "./PaymentManagement";
+import { UsersList } from "./UsersList";
 
 interface Webhook {
   id: number;
@@ -817,6 +818,9 @@ export function AdminPanel() {
                 </Button>
               </CardContent>
             </Card>
+            
+            {/* Users List Component */}
+            <UsersList />
           </TabsContent>
         )}
       </Tabs>
