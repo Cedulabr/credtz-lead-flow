@@ -201,10 +201,7 @@ export function AdminPanel() {
       // Use upsert to update existing or insert new
       const { error } = await supabase
         .from('commission_table')
-        .upsert(commissionData, {
-          onConflict: 'bank_name,product_name,term',
-          ignoreDuplicates: false
-        });
+        .upsert(commissionData);
 
       if (error) throw error;
 
