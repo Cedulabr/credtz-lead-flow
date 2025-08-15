@@ -21,8 +21,10 @@ import {
   Trash2,
   Save,
   X,
-  Users
+  Users,
+  DollarSign
 } from "lucide-react";
+import { PaymentLaunch } from "./PaymentLaunch";
 
 interface Webhook {
   id: number;
@@ -314,10 +316,11 @@ export function AdminPanel() {
       </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'}`}>
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-5' : 'grid-cols-3'}`}>
             <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
             <TabsTrigger value="announcements">Avisos</TabsTrigger>
             <TabsTrigger value="commissions">Comissões</TabsTrigger>
+            {isAdmin && <TabsTrigger value="payments">Pagamentos</TabsTrigger>}
             {isAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
           </TabsList>
 
@@ -703,6 +706,13 @@ export function AdminPanel() {
             ))}
           </div>
         </TabsContent>
+
+        {/* Payment Launch Tab */}
+        {isAdmin && (
+          <TabsContent value="payments" className="space-y-4">
+            <PaymentLaunch />
+          </TabsContent>
+        )}
 
         {/* Users Management Tab */}
         {isAdmin && (
