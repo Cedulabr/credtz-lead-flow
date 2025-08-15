@@ -117,7 +117,7 @@ export function AdminCommissionEdit({
         {!isEditing ? (
           <>
             <div className="flex justify-between items-center">
-              <span className="font-medium">Comissão Base:</span>
+              <span className="font-medium">Repasse do Usuário:</span>
               <span>{currentProduct.base_commission_percentage}%</span>
             </div>
             {isAdmin && (

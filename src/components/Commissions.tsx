@@ -519,13 +519,11 @@ export function Commissions() {
                   <SelectValue placeholder="Selecione o produto" />
                 </SelectTrigger>
                 <SelectContent>
-                  {banksProducts
-                    .filter(bp => bp.bank_name === selectedBank)
-                    .map(bp => (
-                      <SelectItem key={bp.id} value={bp.product_name}>
-                        {bp.product_name}
-                      </SelectItem>
-                    ))}
+                  {['Novo', 'Refinanciamento', 'Portabilidade', 'Refinanciamento da Portabilidade', 'Cartão de Crédito', 'Saque Complementar'].map(product => (
+                    <SelectItem key={product} value={product}>
+                      {product}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -559,57 +557,6 @@ export function Commissions() {
       </Card>
 
 
-      {/* Commission Rules Table - NEW */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Regras de Comissão Cadastradas
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {commissionTableData.length > 0 ? (
-              commissionTableData.map((rule) => (
-                <div key={rule.id} className="border rounded-lg p-4 bg-muted/20">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                      <span className="text-sm text-muted-foreground">Banco: </span>
-                      <span className="font-medium">{rule.bank_name}</span>
-                    </div>
-                    <div>
-                      <span className="text-sm text-muted-foreground">Produto: </span>
-                      <span className="font-medium">{rule.product_name}</span>
-                    </div>
-                    <div>
-                      <span className="text-sm text-muted-foreground">Comissão Total: </span>
-                      <span className="font-medium text-primary">{rule.commission_percentage}%</span>
-                    </div>
-                    <div>
-                      <span className="text-sm text-muted-foreground">Repasse: </span>
-                      <span className="font-medium text-success">{rule.user_percentage}%</span>
-                    </div>
-                  </div>
-                  {rule.term && (
-                    <div className="mt-2">
-                      <span className="text-sm text-muted-foreground">Prazo: </span>
-                      <span className="font-medium">{rule.term}</span>
-                    </div>
-                  )}
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    Atualizado em {formatDate(rule.updated_at)}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>Nenhuma regra de comissão cadastrada</p>
-                <p className="text-sm">Use o formulário acima para cadastrar regras de comissão</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Commissions History Table */}
       <Card>
