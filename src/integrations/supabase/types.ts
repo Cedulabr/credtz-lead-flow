@@ -216,6 +216,30 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_limits: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          max_leads_per_day: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          max_leads_per_day?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          max_leads_per_day?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       form_submissions: {
         Row: {
           client_id: number | null
@@ -488,6 +512,39 @@ export type Database = {
           },
         ]
       }
+      lead_requests: {
+        Row: {
+          banco: string | null
+          convenio: string | null
+          id: string
+          leads_count: number
+          produto: string | null
+          requested_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          banco?: string | null
+          convenio?: string | null
+          id?: string
+          leads_count?: number
+          produto?: string | null
+          requested_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          banco?: string | null
+          convenio?: string | null
+          id?: string
+          leads_count?: number
+          produto?: string | null
+          requested_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           assigned_to: string | null
@@ -502,6 +559,7 @@ export type Database = {
           phone: string
           priority: string | null
           stage: string | null
+          status: string | null
           updated_at: string | null
           valor_operacao: number | null
         }
@@ -518,6 +576,7 @@ export type Database = {
           phone: string
           priority?: string | null
           stage?: string | null
+          status?: string | null
           updated_at?: string | null
           valor_operacao?: number | null
         }
@@ -534,8 +593,63 @@ export type Database = {
           phone?: string
           priority?: string | null
           stage?: string | null
+          status?: string | null
           updated_at?: string | null
           valor_operacao?: number | null
+        }
+        Relationships: []
+      }
+      leads_database: {
+        Row: {
+          banco: string | null
+          convenio: string
+          cpf: string
+          created_at: string
+          data_nascimento: string | null
+          id: string
+          idade: number | null
+          is_available: boolean
+          name: string
+          parcela: number | null
+          parcelas_em_aberto: number | null
+          parcelas_pagas: number | null
+          phone: string
+          tipo_beneficio: string | null
+          updated_at: string
+        }
+        Insert: {
+          banco?: string | null
+          convenio: string
+          cpf: string
+          created_at?: string
+          data_nascimento?: string | null
+          id?: string
+          idade?: number | null
+          is_available?: boolean
+          name: string
+          parcela?: number | null
+          parcelas_em_aberto?: number | null
+          parcelas_pagas?: number | null
+          phone: string
+          tipo_beneficio?: string | null
+          updated_at?: string
+        }
+        Update: {
+          banco?: string | null
+          convenio?: string
+          cpf?: string
+          created_at?: string
+          data_nascimento?: string | null
+          id?: string
+          idade?: number | null
+          is_available?: boolean
+          name?: string
+          parcela?: number | null
+          parcelas_em_aberto?: number | null
+          parcelas_pagas?: number | null
+          phone?: string
+          tipo_beneficio?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -913,6 +1027,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_daily_lead_limit: {
+        Args: { user_id_param: string }
+        Returns: number
+      }
       create_admin_profile: {
         Args: { user_email: string; user_name?: string }
         Returns: string
@@ -927,6 +1045,23 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      request_leads: {
+        Args: {
+          banco_filter?: string
+          convenio_filter?: string
+          leads_requested?: number
+          produto_filter?: string
+        }
+        Returns: {
+          banco: string
+          convenio: string
+          cpf: string
+          lead_id: string
+          name: string
+          phone: string
+          tipo_beneficio: string
+        }[]
       }
     }
     Enums: {
