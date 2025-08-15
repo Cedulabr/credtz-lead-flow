@@ -6,6 +6,7 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   User, 
@@ -20,6 +21,7 @@ import {
 
 export function IndicateClient() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -61,6 +63,16 @@ export function IndicateClient() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!user) {
+      toast({
+        title: "Erro de autenticação",
+        description: "Você precisa estar logado para indicar clientes.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -73,7 +85,7 @@ export function IndicateClient() {
           phone: formData.phone,
           convenio: formData.convenio,
           origem_lead: formData.observations,
-          created_by: (await supabase.auth.getUser()).data.user?.id
+          created_by: user.id
         });
 
       if (insertError) throw insertError;
