@@ -813,6 +813,7 @@ export type Database = {
           created_at: string | null
           email: string | null
           id: string
+          is_active: boolean | null
           level: Database["public"]["Enums"]["user_level"] | null
           name: string | null
           organization_id: number | null
@@ -828,6 +829,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id: string
+          is_active?: boolean | null
           level?: Database["public"]["Enums"]["user_level"] | null
           name?: string | null
           organization_id?: number | null
@@ -843,6 +845,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id?: string
+          is_active?: boolean | null
           level?: Database["public"]["Enums"]["user_level"] | null
           name?: string | null
           organization_id?: number | null

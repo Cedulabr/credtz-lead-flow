@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Edit, UserCheck, UserX, Plus } from "lucide-react";
+import { Edit, UserCheck, UserX, Plus, Trash2 } from "lucide-react";
 
 interface User {
   id: string;
@@ -20,6 +20,7 @@ interface User {
   role: string;
   company?: string;
   level?: string;
+  is_active?: boolean;
   created_at: string;
 }
 
@@ -122,21 +123,64 @@ export function UsersList() {
   };
 
   const toggleUserStatus = async (user: User) => {
-    // For now, we'll show a placeholder since we don't have an active/inactive field
-    // This would typically update an 'is_active' field in the profiles table
-    toast({
-      title: "Funcionalidade em desenvolvimento",
-      description: "Sistema de ativação/desativação será implementado em breve.",
-    });
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_active: !user.is_active })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Status atualizado!",
+        description: `Usuário ${!user.is_active ? 'ativado' : 'inativado'} com sucesso.`,
+      });
+
+      loadUsers();
+    } catch (error) {
+      console.error('Erro ao alterar status do usuário:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao alterar status do usuário.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteUser = async (user: User) => {
+    if (!confirm(`Tem certeza que deseja excluir o usuário ${user.name}? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.functions.invoke('admin-delete-user', {
+        body: { user_id: user.id }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Usuário excluído!",
+        description: "O usuário foi removido do sistema.",
+      });
+
+      loadUsers();
+    } catch (error: any) {
+      console.error('Erro ao excluir usuário:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao excluir usuário.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getUserStatusBadge = (user: User) => {
-    // For now, all users are considered active
-    // This would typically check an 'is_active' field
+    const isActive = user.is_active !== false; // Default to true if undefined
     return (
-      <Badge variant="default" className="flex items-center gap-1">
-        <UserCheck className="h-3 w-3" />
-        Ativo
+      <Badge variant={isActive ? "default" : "secondary"} className="flex items-center gap-1">
+        {isActive ? <UserCheck className="h-3 w-3" /> : <UserX className="h-3 w-3" />}
+        {isActive ? "Ativo" : "Inativo"}
       </Badge>
     );
   };
@@ -203,15 +247,25 @@ export function UsersList() {
                         size="sm"
                         variant="outline"
                         onClick={() => handleEditUser(user)}
+                        title="Editar usuário"
                       >
                         <Edit className="h-3 w-3" />
                       </Button>
                       <Button
                         size="sm"
-                        variant="secondary"
+                        variant={user.is_active !== false ? "secondary" : "default"}
                         onClick={() => toggleUserStatus(user)}
+                        title={user.is_active !== false ? "Inativar usuário" : "Ativar usuário"}
                       >
-                        <UserX className="h-3 w-3" />
+                        {user.is_active !== false ? <UserX className="h-3 w-3" /> : <UserCheck className="h-3 w-3" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => deleteUser(user)}
+                        title="Excluir usuário"
+                      >
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   </TableCell>
