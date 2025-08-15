@@ -222,6 +222,45 @@ export type Database = {
         }
         Relationships: []
       }
+      commission_table: {
+        Row: {
+          bank_name: string
+          commission_percentage: number
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          product_name: string
+          term: string | null
+          updated_at: string | null
+          user_percentage: number
+        }
+        Insert: {
+          bank_name: string
+          commission_percentage: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          product_name: string
+          term?: string | null
+          updated_at?: string | null
+          user_percentage: number
+        }
+        Update: {
+          bank_name?: string
+          commission_percentage?: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          product_name?: string
+          term?: string | null
+          updated_at?: string | null
+          user_percentage?: number
+        }
+        Relationships: []
+      }
       commissions: {
         Row: {
           bank_name: string

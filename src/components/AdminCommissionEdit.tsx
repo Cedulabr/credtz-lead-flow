@@ -68,6 +68,20 @@ export function AdminCommissionEdit({
 
       if (upsertError) throw upsertError;
 
+      // Salvar na tabela de comissão (commission_table)
+      const { error: commissionTableError } = await supabase
+        .from('commission_table')
+        .upsert({
+          bank_name: selectedBank,
+          product_name: selectedProduct,
+          commission_percentage: parseFloat(editCommission),
+          user_percentage: parseFloat(editRepasse),
+          term: currentProduct.term,
+          created_by: user?.id
+        });
+
+      if (commissionTableError) throw commissionTableError;
+
       toast({
         title: "Comissão atualizada! ✅",
         description: "As configurações foram salvas com sucesso.",

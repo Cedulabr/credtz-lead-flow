@@ -76,6 +76,9 @@ export function Commissions() {
     return new Date(dateString).toLocaleDateString("pt-BR");
   };
 
+  // Estados para tabela de comissão
+  const [commissionTableData, setCommissionTableData] = useState<any[]>([]);
+
   // Carregar dados das comissões e bancos/produtos
   useEffect(() => {
     const loadData = async () => {
@@ -96,8 +99,16 @@ export function Commissions() {
           .eq('is_active', true)
           .order('bank_name, product_name');
 
+        // Carregar tabela de comissão
+        const { data: commissionTableResponse } = await supabase
+          .from('commission_table')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false });
+
         if (userCommissions) setCommissions(userCommissions);
         if (banksProductsData) setBanksProducts(banksProductsData);
+        if (commissionTableResponse) setCommissionTableData(commissionTableResponse);
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
       }
@@ -525,17 +536,22 @@ export function Commissions() {
               selectedBank={selectedBank}
               selectedProduct={selectedProduct}
               banksProducts={banksProducts}
-              onUpdate={() => {
+              onUpdate={async () => {
                 // Recarregar dados após atualização
-                const loadData = async () => {
-                  const { data: banksProductsData } = await supabase
-                    .from('banks_products')
-                    .select('*')
-                    .eq('is_active', true)
-                    .order('bank_name, product_name');
-                  if (banksProductsData) setBanksProducts(banksProductsData);
-                };
-                loadData();
+                const { data: banksProductsData } = await supabase
+                  .from('banks_products')
+                  .select('*')
+                  .eq('is_active', true)
+                  .order('bank_name, product_name');
+                  
+                const { data: commissionTableResponse } = await supabase
+                  .from('commission_table')
+                  .select('*')
+                  .eq('is_active', true)
+                  .order('created_at', { ascending: false });
+                
+                if (banksProductsData) setBanksProducts(banksProductsData);
+                if (commissionTableResponse) setCommissionTableData(commissionTableResponse);
               }}
             />
           )}
@@ -543,11 +559,63 @@ export function Commissions() {
       </Card>
 
 
-      {/* Commissions Table */}
+      {/* Commission Rules Table - NEW */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Regras de Comissão Cadastradas
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {commissionTableData.length > 0 ? (
+              commissionTableData.map((rule) => (
+                <div key={rule.id} className="border rounded-lg p-4 bg-muted/20">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <span className="text-sm text-muted-foreground">Banco: </span>
+                      <span className="font-medium">{rule.bank_name}</span>
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Produto: </span>
+                      <span className="font-medium">{rule.product_name}</span>
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Comissão Total: </span>
+                      <span className="font-medium text-primary">{rule.commission_percentage}%</span>
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Repasse: </span>
+                      <span className="font-medium text-success">{rule.user_percentage}%</span>
+                    </div>
+                  </div>
+                  {rule.term && (
+                    <div className="mt-2">
+                      <span className="text-sm text-muted-foreground">Prazo: </span>
+                      <span className="font-medium">{rule.term}</span>
+                    </div>
+                  )}
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Atualizado em {formatDate(rule.updated_at)}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Nenhuma regra de comissão cadastrada</p>
+                <p className="text-sm">Use o formulário acima para cadastrar regras de comissão</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Commissions History Table */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Tabela de Comissão</CardTitle>
+            <CardTitle>Histórico de Comissões</CardTitle>
             <div className="flex gap-2">
               <Button
                 variant={selectedPeriod === "current" ? "default" : "outline"}
