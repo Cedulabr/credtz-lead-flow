@@ -107,12 +107,12 @@ export function Commissions() {
           .eq('is_active', true)
           .order('created_at', { ascending: false });
 
-        // Carregar regras de comissão
+        // Carregar regras de comissão mais recentes da commission_table
         const { data: commissionRulesData } = await supabase
-          .from('commission_rules')
+          .from('commission_table')
           .select('*')
           .eq('is_active', true)
-          .order('created_at', { ascending: false });
+          .order('updated_at', { ascending: false });
 
         if (userCommissions) setCommissions(userCommissions);
         if (banksProductsData) setBanksProducts(banksProductsData);

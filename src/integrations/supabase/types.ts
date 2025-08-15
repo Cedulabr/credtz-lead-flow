@@ -183,48 +183,6 @@ export type Database = {
           },
         ]
       }
-      commission_rules: {
-        Row: {
-          bank_name: string | null
-          commission_percentage: number
-          created_at: string | null
-          created_by_id: string | null
-          description: string | null
-          id: number
-          is_active: boolean | null
-          minimum_value: number | null
-          organization_id: number | null
-          product_name: string
-          updated_at: string | null
-        }
-        Insert: {
-          bank_name?: string | null
-          commission_percentage: number
-          created_at?: string | null
-          created_by_id?: string | null
-          description?: string | null
-          id?: number
-          is_active?: boolean | null
-          minimum_value?: number | null
-          organization_id?: number | null
-          product_name: string
-          updated_at?: string | null
-        }
-        Update: {
-          bank_name?: string | null
-          commission_percentage?: number
-          created_at?: string | null
-          created_by_id?: string | null
-          description?: string | null
-          id?: number
-          is_active?: boolean | null
-          minimum_value?: number | null
-          organization_id?: number | null
-          product_name?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       commission_table: {
         Row: {
           bank_name: string
@@ -237,6 +195,7 @@ export type Database = {
           term: string | null
           updated_at: string | null
           user_percentage: number
+          user_percentage_profile: string | null
         }
         Insert: {
           bank_name: string
@@ -249,6 +208,7 @@ export type Database = {
           term?: string | null
           updated_at?: string | null
           user_percentage: number
+          user_percentage_profile?: string | null
         }
         Update: {
           bank_name?: string
@@ -261,6 +221,7 @@ export type Database = {
           term?: string | null
           updated_at?: string | null
           user_percentage?: number
+          user_percentage_profile?: string | null
         }
         Relationships: []
       }

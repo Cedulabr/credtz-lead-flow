@@ -40,21 +40,25 @@ interface Announcement {
   created_at: string;
 }
 
-interface CommissionRule {
-  id: number;
+interface CommissionTable {
+  id: string;
+  bank_name: string;
   product_name: string;
+  term?: string;
   commission_percentage: number;
-  minimum_value: number;
-  description: string;
+  user_percentage: number;
+  user_percentage_profile?: string;
   is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export function AdminPanel() {
   const { toast } = useToast();
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
+  const [commissionTable, setCommissionTable] = useState<CommissionTable[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -75,8 +79,10 @@ export function AdminPanel() {
   const [commissionForm, setCommissionForm] = useState({
     bank_name: "",
     product_name: "",
+    term: "",
     commission_percentage: "",
-    minimum_value: "50.00",
+    user_percentage: "",
+    user_percentage_profile: "",
     description: ""
   });
 
@@ -98,13 +104,13 @@ export function AdminPanel() {
       const [webhooksRes, announcementsRes, commissionsRes, banksRes] = await Promise.all([
         supabase.from('webhooks').select('*').order('created_at', { ascending: false }),
         supabase.from('announcements').select('*').order('created_at', { ascending: false }),
-        supabase.from('commission_rules').select('*').order('created_at', { ascending: false }),
+        supabase.from('commission_table').select('*').order('created_at', { ascending: false }),
         supabase.from('banks').select('*').order('name')
       ]);
 
       if (webhooksRes.data) setWebhooks(webhooksRes.data);
       if (announcementsRes.data) setAnnouncements(announcementsRes.data);
-      if (commissionsRes.data) setCommissionRules(commissionsRes.data);
+      if (commissionsRes.data) setCommissionTable(commissionsRes.data);
       if (banksRes.data) setBanks(banksRes.data);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -182,23 +188,25 @@ export function AdminPanel() {
   const handleSaveCommission = async () => {
     try {
       const commissionData = {
-        ...commissionForm,
+        bank_name: commissionForm.bank_name,
+        product_name: commissionForm.product_name,
+        term: commissionForm.term || null,
         commission_percentage: parseFloat(commissionForm.commission_percentage),
-        minimum_value: parseFloat(commissionForm.minimum_value)
+        user_percentage: parseFloat(commissionForm.user_percentage || "0"),
+        user_percentage_profile: commissionForm.user_percentage_profile || null,
+        is_active: true,
+        created_by: user?.id
       };
 
-      if (editingItem) {
-        const { error } = await supabase
-          .from('commission_rules')
-          .update(commissionData)
-          .eq('id', editingItem.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('commission_rules')
-          .insert([commissionData]);
-        if (error) throw error;
-      }
+      // Use upsert to update existing or insert new
+      const { error } = await supabase
+        .from('commission_table')
+        .upsert(commissionData, {
+          onConflict: 'bank_name,product_name,term',
+          ignoreDuplicates: false
+        });
+
+      if (error) throw error;
 
       toast({
         title: "Regra de comissão salva!",
@@ -208,8 +216,10 @@ export function AdminPanel() {
       setCommissionForm({
         bank_name: "",
         product_name: "",
+        term: "",
         commission_percentage: "",
-        minimum_value: "50.00",
+        user_percentage: "",
+        user_percentage_profile: "",
         description: ""
       });
       setEditingItem(null);
@@ -225,7 +235,7 @@ export function AdminPanel() {
     }
   };
 
-  const toggleActive = async (table: 'webhooks' | 'announcements' | 'commission_rules', id: number, currentStatus: boolean) => {
+  const toggleActive = async (table: 'webhooks' | 'announcements' | 'commission_table', id: string, currentStatus: boolean) => {
     try {
       const { error } = await supabase
         .from(table)
@@ -239,7 +249,7 @@ export function AdminPanel() {
     }
   };
 
-  const deleteItem = async (table: 'webhooks' | 'announcements' | 'commission_rules', id: number) => {
+  const deleteItem = async (table: 'webhooks' | 'announcements' | 'commission_table', id: string) => {
     try {
       const { error } = await supabase
         .from(table)
@@ -281,9 +291,11 @@ export function AdminPanel() {
       setCommissionForm({
         bank_name: item.bank_name || "",
         product_name: item.product_name,
+        term: item.term || "",
         commission_percentage: item.commission_percentage.toString(),
-        minimum_value: item.minimum_value.toString(),
-        description: item.description
+        user_percentage: item.user_percentage.toString(),
+        user_percentage_profile: item.user_percentage_profile || "",
+        description: ""
       });
       setActiveTab('commissions');
     }
@@ -398,14 +410,14 @@ export function AdminPanel() {
                       <Button
                         size="sm"
                         variant={webhook.is_active ? "secondary" : "default"}
-                        onClick={() => toggleActive('webhooks', webhook.id, webhook.is_active)}
+                        onClick={() => toggleActive('webhooks', webhook.id.toString(), webhook.is_active)}
                       >
                         {webhook.is_active ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
                       </Button>
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => deleteItem('webhooks', webhook.id)}
+                        onClick={() => deleteItem('webhooks', webhook.id.toString())}
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -495,14 +507,14 @@ export function AdminPanel() {
                       <Button
                         size="sm"
                         variant={announcement.is_active ? "secondary" : "default"}
-                        onClick={() => toggleActive('announcements', announcement.id, announcement.is_active)}
+                        onClick={() => toggleActive('announcements', announcement.id.toString(), announcement.is_active)}
                       >
                         {announcement.is_active ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
                       </Button>
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => deleteItem('announcements', announcement.id)}
+                        onClick={() => deleteItem('announcements', announcement.id.toString())}
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -525,8 +537,10 @@ export function AdminPanel() {
                   setCommissionForm({
                     bank_name: "",
                     product_name: "",
+                    term: "",
                     commission_percentage: "",
-                    minimum_value: "50.00",
+                    user_percentage: "",
+                    user_percentage_profile: "",
                     description: ""
                   });
                 }}>
@@ -576,9 +590,18 @@ export function AdminPanel() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div>
+                    <Label htmlFor="term">Prazo</Label>
+                    <Input
+                      id="term"
+                      placeholder="96x, 120x..."
+                      value={commissionForm.term}
+                      onChange={(e) => setCommissionForm({ ...commissionForm, term: e.target.value })}
+                    />
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="commission-pct">Comissão (%) *</Label>
+                      <Label htmlFor="commission-pct">Comissão Total (%) *</Label>
                       <Input
                         id="commission-pct"
                         type="number"
@@ -589,16 +612,28 @@ export function AdminPanel() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="min-value">Valor Mínimo</Label>
+                      <Label htmlFor="user-pct">Repasse de Comissão (%) *</Label>
                       <Input
-                        id="min-value"
+                        id="user-pct"
                         type="number"
                         step="0.01"
-                        placeholder="50.00"
-                        value={commissionForm.minimum_value}
-                        onChange={(e) => setCommissionForm({ ...commissionForm, minimum_value: e.target.value })}
+                        placeholder="2.50"
+                        value={commissionForm.user_percentage}
+                        onChange={(e) => setCommissionForm({ ...commissionForm, user_percentage: e.target.value })}
                       />
                     </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="user-profile">Perfil do Usuário</Label>
+                    <Select value={commissionForm.user_percentage_profile} onValueChange={(value) => setCommissionForm({ ...commissionForm, user_percentage_profile: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o perfil" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="home_office_senior">Home Office Senior</SelectItem>
+                        <SelectItem value="home_office_junior">Home Office Junior</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <Label htmlFor="commission-desc">Descrição</Label>
@@ -619,24 +654,28 @@ export function AdminPanel() {
           </div>
 
           <div className="grid gap-4">
-            {commissionRules.map((rule) => (
+            {commissionTable.map((rule) => (
               <Card key={rule.id}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <Percent className="h-4 w-4 text-primary" />
-                        <h3 className="font-medium">{rule.product_name}</h3>
+                        <h3 className="font-medium">{rule.bank_name} - {rule.product_name}</h3>
+                        {rule.term && <span className="text-sm text-muted-foreground">({rule.term})</span>}
                         <Badge variant={rule.is_active ? "default" : "secondary"}>
                           {rule.is_active ? "Ativo" : "Inativo"}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground mb-1">
-                        Comissão: {rule.commission_percentage}% | Mínimo: R$ {rule.minimum_value}
+                        Comissão Total: {rule.commission_percentage}% | Repasse: {rule.user_percentage}%
                       </p>
-                      {rule.description && (
-                        <p className="text-xs text-muted-foreground">{rule.description}</p>
+                      {rule.user_percentage_profile && (
+                        <p className="text-xs text-muted-foreground">Perfil: {rule.user_percentage_profile}</p>
                       )}
+                      <p className="text-xs text-muted-foreground">
+                        Atualizado em: {new Date(rule.updated_at).toLocaleDateString('pt-BR')}
+                      </p>
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -649,14 +688,14 @@ export function AdminPanel() {
                       <Button
                         size="sm"
                         variant={rule.is_active ? "secondary" : "default"}
-                        onClick={() => toggleActive('commission_rules', rule.id, rule.is_active)}
+                        onClick={() => toggleActive('commission_table', rule.id, rule.is_active)}
                       >
                         {rule.is_active ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
                       </Button>
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => deleteItem('commission_rules', rule.id)}
+                        onClick={() => deleteItem('commission_table', rule.id)}
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
