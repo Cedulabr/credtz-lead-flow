@@ -25,6 +25,7 @@ import {
   DollarSign
 } from "lucide-react";
 import { PaymentLaunch } from "./PaymentLaunch";
+import { PaymentManagement } from "./PaymentManagement";
 
 interface Webhook {
   id: number;
@@ -711,6 +712,7 @@ export function AdminPanel() {
         {isAdmin && (
           <TabsContent value="payments" className="space-y-4">
             <PaymentLaunch />
+            <PaymentManagement />
           </TabsContent>
         )}
 

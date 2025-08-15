@@ -45,10 +45,16 @@ export function Commissions() {
     total: commissions.reduce((sum, c) => sum + Number(c.commission_amount), 0),
     paid: commissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + Number(c.commission_amount), 0),
     pending: commissions.filter(c => c.status === 'pending').reduce((sum, c) => sum + Number(c.commission_amount), 0),
+    preview: commissions.filter(c => c.status === 'preview').reduce((sum, c) => sum + Number(c.commission_amount), 0),
     approved: commissions.filter(c => c.status === 'approved').reduce((sum, c) => sum + Number(c.commission_amount), 0)
   };
 
   const statusConfig = {
+    preview: { 
+      label: "Prévia", 
+      color: "bg-muted/20 text-muted-foreground",
+      icon: Clock 
+    },
     pending: { 
       label: "Pendente", 
       color: "bg-warning/20 text-warning-foreground",
@@ -150,6 +156,18 @@ export function Commissions() {
     try {
       const amount = parseFloat(withdrawalAmount.replace(/[^\d,]/g, '').replace(',', '.'));
       
+      // Atualizar comissões em preview para pending
+      const previewCommissions = commissions.filter(c => c.status === 'preview');
+      if (previewCommissions.length > 0) {
+        const { error: updateError } = await supabase
+          .from('commissions')
+          .update({ status: 'pending' })
+          .eq('user_id', user?.id)
+          .eq('status', 'preview');
+        
+        if (updateError) throw updateError;
+      }
+
       // Buscar webhook ativo para saques
       const { data: webhook } = await supabase
         .from('webhooks')
@@ -319,7 +337,7 @@ export function Commissions() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -363,12 +381,31 @@ export function Commissions() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
+                <p className="text-sm text-muted-foreground">Prévia Pagamento</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {formatCurrency(commissionTotals.preview)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {commissions.filter(c => c.status === 'preview').length} propostas
+                </p>
+              </div>
+              <div className="p-2 bg-muted/20 rounded-lg">
+                <Clock className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-warning/10 to-warning/5">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
                 <p className="text-sm text-muted-foreground">Pendente</p>
                 <p className="text-2xl font-bold text-foreground">
                   {formatCurrency(commissionTotals.pending)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  2 propostas
+                  {commissions.filter(c => c.status === 'pending').length} propostas
                 </p>
               </div>
               <div className="p-2 bg-warning/10 rounded-lg">
