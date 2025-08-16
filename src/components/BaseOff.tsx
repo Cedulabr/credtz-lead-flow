@@ -65,11 +65,14 @@ export function BaseOff() {
   ];
 
   useEffect(() => {
-    fetchLeads();
-    fetchAvailableBancos();
-    fetchAvailableUFs();
-    checkDailyLimit();
-  }, []);
+    console.log('BaseOff: Component mounted, user:', user);
+    if (user) {
+      fetchLeads();
+      fetchAvailableBancos();
+      fetchAvailableUFs();
+      checkDailyLimit();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (selectedUF) {
@@ -108,17 +111,24 @@ export function BaseOff() {
 
   const fetchAvailableBancos = async () => {
     try {
+      console.log('BaseOff: Fetching available bancos...');
+      
       // First get allowed banks from admin settings
       const { data: allowedBanks, error: allowedError } = await supabase
         .from('baseoff_allowed_banks')
         .select('codigo_banco')
         .eq('is_active', true);
 
-      if (allowedError) throw allowedError;
+      if (allowedError) {
+        console.error('Error fetching allowed banks:', allowedError);
+        throw allowedError;
+      }
       
+      console.log('BaseOff: Allowed banks:', allowedBanks);
       const allowedCodes = allowedBanks?.map(bank => bank.codigo_banco) || [];
       
       if (allowedCodes.length === 0) {
+        console.log('BaseOff: No allowed banks found');
         setAvailableBancos([]);
         return;
       }
@@ -131,12 +141,21 @@ export function BaseOff() {
         .or('reserved_until.is.null,reserved_until.lt.now()')
         .in('Codigo_Banco', allowedCodes);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching available leads:', error);
+        throw error;
+      }
       
       const uniqueBancos = [...new Set(data?.map(item => item.Codigo_Banco).filter(Boolean))];
+      console.log('BaseOff: Available bancos:', uniqueBancos);
       setAvailableBancos(uniqueBancos);
     } catch (error) {
       console.error('Error fetching bancos:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar bancos disponíveis",
+        variant: "destructive",
+      });
     }
   };
 
@@ -419,8 +438,12 @@ export function BaseOff() {
     return cleanCPF.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   };
 
+  if (!user) {
+    return <div className="p-6">Usuário não autenticado. Faça login para acessar o BaseOFF.</div>;
+  }
+
   if (loading) {
-    return <div className="p-6">Carregando...</div>;
+    return <div className="p-6">Carregando BaseOFF...</div>;
   }
 
   return (
@@ -431,16 +454,26 @@ export function BaseOff() {
           <div className="text-sm text-muted-foreground">
             Limite diário restante: <strong>{dailyLimit}</strong>
           </div>
+          <Button onClick={() => {
+            console.log('BaseOff: Gerar Lista clicked');
+            console.log('BaseOff: Available bancos:', availableBancos);
+            console.log('BaseOff: Available UFs:', availableUFs);
+            console.log('BaseOff: User:', user);
+            if (!user) {
+              toast({
+                title: "Erro",
+                description: "Usuário não autenticado",
+                variant: "destructive",
+              });
+              return;
+            }
+            setIsGenerateDialogOpen(true);
+          }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Gerar Lista
+          </Button>
+          
           <Dialog open={isGenerateDialogOpen} onOpenChange={setIsGenerateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => {
-                console.log('Gerar Lista clicked, opening dialog');
-                setIsGenerateDialogOpen(true);
-              }}>
-                <Plus className="h-4 w-4 mr-2" />
-                Gerar Lista
-              </Button>
-            </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Gerar Lista de Leads</DialogTitle>
