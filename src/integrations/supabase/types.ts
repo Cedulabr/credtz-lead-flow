@@ -110,78 +110,80 @@ export type Database = {
         }
         Relationships: []
       }
-      clients: {
+      baseoff_requests: {
         Row: {
-          birth_date: string | null
-          contact: string | null
-          convenio: string | null
-          convenio_id: number | null
-          cpf: string
-          created_at: string | null
-          created_by_id: string | null
-          email: string | null
-          id: number
-          name: string
-          organization_id: number | null
-          phone: string
-          updated_at: string | null
-          user_id: string | null
+          codigo_banco: string | null
+          id: string
+          leads_count: number
+          requested_at: string
+          status: string
+          user_id: string
+          valor_parcela_max: number | null
+          valor_parcela_min: number | null
         }
         Insert: {
-          birth_date?: string | null
-          contact?: string | null
-          convenio?: string | null
-          convenio_id?: number | null
-          cpf: string
-          created_at?: string | null
-          created_by_id?: string | null
-          email?: string | null
-          id?: number
-          name: string
-          organization_id?: number | null
-          phone: string
-          updated_at?: string | null
-          user_id?: string | null
+          codigo_banco?: string | null
+          id?: string
+          leads_count?: number
+          requested_at?: string
+          status?: string
+          user_id: string
+          valor_parcela_max?: number | null
+          valor_parcela_min?: number | null
         }
         Update: {
-          birth_date?: string | null
-          contact?: string | null
-          convenio?: string | null
-          convenio_id?: number | null
+          codigo_banco?: string | null
+          id?: string
+          leads_count?: number
+          requested_at?: string
+          status?: string
+          user_id?: string
+          valor_parcela_max?: number | null
+          valor_parcela_min?: number | null
+        }
+        Relationships: []
+      }
+      clientes: {
+        Row: {
+          beneficio: string | null
+          contatos: Json | null
+          cpf: string
+          created_at: string | null
+          dt_nascimento: string | null
+          id: string
+          idade: number | null
+          margem: number | null
+          nome: string | null
+          updated_at: string | null
+          vl_beneficio: number | null
+        }
+        Insert: {
+          beneficio?: string | null
+          contatos?: Json | null
+          cpf: string
+          created_at?: string | null
+          dt_nascimento?: string | null
+          id?: string
+          idade?: number | null
+          margem?: number | null
+          nome?: string | null
+          updated_at?: string | null
+          vl_beneficio?: number | null
+        }
+        Update: {
+          beneficio?: string | null
+          contatos?: Json | null
           cpf?: string
           created_at?: string | null
-          created_by_id?: string | null
-          email?: string | null
-          id?: number
-          name?: string
-          organization_id?: number | null
-          phone?: string
+          dt_nascimento?: string | null
+          id?: string
+          idade?: number | null
+          margem?: number | null
+          nome?: string | null
           updated_at?: string | null
-          user_id?: string | null
+          vl_beneficio?: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "clients_convenio_id_fkey"
-            columns: ["convenio_id"]
-            isOneToOne: false
-            referencedRelation: "convenios"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "clients_created_by_id_fkey"
-            columns: ["created_by_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "clients_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       commission_table: {
         Row: {
@@ -276,6 +278,56 @@ export type Database = {
         }
         Relationships: []
       }
+      contratos: {
+        Row: {
+          cliente_id: string | null
+          data_atualizacao: string | null
+          data_fim: string | null
+          data_inicio: string | null
+          id: string
+          id_banco: string | null
+          id_contrato: string | null
+          quant_parcelas: number | null
+          tipo: string | null
+          vl_emprestimo: number | null
+          vl_parcela: number | null
+        }
+        Insert: {
+          cliente_id?: string | null
+          data_atualizacao?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          id?: string
+          id_banco?: string | null
+          id_contrato?: string | null
+          quant_parcelas?: number | null
+          tipo?: string | null
+          vl_emprestimo?: number | null
+          vl_parcela?: number | null
+        }
+        Update: {
+          cliente_id?: string | null
+          data_atualizacao?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          id?: string
+          id_banco?: string | null
+          id_contrato?: string | null
+          quant_parcelas?: number | null
+          tipo?: string | null
+          vl_emprestimo?: number | null
+          vl_parcela?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       convenios: {
         Row: {
           created_at: string | null
@@ -365,13 +417,6 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "form_submissions_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "form_submissions_organization_id_fkey"
             columns: ["organization_id"]
@@ -523,82 +568,6 @@ export type Database = {
           },
         ]
       }
-      lead_activities: {
-        Row: {
-          activity_type: string
-          created_at: string | null
-          created_by: string | null
-          description: string
-          id: string
-          lead_id: string
-        }
-        Insert: {
-          activity_type: string
-          created_at?: string | null
-          created_by?: string | null
-          description: string
-          id?: string
-          lead_id: string
-        }
-        Update: {
-          activity_type?: string
-          created_at?: string | null
-          created_by?: string | null
-          description?: string
-          id?: string
-          lead_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "lead_activities_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "leads"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      lead_attachments: {
-        Row: {
-          created_at: string | null
-          file_name: string
-          file_size: number | null
-          file_type: string | null
-          file_url: string
-          id: string
-          lead_id: string
-          uploaded_by: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          file_name: string
-          file_size?: number | null
-          file_type?: string | null
-          file_url: string
-          id?: string
-          lead_id: string
-          uploaded_by?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          file_name?: string
-          file_size?: number | null
-          file_type?: string | null
-          file_url?: string
-          id?: string
-          lead_id?: string
-          uploaded_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "lead_attachments_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "leads"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       lead_requests: {
         Row: {
           banco: string | null
@@ -737,6 +706,138 @@ export type Database = {
           phone?: string
           tipo_beneficio?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      leads_semtelefone: {
+        Row: {
+          Agencia: string | null
+          assigned_to: string | null
+          Bairro: string | null
+          Banco: string | null
+          Beneficio: string | null
+          CEP: string | null
+          Codigo_Banco: string | null
+          Codigo_Emprestimo: string | null
+          Codigo_Especie: number | null
+          Conta: string | null
+          CPF: string | null
+          CPF_Representante: string | null
+          created_at: string | null
+          created_by: string | null
+          Data_Nascimento: string | null
+          Emprestimo_Ativos: string | null
+          Endereco: string | null
+          Fim_Desconto: string | null
+          id: string
+          Idade: number | null
+          Inicio_Desconto: string | null
+          is_available: boolean | null
+          Margem_Disponivel: string | null
+          Margem_RCC: string | null
+          Margem_RMC: string | null
+          Municipio: string | null
+          Nome: string | null
+          Nome_Representante: string | null
+          Numero_Contrato: string | null
+          Parcela_Pagas: number | null
+          Parcela_Restante: number | null
+          phone: string | null
+          Possui_Representante: string | null
+          Prazo: number | null
+          RG: string | null
+          status: string | null
+          Taxa: string | null
+          UF: string | null
+          updated_at: string | null
+          Valor_Emprestimo: string | null
+          Valor_Parcela: string | null
+        }
+        Insert: {
+          Agencia?: string | null
+          assigned_to?: string | null
+          Bairro?: string | null
+          Banco?: string | null
+          Beneficio?: string | null
+          CEP?: string | null
+          Codigo_Banco?: string | null
+          Codigo_Emprestimo?: string | null
+          Codigo_Especie?: number | null
+          Conta?: string | null
+          CPF?: string | null
+          CPF_Representante?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          Data_Nascimento?: string | null
+          Emprestimo_Ativos?: string | null
+          Endereco?: string | null
+          Fim_Desconto?: string | null
+          id?: string
+          Idade?: number | null
+          Inicio_Desconto?: string | null
+          is_available?: boolean | null
+          Margem_Disponivel?: string | null
+          Margem_RCC?: string | null
+          Margem_RMC?: string | null
+          Municipio?: string | null
+          Nome?: string | null
+          Nome_Representante?: string | null
+          Numero_Contrato?: string | null
+          Parcela_Pagas?: number | null
+          Parcela_Restante?: number | null
+          phone?: string | null
+          Possui_Representante?: string | null
+          Prazo?: number | null
+          RG?: string | null
+          status?: string | null
+          Taxa?: string | null
+          UF?: string | null
+          updated_at?: string | null
+          Valor_Emprestimo?: string | null
+          Valor_Parcela?: string | null
+        }
+        Update: {
+          Agencia?: string | null
+          assigned_to?: string | null
+          Bairro?: string | null
+          Banco?: string | null
+          Beneficio?: string | null
+          CEP?: string | null
+          Codigo_Banco?: string | null
+          Codigo_Emprestimo?: string | null
+          Codigo_Especie?: number | null
+          Conta?: string | null
+          CPF?: string | null
+          CPF_Representante?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          Data_Nascimento?: string | null
+          Emprestimo_Ativos?: string | null
+          Endereco?: string | null
+          Fim_Desconto?: string | null
+          id?: string
+          Idade?: number | null
+          Inicio_Desconto?: string | null
+          is_available?: boolean | null
+          Margem_Disponivel?: string | null
+          Margem_RCC?: string | null
+          Margem_RMC?: string | null
+          Municipio?: string | null
+          Nome?: string | null
+          Nome_Representante?: string | null
+          Numero_Contrato?: string | null
+          Parcela_Pagas?: number | null
+          Parcela_Restante?: number | null
+          phone?: string | null
+          Possui_Representante?: string | null
+          Prazo?: number | null
+          RG?: string | null
+          status?: string | null
+          Taxa?: string | null
+          UF?: string | null
+          updated_at?: string | null
+          Valor_Emprestimo?: string | null
+          Valor_Parcela?: string | null
         }
         Relationships: []
       }
@@ -933,13 +1034,6 @@ export type Database = {
             columns: ["bank_id"]
             isOneToOne: false
             referencedRelation: "banks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "proposals_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
           {
@@ -1161,6 +1255,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_baseoff_daily_limit: {
+        Args: { user_id_param: string }
+        Returns: number
+      }
       check_daily_lead_limit: {
         Args: { user_id_param: string }
         Returns: number
