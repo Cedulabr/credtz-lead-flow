@@ -19,6 +19,8 @@ interface BaseOffLead {
   phone: string | null;
   Codigo_Banco: string;
   Valor_Parcela: string;
+  UF: string;
+  Municipio: string;
   status: string;
   assigned_to: string | null;
   created_at: string;
