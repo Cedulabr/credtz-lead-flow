@@ -745,6 +745,8 @@ export type Database = {
           phone: string | null
           Possui_Representante: string | null
           Prazo: number | null
+          reserved_by: string | null
+          reserved_until: string | null
           RG: string | null
           status: string | null
           Taxa: string | null
@@ -788,6 +790,8 @@ export type Database = {
           phone?: string | null
           Possui_Representante?: string | null
           Prazo?: number | null
+          reserved_by?: string | null
+          reserved_until?: string | null
           RG?: string | null
           status?: string | null
           Taxa?: string | null
@@ -831,6 +835,8 @@ export type Database = {
           phone?: string | null
           Possui_Representante?: string | null
           Prazo?: number | null
+          reserved_by?: string | null
+          reserved_until?: string | null
           RG?: string | null
           status?: string | null
           Taxa?: string | null
@@ -1066,6 +1072,33 @@ export type Database = {
           },
         ]
       }
+      registrodiariobaseoff: {
+        Row: {
+          created_at: string
+          data_registro: string
+          id: string
+          quantidade_leads: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_registro?: string
+          id?: string
+          quantidade_leads?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data_registro?: string
+          id?: string
+          quantidade_leads?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_commission_config: {
         Row: {
           bank_product_id: string
@@ -1294,6 +1327,10 @@ export type Database = {
           phone: string
           tipo_beneficio: string
         }[]
+      }
+      update_daily_baseoff_usage: {
+        Args: { leads_count_param: number; user_id_param: string }
+        Returns: undefined
       }
     }
     Enums: {

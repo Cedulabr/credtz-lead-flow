@@ -41,9 +41,16 @@ export function BaseOff() {
   // Generate list states
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
   const [selectedBanco, setSelectedBanco] = useState<string>("");
-  const [valorMin, setValorMin] = useState<string>("");
-  const [valorMax, setValorMax] = useState<string>("");
+  const [valorMin, setValorMin] = useState<string>("100");
+  const [valorMax, setValorMax] = useState<string>("1500");
+  const [idadeMin, setIdadeMin] = useState<string>("45");
+  const [idadeMax, setIdadeMax] = useState<string>("71");
+  const [selectedUF, setSelectedUF] = useState<string>("");
+  const [selectedMunicipio, setSelectedMunicipio] = useState<string>("");
+  const [quantidadeLeads, setQuantidadeLeads] = useState<string>("50");
   const [availableBancos, setAvailableBancos] = useState<string[]>([]);
+  const [availableUFs, setAvailableUFs] = useState<string[]>([]);
+  const [availableMunicipios, setAvailableMunicipios] = useState<string[]>([]);
   const [dailyLimit, setDailyLimit] = useState<number>(0);
 
   const statusOptions = [
@@ -58,8 +65,18 @@ export function BaseOff() {
   useEffect(() => {
     fetchLeads();
     fetchAvailableBancos();
+    fetchAvailableUFs();
     checkDailyLimit();
   }, []);
+
+  useEffect(() => {
+    if (selectedUF) {
+      fetchAvailableMunicipios();
+    } else {
+      setAvailableMunicipios([]);
+      setSelectedMunicipio("");
+    }
+  }, [selectedUF]);
 
   useEffect(() => {
     filterLeads();
@@ -92,7 +109,8 @@ export function BaseOff() {
       const { data, error } = await supabase
         .from('leads_semtelefone')
         .select('Codigo_Banco')
-        .eq('is_available', true);
+        .eq('is_available', true)
+        .or('reserved_until.is.null,reserved_until.lt.now()');
 
       if (error) throw error;
       
@@ -100,6 +118,41 @@ export function BaseOff() {
       setAvailableBancos(uniqueBancos);
     } catch (error) {
       console.error('Error fetching bancos:', error);
+    }
+  };
+
+  const fetchAvailableUFs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('leads_semtelefone')
+        .select('UF')
+        .eq('is_available', true)
+        .or('reserved_until.is.null,reserved_until.lt.now()');
+
+      if (error) throw error;
+      
+      const uniqueUFs = [...new Set(data?.map(item => item.UF).filter(Boolean))];
+      setAvailableUFs(uniqueUFs);
+    } catch (error) {
+      console.error('Error fetching UFs:', error);
+    }
+  };
+
+  const fetchAvailableMunicipios = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('leads_semtelefone')
+        .select('Municipio')
+        .eq('is_available', true)
+        .eq('UF', selectedUF)
+        .or('reserved_until.is.null,reserved_until.lt.now()');
+
+      if (error) throw error;
+      
+      const uniqueMunicipios = [...new Set(data?.map(item => item.Municipio).filter(Boolean))];
+      setAvailableMunicipios(uniqueMunicipios);
+    } catch (error) {
+      console.error('Error fetching municípios:', error);
     }
   };
 
@@ -131,35 +184,50 @@ export function BaseOff() {
 
   const generateLeads = async () => {
     try {
-      if (!selectedBanco || !valorMin || !valorMax) {
+      const requestedLeads = parseInt(quantidadeLeads);
+      const maxLeads = Math.min(requestedLeads, dailyLimit);
+
+      if (!selectedBanco || !valorMin || !valorMax || !idadeMin || !idadeMax) {
         toast({
           title: "Erro",
-          description: "Preencha todos os filtros",
+          description: "Preencha todos os filtros obrigatórios",
           variant: "destructive",
         });
         return;
       }
 
-      const leadsToGenerate = Math.min(50, dailyLimit);
-
-      if (leadsToGenerate <= 0) {
+      if (maxLeads <= 0) {
         toast({
           title: "Limite atingido",
-          description: "Você atingiu o limite diário de 50 leads",
+          description: "Você atingiu o limite diário de 80 leads",
           variant: "destructive",
         });
         return;
       }
 
-      // Convert valor_parcela to numeric for comparison
-      const { data: availableLeads, error: fetchError } = await supabase
+      // Build query with filters
+      let query = supabase
         .from('leads_semtelefone')
         .select('*')
         .eq('is_available', true)
+        .or('reserved_until.is.null,reserved_until.lt.now()')
         .eq('Codigo_Banco', selectedBanco)
         .gte('Valor_Parcela', valorMin)
         .lte('Valor_Parcela', valorMax)
-        .limit(leadsToGenerate);
+        .gte('Idade', parseInt(idadeMin))
+        .lte('Idade', parseInt(idadeMax));
+
+      // Add UF filter if selected
+      if (selectedUF) {
+        query = query.eq('UF', selectedUF);
+      }
+
+      // Add Municipio filter if selected
+      if (selectedMunicipio) {
+        query = query.eq('Municipio', selectedMunicipio);
+      }
+
+      const { data: availableLeads, error: fetchError } = await query.limit(maxLeads);
 
       if (fetchError) throw fetchError;
 
@@ -172,19 +240,29 @@ export function BaseOff() {
         return;
       }
 
-      // Update the selected leads to assign them to the user
+      // Reserve leads for 30 days and assign to user
       const leadIds = availableLeads.map(lead => lead.id);
+      const reserveUntil = new Date();
+      reserveUntil.setDate(reserveUntil.getDate() + 30);
       
       const { error: updateError } = await supabase
         .from('leads_semtelefone')
         .update({
           assigned_to: user?.id,
           is_available: false,
-          created_by: user?.id
+          created_by: user?.id,
+          reserved_until: reserveUntil.toISOString(),
+          reserved_by: user?.id
         })
         .in('id', leadIds);
 
       if (updateError) throw updateError;
+
+      // Update daily usage tracking
+      await supabase.rpc('update_daily_baseoff_usage', {
+        user_id_param: user?.id,
+        leads_count_param: availableLeads.length
+      });
 
       // Record the request
       await supabase
@@ -339,32 +417,104 @@ export function BaseOff() {
                   </Select>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="valor-min">Valor Mínimo da Parcela</Label>
-                    <Input
-                      id="valor-min"
-                      type="number"
-                      placeholder="100"
-                      value={valorMin}
-                      onChange={(e) => setValorMin(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="valor-max">Valor Máximo da Parcela</Label>
-                    <Input
-                      id="valor-max"
-                      type="number"
-                      placeholder="300"
-                      value={valorMax}
-                      onChange={(e) => setValorMax(e.target.value)}
-                    />
-                  </div>
-                </div>
+                 <div>
+                   <Label htmlFor="quantidade">Quantidade de Leads</Label>
+                   <Input
+                     id="quantidade"
+                     type="number"
+                     placeholder="50"
+                     min="1"
+                     max="80"
+                     value={quantidadeLeads}
+                     onChange={(e) => setQuantidadeLeads(e.target.value)}
+                   />
+                 </div>
 
-                <p className="text-sm text-muted-foreground">
-                  Será gerado até 50 leads (limitado pelo seu limite diário restante: {dailyLimit})
-                </p>
+                 <div className="grid grid-cols-2 gap-4">
+                   <div>
+                     <Label htmlFor="valor-min">Valor Mínimo da Parcela</Label>
+                     <Input
+                       id="valor-min"
+                       type="number"
+                       placeholder="100"
+                       value={valorMin}
+                       onChange={(e) => setValorMin(e.target.value)}
+                     />
+                   </div>
+                   <div>
+                     <Label htmlFor="valor-max">Valor Máximo da Parcela</Label>
+                     <Input
+                       id="valor-max"
+                       type="number"
+                       placeholder="1500"
+                       value={valorMax}
+                       onChange={(e) => setValorMax(e.target.value)}
+                     />
+                   </div>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4">
+                   <div>
+                     <Label htmlFor="idade-min">Idade Mínima</Label>
+                     <Input
+                       id="idade-min"
+                       type="number"
+                       placeholder="45"
+                       value={idadeMin}
+                       onChange={(e) => setIdadeMin(e.target.value)}
+                     />
+                   </div>
+                   <div>
+                     <Label htmlFor="idade-max">Idade Máxima</Label>
+                     <Input
+                       id="idade-max"
+                       type="number"
+                       placeholder="71"
+                       value={idadeMax}
+                       onChange={(e) => setIdadeMax(e.target.value)}
+                     />
+                   </div>
+                 </div>
+
+                 <div>
+                   <Label htmlFor="uf">Estado (UF)</Label>
+                   <Select value={selectedUF} onValueChange={setSelectedUF}>
+                     <SelectTrigger>
+                       <SelectValue placeholder="Selecione um estado (opcional)" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="">Todos os estados</SelectItem>
+                       {availableUFs.map(uf => (
+                         <SelectItem key={uf} value={uf}>
+                           {uf}
+                         </SelectItem>
+                       ))}
+                     </SelectContent>
+                   </Select>
+                 </div>
+
+                 {selectedUF && (
+                   <div>
+                     <Label htmlFor="municipio">Cidade</Label>
+                     <Select value={selectedMunicipio} onValueChange={setSelectedMunicipio}>
+                       <SelectTrigger>
+                         <SelectValue placeholder="Selecione uma cidade (opcional)" />
+                       </SelectTrigger>
+                       <SelectContent>
+                         <SelectItem value="">Todas as cidades</SelectItem>
+                         {availableMunicipios.map(municipio => (
+                           <SelectItem key={municipio} value={municipio}>
+                             {municipio}
+                           </SelectItem>
+                         ))}
+                       </SelectContent>
+                     </Select>
+                   </div>
+                 )}
+
+                 <p className="text-sm text-muted-foreground">
+                   Máximo: 80 leads por dia. Restante hoje: <strong>{dailyLimit}</strong>
+                 </p>
 
                 <Button onClick={generateLeads} className="w-full">
                   Gerar Leads
