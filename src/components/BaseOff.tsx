@@ -431,7 +431,10 @@ export function BaseOff() {
           </div>
           <Dialog open={isGenerateDialogOpen} onOpenChange={setIsGenerateDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button onClick={() => {
+                console.log('Gerar Lista clicked, opening dialog');
+                setIsGenerateDialogOpen(true);
+              }}>
                 <Plus className="h-4 w-4 mr-2" />
                 Gerar Lista
               </Button>
