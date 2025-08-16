@@ -27,6 +27,7 @@ import {
 import { PaymentLaunch } from "./PaymentLaunch";
 import { PaymentManagement } from "./PaymentManagement";
 import { UsersList } from "./UsersList";
+import { AdminBaseOffBanks } from "./AdminBaseOffBanks";
 
 interface Webhook {
   id: number;
@@ -320,10 +321,11 @@ export function AdminPanel() {
       </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-5' : 'grid-cols-3'}`}>
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-6' : 'grid-cols-3'}`}>
             <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
             <TabsTrigger value="announcements">Avisos</TabsTrigger>
             <TabsTrigger value="commissions">Comissões</TabsTrigger>
+            {isAdmin && <TabsTrigger value="baseoff-banks">Bancos BaseOFF</TabsTrigger>}
             {isAdmin && <TabsTrigger value="payments">Pagamentos</TabsTrigger>}
             {isAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
           </TabsList>
@@ -716,6 +718,13 @@ export function AdminPanel() {
           <TabsContent value="payments" className="space-y-4">
             <PaymentLaunch />
             <PaymentManagement />
+          </TabsContent>
+        )}
+
+        {/* BaseOFF Banks Management Tab */}
+        {isAdmin && (
+          <TabsContent value="baseoff-banks" className="space-y-4">
+            <AdminBaseOffBanks />
           </TabsContent>
         )}
 

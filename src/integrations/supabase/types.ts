@@ -110,6 +110,33 @@ export type Database = {
         }
         Relationships: []
       }
+      baseoff_allowed_banks: {
+        Row: {
+          codigo_banco: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          codigo_banco: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          codigo_banco?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       baseoff_requests: {
         Row: {
           codigo_banco: string | null

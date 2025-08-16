@@ -106,11 +106,28 @@ export function BaseOff() {
 
   const fetchAvailableBancos = async () => {
     try {
+      // First get allowed banks from admin settings
+      const { data: allowedBanks, error: allowedError } = await supabase
+        .from('baseoff_allowed_banks')
+        .select('codigo_banco')
+        .eq('is_active', true);
+
+      if (allowedError) throw allowedError;
+      
+      const allowedCodes = allowedBanks?.map(bank => bank.codigo_banco) || [];
+      
+      if (allowedCodes.length === 0) {
+        setAvailableBancos([]);
+        return;
+      }
+
+      // Then get available leads with those bank codes
       const { data, error } = await supabase
         .from('leads_semtelefone')
         .select('Codigo_Banco')
         .eq('is_available', true)
-        .or('reserved_until.is.null,reserved_until.lt.now()');
+        .or('reserved_until.is.null,reserved_until.lt.now()')
+        .in('Codigo_Banco', allowedCodes);
 
       if (error) throw error;
       
@@ -200,6 +217,23 @@ export function BaseOff() {
         toast({
           title: "Limite atingido",
           description: "Você atingiu o limite diário de 80 leads",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check if bank is allowed first
+      const { data: allowedBank, error: bankError } = await supabase
+        .from('baseoff_allowed_banks')
+        .select('codigo_banco')
+        .eq('codigo_banco', selectedBanco)
+        .eq('is_active', true)
+        .single();
+
+      if (bankError || !allowedBank) {
+        toast({
+          title: "Banco não permitido",
+          description: "Este banco não está disponível para geração de leads",
           variant: "destructive",
         });
         return;
@@ -375,6 +409,12 @@ export function BaseOff() {
   const getStatusLabel = (status: string) => {
     const option = statusOptions.find(opt => opt.value === status);
     return option?.label || status;
+  };
+
+  const formatCPF = (cpf: string) => {
+    if (!cpf) return '';
+    const cleanCPF = cpf.replace(/\D/g, '');
+    return cleanCPF.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   };
 
   if (loading) {
@@ -594,7 +634,7 @@ export function BaseOff() {
               {filteredLeads.map((lead) => (
                 <TableRow key={lead.id}>
                   <TableCell className="font-medium">{lead.Nome}</TableCell>
-                  <TableCell>{lead.CPF}</TableCell>
+                  <TableCell>{formatCPF(lead.CPF)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {lead.phone || "Sem telefone"}
