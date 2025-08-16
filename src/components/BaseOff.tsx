@@ -36,7 +36,7 @@ export function BaseOff() {
   
   // Filter states
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [bancoFilter, setBancoFilter] = useState<string>("all");
+  const [nomeFilter, setNomeFilter] = useState<string>("");
   
   // Generate list states
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
@@ -80,7 +80,7 @@ export function BaseOff() {
 
   useEffect(() => {
     filterLeads();
-  }, [leads, statusFilter, bancoFilter]);
+  }, [leads, statusFilter, nomeFilter]);
 
   const fetchLeads = async () => {
     try {
@@ -192,8 +192,10 @@ export function BaseOff() {
       filtered = filtered.filter(lead => lead.status === statusFilter);
     }
 
-    if (bancoFilter !== "all") {
-      filtered = filtered.filter(lead => lead.Codigo_Banco === bancoFilter);
+    if (nomeFilter.trim()) {
+      filtered = filtered.filter(lead => 
+        lead.Nome.toLowerCase().includes(nomeFilter.toLowerCase())
+      );
     }
 
     setFilteredLeads(filtered);
@@ -204,7 +206,7 @@ export function BaseOff() {
       const requestedLeads = parseInt(quantidadeLeads);
       const maxLeads = Math.min(requestedLeads, dailyLimit);
 
-      if (!selectedBanco || !valorMin || !valorMax || !idadeMin || !idadeMax) {
+      if (!selectedBanco || !valorMin || !valorMax) {
         toast({
           title: "Erro",
           description: "Preencha todos os filtros obrigatórios",
@@ -247,9 +249,7 @@ export function BaseOff() {
         .or('reserved_until.is.null,reserved_until.lt.now()')
         .eq('Codigo_Banco', selectedBanco)
         .gte('Valor_Parcela', valorMin)
-        .lte('Valor_Parcela', valorMax)
-        .gte('Idade', parseInt(idadeMin))
-        .lte('Idade', parseInt(idadeMax));
+        .lte('Valor_Parcela', valorMax);
 
       // Add UF filter if selected
       if (selectedUF) {
@@ -496,64 +496,42 @@ export function BaseOff() {
                    </div>
                  </div>
 
-                 <div className="grid grid-cols-2 gap-4">
-                   <div>
-                     <Label htmlFor="idade-min">Idade Mínima</Label>
-                     <Input
-                       id="idade-min"
-                       type="number"
-                       placeholder="45"
-                       value={idadeMin}
-                       onChange={(e) => setIdadeMin(e.target.value)}
-                     />
-                   </div>
-                   <div>
-                     <Label htmlFor="idade-max">Idade Máxima</Label>
-                     <Input
-                       id="idade-max"
-                       type="number"
-                       placeholder="71"
-                       value={idadeMax}
-                       onChange={(e) => setIdadeMax(e.target.value)}
-                     />
-                   </div>
-                 </div>
+                  <div>
+                    <Label htmlFor="uf">Estado (UF)</Label>
+                    <Select value={selectedUF} onValueChange={setSelectedUF}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um estado (opcional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Todos os estados</SelectItem>
+                        {availableUFs.map(uf => (
+                          <SelectItem key={uf} value={uf}>
+                            {uf}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                 <div>
-                   <Label htmlFor="uf">Estado (UF)</Label>
-                   <Select value={selectedUF} onValueChange={setSelectedUF}>
-                     <SelectTrigger>
-                       <SelectValue placeholder="Selecione um estado (opcional)" />
-                     </SelectTrigger>
-                     <SelectContent>
-                       <SelectItem value="">Todos os estados</SelectItem>
-                       {availableUFs.map(uf => (
-                         <SelectItem key={uf} value={uf}>
-                           {uf}
-                         </SelectItem>
-                       ))}
-                     </SelectContent>
-                   </Select>
-                 </div>
+                  {selectedUF && (
+                    <div>
+                      <Label htmlFor="municipio">Cidade</Label>
+                      <Select value={selectedMunicipio} onValueChange={setSelectedMunicipio}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma cidade (opcional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Todas as cidades</SelectItem>
+                          {availableMunicipios.map(municipio => (
+                            <SelectItem key={municipio} value={municipio}>
+                              {municipio}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
-                 {selectedUF && (
-                   <div>
-                     <Label htmlFor="municipio">Cidade</Label>
-                     <Select value={selectedMunicipio} onValueChange={setSelectedMunicipio}>
-                       <SelectTrigger>
-                         <SelectValue placeholder="Selecione uma cidade (opcional)" />
-                       </SelectTrigger>
-                       <SelectContent>
-                         <SelectItem value="">Todas as cidades</SelectItem>
-                         {availableMunicipios.map(municipio => (
-                           <SelectItem key={municipio} value={municipio}>
-                             {municipio}
-                           </SelectItem>
-                         ))}
-                       </SelectContent>
-                     </Select>
-                   </div>
-                 )}
 
                  <p className="text-sm text-muted-foreground">
                    Máximo: 80 leads por dia. Restante hoje: <strong>{dailyLimit}</strong>
@@ -596,20 +574,14 @@ export function BaseOff() {
             </div>
             
             <div>
-              <Label htmlFor="banco-filter">Banco</Label>
-              <Select value={bancoFilter} onValueChange={setBancoFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os bancos</SelectItem>
-                  {availableBancos.map(banco => (
-                    <SelectItem key={banco} value={banco}>
-                      {banco}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="nome-filter">Nome do Cliente</Label>
+              <Input
+                id="nome-filter"
+                type="text"
+                placeholder="Digite o nome do cliente..."
+                value={nomeFilter}
+                onChange={(e) => setNomeFilter(e.target.value)}
+              />
             </div>
           </div>
         </CardContent>
