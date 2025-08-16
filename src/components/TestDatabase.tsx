@@ -58,7 +58,7 @@ export function TestDatabase() {
     setLoading("client");
     try {
       const { data, error } = await supabase
-        .from("clients")
+        .from("clientes")
         .insert([clientData])
         .select();
 

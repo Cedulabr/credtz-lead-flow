@@ -4,6 +4,7 @@ import { Navigation } from "@/components/Navigation";
 import { Dashboard } from "@/components/Dashboard";
 import { IndicateClient } from "@/components/IndicateClient";
 import { LeadsManagement } from "@/components/LeadsManagement";
+import { BaseOff } from "@/components/BaseOff";
 import { Commissions } from "@/components/Commissions";
 import { Notifications } from "@/components/Notifications";
 import { AdminTest } from "@/components/AdminTest";
@@ -60,6 +61,8 @@ const Index = () => {
         return <IndicateClient />;
       case "leads":
         return <LeadsManagement />;
+      case "baseoff":
+        return <BaseOff />;
       case "commissions":
         return <Commissions />;
       case "notifications":
