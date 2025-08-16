@@ -43,17 +43,13 @@ export function BaseOff() {
   // Generate list states
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
   const [selectedBanco, setSelectedBanco] = useState<string>("");
-  const [valorMin, setValorMin] = useState<string>("100");
-  const [valorMax, setValorMax] = useState<string>("1500");
-  const [idadeMin, setIdadeMin] = useState<string>("45");
-  const [idadeMax, setIdadeMax] = useState<string>("71");
+  const [valorParcela, setValorParcela] = useState<string>("");
   const [selectedUF, setSelectedUF] = useState<string>("");
-  const [selectedMunicipio, setSelectedMunicipio] = useState<string>("");
-  const [quantidadeLeads, setQuantidadeLeads] = useState<string>("50");
+  const [quantidadeLeads, setQuantidadeLeads] = useState<string>("10");
   const [availableBancos, setAvailableBancos] = useState<string[]>([]);
   const [availableUFs, setAvailableUFs] = useState<string[]>([]);
-  const [availableMunicipios, setAvailableMunicipios] = useState<string[]>([]);
   const [dailyLimit, setDailyLimit] = useState<number>(0);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const statusOptions = [
     { value: "novo_lead", label: "Novo Lead" },
@@ -73,15 +69,6 @@ export function BaseOff() {
       checkDailyLimit();
     }
   }, [user]);
-
-  useEffect(() => {
-    if (selectedUF) {
-      fetchAvailableMunicipios();
-    } else {
-      setAvailableMunicipios([]);
-      setSelectedMunicipio("");
-    }
-  }, [selectedUF]);
 
   useEffect(() => {
     filterLeads();
@@ -176,23 +163,6 @@ export function BaseOff() {
     }
   };
 
-  const fetchAvailableMunicipios = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('leads_semtelefone')
-        .select('Municipio')
-        .eq('is_available', true)
-        .eq('UF', selectedUF)
-        .or('reserved_until.is.null,reserved_until.lt.now()');
-
-      if (error) throw error;
-      
-      const uniqueMunicipios = [...new Set(data?.map(item => item.Municipio).filter(Boolean))];
-      setAvailableMunicipios(uniqueMunicipios);
-    } catch (error) {
-      console.error('Error fetching municípios:', error);
-    }
-  };
 
   const checkDailyLimit = async () => {
     try {
@@ -224,13 +194,31 @@ export function BaseOff() {
 
   const generateLeads = async () => {
     try {
+      setIsGenerating(true);
+      console.log('BaseOff: Generating leads with filters:', {
+        selectedBanco,
+        valorParcela,
+        selectedUF,
+        quantidadeLeads
+      });
+
       const requestedLeads = parseInt(quantidadeLeads);
       const maxLeads = Math.min(requestedLeads, dailyLimit);
 
-      if (!selectedBanco || !valorMin || !valorMax) {
+      // Validação dos campos obrigatórios
+      if (!selectedBanco) {
         toast({
           title: "Erro",
-          description: "Preencha todos os filtros obrigatórios",
+          description: "Selecione um código de banco",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!quantidadeLeads || requestedLeads <= 0) {
+        toast({
+          title: "Erro",
+          description: "Informe uma quantidade válida de leads",
           variant: "destructive",
         });
         return;
@@ -239,52 +227,38 @@ export function BaseOff() {
       if (maxLeads <= 0) {
         toast({
           title: "Limite atingido",
-          description: "Você atingiu o limite diário de 80 leads",
+          description: "Você atingiu o limite diário de leads",
           variant: "destructive",
         });
         return;
       }
 
-      // Check if bank is allowed first
-      const { data: allowedBank, error: bankError } = await supabase
-        .from('baseoff_allowed_banks')
-        .select('codigo_banco')
-        .eq('codigo_banco', selectedBanco)
-        .eq('is_active', true)
-        .single();
-
-      if (bankError || !allowedBank) {
-        toast({
-          title: "Banco não permitido",
-          description: "Este banco não está disponível para geração de leads",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Build query with filters
+      // Construir query com filtros
       let query = supabase
         .from('leads_semtelefone')
         .select('*')
         .eq('is_available', true)
         .or('reserved_until.is.null,reserved_until.lt.now()')
-        .eq('Codigo_Banco', selectedBanco)
-        .gte('Valor_Parcela', valorMin)
-        .lte('Valor_Parcela', valorMax);
+        .eq('Codigo_Banco', selectedBanco);
 
-      // Add UF filter if selected
+      // Filtro por valor da parcela (se preenchido)
+      if (valorParcela) {
+        query = query.eq('Valor_Parcela', valorParcela);
+      }
+
+      // Filtro por UF (se selecionado)
       if (selectedUF) {
         query = query.eq('UF', selectedUF);
       }
 
-      // Add Municipio filter if selected
-      if (selectedMunicipio) {
-        query = query.eq('Municipio', selectedMunicipio);
-      }
-
       const { data: availableLeads, error: fetchError } = await query.limit(maxLeads);
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error('BaseOff: Error fetching leads:', fetchError);
+        throw fetchError;
+      }
+
+      console.log('BaseOff: Found leads:', availableLeads?.length || 0);
 
       if (!availableLeads || availableLeads.length === 0) {
         toast({
@@ -295,7 +269,7 @@ export function BaseOff() {
         return;
       }
 
-      // Reserve leads for 30 days and assign to user
+      // Reservar leads e atribuir ao usuário
       const leadIds = availableLeads.map(lead => lead.id);
       const reserveUntil = new Date();
       reserveUntil.setDate(reserveUntil.getDate() + 30);
@@ -311,23 +285,24 @@ export function BaseOff() {
         })
         .in('id', leadIds);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('BaseOff: Error updating leads:', updateError);
+        throw updateError;
+      }
 
-      // Update daily usage tracking
+      // Atualizar tracking de uso diário
       await supabase.rpc('update_daily_baseoff_usage', {
         user_id_param: user?.id,
         leads_count_param: availableLeads.length
       });
 
-      // Record the request
+      // Registrar a solicitação
       await supabase
         .from('baseoff_requests')
         .insert({
           user_id: user?.id,
           leads_count: availableLeads.length,
-          codigo_banco: selectedBanco,
-          valor_parcela_min: parseFloat(valorMin),
-          valor_parcela_max: parseFloat(valorMax)
+          codigo_banco: selectedBanco
         });
 
       toast({
@@ -338,13 +313,22 @@ export function BaseOff() {
       setIsGenerateDialogOpen(false);
       fetchLeads();
       checkDailyLimit();
+      
+      // Limpar filtros
+      setSelectedBanco("");
+      setValorParcela("");
+      setSelectedUF("");
+      setQuantidadeLeads("10");
+      
     } catch (error) {
-      console.error('Error generating leads:', error);
+      console.error('BaseOff: Error generating leads:', error);
       toast({
         title: "Erro",
         description: "Erro ao gerar leads",
         variant: "destructive",
       });
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -480,100 +464,80 @@ export function BaseOff() {
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="banco">Código do Banco</Label>
+                  <Label htmlFor="banco">Código do Banco *</Label>
                   <Select value={selectedBanco} onValueChange={setSelectedBanco}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione um banco" />
+                      <SelectValue placeholder="Selecione um código de banco" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableBancos.map(banco => (
-                        <SelectItem key={banco} value={banco}>
-                          {banco}
-                        </SelectItem>
-                      ))}
+                      {availableBancos.length > 0 ? (
+                        availableBancos.map(banco => (
+                          <SelectItem key={banco} value={banco}>
+                            {banco}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>Nenhum banco disponível</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
-                
-                 <div>
-                   <Label htmlFor="quantidade">Quantidade de Leads</Label>
-                   <Input
-                     id="quantidade"
-                     type="number"
-                     placeholder="50"
-                     min="1"
-                     max="80"
-                     value={quantidadeLeads}
-                     onChange={(e) => setQuantidadeLeads(e.target.value)}
-                   />
-                 </div>
 
-                 <div className="grid grid-cols-2 gap-4">
-                   <div>
-                     <Label htmlFor="valor-min">Valor Mínimo da Parcela</Label>
-                     <Input
-                       id="valor-min"
-                       type="number"
-                       placeholder="100"
-                       value={valorMin}
-                       onChange={(e) => setValorMin(e.target.value)}
-                     />
-                   </div>
-                   <div>
-                     <Label htmlFor="valor-max">Valor Máximo da Parcela</Label>
-                     <Input
-                       id="valor-max"
-                       type="number"
-                       placeholder="1500"
-                       value={valorMax}
-                       onChange={(e) => setValorMax(e.target.value)}
-                     />
-                   </div>
-                 </div>
+                <div>
+                  <Label htmlFor="valor-parcela">Valor da Parcela</Label>
+                  <Input
+                    id="valor-parcela"
+                    type="text"
+                    placeholder="Ex: 150.00 (opcional)"
+                    value={valorParcela}
+                    onChange={(e) => setValorParcela(e.target.value)}
+                  />
+                </div>
 
-                  <div>
-                    <Label htmlFor="uf">Estado (UF)</Label>
-                    <Select value={selectedUF} onValueChange={setSelectedUF}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um estado (opcional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">Todos os estados</SelectItem>
-                        {availableUFs.map(uf => (
+                <div>
+                  <Label htmlFor="uf">Estado (UF)</Label>
+                  <Select value={selectedUF} onValueChange={setSelectedUF}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um estado (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos os estados</SelectItem>
+                      {availableUFs.length > 0 ? (
+                        availableUFs.map(uf => (
                           <SelectItem key={uf} value={uf}>
                             {uf}
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>Nenhum estado disponível</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  {selectedUF && (
-                    <div>
-                      <Label htmlFor="municipio">Cidade</Label>
-                      <Select value={selectedMunicipio} onValueChange={setSelectedMunicipio}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione uma cidade (opcional)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">Todas as cidades</SelectItem>
-                          {availableMunicipios.map(municipio => (
-                            <SelectItem key={municipio} value={municipio}>
-                              {municipio}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
+                <div>
+                  <Label htmlFor="quantidade">Quantidade de Leads *</Label>
+                  <Input
+                    id="quantidade"
+                    type="number"
+                    placeholder="10"
+                    min="1"
+                    max="80"
+                    value={quantidadeLeads}
+                    onChange={(e) => setQuantidadeLeads(e.target.value)}
+                  />
+                </div>
 
+                <p className="text-sm text-muted-foreground">
+                  Limite diário restante: <strong>{dailyLimit}</strong> leads
+                </p>
 
-                 <p className="text-sm text-muted-foreground">
-                   Máximo: 80 leads por dia. Restante hoje: <strong>{dailyLimit}</strong>
-                 </p>
-
-                <Button onClick={generateLeads} className="w-full">
-                  Gerar Leads
+                <Button 
+                  onClick={generateLeads} 
+                  className="w-full" 
+                  disabled={isGenerating || !selectedBanco || !quantidadeLeads}
+                >
+                  {isGenerating ? "Gerando..." : "Gerar Leads"}
                 </Button>
               </div>
             </DialogContent>
