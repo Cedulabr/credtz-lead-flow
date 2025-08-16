@@ -50,6 +50,7 @@ export function BaseOff() {
   const [availableUFs, setAvailableUFs] = useState<string[]>([]);
   const [dailyLimit, setDailyLimit] = useState<number>(0);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   const statusOptions = [
     { value: "novo_lead", label: "Novo Lead" },
@@ -63,12 +64,25 @@ export function BaseOff() {
   useEffect(() => {
     console.log('BaseOff: Component mounted, user:', user);
     if (user) {
-      fetchLeads();
-      fetchAvailableBancos();
-      fetchAvailableUFs();
-      checkDailyLimit();
+      initializeData();
     }
   }, [user]);
+
+  const initializeData = async () => {
+    setIsLoadingData(true);
+    try {
+      await Promise.all([
+        fetchLeads(),
+        fetchAvailableBancos(),
+        fetchAvailableUFs(),
+        checkDailyLimit()
+      ]);
+    } catch (error) {
+      console.error('Error initializing data:', error);
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
 
   useEffect(() => {
     filterLeads();
@@ -438,26 +452,53 @@ export function BaseOff() {
           <div className="text-sm text-muted-foreground">
             Limite diário restante: <strong>{dailyLimit}</strong>
           </div>
-          <Button onClick={() => {
-            console.log('BaseOff: Gerar Lista clicked');
-            console.log('BaseOff: Available bancos:', availableBancos);
-            console.log('BaseOff: Available UFs:', availableUFs);
-            console.log('BaseOff: User:', user);
-            if (!user) {
-              toast({
-                title: "Erro",
-                description: "Usuário não autenticado",
-                variant: "destructive",
-              });
-              return;
-            }
-            setIsGenerateDialogOpen(true);
-          }}>
+          <Button 
+            onClick={() => {
+              console.log('BaseOff: Gerar Lista clicked');
+              console.log('BaseOff: Available bancos:', availableBancos);
+              console.log('BaseOff: Available UFs:', availableUFs);
+              console.log('BaseOff: User:', user);
+              console.log('BaseOff: Loading data:', isLoadingData);
+              
+              if (!user) {
+                toast({
+                  title: "Erro",
+                  description: "Usuário não autenticado",
+                  variant: "destructive",
+                });
+                return;
+              }
+              
+              if (isLoadingData) {
+                toast({
+                  title: "Aguarde",
+                  description: "Carregando dados necessários...",
+                  variant: "default",
+                });
+                return;
+              }
+              
+              if (availableBancos.length === 0) {
+                toast({
+                  title: "Atenção",
+                  description: "Nenhum banco disponível para geração de leads",
+                  variant: "destructive",
+                });
+                return;
+              }
+              
+              setIsGenerateDialogOpen(true);
+            }}
+            disabled={isLoadingData || !user || availableBancos.length === 0}
+          >
             <Plus className="h-4 w-4 mr-2" />
-            Gerar Lista
+            {isLoadingData ? "Carregando..." : "Gerar Lista"}
           </Button>
-          
-          <Dialog open={isGenerateDialogOpen} onOpenChange={setIsGenerateDialogOpen}>
+        </div>
+      </div>
+
+      {/* Generate Leads Dialog */}
+      <Dialog open={isGenerateDialogOpen} onOpenChange={setIsGenerateDialogOpen}>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Gerar Lista de Leads</DialogTitle>
@@ -469,17 +510,19 @@ export function BaseOff() {
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um código de banco" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {availableBancos.length > 0 ? (
-                        availableBancos.map(banco => (
-                          <SelectItem key={banco} value={banco}>
-                            {banco}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="" disabled>Nenhum banco disponível</SelectItem>
-                      )}
-                    </SelectContent>
+                     <SelectContent>
+                       {isLoadingData ? (
+                         <SelectItem value="" disabled>Carregando bancos...</SelectItem>
+                       ) : availableBancos.length > 0 ? (
+                         availableBancos.map(banco => (
+                           <SelectItem key={banco} value={banco}>
+                             Código: {banco}
+                           </SelectItem>
+                         ))
+                       ) : (
+                         <SelectItem value="" disabled>Nenhum banco disponível</SelectItem>
+                       )}
+                     </SelectContent>
                   </Select>
                 </div>
 
@@ -500,18 +543,20 @@ export function BaseOff() {
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um estado (opcional)" />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Todos os estados</SelectItem>
-                      {availableUFs.length > 0 ? (
-                        availableUFs.map(uf => (
-                          <SelectItem key={uf} value={uf}>
-                            {uf}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="" disabled>Nenhum estado disponível</SelectItem>
-                      )}
-                    </SelectContent>
+                     <SelectContent>
+                       <SelectItem value="">Todos os estados</SelectItem>
+                       {isLoadingData ? (
+                         <SelectItem value="" disabled>Carregando estados...</SelectItem>
+                       ) : availableUFs.length > 0 ? (
+                         availableUFs.map(uf => (
+                           <SelectItem key={uf} value={uf}>
+                             {uf}
+                           </SelectItem>
+                         ))
+                       ) : (
+                         <SelectItem value="" disabled>Nenhum estado disponível</SelectItem>
+                       )}
+                     </SelectContent>
                   </Select>
                 </div>
 
@@ -532,18 +577,16 @@ export function BaseOff() {
                   Limite diário restante: <strong>{dailyLimit}</strong> leads
                 </p>
 
-                <Button 
-                  onClick={generateLeads} 
-                  className="w-full" 
-                  disabled={isGenerating || !selectedBanco || !quantidadeLeads}
-                >
-                  {isGenerating ? "Gerando..." : "Gerar Leads"}
-                </Button>
+                 <Button 
+                   onClick={generateLeads} 
+                   className="w-full" 
+                   disabled={isGenerating || !selectedBanco || !quantidadeLeads || isLoadingData || dailyLimit <= 0}
+                 >
+                   {isGenerating ? "Gerando..." : isLoadingData ? "Carregando..." : "Gerar Leads"}
+                 </Button>
               </div>
             </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+        </Dialog>
 
       {/* Filters */}
       <Card>
