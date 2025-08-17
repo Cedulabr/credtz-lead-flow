@@ -22,6 +22,7 @@ interface BaseOffLead {
   UF: string;
   Municipio: string;
   Margem_Disponivel?: string;
+  status?: string;
 }
 
 export function BaseOff() {
@@ -33,6 +34,17 @@ export function BaseOff() {
   
   // Filter states
   const [nomeFilter, setNomeFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  
+  // Status options
+  const statusOptions = [
+    "Novo lead",
+    "Em andamento", 
+    "Aguardando retorno",
+    "Cliente Fechado",
+    "Oferta negada",
+    "Contato Futuro"
+  ];
   
   // Generate list states
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false);
@@ -71,7 +83,7 @@ export function BaseOff() {
 
   useEffect(() => {
     filterLeads();
-  }, [leads, nomeFilter]);
+  }, [leads, nomeFilter, statusFilter]);
 
   const fetchLeads = async () => {
     try {
@@ -178,7 +190,42 @@ export function BaseOff() {
       );
     }
 
+    if (statusFilter.trim()) {
+      filtered = filtered.filter(lead => 
+        lead.status === statusFilter
+      );
+    }
+
     setFilteredLeads(filtered);
+  };
+  
+  const formatPhoneForWhatsApp = (phone: string) => {
+    if (!phone) return '';
+    // Remove all non-digits
+    const cleanPhone = phone.replace(/\D/g, '');
+    // Add country code if not present
+    const phoneWithCountry = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    return `https://wa.me/${phoneWithCountry}`;
+  };
+
+  const updateLeadStatus = async (leadIndex: number, newStatus: string) => {
+    try {
+      const updatedLeads = [...leads];
+      updatedLeads[leadIndex] = { ...updatedLeads[leadIndex], status: newStatus };
+      setLeads(updatedLeads);
+      
+      toast({
+        title: "Status atualizado",
+        description: `Lead marcado como: ${newStatus}`,
+      });
+    } catch (error) {
+      console.error('Error updating lead status:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar status do lead",
+        variant: "destructive",
+      });
+    }
   };
 
   const generateLeads = async () => {
@@ -476,6 +523,22 @@ export function BaseOff() {
                 onChange={(e) => setNomeFilter(e.target.value)}
               />
             </div>
+            <div>
+              <Label htmlFor="status-filter">Status do Lead</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todos os status</SelectItem>
+                  {statusOptions.map(status => (
+                    <SelectItem key={status} value={status}>
+                      {status}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -492,11 +555,7 @@ export function BaseOff() {
                 <TableHead>Nome</TableHead>
                 <TableHead>CPF</TableHead>
                 <TableHead>Telefone</TableHead>
-                <TableHead>Banco</TableHead>
-                <TableHead>Valor Benefício</TableHead>
-                <TableHead>UF</TableHead>
-                <TableHead>Município</TableHead>
-                <TableHead>Margem Disponível</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -506,19 +565,71 @@ export function BaseOff() {
                   <TableCell>{formatCPF(lead.CPF)}</TableCell>
                   <TableCell>
                     <div className="space-y-1 text-xs">
-                      {lead.Telefone1 && <div>{lead.Telefone1}</div>}
-                      {lead.Telefone2 && <div>{lead.Telefone2}</div>}
-                      {lead.Telefone3 && <div>{lead.Telefone3}</div>}
+                      {lead.Telefone1 && (
+                        <a 
+                          href={formatPhoneForWhatsApp(lead.Telefone1)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-green-600 hover:text-green-800 font-medium"
+                        >
+                          📱 {lead.Telefone1}
+                        </a>
+                      )}
+                      {lead.Telefone2 && (
+                        <a 
+                          href={formatPhoneForWhatsApp(lead.Telefone2)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-green-600 hover:text-green-800 font-medium"
+                        >
+                          📱 {lead.Telefone2}
+                        </a>
+                      )}
+                      {lead.Telefone3 && (
+                        <a 
+                          href={formatPhoneForWhatsApp(lead.Telefone3)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-green-600 hover:text-green-800 font-medium"
+                        >
+                          📱 {lead.Telefone3}
+                        </a>
+                      )}
                       {!lead.Telefone1 && !lead.Telefone2 && !lead.Telefone3 && (
-                        <div className="text-muted-foreground">Sem telefone</div>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="text-xs h-6"
+                          onClick={() => {
+                            // TODO: Implement phone number registration
+                            toast({
+                              title: "Em desenvolvimento",
+                              description: "Funcionalidade de cadastro de número em desenvolvimento",
+                            });
+                          }}
+                        >
+                          Cadastrar número
+                        </Button>
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>{lead.Banco}</TableCell>
-                  <TableCell>R$ {lead.Valor_Beneficio}</TableCell>
-                  <TableCell>{lead.UF}</TableCell>
-                  <TableCell>{lead.Municipio}</TableCell>
-                  <TableCell>{lead.Margem_Disponivel ? `R$ ${lead.Margem_Disponivel}` : 'N/A'}</TableCell>
+                  <TableCell>
+                    <Select 
+                      value={lead.status || "Novo lead"} 
+                      onValueChange={(value) => updateLeadStatus(index, value)}
+                    >
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statusOptions.map(status => (
+                          <SelectItem key={status} value={status}>
+                            {status}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
