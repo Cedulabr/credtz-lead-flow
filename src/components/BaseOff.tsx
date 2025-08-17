@@ -78,7 +78,7 @@ export function BaseOff() {
       const { data, error } = await supabase
         .from('baseoff')
         .select('*')
-        .limit(50);
+        .limit(50) as any;
 
       if (error) throw error;
       setLeads(data || []);
@@ -119,7 +119,7 @@ export function BaseOff() {
       }
 
       // Then get available leads with those bank codes
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('baseoff')
         .select('Banco')
         .in('Banco', allowedCodes);
@@ -129,7 +129,7 @@ export function BaseOff() {
         throw error;
       }
       
-      const uniqueBancos = [...new Set(data?.map(item => item.Banco).filter(Boolean))];
+      const uniqueBancos = [...new Set(data?.map((item: any) => item.Banco).filter(Boolean))] as string[];
       console.log('BaseOff: Available bancos:', uniqueBancos);
       setAvailableBancos(uniqueBancos);
     } catch (error) {
@@ -144,13 +144,13 @@ export function BaseOff() {
 
   const fetchAvailableUFs = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('baseoff')
         .select('UF');
 
       if (error) throw error;
       
-      const uniqueUFs = [...new Set(data?.map(item => item.UF).filter(Boolean))];
+      const uniqueUFs = [...new Set(data?.map((item: any) => item.UF).filter(Boolean))] as string[];
       setAvailableUFs(uniqueUFs);
     } catch (error) {
       console.error('Error fetching UFs:', error);
@@ -223,7 +223,7 @@ export function BaseOff() {
       }
 
       // Construir query com filtros
-      let query = supabase
+      let query = (supabase as any)
         .from('baseoff')
         .select('*')
         .eq('Banco', selectedBanco);

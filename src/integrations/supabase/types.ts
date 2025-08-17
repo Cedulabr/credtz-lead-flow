@@ -110,6 +110,120 @@ export type Database = {
         }
         Relationships: []
       }
+      baseoff: {
+        Row: {
+          Agencia: string | null
+          Bairro: string | null
+          Banco: string | null
+          Beneficio: string | null
+          Bloqueado_Emprestimo: string | null
+          CEP: string | null
+          Codigo_Especie: string | null
+          Conta: string | null
+          CPF: string | null
+          CPF_Representante: string | null
+          Data_Nascimento: string | null
+          DDB: string | null
+          Desconto_Associacao: string | null
+          DIB: string | null
+          Email1: string | null
+          Email2: string | null
+          Email3: string | null
+          Emprestimo_Ativos: string | null
+          Endereco: string | null
+          Idade: string | null
+          Margem_Disponivel: string | null
+          Margem_RCC: string | null
+          Margem_RMC: string | null
+          Meio_Pagamento: string | null
+          Municipio: string | null
+          Nome: string | null
+          Nome_Mae: string | null
+          Nome_Representante: string | null
+          Possui_Representante: string | null
+          RG: string | null
+          Telefone1: string | null
+          Telefone2: string | null
+          Telefone3: string | null
+          UF: string | null
+          Valor_Beneficio: string | null
+        }
+        Insert: {
+          Agencia?: string | null
+          Bairro?: string | null
+          Banco?: string | null
+          Beneficio?: string | null
+          Bloqueado_Emprestimo?: string | null
+          CEP?: string | null
+          Codigo_Especie?: string | null
+          Conta?: string | null
+          CPF?: string | null
+          CPF_Representante?: string | null
+          Data_Nascimento?: string | null
+          DDB?: string | null
+          Desconto_Associacao?: string | null
+          DIB?: string | null
+          Email1?: string | null
+          Email2?: string | null
+          Email3?: string | null
+          Emprestimo_Ativos?: string | null
+          Endereco?: string | null
+          Idade?: string | null
+          Margem_Disponivel?: string | null
+          Margem_RCC?: string | null
+          Margem_RMC?: string | null
+          Meio_Pagamento?: string | null
+          Municipio?: string | null
+          Nome?: string | null
+          Nome_Mae?: string | null
+          Nome_Representante?: string | null
+          Possui_Representante?: string | null
+          RG?: string | null
+          Telefone1?: string | null
+          Telefone2?: string | null
+          Telefone3?: string | null
+          UF?: string | null
+          Valor_Beneficio?: string | null
+        }
+        Update: {
+          Agencia?: string | null
+          Bairro?: string | null
+          Banco?: string | null
+          Beneficio?: string | null
+          Bloqueado_Emprestimo?: string | null
+          CEP?: string | null
+          Codigo_Especie?: string | null
+          Conta?: string | null
+          CPF?: string | null
+          CPF_Representante?: string | null
+          Data_Nascimento?: string | null
+          DDB?: string | null
+          Desconto_Associacao?: string | null
+          DIB?: string | null
+          Email1?: string | null
+          Email2?: string | null
+          Email3?: string | null
+          Emprestimo_Ativos?: string | null
+          Endereco?: string | null
+          Idade?: string | null
+          Margem_Disponivel?: string | null
+          Margem_RCC?: string | null
+          Margem_RMC?: string | null
+          Meio_Pagamento?: string | null
+          Municipio?: string | null
+          Nome?: string | null
+          Nome_Mae?: string | null
+          Nome_Representante?: string | null
+          Possui_Representante?: string | null
+          RG?: string | null
+          Telefone1?: string | null
+          Telefone2?: string | null
+          Telefone3?: string | null
+          UF?: string | null
+          Valor_Beneficio?: string | null
+        }
+        Relationships: []
+      }
       baseoff_allowed_banks: {
         Row: {
           codigo_banco: string
@@ -733,144 +847,6 @@ export type Database = {
           phone?: string
           tipo_beneficio?: string | null
           updated_at?: string
-        }
-        Relationships: []
-      }
-      leads_semtelefone: {
-        Row: {
-          Agencia: string | null
-          assigned_to: string | null
-          Bairro: string | null
-          Banco: string | null
-          Beneficio: string | null
-          CEP: string | null
-          Codigo_Banco: string | null
-          Codigo_Emprestimo: string | null
-          Codigo_Especie: number | null
-          Conta: string | null
-          CPF: string | null
-          CPF_Representante: string | null
-          created_at: string | null
-          created_by: string | null
-          Data_Nascimento: string | null
-          Emprestimo_Ativos: string | null
-          Endereco: string | null
-          Fim_Desconto: string | null
-          id: string
-          Idade: number | null
-          Inicio_Desconto: string | null
-          is_available: boolean | null
-          Margem_Disponivel: string | null
-          Margem_RCC: string | null
-          Margem_RMC: string | null
-          Municipio: string | null
-          Nome: string | null
-          Nome_Representante: string | null
-          Numero_Contrato: string | null
-          Parcela_Pagas: number | null
-          Parcela_Restante: number | null
-          phone: string | null
-          Possui_Representante: string | null
-          Prazo: number | null
-          reserved_by: string | null
-          reserved_until: string | null
-          RG: string | null
-          status: string | null
-          Taxa: string | null
-          UF: string | null
-          updated_at: string | null
-          Valor_Emprestimo: string | null
-          Valor_Parcela: string | null
-        }
-        Insert: {
-          Agencia?: string | null
-          assigned_to?: string | null
-          Bairro?: string | null
-          Banco?: string | null
-          Beneficio?: string | null
-          CEP?: string | null
-          Codigo_Banco?: string | null
-          Codigo_Emprestimo?: string | null
-          Codigo_Especie?: number | null
-          Conta?: string | null
-          CPF?: string | null
-          CPF_Representante?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          Data_Nascimento?: string | null
-          Emprestimo_Ativos?: string | null
-          Endereco?: string | null
-          Fim_Desconto?: string | null
-          id?: string
-          Idade?: number | null
-          Inicio_Desconto?: string | null
-          is_available?: boolean | null
-          Margem_Disponivel?: string | null
-          Margem_RCC?: string | null
-          Margem_RMC?: string | null
-          Municipio?: string | null
-          Nome?: string | null
-          Nome_Representante?: string | null
-          Numero_Contrato?: string | null
-          Parcela_Pagas?: number | null
-          Parcela_Restante?: number | null
-          phone?: string | null
-          Possui_Representante?: string | null
-          Prazo?: number | null
-          reserved_by?: string | null
-          reserved_until?: string | null
-          RG?: string | null
-          status?: string | null
-          Taxa?: string | null
-          UF?: string | null
-          updated_at?: string | null
-          Valor_Emprestimo?: string | null
-          Valor_Parcela?: string | null
-        }
-        Update: {
-          Agencia?: string | null
-          assigned_to?: string | null
-          Bairro?: string | null
-          Banco?: string | null
-          Beneficio?: string | null
-          CEP?: string | null
-          Codigo_Banco?: string | null
-          Codigo_Emprestimo?: string | null
-          Codigo_Especie?: number | null
-          Conta?: string | null
-          CPF?: string | null
-          CPF_Representante?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          Data_Nascimento?: string | null
-          Emprestimo_Ativos?: string | null
-          Endereco?: string | null
-          Fim_Desconto?: string | null
-          id?: string
-          Idade?: number | null
-          Inicio_Desconto?: string | null
-          is_available?: boolean | null
-          Margem_Disponivel?: string | null
-          Margem_RCC?: string | null
-          Margem_RMC?: string | null
-          Municipio?: string | null
-          Nome?: string | null
-          Nome_Representante?: string | null
-          Numero_Contrato?: string | null
-          Parcela_Pagas?: number | null
-          Parcela_Restante?: number | null
-          phone?: string | null
-          Possui_Representante?: string | null
-          Prazo?: number | null
-          reserved_by?: string | null
-          reserved_until?: string | null
-          RG?: string | null
-          status?: string | null
-          Taxa?: string | null
-          UF?: string | null
-          updated_at?: string | null
-          Valor_Emprestimo?: string | null
-          Valor_Parcela?: string | null
         }
         Relationships: []
       }
