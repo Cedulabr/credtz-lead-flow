@@ -14,7 +14,7 @@ interface NavigationProps {
 const navItems = [
   { id: "dashboard", label: "Início", icon: Home },
   { id: "indicate", label: "Indicar", icon: Users },
-  { id: "leads", label: "Leads", icon: TrendingUp },
+  { id: "leads", label: "Leads Premium", icon: TrendingUp },
   { id: "baseoff", label: "BaseOFF", icon: Users },
   { id: "commissions", label: "Comissões", icon: DollarSign },
   { id: "notifications", label: "Avisos", icon: Bell },

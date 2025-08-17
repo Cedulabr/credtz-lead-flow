@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Bell, 
   CheckCircle, 
@@ -12,10 +15,24 @@ import {
   Star,
   Clock,
   Settings,
-  Trash2
+  Trash2,
+  Megaphone,
+  RefreshCw
 } from "lucide-react";
 
+interface Announcement {
+  id: number;
+  title: string;
+  content: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export function Notifications() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([
     {
       id: 1,
@@ -93,6 +110,33 @@ export function Notifications() {
     }
   ]);
 
+  useEffect(() => {
+    fetchAnnouncements();
+  }, []);
+
+  const fetchAnnouncements = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('announcements')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAnnouncements(data || []);
+    } catch (error) {
+      console.error('Error fetching announcements:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar avisos",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const markAsRead = (id: number) => {
     setNotifications(prev => 
       prev.map(notif => 
@@ -130,7 +174,7 @@ export function Notifications() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-              Notificações
+              Avisos & Notificações
             </h1>
             <p className="text-muted-foreground">
               {unreadCount > 0 
@@ -139,10 +183,21 @@ export function Notifications() {
               }
             </p>
           </div>
-          <Button variant="outline" size="sm">
-            <Settings className="h-4 w-4 mr-2" />
-            Configurar
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={fetchAnnouncements}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
+            <Button variant="outline" size="sm">
+              <Settings className="h-4 w-4 mr-2" />
+              Configurar
+            </Button>
+          </div>
         </div>
 
         {/* Action Buttons */}
@@ -198,6 +253,44 @@ export function Notifications() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Announcements from Admin */}
+      {announcements.length > 0 && (
+        <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-success/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Megaphone className="h-5 w-5 text-primary" />
+              Avisos Oficiais
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {announcements.map((announcement) => (
+                <div key={announcement.id} className="p-4 bg-background/50 rounded-lg border">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground mb-2">
+                        {announcement.title}
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {announcement.content}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          Oficial
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(announcement.created_at).toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Notifications List */}
       <div className="space-y-3">

@@ -51,32 +51,36 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const stats = [
     {
-      title: "Indicações do Mês",
+      title: "Área do Indicador",
       value: "12",
       change: "+3 esta semana",
       icon: Users,
-      color: "primary"
+      color: "primary",
+      description: "Indicações cadastradas este mês"
     },
     {
-      title: "Leads Ativos",
+      title: "Leads Finalizados",
       value: "8",
       change: "4 novos hoje",
-      icon: TrendingUp,
-      color: "success"
+      icon: CheckCircle,
+      color: "success",
+      description: "Propostas finalizadas este mês"
     },
     {
-      title: "Comissões Pendentes",
+      title: "Prévia de Comissão",
       value: "R$ 2.840",
       change: "+R$ 450 hoje",
       icon: DollarSign,
-      color: "warning"
+      color: "warning",
+      description: "Leads finalizados com proposta paga no mês"
     },
     {
       title: "Taxa de Conversão",
       value: "68%",
       change: "+5% este mês",
       icon: Target,
-      color: "primary"
+      color: "primary",
+      description: "Índice de conversão geral"
     }
   ];
 
@@ -138,7 +142,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             className="flex-1"
           >
             <TrendingUp className="mr-2 h-4 w-4" />
-            Ver Leads
+            Leads Premium
           </Button>
         </div>
       </div>
@@ -155,6 +159,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     <p className="text-sm text-muted-foreground">{stat.title}</p>
                     <p className="text-2xl font-bold text-foreground mt-1">{stat.value}</p>
                     <p className={`text-xs mt-1 text-${stat.color}`}>{stat.change}</p>
+                    <p className="text-xs text-muted-foreground/80 mt-1">{stat.description}</p>
                   </div>
                   <div className={`p-2 bg-${stat.color}/10 rounded-lg`}>
                     <Icon className={`h-5 w-5 text-${stat.color}`} />

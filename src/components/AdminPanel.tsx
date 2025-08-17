@@ -317,7 +317,17 @@ export function AdminPanel() {
             Gerencie webhooks, avisos e comissões do sistema
           </p>
         </div>
-        <Settings className="h-8 w-8 text-primary" />
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={() => window.location.href = '/'}
+            className="gap-2"
+          >
+            <X className="h-4 w-4" />
+            Sair
+          </Button>
+          <Settings className="h-8 w-8 text-primary" />
+        </div>
       </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

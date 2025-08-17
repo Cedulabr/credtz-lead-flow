@@ -40,13 +40,17 @@ export function Commissions() {
   const [isSubmittingWithdrawal, setIsSubmittingWithdrawal] = useState(false);
   const [isSubmittingExtract, setIsSubmittingExtract] = useState(false);
 
-  // Calcular totais das comissões
+  // Calcular totais das comissões (separando valores positivos de negativos)
+  const positiveCommissions = commissions.filter(c => Number(c.commission_amount) > 0);
+  const negativeCommissions = commissions.filter(c => Number(c.commission_amount) < 0);
+  
   const commissionTotals = {
-    total: commissions.reduce((sum, c) => sum + Number(c.commission_amount), 0),
-    paid: commissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + Number(c.commission_amount), 0),
-    pending: commissions.filter(c => c.status === 'pending').reduce((sum, c) => sum + Number(c.commission_amount), 0),
-    preview: commissions.filter(c => c.status === 'preview').reduce((sum, c) => sum + Number(c.commission_amount), 0),
-    approved: commissions.filter(c => c.status === 'approved').reduce((sum, c) => sum + Number(c.commission_amount), 0)
+    total: positiveCommissions.reduce((sum, c) => sum + Number(c.commission_amount), 0),
+    paid: positiveCommissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + Number(c.commission_amount), 0),
+    pending: positiveCommissions.filter(c => c.status === 'pending').reduce((sum, c) => sum + Number(c.commission_amount), 0),
+    preview: positiveCommissions.filter(c => c.status === 'preview').reduce((sum, c) => sum + Number(c.commission_amount), 0),
+    approved: positiveCommissions.filter(c => c.status === 'approved').reduce((sum, c) => sum + Number(c.commission_amount), 0),
+    withdrawals: Math.abs(negativeCommissions.reduce((sum, c) => sum + Number(c.commission_amount), 0))
   };
 
   const statusConfig = {
@@ -364,10 +368,10 @@ export function Commissions() {
               <div>
                 <p className="text-sm text-muted-foreground">Já Recebido</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {formatCurrency(commissionTotals.paid)}
+                  {formatCurrency(commissionTotals.paid - commissionTotals.withdrawals)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  3 pagamentos
+                  {positiveCommissions.filter(c => c.status === 'paid').length} pagamentos
                 </p>
               </div>
               <div className="p-2 bg-success/10 rounded-lg">
@@ -381,12 +385,12 @@ export function Commissions() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Prévia Pagamento</p>
+                <p className="text-sm text-muted-foreground">Prévia de Comissão</p>
                 <p className="text-2xl font-bold text-foreground">
                   {formatCurrency(commissionTotals.preview)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {commissions.filter(c => c.status === 'preview').length} propostas
+                  {positiveCommissions.filter(c => c.status === 'preview').length} propostas
                 </p>
               </div>
               <div className="p-2 bg-muted/20 rounded-lg">
@@ -405,7 +409,7 @@ export function Commissions() {
                   {formatCurrency(commissionTotals.pending)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {commissions.filter(c => c.status === 'pending').length} propostas
+                  {positiveCommissions.filter(c => c.status === 'pending').length} propostas
                 </p>
               </div>
               <div className="p-2 bg-warning/10 rounded-lg">
