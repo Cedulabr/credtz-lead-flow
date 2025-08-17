@@ -87,12 +87,20 @@ export function BaseOff() {
 
   const fetchLeads = async () => {
     try {
+      console.log('BaseOff: Fetching leads...');
       const { data, error } = await supabase
         .from('baseoff')
         .select('*')
-        .limit(50) as any;
+        .not('Banco', 'is', null)
+        .not('Nome', 'is', null)
+        .limit(50);
 
-      if (error) throw error;
+      if (error) {
+        console.error('BaseOff: Error fetching leads:', error);
+        throw error;
+      }
+      
+      console.log('BaseOff: Fetched leads:', data?.length || 0);
       setLeads(data || []);
     } catch (error) {
       console.error('Error fetching leads:', error);
@@ -131,9 +139,10 @@ export function BaseOff() {
       }
 
       // Then get available leads with those bank codes
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('baseoff')
         .select('Banco')
+        .not('Banco', 'is', null)
         .in('Banco', allowedCodes);
 
       if (error) {
@@ -156,9 +165,10 @@ export function BaseOff() {
 
   const fetchAvailableUFs = async () => {
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('baseoff')
-        .select('UF');
+        .select('UF')
+        .not('UF', 'is', null);
 
       if (error) throw error;
       
@@ -270,10 +280,12 @@ export function BaseOff() {
       }
 
       // Construir query com filtros
-      let query = (supabase as any)
+      let query = supabase
         .from('baseoff')
         .select('*')
-        .eq('Banco', selectedBanco);
+        .eq('Banco', selectedBanco)
+        .not('Nome', 'is', null)
+        .not('CPF', 'is', null);
 
       // Filtro por valor da parcela (se preenchido)
       if (valorParcela) {
