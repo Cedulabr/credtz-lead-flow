@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Filter } from "lucide-react";
+import { Plus, Filter, LogIn } from "lucide-react";
 
 interface BaseOffLead {
   CPF: string;
@@ -351,12 +351,33 @@ export function BaseOff() {
     return cleanCPF.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   };
 
-  if (!user) {
-    return <div className="p-6">Usuário não autenticado. Faça login para acessar o BaseOFF.</div>;
+  if (loading || isLoadingData) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
+          <p className="text-lg text-muted-foreground">Carregando dados do BaseOff...</p>
+        </div>
+      </div>
+    );
   }
 
-  if (loading) {
-    return <div className="p-6">Carregando BaseOFF...</div>;
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h2 className="text-2xl font-bold text-foreground">Acesso Restrito</h2>
+          <p className="text-lg text-muted-foreground max-w-md mx-auto">
+            Você precisa estar logado para acessar o BaseOff. 
+            Faça login para continuar.
+          </p>
+          <Button onClick={() => window.location.href = '/auth'} className="mt-4">
+            <LogIn className="mr-2 h-4 w-4" />
+            Fazer Login
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
