@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import credtzLogo from "@/assets/credtz-logo.png";
+import { ConnectionStatus } from "./ConnectionStatus";
 
 interface NavigationProps {
   activeTab: string;
@@ -150,6 +151,12 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                   )}
                 </div>
               </div>
+              
+              {/* Connection Status */}
+              <div className="flex justify-center">
+                <ConnectionStatus />
+              </div>
+              
               <Button
                 variant="ghost"
                 size="sm"

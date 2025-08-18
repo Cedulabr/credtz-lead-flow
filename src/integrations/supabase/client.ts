@@ -10,8 +10,55 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
+    storage: typeof window !== 'undefined' ? localStorage : undefined,
     persistSession: true,
     autoRefreshToken: true,
-  }
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'credtz-lead-flow',
+    },
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+  },
 });
+
+// Add connection status monitoring
+export const checkConnection = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('count')
+      .limit(1);
+    
+    if (error) {
+      console.error('Supabase connection error:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Supabase connection check failed:', error);
+    return false;
+  }
+};
+
+// Add session refresh utility
+export const refreshSession = async () => {
+  try {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error) {
+      console.error('Session refresh error:', error);
+      return { success: false, error };
+    }
+    return { success: true, session: data.session };
+  } catch (error) {
+    console.error('Session refresh failed:', error);
+    return { success: false, error };
+  }
+};
