@@ -8,8 +8,10 @@ import { BaseOffModern } from "@/components/BaseOffModern";
 import { Commissions } from "@/components/Commissions";
 import { Notifications } from "@/components/Notifications";
 import { AdminTest } from "@/components/AdminTest";
+import { TestFunctionalities } from "@/components/TestFunctionalities";
+import { SystemStatus } from "@/components/SystemStatus";
 import { Button } from "@/components/ui/button";
-import { Database, LogIn } from "lucide-react";
+import { Database, LogIn, TestTube, Activity } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
@@ -67,6 +69,10 @@ const Index = () => {
         return <Commissions />;
       case "notifications":
         return <Notifications />;
+      case "test-functionalities":
+        return <TestFunctionalities />;
+      case "system-status":
+        return <SystemStatus />;
       default:
         return <Dashboard onNavigate={setActiveTab} />;
     }
@@ -84,12 +90,29 @@ const Index = () => {
       {/* Admin Test Panel - visible on main page for debugging */}
       <AdminTest />
       
-      {/* Botão flutuante para teste do banco */}
-      <div className="fixed bottom-20 md:bottom-6 right-6 z-40">
+      {/* Botões flutuantes para teste */}
+      <div className="fixed bottom-20 md:bottom-6 right-6 z-40 flex flex-col gap-3">
+        <Button
+          onClick={() => setActiveTab("system-status")}
+          className="h-12 w-12 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700"
+          size="icon"
+          title="Status do Sistema"
+        >
+          <Activity size={20} />
+        </Button>
+        <Button
+          onClick={() => setActiveTab("test-functionalities")}
+          className="h-12 w-12 rounded-full shadow-lg bg-green-600 hover:bg-green-700"
+          size="icon"
+          title="Testar Funcionalidades"
+        >
+          <TestTube size={20} />
+        </Button>
         <Button
           onClick={() => navigate("/test-database")}
           className="h-12 w-12 rounded-full shadow-lg bg-primary hover:bg-primary-dark"
           size="icon"
+          title="Teste do Banco"
         >
           <Database size={20} />
         </Button>
