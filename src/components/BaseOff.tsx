@@ -200,7 +200,7 @@ export function BaseOff() {
       );
     }
 
-    if (statusFilter.trim()) {
+    if (statusFilter.trim() && statusFilter !== "all") {
       filtered = filtered.filter(lead => 
         lead.status === statusFilter
       );
@@ -293,7 +293,7 @@ export function BaseOff() {
       }
 
       // Filtro por UF (se selecionado)
-      if (selectedUF) {
+      if (selectedUF && selectedUF !== "all") {
         query = query.eq('UF', selectedUF);
       }
 
@@ -460,7 +460,7 @@ export function BaseOff() {
                 </SelectTrigger>
                 <SelectContent>
                   {isLoadingData ? (
-                    <SelectItem value="" disabled>Carregando bancos...</SelectItem>
+                    <SelectItem value="loading" disabled>Carregando bancos...</SelectItem>
                   ) : availableBancos.length > 0 ? (
                     availableBancos.map(banco => (
                       <SelectItem key={banco} value={banco}>
@@ -468,7 +468,7 @@ export function BaseOff() {
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem value="" disabled>Nenhum banco disponível</SelectItem>
+                    <SelectItem value="none" disabled>Nenhum banco disponível</SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -492,9 +492,9 @@ export function BaseOff() {
                   <SelectValue placeholder="Selecione um estado (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos os estados</SelectItem>
+                  <SelectItem value="all">Todos os estados</SelectItem>
                   {isLoadingData ? (
-                    <SelectItem value="" disabled>Carregando estados...</SelectItem>
+                    <SelectItem value="loading-states" disabled>Carregando estados...</SelectItem>
                   ) : availableUFs.length > 0 ? (
                     availableUFs.map(uf => (
                       <SelectItem key={uf} value={uf}>
@@ -502,7 +502,7 @@ export function BaseOff() {
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem value="" disabled>Nenhum estado disponível</SelectItem>
+                    <SelectItem value="no-states" disabled>Nenhum estado disponível</SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -563,7 +563,7 @@ export function BaseOff() {
                   <SelectValue placeholder="Selecione um status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos os status</SelectItem>
+                  <SelectItem value="all">Todos os status</SelectItem>
                   {statusOptions.map(status => (
                     <SelectItem key={status} value={status}>
                       {status}

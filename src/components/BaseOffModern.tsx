@@ -207,7 +207,7 @@ export function BaseOffModern() {
       );
     }
 
-    if (statusFilter.trim()) {
+    if (statusFilter.trim() && statusFilter !== "all") {
       filtered = filtered.filter(lead => 
         lead.status === statusFilter
       );
@@ -282,7 +282,7 @@ export function BaseOffModern() {
         .rpc('secure_baseoff_access', {
           limite: maxLeads,
           codigo_banco_filter: selectedBanco,
-          uf_filter: selectedUF || null
+          uf_filter: selectedUF && selectedUF !== "all" ? selectedUF : null
         });
 
       if (fetchError) {
@@ -504,7 +504,7 @@ export function BaseOffModern() {
                     <SelectValue placeholder="Todos os status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos os status</SelectItem>
+                    <SelectItem value="all">Todos os status</SelectItem>
                     {statusOptions.map(status => (
                       <SelectItem key={status} value={status}>
                         {status}
@@ -675,7 +675,7 @@ export function BaseOffModern() {
                   </SelectTrigger>
                   <SelectContent>
                     {isLoadingData ? (
-                      <SelectItem value="" disabled>Carregando bancos...</SelectItem>
+                      <SelectItem value="loading" disabled>Carregando bancos...</SelectItem>
                     ) : availableBancos.length > 0 ? (
                       availableBancos.map(banco => (
                         <SelectItem key={banco} value={banco}>
@@ -683,7 +683,7 @@ export function BaseOffModern() {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="" disabled>Nenhum banco disponível</SelectItem>
+                      <SelectItem value="none" disabled>Nenhum banco disponível</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
@@ -707,7 +707,7 @@ export function BaseOffModern() {
                     <SelectValue placeholder="Todos os estados" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos os estados</SelectItem>
+                    <SelectItem value="all">Todos os estados</SelectItem>
                     {availableUFs.map(uf => (
                       <SelectItem key={uf} value={uf}>
                         {uf}
