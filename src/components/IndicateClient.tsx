@@ -76,51 +76,21 @@ export function IndicateClient() {
     setIsSubmitting(true);
 
     try {
-      // Salvar no banco de dados na tabela leads
+      // Salvar no banco de dados na tabela leads_indicados
       const { error: insertError } = await supabase
-        .from('leads')
+        .from('leads_indicados')
         .insert({
-          name: formData.name,
+          nome: formData.name,
           cpf: formData.cpf,
-          phone: formData.phone,
+          telefone: formData.phone,
           convenio: formData.convenio,
-          origem_lead: formData.observations,
+          observacoes: formData.observations,
+          status: 'lead_digitado',
           created_by: user.id
         });
 
       if (insertError) throw insertError;
 
-      // Buscar webhook ativo para indicações
-      const { data: webhook } = await supabase
-        .from('webhooks')
-        .select('url')
-        .eq('name', 'client_indication')
-        .eq('is_active', true)
-        .single();
-
-      // Enviar webhook se configurado
-      if (webhook?.url) {
-        try {
-          await fetch(webhook.url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            mode: 'no-cors',
-            body: JSON.stringify({
-              type: 'client_indication',
-              client: {
-                name: formData.name,
-                cpf: formData.cpf,
-                phone: formData.phone,
-                convenio: formData.convenio,
-                observations: formData.observations
-              },
-              timestamp: new Date().toISOString()
-            })
-          });
-        } catch (webhookError) {
-          console.log('Webhook enviado (modo no-cors)');
-        }
-      }
       
       toast({
         title: "Cliente indicado com sucesso! 🎉",

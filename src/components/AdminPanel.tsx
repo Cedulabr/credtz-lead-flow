@@ -108,14 +108,12 @@ export function AdminPanel() {
 
   const loadData = async () => {
     try {
-      const [webhooksRes, announcementsRes, commissionsRes, banksRes] = await Promise.all([
-        supabase.from('webhooks').select('*').order('created_at', { ascending: false }),
+      const [announcementsRes, commissionsRes, banksRes] = await Promise.all([
         supabase.from('announcements').select('*').order('created_at', { ascending: false }),
         supabase.from('commission_table').select('*').order('created_at', { ascending: false }),
         supabase.from('banks').select('*').order('name')
       ]);
 
-      if (webhooksRes.data) setWebhooks(webhooksRes.data);
       if (announcementsRes.data) setAnnouncements(announcementsRes.data);
       if (commissionsRes.data) setCommissionTable(commissionsRes.data);
       if (banksRes.data) setBanks(banksRes.data);

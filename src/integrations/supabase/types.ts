@@ -584,157 +584,7 @@ export type Database = {
           template_id?: number | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "form_submissions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "form_submissions_processed_by_id_fkey"
-            columns: ["processed_by_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "form_submissions_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "form_templates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      form_templates: {
-        Row: {
-          created_at: string | null
-          created_by_id: string | null
-          description: string | null
-          fields: Json | null
-          id: number
-          is_active: boolean | null
-          name: string
-          organization_id: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by_id?: string | null
-          description?: string | null
-          fields?: Json | null
-          id?: number
-          is_active?: boolean | null
-          name: string
-          organization_id?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by_id?: string | null
-          description?: string | null
-          fields?: Json | null
-          id?: number
-          is_active?: boolean | null
-          name?: string
-          organization_id?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "form_templates_created_by_id_fkey"
-            columns: ["created_by_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "form_templates_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      invitation_requests: {
-        Row: {
-          company: string | null
-          created_at: string
-          email: string
-          id: string
-          name: string
-          processed_at: string | null
-          processed_by_id: string | null
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          company?: string | null
-          created_at?: string
-          email: string
-          id?: string
-          name: string
-          processed_at?: string | null
-          processed_by_id?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          company?: string | null
-          created_at?: string
-          email?: string
-          id?: string
-          name?: string
-          processed_at?: string | null
-          processed_by_id?: string | null
-          status?: string
-          updated_at?: string
-        }
         Relationships: []
-      }
-      invitations: {
-        Row: {
-          accepted_at: string | null
-          email: string
-          expires_at: string | null
-          id: string
-          invited_at: string | null
-          invited_by: string | null
-          is_used: boolean | null
-          role: Database["public"]["Enums"]["app_role"]
-        }
-        Insert: {
-          accepted_at?: string | null
-          email: string
-          expires_at?: string | null
-          id?: string
-          invited_at?: string | null
-          invited_by?: string | null
-          is_used?: boolean | null
-          role?: Database["public"]["Enums"]["app_role"]
-        }
-        Update: {
-          accepted_at?: string | null
-          email?: string
-          expires_at?: string | null
-          id?: string
-          invited_at?: string | null
-          invited_by?: string | null
-          is_used?: boolean | null
-          role?: Database["public"]["Enums"]["app_role"]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invitations_invited_by_fkey"
-            columns: ["invited_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       lead_requests: {
         Row: {
@@ -877,42 +727,42 @@ export type Database = {
         }
         Relationships: []
       }
-      organizations: {
+      leads_indicados: {
         Row: {
-          address: string | null
-          cnpj: string | null
-          created_at: string | null
-          email: string | null
-          id: number
-          logo_url: string | null
-          name: string
-          phone: string | null
-          updated_at: string | null
-          website: string | null
+          convenio: string
+          cpf: string
+          created_at: string
+          created_by: string
+          id: string
+          nome: string
+          observacoes: string | null
+          status: string
+          telefone: string
+          updated_at: string
         }
         Insert: {
-          address?: string | null
-          cnpj?: string | null
-          created_at?: string | null
-          email?: string | null
-          id?: number
-          logo_url?: string | null
-          name: string
-          phone?: string | null
-          updated_at?: string | null
-          website?: string | null
+          convenio: string
+          cpf: string
+          created_at?: string
+          created_by: string
+          id?: string
+          nome: string
+          observacoes?: string | null
+          status?: string
+          telefone: string
+          updated_at?: string
         }
         Update: {
-          address?: string | null
-          cnpj?: string | null
-          created_at?: string | null
-          email?: string | null
-          id?: number
-          logo_url?: string | null
-          name?: string
-          phone?: string | null
-          updated_at?: string | null
-          website?: string | null
+          convenio?: string
+          cpf?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          status?: string
+          telefone?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1080,20 +930,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "proposals_created_by_id_fkey"
-            columns: ["created_by_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "proposals_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "proposals_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
@@ -1153,151 +989,6 @@ export type Database = {
           quantidade_leads?: number
           updated_at?: string
           user_id?: string
-        }
-        Relationships: []
-      }
-      user_commission_config: {
-        Row: {
-          bank_product_id: string
-          commission_percentage: number
-          created_at: string
-          created_by: string | null
-          id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          bank_product_id: string
-          commission_percentage: number
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          bank_product_id?: string
-          commission_percentage?: number
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_commission_config_bank_product_id_fkey"
-            columns: ["bank_product_id"]
-            isOneToOne: false
-            referencedRelation: "banks_products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_profiles: {
-        Row: {
-          created_at: string | null
-          id: string
-          name: string | null
-          organization_id: number | null
-          role: string | null
-          sector: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id: string
-          name?: string | null
-          organization_id?: number | null
-          role?: string | null
-          sector?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          name?: string | null
-          organization_id?: number | null
-          role?: string | null
-          sector?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      users: {
-        Row: {
-          created_at: string | null
-          email: string | null
-          id: string
-          name: string | null
-          organization_id: number | null
-          role: string | null
-          sector: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          email?: string | null
-          id: string
-          name?: string | null
-          organization_id?: number | null
-          role?: string | null
-          sector?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          email?: string | null
-          id?: string
-          name?: string | null
-          organization_id?: number | null
-          role?: string | null
-          sector?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "users_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      webhooks: {
-        Row: {
-          created_at: string | null
-          created_by_id: string | null
-          description: string | null
-          id: number
-          is_active: boolean | null
-          name: string
-          organization_id: number | null
-          updated_at: string | null
-          url: string
-        }
-        Insert: {
-          created_at?: string | null
-          created_by_id?: string | null
-          description?: string | null
-          id?: number
-          is_active?: boolean | null
-          name: string
-          organization_id?: number | null
-          updated_at?: string | null
-          url: string
-        }
-        Update: {
-          created_at?: string | null
-          created_by_id?: string | null
-          description?: string | null
-          id?: number
-          is_active?: boolean | null
-          name?: string
-          organization_id?: number | null
-          updated_at?: string | null
-          url?: string
         }
         Relationships: []
       }
