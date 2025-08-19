@@ -1365,6 +1365,10 @@ export type Database = {
         Args: { user_email: string; user_name?: string }
         Returns: string
       }
+      detect_suspicious_activity: {
+        Args: { time_window_minutes?: number; user_id_param: string }
+        Returns: Json
+      }
       get_baseoff_data: {
         Args: {
           codigo_banco_filter?: string
@@ -1412,6 +1416,18 @@ export type Database = {
       update_daily_baseoff_usage: {
         Args: { leads_count_param: number; user_id_param: string }
         Returns: undefined
+      }
+      validate_cpf: {
+        Args: { cpf_input: string }
+        Returns: boolean
+      }
+      validate_email: {
+        Args: { email_input: string }
+        Returns: boolean
+      }
+      validate_phone: {
+        Args: { phone_input: string }
+        Returns: boolean
       }
     }
     Enums: {
