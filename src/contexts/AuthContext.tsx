@@ -35,28 +35,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
 
-  const fetchProfile = useCallback(async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string, retryCount = 0) => {
     if (!userId) return;
     
     setProfileLoading(true);
     try {
-      console.log('Fetching profile for user:', userId);
+      console.log('Fetching profile for user:', userId, `(attempt ${retryCount + 1})`);
       
-      // Add timeout to prevent infinite loading
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
-      );
-      
-      const fetchPromise = supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .maybeSingle(); // Use maybeSingle instead of single to handle no results gracefully
-      
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+        .maybeSingle();
       
       if (error) {
         console.error('Error fetching profile:', error);
+        
+        // If it's a network error and we haven't retried much, try again
+        if ((error.message?.includes('Failed to fetch') || error.message?.includes('timeout')) && retryCount < 2) {
+          console.log(`Network error, retrying in ${(retryCount + 1) * 1000}ms...`);
+          setTimeout(() => {
+            fetchProfile(userId, retryCount + 1);
+          }, (retryCount + 1) * 1000);
+          return;
+        }
         
         // Only try to create profile if it doesn't exist (not for other errors)
         if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
@@ -75,108 +77,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             if (createError) {
               console.error('Error creating profile:', createError);
-              // Set a minimal profile to prevent infinite loading
-              setProfile({
-                id: userId,
-                role: 'partner' as any,
-                name: user?.email?.split('@')[0] || 'User',
-                email: user?.email,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                organization_id: null,
-                level: null,
-                is_active: true,
-                sector: null,
-                company: null,
-                pix_key: null,
-                cpf: null,
-                phone: null
-              });
             } else {
               setProfile(newProfile);
+              return;
             }
           } catch (createError) {
             console.error('Failed to create profile:', createError);
-            // Set minimal profile as fallback
-            setProfile({
-              id: userId,
-              role: 'partner' as any,
-              name: user?.email?.split('@')[0] || 'User',
-              email: user?.email,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              organization_id: null,
-              level: null,
-              is_active: true,
-              sector: null,
-              company: null,
-              pix_key: null,
-              cpf: null,
-              phone: null
-            });
           }
-        } else {
-          // For other errors, set a minimal profile to prevent blocking
-          console.log('Setting fallback profile due to error:', error.message);
-          setProfile({
-            id: userId,
-            role: 'partner' as any,
-            name: user?.email?.split('@')[0] || 'User',
-            email: user?.email,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            organization_id: null,
-            level: null,
-            is_active: true,
-            sector: null,
-            company: null,
-            pix_key: null,
-            cpf: null,
-            phone: null
-          });
         }
+        
+        // For persistent network errors, don't set a fallback - keep profile as null
+        // This will allow the user to retry manually
+        console.log('Network error persists, keeping profile as null for manual retry');
+        setProfile(null);
+        
       } else if (data) {
         console.log('Profile loaded successfully:', data);
         setProfile(data);
       } else {
-        // No profile found, create minimal one
-        console.log('No profile data, creating fallback');
-        setProfile({
-          id: userId,
-          role: 'partner' as any,
-          name: user?.email?.split('@')[0] || 'User',
-          email: user?.email,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          organization_id: null,
-          level: null,
-          is_active: true,
-          sector: null,
-          company: null,
-          pix_key: null,
-          cpf: null,
-          phone: null
-        });
+        // No profile found but no error, try to create one
+        console.log('No profile data, attempting to create one...');
+        try {
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              id: userId,
+              role: 'partner',
+              name: user?.user_metadata?.name || user?.email?.split('@')[0] || 'User',
+              email: user?.email
+            })
+            .select()
+            .maybeSingle();
+          
+          if (createError) {
+            console.error('Error creating profile:', createError);
+            setProfile(null);
+          } else {
+            setProfile(newProfile);
+          }
+        } catch (createError) {
+          console.error('Failed to create profile:', createError);
+          setProfile(null);
+        }
       }
     } catch (error) {
       console.error('Error in fetchProfile:', error);
-      // Always set a fallback profile to prevent infinite loading
-      setProfile({
-        id: userId,
-        role: 'partner' as any,
-        name: user?.email?.split('@')[0] || 'User',
-        email: user?.email,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        organization_id: null,
-        level: null,
-        is_active: true,
-        sector: null,
-        company: null,
-        pix_key: null,
-        cpf: null,
-        phone: null
-      });
+      
+      // If it's a network error and we haven't retried much, try again
+      if (retryCount < 2) {
+        console.log(`Unexpected error, retrying in ${(retryCount + 1) * 1000}ms...`);
+        setTimeout(() => {
+          fetchProfile(userId, retryCount + 1);
+        }, (retryCount + 1) * 1000);
+        return;
+      }
+      
+      // After retries, keep profile as null
+      setProfile(null);
     } finally {
       setProfileLoading(false);
     }
