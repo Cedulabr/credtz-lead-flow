@@ -190,6 +190,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let mounted = true;
+    let forceStopTimer: NodeJS.Timeout;
+
+    // Force stop loading after 15 seconds to prevent infinite loading
+    forceStopTimer = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('Auth initialization took too long, forcing completion');
+        setLoading(false);
+      }
+    }, 15000);
 
     const initializeAuth = async () => {
       try {
@@ -263,6 +272,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       mounted = false;
+      clearTimeout(forceStopTimer);
       subscription.unsubscribe();
     };
   }, [fetchProfile]);
