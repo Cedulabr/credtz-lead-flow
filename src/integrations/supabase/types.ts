@@ -1102,6 +1102,33 @@ export type Database = {
           },
         ]
       }
+      rate_limits: {
+        Row: {
+          action_type: string
+          count: number
+          created_at: string
+          id: string
+          user_id: string
+          window_start: string
+        }
+        Insert: {
+          action_type: string
+          count?: number
+          created_at?: string
+          id?: string
+          user_id: string
+          window_start?: string
+        }
+        Update: {
+          action_type?: string
+          count?: number
+          created_at?: string
+          id?: string
+          user_id?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       registrodiariobaseoff: {
         Row: {
           created_at: string
@@ -1326,9 +1353,33 @@ export type Database = {
         Args: { user_id_param: string }
         Returns: number
       }
+      check_rate_limit: {
+        Args: {
+          action_type_param: string
+          max_attempts?: number
+          window_minutes?: number
+        }
+        Returns: boolean
+      }
       create_admin_profile: {
         Args: { user_email: string; user_name?: string }
         Returns: string
+      }
+      get_baseoff_data: {
+        Args: {
+          codigo_banco_filter?: string
+          limite?: number
+          valor_max?: number
+          valor_min?: number
+        }
+        Returns: {
+          banco: string
+          cpf: string
+          margem_disponivel: string
+          nome: string
+          telefone1: string
+          valor_beneficio: string
+        }[]
       }
       get_complete_schema: {
         Args: Record<PropertyKey, never>
