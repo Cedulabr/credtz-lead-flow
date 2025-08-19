@@ -40,42 +40,143 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     setProfileLoading(true);
     try {
-      const { data, error } = await supabase
+      console.log('Fetching profile for user:', userId);
+      
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
+      );
+      
+      const fetchPromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle(); // Use maybeSingle instead of single to handle no results gracefully
+      
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
       
       if (error) {
         console.error('Error fetching profile:', error);
-        // If profile doesn't exist, try to create one
-        if (error.code === 'PGRST116') {
+        
+        // Only try to create profile if it doesn't exist (not for other errors)
+        if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
           console.log('Profile not found, attempting to create one...');
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({
+          try {
+            const { data: newProfile, error: createError } = await supabase
+              .from('profiles')
+              .insert({
+                id: userId,
+                role: 'partner',
+                name: user?.user_metadata?.name || user?.email?.split('@')[0] || 'User',
+                email: user?.email
+              })
+              .select()
+              .maybeSingle();
+            
+            if (createError) {
+              console.error('Error creating profile:', createError);
+              // Set a minimal profile to prevent infinite loading
+              setProfile({
+                id: userId,
+                role: 'partner' as any,
+                name: user?.email?.split('@')[0] || 'User',
+                email: user?.email,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                organization_id: null,
+                level: null,
+                is_active: true,
+                sector: null,
+                company: null,
+                pix_key: null,
+                cpf: null,
+                phone: null
+              });
+            } else {
+              setProfile(newProfile);
+            }
+          } catch (createError) {
+            console.error('Failed to create profile:', createError);
+            // Set minimal profile as fallback
+            setProfile({
               id: userId,
-              role: 'partner',
-              name: user?.user_metadata?.name || user?.email || 'User'
-            })
-            .select()
-            .single();
-          
-          if (createError) {
-            console.error('Error creating profile:', createError);
-            setProfile(null);
-          } else {
-            setProfile(newProfile);
+              role: 'partner' as any,
+              name: user?.email?.split('@')[0] || 'User',
+              email: user?.email,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              organization_id: null,
+              level: null,
+              is_active: true,
+              sector: null,
+              company: null,
+              pix_key: null,
+              cpf: null,
+              phone: null
+            });
           }
         } else {
-          setProfile(null);
+          // For other errors, set a minimal profile to prevent blocking
+          console.log('Setting fallback profile due to error:', error.message);
+          setProfile({
+            id: userId,
+            role: 'partner' as any,
+            name: user?.email?.split('@')[0] || 'User',
+            email: user?.email,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            organization_id: null,
+            level: null,
+            is_active: true,
+            sector: null,
+            company: null,
+            pix_key: null,
+            cpf: null,
+            phone: null
+          });
         }
-      } else {
+      } else if (data) {
+        console.log('Profile loaded successfully:', data);
         setProfile(data);
+      } else {
+        // No profile found, create minimal one
+        console.log('No profile data, creating fallback');
+        setProfile({
+          id: userId,
+          role: 'partner' as any,
+          name: user?.email?.split('@')[0] || 'User',
+          email: user?.email,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          organization_id: null,
+          level: null,
+          is_active: true,
+          sector: null,
+          company: null,
+          pix_key: null,
+          cpf: null,
+          phone: null
+        });
       }
     } catch (error) {
       console.error('Error in fetchProfile:', error);
-      setProfile(null);
+      // Always set a fallback profile to prevent infinite loading
+      setProfile({
+        id: userId,
+        role: 'partner' as any,
+        name: user?.email?.split('@')[0] || 'User',
+        email: user?.email,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        organization_id: null,
+        level: null,
+        is_active: true,
+        sector: null,
+        company: null,
+        pix_key: null,
+        cpf: null,
+        phone: null
+      });
     } finally {
       setProfileLoading(false);
     }
@@ -92,25 +193,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const initializeAuth = async () => {
       try {
-        // First, get the current session
-        const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+        console.log('Initializing authentication...');
+        
+        // Add timeout for session check
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session check timeout')), 8000)
+        );
+        
+        const sessionPromise = supabase.auth.getSession();
+        
+        const { data: { session: currentSession }, error: sessionError } = await Promise.race([
+          sessionPromise, 
+          timeoutPromise
+        ]) as any;
         
         if (sessionError) {
           console.error('Error getting session:', sessionError);
         }
 
         if (mounted) {
+          console.log('Setting initial session:', currentSession?.user?.id ? 'User found' : 'No user');
           setSession(currentSession);
           setUser(currentSession?.user ?? null);
           
           if (currentSession?.user) {
-            await fetchProfile(currentSession.user.id);
+            // Don't await profile fetch to prevent blocking
+            fetchProfile(currentSession.user.id).catch(error => {
+              console.error('Initial profile fetch failed:', error);
+            });
           }
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
+        // Still set loading to false even if there's an error
       } finally {
         if (mounted) {
+          console.log('Auth initialization complete');
           setLoading(false);
         }
       }
@@ -127,11 +245,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          await fetchProfile(session.user.id);
+          // Don't await to prevent blocking UI
+          fetchProfile(session.user.id).catch(error => {
+            console.error('Profile fetch in auth change failed:', error);
+          });
         } else {
           setProfile(null);
         }
         
+        // Always set loading to false regardless of profile fetch result
         setLoading(false);
       }
     );
