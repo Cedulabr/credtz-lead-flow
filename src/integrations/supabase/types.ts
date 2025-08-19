@@ -47,6 +47,33 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_log: {
+        Row: {
+          id: string
+          operation: string
+          record_id: string | null
+          table_name: string
+          timestamp: string | null
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          operation: string
+          record_id?: string | null
+          table_name: string
+          timestamp?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          operation?: string
+          record_id?: string | null
+          table_name?: string
+          timestamp?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       banks: {
         Row: {
           created_at: string | null
