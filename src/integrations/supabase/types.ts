@@ -1369,6 +1369,18 @@ export type Database = {
         Args: { time_window_minutes?: number; user_id_param: string }
         Returns: Json
       }
+      get_available_banks: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          codigo_banco: string
+        }[]
+      }
+      get_available_ufs: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          uf: string
+        }[]
+      }
       get_baseoff_data: {
         Args: {
           codigo_banco_filter?: string
@@ -1411,6 +1423,25 @@ export type Database = {
           name: string
           phone: string
           tipo_beneficio: string
+        }[]
+      }
+      secure_baseoff_access: {
+        Args: {
+          codigo_banco_filter?: string
+          limite?: number
+          uf_filter?: string
+        }
+        Returns: {
+          banco: string
+          cpf: string
+          margem_disponivel: string
+          municipio: string
+          nome: string
+          telefone1: string
+          telefone2: string
+          telefone3: string
+          uf: string
+          valor_beneficio: string
         }[]
       }
       update_daily_baseoff_usage: {

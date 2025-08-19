@@ -103,25 +103,40 @@ export function BaseOffModern() {
 
   const fetchLeads = async () => {
     try {
+      console.log('BaseOff: Fetching leads using secure function...');
       const { data, error } = await supabase
-        .from('baseoff')
-        .select('*')
-        .not('Banco', 'is', null)
-        .not('Nome', 'is', null)
-        .not('CPF', 'is', null)
-        .limit(50);
+        .rpc('secure_baseoff_access', {
+          limite: 50
+        });
 
       if (error) {
         console.error('BaseOff: Error fetching leads:', error);
         throw error;
       }
       
-      setLeads(data || []);
+      console.log('BaseOff: Fetched leads:', data?.length || 0);
+      
+      // Mapear os dados para a interface esperada
+      const mappedLeads = data?.map((item: any) => ({
+        CPF: item.cpf,
+        Nome: item.nome,
+        Telefone1: item.telefone1,
+        Telefone2: item.telefone2,
+        Telefone3: item.telefone3,
+        Banco: item.banco,
+        Valor_Beneficio: item.valor_beneficio,
+        UF: item.uf,
+        Municipio: item.municipio,
+        Margem_Disponivel: item.margem_disponivel,
+        status: 'Novo lead'
+      })) || [];
+      
+      setLeads(mappedLeads);
     } catch (error) {
       console.error('Error fetching leads:', error);
       toast({
         title: "Erro",
-        description: "Erro ao carregar leads",
+        description: "Erro ao carregar leads. Verifique suas permissões.",
         variant: "destructive",
       });
     } finally {
@@ -131,36 +146,18 @@ export function BaseOffModern() {
 
   const fetchAvailableBancos = async () => {
     try {
-      const { data: allowedBanks, error: allowedError } = await supabase
-        .from('baseoff_allowed_banks')
-        .select('codigo_banco')
-        .eq('is_active', true);
-
-      if (allowedError) {
-        console.error('Error fetching allowed banks:', allowedError);
-        throw allowedError;
-      }
-      
-      const allowedCodes = allowedBanks?.map(bank => bank.codigo_banco) || [];
-      
-      if (allowedCodes.length === 0) {
-        setAvailableBancos([]);
-        return;
-      }
-
+      console.log('BaseOff: Fetching available bancos using secure function...');
       const { data, error } = await supabase
-        .from('baseoff')
-        .select('Banco')
-        .not('Banco', 'is', null)
-        .in('Banco', allowedCodes);
+        .rpc('get_available_banks');
 
       if (error) {
-        console.error('Error fetching available leads:', error);
+        console.error('Error fetching available banks:', error);
         throw error;
       }
       
-      const uniqueBancos = [...new Set(data?.map((item: any) => item.Banco).filter(Boolean))] as string[];
-      setAvailableBancos(uniqueBancos);
+      console.log('BaseOff: Available bancos:', data);
+      const bankCodes = data?.map((item: any) => item.codigo_banco) || [];
+      setAvailableBancos(bankCodes);
     } catch (error) {
       console.error('Error fetching bancos:', error);
       toast({
@@ -173,15 +170,17 @@ export function BaseOffModern() {
 
   const fetchAvailableUFs = async () => {
     try {
+      console.log('BaseOff: Fetching available UFs using secure function...');
       const { data, error } = await supabase
-        .from('baseoff')
-        .select('UF')
-        .not('UF', 'is', null);
+        .rpc('get_available_ufs');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching UFs:', error);
+        throw error;
+      }
       
-      const uniqueUFs = [...new Set(data?.map((item: any) => item.UF).filter(Boolean))] as string[];
-      setAvailableUFs(uniqueUFs);
+      const ufs = data?.map((item: any) => item.uf) || [];
+      setAvailableUFs(ufs);
     } catch (error) {
       console.error('Error fetching UFs:', error);
     }
@@ -278,22 +277,13 @@ export function BaseOffModern() {
         return;
       }
 
-      let query = supabase
-        .from('baseoff')
-        .select('*')
-        .eq('Banco', selectedBanco)
-        .not('Nome', 'is', null)
-        .not('CPF', 'is', null);
-
-      if (valorParcela) {
-        query = query.eq('Valor_Beneficio', valorParcela);
-      }
-
-      if (selectedUF) {
-        query = query.eq('UF', selectedUF);
-      }
-
-      const { data: availableLeads, error: fetchError } = await query.limit(maxLeads);
+      console.log('BaseOff: Generating leads using secure function...');
+      const { data: availableLeads, error: fetchError } = await supabase
+        .rpc('secure_baseoff_access', {
+          limite: maxLeads,
+          codigo_banco_filter: selectedBanco,
+          uf_filter: selectedUF || null
+        });
 
       if (fetchError) {
         console.error('BaseOff: Error fetching leads:', fetchError);
@@ -424,59 +414,59 @@ export function BaseOffModern() {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Stats Cards - Mobile Responsive */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <Card className="border-0 bg-gradient-to-br from-primary/10 to-primary/5 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-primary/20 rounded-xl">
-                  <Target className="h-6 w-6 text-primary" />
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center gap-2 md:gap-4">
+                <div className="p-2 md:p-3 bg-primary/20 rounded-xl">
+                  <Target className="h-4 w-4 md:h-6 md:w-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total de Leads</p>
-                  <p className="text-2xl font-bold text-foreground">{stats.total}</p>
+                  <p className="text-xs md:text-sm font-medium text-muted-foreground">Total de Leads</p>
+                  <p className="text-lg md:text-2xl font-bold text-foreground">{stats.total}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-0 bg-gradient-to-br from-success/10 to-success/5 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-success/20 rounded-xl">
-                  <Sparkles className="h-6 w-6 text-success" />
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center gap-2 md:gap-4">
+                <div className="p-2 md:p-3 bg-success/20 rounded-xl">
+                  <Sparkles className="h-4 w-4 md:h-6 md:w-6 text-success" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Premium</p>
-                  <p className="text-2xl font-bold text-foreground">{stats.premium}</p>
+                  <p className="text-xs md:text-sm font-medium text-muted-foreground">Premium</p>
+                  <p className="text-lg md:text-2xl font-bold text-foreground">{stats.premium}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-0 bg-gradient-to-br from-warning/10 to-warning/5 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-warning/20 rounded-xl">
-                  <Users className="h-6 w-6 text-warning" />
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center gap-2 md:gap-4">
+                <div className="p-2 md:p-3 bg-warning/20 rounded-xl">
+                  <Users className="h-4 w-4 md:h-6 md:w-6 text-warning" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Contatados</p>
-                  <p className="text-2xl font-bold text-foreground">{stats.contacted}</p>
+                  <p className="text-xs md:text-sm font-medium text-muted-foreground">Contatados</p>
+                  <p className="text-lg md:text-2xl font-bold text-foreground">{stats.contacted}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-0 bg-gradient-to-br from-blue-500/10 to-blue-500/5 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-500/20 rounded-xl">
-                  <RefreshCw className="h-6 w-6 text-blue-600" />
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center gap-2 md:gap-4">
+                <div className="p-2 md:p-3 bg-blue-500/20 rounded-xl">
+                  <RefreshCw className="h-4 w-4 md:h-6 md:w-6 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Disponível</p>
-                  <p className="text-2xl font-bold text-foreground">{stats.available}</p>
+                  <p className="text-xs md:text-sm font-medium text-muted-foreground">Disponível</p>
+                  <p className="text-lg md:text-2xl font-bold text-foreground">{stats.available}</p>
                 </div>
               </div>
             </CardContent>
@@ -551,15 +541,15 @@ export function BaseOffModern() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="rounded-lg border overflow-hidden">
+            <div className="rounded-lg border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="font-semibold">Cliente</TableHead>
-                    <TableHead className="font-semibold">CPF</TableHead>
-                    <TableHead className="font-semibold">Contato</TableHead>
-                    <TableHead className="font-semibold">Status</TableHead>
-                    <TableHead className="font-semibold">Ações</TableHead>
+                    <TableHead className="font-semibold min-w-[180px]">Cliente</TableHead>
+                    <TableHead className="font-semibold min-w-[120px] hidden md:table-cell">CPF</TableHead>
+                    <TableHead className="font-semibold min-w-[100px]">Contato</TableHead>
+                    <TableHead className="font-semibold min-w-[130px] hidden lg:table-cell">Status</TableHead>
+                    <TableHead className="font-semibold min-w-[80px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -567,18 +557,21 @@ export function BaseOffModern() {
                     <TableRow key={index} className="hover:bg-muted/20 transition-colors">
                       <TableCell>
                         <div className="space-y-1">
-                          <p className="font-medium text-foreground">{lead.Nome}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <p className="font-medium text-foreground text-sm md:text-base">{lead.Nome}</p>
+                          <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 text-xs text-muted-foreground">
                             <span>{lead.Municipio} - {lead.UF}</span>
+                            <span className="md:hidden font-mono text-xs bg-muted px-1 py-0.5 rounded max-w-fit">
+                              {formatCPF(lead.CPF)}
+                            </span>
                             {lead.Margem_Disponivel && (
-                              <Badge variant="outline" className="text-xs">
+                              <Badge variant="outline" className="text-xs max-w-fit">
                                 {lead.Margem_Disponivel}
                               </Badge>
                             )}
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
                           {formatCPF(lead.CPF)}
                         </code>
@@ -607,7 +600,7 @@ export function BaseOffModern() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <Select 
                           value={lead.status || "Novo lead"} 
                           onValueChange={(value) => updateLeadStatus(index, value)}
@@ -625,13 +618,32 @@ export function BaseOffModern() {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                        >
-                          <Star className="h-3 w-3" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                          >
+                            <Star className="h-3 w-3" />
+                          </Button>
+                          <div className="lg:hidden">
+                            <Select 
+                              value={lead.status || "Novo lead"} 
+                              onValueChange={(value) => updateLeadStatus(index, value)}
+                            >
+                              <SelectTrigger className="w-8 h-8 p-0">
+                                <div className="w-3 h-3 rounded-full bg-primary"></div>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {statusOptions.map(status => (
+                                  <SelectItem key={status} value={status}>
+                                    {status}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
