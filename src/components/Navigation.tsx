@@ -31,21 +31,14 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
 
   return (
     <>
-      {/* Mobile Header - Only Logo */}
+      {/* Mobile Header - Simple and Clean */}
       <div className="md:hidden bg-card border-b sticky top-0 z-50">
-        <div className="flex items-center justify-center p-4">
-          <div className="flex items-center space-x-3">
-            <img 
-              src={credtzLogo} 
-              alt="Credtz Logo" 
-              className="w-8 h-8 rounded-lg"
-            />
-            <h1 className="text-lg font-bold text-foreground">Credtz</h1>
-          </div>
+        <div className="flex items-center justify-center py-3">
+          <h1 className="text-lg font-bold text-foreground">Credtz</h1>
         </div>
       </div>
 
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar - Hidden on Mobile */}
       <div className="hidden md:flex md:flex-col md:w-64 md:bg-card md:border-r md:h-screen md:sticky md:top-0">
         <div className="p-6 border-b">
           <div className="flex items-center space-x-3">
@@ -124,9 +117,9 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         </div>
       </div>
 
-      {/* Bottom Navigation for Mobile - All Items */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t z-50">
-        <div className="flex">
+      {/* Bottom Navigation for Mobile - Complete Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t z-50 safe-area-pb">
+        <div className="grid grid-cols-5 gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -134,24 +127,24 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
                 className={cn(
-                  "flex-1 flex flex-col items-center justify-center py-2 px-1 transition-colors min-h-[60px]",
+                  "flex flex-col items-center justify-center py-2 px-1 transition-colors min-h-[64px]",
                   activeTab === item.id
                     ? "text-primary bg-primary/10"
-                    : "text-muted-foreground"
+                    : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <Icon size={18} />
-                <span className="text-[10px] mt-1 text-center leading-tight">{item.label}</span>
+                <Icon size={20} />
+                <span className="text-[10px] mt-1 text-center leading-tight font-medium">{item.label}</span>
               </button>
             );
           })}
           {isAdmin && (
             <button
               onClick={() => window.location.href = '/admin'}
-              className="flex-1 flex flex-col items-center justify-center py-2 px-1 transition-colors min-h-[60px] text-muted-foreground"
+              className="flex flex-col items-center justify-center py-2 px-1 transition-colors min-h-[64px] text-muted-foreground hover:text-foreground"
             >
-              <Settings size={18} />
-              <span className="text-[10px] mt-1 text-center leading-tight">Admin</span>
+              <Settings size={20} />
+              <span className="text-[10px] mt-1 text-center leading-tight font-medium">Admin</span>
             </button>
           )}
         </div>

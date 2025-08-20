@@ -72,9 +72,10 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="flex">
+      {/* Mobile: Full width layout, Desktop: Sidebar + Content */}
+      <div className="flex md:flex">
         <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="flex-1 md:ml-0">
+        <main className="flex-1 w-full md:w-auto">
           {renderActiveComponent()}
         </main>
       </div>
