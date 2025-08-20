@@ -1,0 +1,118 @@
+# Credtz Lead Flow - Production Deployment
+version: '3.8'
+
+services:
+  # Main Application
+  credtz-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: credtz-app
+    ports:
+      - "3000:80"
+    environment:
+      - NODE_ENV=production
+      # Supabase Configuration
+      - VITE_SUPABASE_URL=${SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - VITE_SUPABASE_PROJECT_ID=${SUPABASE_PROJECT_ID}
+    volumes:
+      - nginx_logs:/var/log/nginx
+    restart: unless-stopped
+    networks:
+      - credtz-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.credtz.rule=Host(`${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.credtz.tls=true"
+      - "traefik.http.routers.credtz.tls.certresolver=letsencrypt"
+
+  # Reverse Proxy & SSL
+  traefik:
+    image: traefik:v2.10
+    container_name: credtz-traefik
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@credtz.com}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    restart: unless-stopped
+    networks:
+      - credtz-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.routers.traefik.service=api@internal"
+
+  # Redis for Caching & Sessions
+  redis:
+    image: redis:7-alpine
+    container_name: credtz-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-credtz-redis-2024}
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - credtz-network
+    ports:
+      - "6379:6379"
+
+  # PostgreSQL Database (Optional - use if not using Supabase)
+  postgres:
+    image: postgres:15-alpine
+    container_name: credtz-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-credtz}
+      POSTGRES_USER: ${POSTGRES_USER:-credtz}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-credtz-secure-2024}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - credtz-network
+    ports:
+      - "5432:5432"
+    profiles:
+      - local-db # Only start with --profile local-db
+
+  # Monitoring with Watchtower
+  watchtower:
+    image: containrrr/watchtower
+    container_name: credtz-watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_SCHEDULE=0 0 4 * * *  # 4 AM daily
+    restart: unless-stopped
+    networks:
+      - credtz-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  traefik_letsencrypt:
+    driver: local
+  nginx_logs:
+    driver: local
+
+networks:
+  credtz-network:
+    driver: bridge

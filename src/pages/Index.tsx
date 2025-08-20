@@ -1,19 +1,24 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navigation } from "@/components/Navigation";
 import { Dashboard } from "@/components/Dashboard";
 import { IndicateClient } from "@/components/IndicateClient";
-import { LeadsManagement } from "@/components/LeadsManagement";
-
-import { Commissions } from "@/components/Commissions";
 import { Notifications } from "@/components/Notifications";
 import { AdminTest } from "@/components/AdminTest";
-import { TestFunctionalities } from "@/components/TestFunctionalities";
 import { SystemStatus } from "@/components/SystemStatus";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
 import { Database, LogIn, TestTube, Activity } from "lucide-react";
 import LoadingAuth from "@/components/LoadingAuth";
 import { useAuth } from "@/contexts/AuthContext";
+
+// Lazy load heavy components for better performance
+import { 
+  LazyLeadsManagement, 
+  LazyCommissions, 
+  LazyTestFunctionalities 
+} from "@/components/LazyComponents";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -50,19 +55,47 @@ const Index = () => {
   }
 
   const renderActiveComponent = () => {
+    // Loading skeleton for lazy components
+    const LoadingFallback = () => (
+      <Card className="m-4">
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-48" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Skeleton className="h-32" />
+              <Skeleton className="h-32" />
+              <Skeleton className="h-32" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+
     switch (activeTab) {
       case "dashboard":
         return <Dashboard onNavigate={setActiveTab} />;
       case "indicate":
         return <IndicateClient />;
       case "leads":
-        return <LeadsManagement />;
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <LazyLeadsManagement />
+          </Suspense>
+        );
       case "commissions":
-        return <Commissions />;
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <LazyCommissions />
+          </Suspense>
+        );
       case "notifications":
         return <Notifications />;
       case "test-functionalities":
-        return <TestFunctionalities />;
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <LazyTestFunctionalities />
+          </Suspense>
+        );
       case "system-status":
         return <SystemStatus />;
       default:
