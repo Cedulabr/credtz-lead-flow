@@ -56,18 +56,6 @@ export function AdminCommissionEdit({
 
       if (updateError) throw updateError;
 
-      // Criar ou atualizar configuração de repasse para o usuário
-      const { error: upsertError } = await supabase
-        .from('user_commission_config')
-        .upsert({
-          user_id: user?.id,
-          bank_product_id: currentProduct.id,
-          commission_percentage: parseFloat(editRepasse),
-          created_by: user?.id
-        });
-
-      if (upsertError) throw upsertError;
-
       // Salvar na tabela de comissão (commission_table)
       const { error: commissionTableError } = await supabase
         .from('commission_table')

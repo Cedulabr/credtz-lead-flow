@@ -31,9 +31,9 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
 
   return (
     <>
-      {/* Mobile Header */}
+      {/* Mobile Header - Only Logo */}
       <div className="md:hidden bg-card border-b sticky top-0 z-50">
-        <div className="flex items-center justify-between p-4">
+        <div className="flex items-center justify-center p-4">
           <div className="flex items-center space-x-3">
             <img 
               src={credtzLogo} 
@@ -42,53 +42,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
             />
             <h1 className="text-lg font-bold text-foreground">Credtz</h1>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          >
-            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-          </Button>
         </div>
-
-        {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <div className="border-t bg-card">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    onTabChange(item.id);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={cn(
-                    "w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors",
-                    activeTab === item.id
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-muted"
-                  )}
-                >
-                  <Icon size={20} />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-            {isAdmin && (
-              <button
-                onClick={() => {
-                  window.location.href = '/admin';
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-muted-foreground hover:bg-muted"
-              >
-                <Settings size={20} />
-                <span>Admin</span>
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Desktop Sidebar */}
@@ -170,27 +124,36 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         </div>
       </div>
 
-      {/* Bottom Navigation for Mobile */}
+      {/* Bottom Navigation for Mobile - All Items */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t z-50">
         <div className="flex">
-          {navItems.slice(0, 4).map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon;
             return (
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
                 className={cn(
-                  "flex-1 flex flex-col items-center justify-center py-2 px-1 transition-colors",
+                  "flex-1 flex flex-col items-center justify-center py-2 px-1 transition-colors min-h-[60px]",
                   activeTab === item.id
-                    ? "text-primary"
+                    ? "text-primary bg-primary/10"
                     : "text-muted-foreground"
                 )}
               >
-                <Icon size={20} />
-                <span className="text-xs mt-1">{item.label}</span>
+                <Icon size={18} />
+                <span className="text-[10px] mt-1 text-center leading-tight">{item.label}</span>
               </button>
             );
           })}
+          {isAdmin && (
+            <button
+              onClick={() => window.location.href = '/admin'}
+              className="flex-1 flex flex-col items-center justify-center py-2 px-1 transition-colors min-h-[60px] text-muted-foreground"
+            >
+              <Settings size={18} />
+              <span className="text-[10px] mt-1 text-center leading-tight">Admin</span>
+            </button>
+          )}
         </div>
       </div>
     </>
