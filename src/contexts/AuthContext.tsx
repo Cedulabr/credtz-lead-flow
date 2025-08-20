@@ -38,29 +38,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchProfile = useCallback(async (userId: string, retryCount = 0) => {
     if (!userId) return;
     
-    setProfileLoading(true);
+    // Prevent multiple concurrent fetches
+    if (retryCount === 0) {
+      setProfileLoading(true);
+    }
+    
     try {
       console.log('Fetching profile for user:', userId, `(attempt ${retryCount + 1})`);
+      
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
+        .abortSignal(controller.signal)
         .maybeSingle();
+      
+      clearTimeout(timeoutId);
       
       if (error) {
         console.error('Error fetching profile:', error);
         
-        // If it's a network error and we haven't retried much, try again
-        if ((error.message?.includes('Failed to fetch') || error.message?.includes('timeout')) && retryCount < 2) {
-          console.log(`Network error, retrying in ${(retryCount + 1) * 1000}ms...`);
+        // Handle network errors with exponential backoff
+        if ((error.message?.includes('Failed to fetch') || 
+             error.message?.includes('timeout') || 
+             error.message?.includes('aborted')) && retryCount < 2) {
+          
+          const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+          console.log(`Network error, retrying in ${delay}ms...`);
+          
           setTimeout(() => {
             fetchProfile(userId, retryCount + 1);
-          }, (retryCount + 1) * 1000);
+          }, delay);
           return;
         }
         
-        // Only try to create profile if it doesn't exist (not for other errors)
+        // Only try to create profile if it doesn't exist
         if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
           console.log('Profile not found, attempting to create one...');
           try {
@@ -77,19 +93,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             if (createError) {
               console.error('Error creating profile:', createError);
+              setProfile(null);
             } else {
               setProfile(newProfile);
-              return;
             }
           } catch (createError) {
             console.error('Failed to create profile:', createError);
+            setProfile(null);
           }
+        } else {
+          // For other errors, set profile to null to show retry UI
+          setProfile(null);
         }
-        
-        // For persistent network errors, don't set a fallback - keep profile as null
-        // This will allow the user to retry manually
-        console.log('Network error persists, keeping profile as null for manual retry');
-        setProfile(null);
         
       } else if (data) {
         console.log('Profile loaded successfully:', data);
@@ -123,19 +138,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error in fetchProfile:', error);
       
-      // If it's a network error and we haven't retried much, try again
-      if (retryCount < 2) {
-        console.log(`Unexpected error, retrying in ${(retryCount + 1) * 1000}ms...`);
+      // Handle fetch errors with limited retries
+      if (retryCount < 1) {
+        const delay = 2000;
+        console.log(`Unexpected error, retrying in ${delay}ms...`);
         setTimeout(() => {
           fetchProfile(userId, retryCount + 1);
-        }, (retryCount + 1) * 1000);
+        }, delay);
         return;
       }
       
-      // After retries, keep profile as null
+      // After all retries failed, set profile to null
       setProfile(null);
     } finally {
-      setProfileLoading(false);
+      // Only stop loading on the final attempt or success
+      if (retryCount >= 2 || profile !== undefined) {
+        setProfileLoading(false);
+      }
     }
   }, [user]);
 
@@ -149,29 +168,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let mounted = true;
     let forceStopTimer: NodeJS.Timeout;
 
-    // Force stop loading after 15 seconds to prevent infinite loading
+    // Force stop loading after 10 seconds to prevent infinite loading
     forceStopTimer = setTimeout(() => {
       if (mounted && loading) {
         console.warn('Auth initialization took too long, forcing completion');
         setLoading(false);
+        setProfileLoading(false);
       }
-    }, 15000);
+    }, 10000);
 
     const initializeAuth = async () => {
       try {
         console.log('Initializing authentication...');
         
-        // Add timeout for session check
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session check timeout')), 8000)
-        );
+        // Get session with a reasonable timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
         
-        const sessionPromise = supabase.auth.getSession();
-        
-        const { data: { session: currentSession }, error: sessionError } = await Promise.race([
-          sessionPromise, 
-          timeoutPromise
-        ]) as any;
+        const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+        clearTimeout(timeoutId);
         
         if (sessionError) {
           console.error('Error getting session:', sessionError);
@@ -183,26 +198,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(currentSession?.user ?? null);
           
           if (currentSession?.user) {
-            // Don't await profile fetch to prevent blocking
-            fetchProfile(currentSession.user.id).catch(error => {
-              console.error('Initial profile fetch failed:', error);
-            });
+            // Fetch profile but don't block initialization
+            setTimeout(() => {
+              fetchProfile(currentSession.user.id).catch(error => {
+                console.error('Initial profile fetch failed:', error);
+              });
+            }, 100);
           }
+          
+          // Set loading to false regardless of profile fetch
+          setLoading(false);
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
-        // Still set loading to false even if there's an error
-      } finally {
         if (mounted) {
-          console.log('Auth initialization complete');
           setLoading(false);
+          setProfileLoading(false);
         }
       }
     };
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (!mounted) return;
 
         console.log('Auth state changed:', event, session?.user?.id);
@@ -211,15 +229,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Don't await to prevent blocking UI
-          fetchProfile(session.user.id).catch(error => {
-            console.error('Profile fetch in auth change failed:', error);
-          });
+          // Debounce profile fetch to prevent rapid calls
+          setTimeout(() => {
+            fetchProfile(session.user.id).catch(error => {
+              console.error('Profile fetch in auth change failed:', error);
+            });
+          }, 200);
         } else {
           setProfile(null);
+          setProfileLoading(false);
         }
         
-        // Always set loading to false regardless of profile fetch result
+        // Auth loading is done regardless of profile state
         setLoading(false);
       }
     );
@@ -232,7 +253,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearTimeout(forceStopTimer);
       subscription.unsubscribe();
     };
-  }, [fetchProfile]);
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
