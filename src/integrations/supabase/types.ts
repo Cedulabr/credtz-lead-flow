@@ -137,180 +137,6 @@ export type Database = {
         }
         Relationships: []
       }
-      baseoff: {
-        Row: {
-          Agencia: string | null
-          Bairro: string | null
-          Banco: string | null
-          Beneficio: string | null
-          Bloqueado_Emprestimo: string | null
-          CEP: string | null
-          Codigo_Especie: string | null
-          Conta: string | null
-          CPF: string | null
-          CPF_Representante: string | null
-          Data_Nascimento: string | null
-          DDB: string | null
-          Desconto_Associacao: string | null
-          DIB: string | null
-          Email1: string | null
-          Email2: string | null
-          Email3: string | null
-          Emprestimo_Ativos: string | null
-          Endereco: string | null
-          Idade: string | null
-          Margem_Disponivel: string | null
-          Margem_RCC: string | null
-          Margem_RMC: string | null
-          Meio_Pagamento: string | null
-          Municipio: string | null
-          Nome: string | null
-          Nome_Mae: string | null
-          Nome_Representante: string | null
-          Possui_Representante: string | null
-          RG: string | null
-          Telefone1: string | null
-          Telefone2: string | null
-          Telefone3: string | null
-          UF: string | null
-          Valor_Beneficio: string | null
-        }
-        Insert: {
-          Agencia?: string | null
-          Bairro?: string | null
-          Banco?: string | null
-          Beneficio?: string | null
-          Bloqueado_Emprestimo?: string | null
-          CEP?: string | null
-          Codigo_Especie?: string | null
-          Conta?: string | null
-          CPF?: string | null
-          CPF_Representante?: string | null
-          Data_Nascimento?: string | null
-          DDB?: string | null
-          Desconto_Associacao?: string | null
-          DIB?: string | null
-          Email1?: string | null
-          Email2?: string | null
-          Email3?: string | null
-          Emprestimo_Ativos?: string | null
-          Endereco?: string | null
-          Idade?: string | null
-          Margem_Disponivel?: string | null
-          Margem_RCC?: string | null
-          Margem_RMC?: string | null
-          Meio_Pagamento?: string | null
-          Municipio?: string | null
-          Nome?: string | null
-          Nome_Mae?: string | null
-          Nome_Representante?: string | null
-          Possui_Representante?: string | null
-          RG?: string | null
-          Telefone1?: string | null
-          Telefone2?: string | null
-          Telefone3?: string | null
-          UF?: string | null
-          Valor_Beneficio?: string | null
-        }
-        Update: {
-          Agencia?: string | null
-          Bairro?: string | null
-          Banco?: string | null
-          Beneficio?: string | null
-          Bloqueado_Emprestimo?: string | null
-          CEP?: string | null
-          Codigo_Especie?: string | null
-          Conta?: string | null
-          CPF?: string | null
-          CPF_Representante?: string | null
-          Data_Nascimento?: string | null
-          DDB?: string | null
-          Desconto_Associacao?: string | null
-          DIB?: string | null
-          Email1?: string | null
-          Email2?: string | null
-          Email3?: string | null
-          Emprestimo_Ativos?: string | null
-          Endereco?: string | null
-          Idade?: string | null
-          Margem_Disponivel?: string | null
-          Margem_RCC?: string | null
-          Margem_RMC?: string | null
-          Meio_Pagamento?: string | null
-          Municipio?: string | null
-          Nome?: string | null
-          Nome_Mae?: string | null
-          Nome_Representante?: string | null
-          Possui_Representante?: string | null
-          RG?: string | null
-          Telefone1?: string | null
-          Telefone2?: string | null
-          Telefone3?: string | null
-          UF?: string | null
-          Valor_Beneficio?: string | null
-        }
-        Relationships: []
-      }
-      baseoff_allowed_banks: {
-        Row: {
-          codigo_banco: string
-          created_at: string
-          created_by: string | null
-          id: string
-          is_active: boolean
-          updated_at: string
-        }
-        Insert: {
-          codigo_banco: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          is_active?: boolean
-          updated_at?: string
-        }
-        Update: {
-          codigo_banco?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          is_active?: boolean
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      baseoff_requests: {
-        Row: {
-          codigo_banco: string | null
-          id: string
-          leads_count: number
-          requested_at: string
-          status: string
-          user_id: string
-          valor_parcela_max: number | null
-          valor_parcela_min: number | null
-        }
-        Insert: {
-          codigo_banco?: string | null
-          id?: string
-          leads_count?: number
-          requested_at?: string
-          status?: string
-          user_id: string
-          valor_parcela_max?: number | null
-          valor_parcela_min?: number | null
-        }
-        Update: {
-          codigo_banco?: string | null
-          id?: string
-          leads_count?: number
-          requested_at?: string
-          status?: string
-          user_id?: string
-          valor_parcela_max?: number | null
-          valor_parcela_min?: number | null
-        }
-        Relationships: []
-      }
       clientes: {
         Row: {
           beneficio: string | null
@@ -998,33 +824,6 @@ export type Database = {
         }
         Relationships: []
       }
-      registrodiariobaseoff: {
-        Row: {
-          created_at: string
-          data_registro: string
-          id: string
-          quantidade_leads: number
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          data_registro?: string
-          id?: string
-          quantidade_leads?: number
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          data_registro?: string
-          id?: string
-          quantidade_leads?: number
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       withdrawal_requests: {
         Row: {
           amount: number
@@ -1194,7 +993,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "partner"
-      user_level: "home_office_senior" | "home_office_junior"
+      user_level: "junior" | "pleno" | "senior"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1323,7 +1122,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "partner"],
-      user_level: ["home_office_senior", "home_office_junior"],
+      user_level: ["junior", "pleno", "senior"],
     },
   },
 } as const

@@ -182,19 +182,15 @@ export function UsersList() {
     }
 
     try {
-      // Generate new temporary password
-      const newPassword = Math.random().toString(36).slice(-8);
-      
-      const { error } = await supabase.auth.admin.updateUserById(
-        user.id,
-        { password: newPassword }
-      );
+      const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+        body: { user_id: user.id }
+      });
 
       if (error) throw error;
 
       toast({
         title: "Senha resetada!",
-        description: `Nova senha temporária: ${newPassword}`,
+        description: `Nova senha temporária: ${data.new_password}`,
       });
 
     } catch (error: any) {
