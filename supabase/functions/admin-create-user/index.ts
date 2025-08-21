@@ -8,13 +8,14 @@ const corsHeaders = {
 
 interface CreateUserPayload {
   company: string;
-  level: "home_office_senior" | "home_office_junior";
+  level?: string;
   name: string;
   email: string;
   password: string;
-  pix_key: string;
-  cpf: string;
-  phone: string;
+  pix_key?: string;
+  cpf?: string;
+  phone?: string;
+  role: "admin" | "partner";
 }
 
 serve(async (req: Request) => {
@@ -76,11 +77,11 @@ serve(async (req: Request) => {
       .from("profiles")
       .upsert({
         id: created.user.id,
-        role: "partner",
+        role: payload.role,
         name: payload.name,
         email: payload.email,
         company: payload.company,
-        level: payload.level as any,
+        level: payload.level,
         pix_key: payload.pix_key,
         cpf: payload.cpf,
         phone: payload.phone,

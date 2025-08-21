@@ -557,21 +557,7 @@ export function Commissions() {
             </div>
           </DialogContent>
         </Dialog>
-
-        <Button onClick={() => setShowForm(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Record Commission
-        </Button>
       </div>
-
-      {showForm && (
-        <CommissionForm
-          onSubmit={handleSubmit}
-          onCancel={() => setShowForm(false)}
-          formData={formData}
-          setFormData={setFormData}
-        />
-      )}
 
       {/* Commissions History */}
       <Card>

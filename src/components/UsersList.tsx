@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Edit, UserCheck, UserX, Plus, Trash2 } from "lucide-react";
+import { Edit, UserCheck, UserX, Plus, Trash2, RefreshCw } from "lucide-react";
+import { CreateUser } from "./CreateUser";
 
 interface User {
   id: string;
@@ -175,6 +176,37 @@ export function UsersList() {
     }
   };
 
+  const resetUserPassword = async (user: User) => {
+    if (!confirm(`Tem certeza que deseja resetar a senha do usuário ${user.name}?`)) {
+      return;
+    }
+
+    try {
+      // Generate new temporary password
+      const newPassword = Math.random().toString(36).slice(-8);
+      
+      const { error } = await supabase.auth.admin.updateUserById(
+        user.id,
+        { password: newPassword }
+      );
+
+      if (error) throw error;
+
+      toast({
+        title: "Senha resetada!",
+        description: `Nova senha temporária: ${newPassword}`,
+      });
+
+    } catch (error: any) {
+      console.error('Erro ao resetar senha:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao resetar senha do usuário.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getUserStatusBadge = (user: User) => {
     const isActive = user.is_active !== false; // Default to true if undefined
     return (
@@ -201,9 +233,12 @@ export function UsersList() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <UserCheck className="h-5 w-5" />
-          Usuários Criados
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <UserCheck className="h-5 w-5" />
+            Usuários Criados
+          </div>
+          <CreateUser />
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -258,6 +293,14 @@ export function UsersList() {
                         title={user.is_active !== false ? "Inativar usuário" : "Ativar usuário"}
                       >
                         {user.is_active !== false ? <UserX className="h-3 w-3" /> : <UserCheck className="h-3 w-3" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => resetUserPassword(user)}
+                        title="Resetar senha"
+                      >
+                        <RefreshCw className="h-3 w-3" />
                       </Button>
                       <Button
                         size="sm"

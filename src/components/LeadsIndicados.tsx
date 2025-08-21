@@ -57,6 +57,7 @@ const LeadsIndicados = () => {
       const { data, error } = await supabase
         .from('leads_indicados')
         .select('*')
+        .eq('created_by', user?.id)
         .order('created_at', { ascending: false });
 
       if (error) {

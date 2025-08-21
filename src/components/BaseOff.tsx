@@ -185,9 +185,10 @@ export function BaseOff() {
         .rpc('check_baseoff_daily_limit', { user_id_param: user?.id });
 
       if (error) throw error;
-      setDailyLimit(data || 0);
+      setDailyLimit(data || 80);
     } catch (error) {
       console.error('Error checking daily limit:', error);
+      setDailyLimit(80);
     }
   };
 
