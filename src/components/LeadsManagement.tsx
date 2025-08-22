@@ -222,10 +222,10 @@ export function LeadsManagement() {
   };
 
   const filteredLeads = leads.filter(lead => {
-    const matchesSearch = lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lead.cpf.includes(searchTerm) ||
-                         lead.phone.includes(searchTerm) ||
-                         lead.convenio.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (lead.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (lead.cpf || "").includes(searchTerm) ||
+                         (lead.phone || "").includes(searchTerm) ||
+                         (lead.convenio || "").toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || lead.status === statusFilter;
     
@@ -302,34 +302,19 @@ export function LeadsManagement() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Produto</label>
-                  <Select value={leadRequest.produto} onValueChange={(value) => 
-                    setLeadRequest(prev => ({ ...prev, produto: value }))
-                  }>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o produto" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {produtoOptions.map(option => (
-                        <SelectItem key={option} value={option}>{option}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Quantidade</label>
                   <Input
                     type="number"
                     min="1"
-                    max={remainingLeads}
+                    max="80"
                     value={leadRequest.count}
                     onChange={(e) => setLeadRequest(prev => ({ 
                       ...prev, 
-                      count: Math.min(Number(e.target.value), remainingLeads) 
+                      count: Math.min(Number(e.target.value), 80, remainingLeads) 
                     }))}
-                    placeholder="Número de leads"
+                    placeholder="Número de leads (máx. 80)"
                   />
                 </div>
 

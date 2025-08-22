@@ -8,6 +8,7 @@ const corsHeaders = {
 
 interface ResetPasswordPayload {
   user_id: string;
+  new_password?: string;
 }
 
 serve(async (req: Request) => {
@@ -52,15 +53,21 @@ serve(async (req: Request) => {
       });
     }
 
-    // Use service role to reset password
+    // Use service role to update password
     const adminClient = createClient(supabaseUrl, serviceKey);
 
-    // Generate new temporary password
-    const newPassword = Math.random().toString(36).slice(-8) + "A1!";
+    const { user_id, new_password } = payload;
+
+    let finalPassword = new_password;
+    
+    // If no new password provided, generate one
+    if (!finalPassword) {
+      finalPassword = Math.random().toString(36).slice(-8) + "A1!";
+    }
 
     const { data: updatedUser, error: updateError } = await adminClient.auth.admin.updateUserById(
-      payload.user_id,
-      { password: newPassword }
+      user_id,
+      { password: finalPassword }
     );
 
     if (updateError) {
@@ -70,8 +77,8 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: "Password reset successfully",
-        new_password: newPassword
+        message: new_password ? "Password updated successfully" : "Password reset successfully",
+        new_password: new_password ? undefined : finalPassword
       }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );

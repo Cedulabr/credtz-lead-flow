@@ -28,6 +28,7 @@ import { PaymentLaunch } from "./PaymentLaunch";
 import { PaymentManagement } from "./PaymentManagement";
 import { UsersList } from "./UsersList";
 import { AdminBaseOffBanks } from "./AdminBaseOffBanks";
+import { CommissionLaunch } from "./CommissionLaunch";
 
 interface Announcement {
   id: number;
@@ -302,9 +303,10 @@ export function AdminPanel() {
       </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-5' : 'grid-cols-2'}`}>
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-6' : 'grid-cols-2'}`}>
             <TabsTrigger value="announcements">Avisos</TabsTrigger>
             <TabsTrigger value="commissions">Comissões</TabsTrigger>
+            {isAdmin && <TabsTrigger value="commission-launch">Lançar Comissões</TabsTrigger>}
             {isAdmin && <TabsTrigger value="baseoff-banks">Bancos BaseOFF</TabsTrigger>}
             {isAdmin && <TabsTrigger value="payments">Pagamentos</TabsTrigger>}
             {isAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
@@ -560,6 +562,13 @@ export function AdminPanel() {
             ))}
           </div>
         </TabsContent>
+
+        {/* Commission Launch Tab */}
+        {isAdmin && (
+          <TabsContent value="commission-launch" className="space-y-4">
+            <CommissionLaunch />
+          </TabsContent>
+        )}
 
         {isAdmin && (
           <>

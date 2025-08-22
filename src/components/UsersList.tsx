@@ -28,6 +28,8 @@ interface User {
 export function UsersList() {
   const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
+  const [passwordDialog, setPasswordDialog] = useState({ open: false, user: null as any });
+  const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(true);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -176,6 +178,41 @@ export function UsersList() {
     }
   };
 
+  const handleSetPassword = (user: any) => {
+    setPasswordDialog({ open: true, user });
+    setNewPassword("");
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!passwordDialog.user || !newPassword) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+        body: { 
+          user_id: passwordDialog.user.id,
+          new_password: newPassword
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Senha definida com sucesso!",
+        description: `Nova senha definida para ${passwordDialog.user.name || passwordDialog.user.email}`,
+      });
+
+      setPasswordDialog({ open: false, user: null });
+      setNewPassword("");
+    } catch (error: any) {
+      console.error('Error setting password:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao definir senha",
+        variant: "destructive",
+      });
+    }
+  };
+
   const resetUserPassword = async (user: User) => {
     if (!confirm(`Tem certeza que deseja resetar a senha do usuário ${user.name}?`)) {
       return;
@@ -293,6 +330,14 @@ export function UsersList() {
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => handleSetPassword(user)}
+                        title="Definir senha"
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => resetUserPassword(user)}
                         title="Resetar senha"
                       >
@@ -384,6 +429,41 @@ export function UsersList() {
               <Button onClick={handleSaveUser} className="w-full">
                 Salvar Alterações
               </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Password Dialog */}
+        <Dialog open={passwordDialog.open} onOpenChange={(open) => setPasswordDialog({ open, user: null })}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Definir Senha - {passwordDialog.user?.name || passwordDialog.user?.email}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="new-password">Nova Senha</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Digite a nova senha"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setPasswordDialog({ open: false, user: null })}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleUpdatePassword}
+                  disabled={!newPassword}
+                >
+                  Definir Senha
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
