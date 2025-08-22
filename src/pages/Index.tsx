@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Navigation } from "@/components/Navigation";
 import { Dashboard } from "@/components/Dashboard";
 import { IndicateClient } from "@/components/IndicateClient";
+import IndicatedClientsTracking from "@/components/IndicatedClientsTracking";
 import { Notifications } from "@/components/Notifications";
 import { AdminTest } from "@/components/AdminTest";
 import { SystemStatus } from "@/components/SystemStatus";
@@ -75,7 +76,12 @@ const Index = () => {
       case "dashboard":
         return <Dashboard onNavigate={setActiveTab} />;
       case "indicate":
-        return <IndicateClient />;
+        return (
+          <div className="space-y-6">
+            <IndicateClient />
+            <IndicatedClientsTracking />
+          </div>
+        );
       case "leads":
         return (
           <Suspense fallback={<LoadingFallback />}>

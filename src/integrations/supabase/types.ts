@@ -137,6 +137,102 @@ export type Database = {
         }
         Relationships: []
       }
+      baseoff: {
+        Row: {
+          banco: string
+          cpf: string
+          created_at: string
+          id: string
+          margem_disponivel: string | null
+          municipio: string | null
+          nome: string
+          telefone1: string | null
+          telefone2: string | null
+          telefone3: string | null
+          uf: string | null
+          updated_at: string
+          valor_beneficio: string | null
+        }
+        Insert: {
+          banco: string
+          cpf: string
+          created_at?: string
+          id?: string
+          margem_disponivel?: string | null
+          municipio?: string | null
+          nome: string
+          telefone1?: string | null
+          telefone2?: string | null
+          telefone3?: string | null
+          uf?: string | null
+          updated_at?: string
+          valor_beneficio?: string | null
+        }
+        Update: {
+          banco?: string
+          cpf?: string
+          created_at?: string
+          id?: string
+          margem_disponivel?: string | null
+          municipio?: string | null
+          nome?: string
+          telefone1?: string | null
+          telefone2?: string | null
+          telefone3?: string | null
+          uf?: string | null
+          updated_at?: string
+          valor_beneficio?: string | null
+        }
+        Relationships: []
+      }
+      baseoff_allowed_banks: {
+        Row: {
+          codigo_banco: string
+          created_at: string
+          id: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          codigo_banco: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          codigo_banco?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      baseoff_requests: {
+        Row: {
+          codigo_banco: string | null
+          id: string
+          leads_count: number
+          requested_at: string
+          user_id: string
+        }
+        Insert: {
+          codigo_banco?: string | null
+          id?: string
+          leads_count?: number
+          requested_at?: string
+          user_id: string
+        }
+        Update: {
+          codigo_banco?: string | null
+          id?: string
+          leads_count?: number
+          requested_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           beneficio: string | null
@@ -821,6 +917,33 @@ export type Database = {
           id?: string
           user_id?: string
           window_start?: string
+        }
+        Relationships: []
+      }
+      registrodiariobaseoff: {
+        Row: {
+          created_at: string
+          data_registro: string
+          id: string
+          quantidade_leads: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_registro?: string
+          id?: string
+          quantidade_leads?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data_registro?: string
+          id?: string
+          quantidade_leads?: number
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

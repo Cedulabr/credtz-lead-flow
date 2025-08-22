@@ -88,7 +88,7 @@ export function BaseOff() {
   const fetchLeads = async () => {
     try {
       console.log('BaseOff: Fetching leads...');
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('baseoff')
         .select('*')
         .not('Banco', 'is', null)
@@ -119,7 +119,7 @@ export function BaseOff() {
       console.log('BaseOff: Fetching available bancos...');
       
       // First get allowed banks from admin settings
-      const { data: allowedBanks, error: allowedError } = await supabase
+      const { data: allowedBanks, error: allowedError } = await (supabase as any)
         .from('baseoff_allowed_banks')
         .select('codigo_banco')
         .eq('is_active', true);
@@ -130,7 +130,7 @@ export function BaseOff() {
       }
       
       console.log('BaseOff: Allowed banks:', allowedBanks);
-      const allowedCodes = allowedBanks?.map(bank => bank.codigo_banco) || [];
+      const allowedCodes = allowedBanks?.map((bank: any) => bank.codigo_banco) || [];
       
       if (allowedCodes.length === 0) {
         console.log('BaseOff: No allowed banks found');
@@ -139,7 +139,7 @@ export function BaseOff() {
       }
 
       // Then get available leads with those bank codes
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('baseoff')
         .select('Banco')
         .not('Banco', 'is', null)
@@ -165,7 +165,7 @@ export function BaseOff() {
 
   const fetchAvailableUFs = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('baseoff')
         .select('UF')
         .not('UF', 'is', null);
@@ -281,7 +281,7 @@ export function BaseOff() {
       }
 
       // Construir query com filtros
-      let query = supabase
+      let query = (supabase as any)
         .from('baseoff')
         .select('*')
         .eq('Banco', selectedBanco)
@@ -323,7 +323,7 @@ export function BaseOff() {
       });
 
       // Registrar a solicitação
-      await supabase
+      await (supabase as any)
         .from('baseoff_requests')
         .insert({
           user_id: user?.id,
