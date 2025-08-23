@@ -5,10 +5,12 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Badge } from "./ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { DollarSign, Plus, Check, X } from "lucide-react";
+import { DollarSign, Plus, Check, X, History } from "lucide-react";
 
 interface IndicatedLead {
   id: string;
@@ -35,12 +37,18 @@ interface Commission {
   status: string;
   proposal_date: string;
   payment_date?: string;
+  created_at: string;
+  profiles?: {
+    name: string;
+    email: string;
+  };
 }
 
 export function CommissionLaunch() {
   const { toast } = useToast();
   const { user, isAdmin } = useAuth();
   const [indicatedLeads, setIndicatedLeads] = useState<IndicatedLead[]>([]);
+  const [launchedCommissions, setLaunchedCommissions] = useState<Commission[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<IndicatedLead | null>(null);
   const [commissionForm, setCommissionForm] = useState({
@@ -55,16 +63,17 @@ export function CommissionLaunch() {
   useEffect(() => {
     if (isAdmin) {
       fetchIndicatedLeads();
+      fetchLaunchedCommissions();
     }
   }, [isAdmin]);
 
   const fetchIndicatedLeads = async () => {
     try {
-      // Buscar leads indicados com status de cliente fechado
+      // Buscar leads indicados com status de oferta aprovada
       const { data: leads, error } = await supabase
         .from('leads_indicados')
         .select('*')
-        .eq('status', 'cliente_fechado')
+        .eq('status', 'oferta_aprovada')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -153,6 +162,7 @@ export function CommissionLaunch() {
         payment_date: ""
       });
       fetchIndicatedLeads();
+      fetchLaunchedCommissions();
     } catch (error) {
       console.error('Error launching commission:', error);
       toast({
@@ -160,6 +170,34 @@ export function CommissionLaunch() {
         description: "Erro ao lançar comissão",
         variant: "destructive",
       });
+    }
+  };
+
+  const fetchLaunchedCommissions = async () => {
+    try {
+      const { data: commissions, error } = await supabase
+        .from('commissions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Buscar perfis dos usuários
+      const userIds = [...new Set(commissions?.map(c => c.user_id) || [])];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .in('id', userIds);
+
+      // Combinar dados
+      const commissionsWithProfiles = commissions?.map(commission => ({
+        ...commission,
+        profiles: profiles?.find(profile => profile.id === commission.user_id)
+      })) || [];
+
+      setLaunchedCommissions(commissionsWithProfiles as Commission[]);
+    } catch (error) {
+      console.error('Error fetching launched commissions:', error);
     }
   };
 
@@ -188,15 +226,22 @@ export function CommissionLaunch() {
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Lançar Comissões</h2>
+          <h2 className="text-2xl font-bold text-foreground">Gerenciar Comissões de Indicações</h2>
           <p className="text-muted-foreground">
-            Gerencie as comissões dos leads indicados fechados
+            Gerencie as comissões dos leads indicados aprovados
           </p>
         </div>
       </div>
 
-      <div className="grid gap-4">
-        {indicatedLeads.map((lead) => (
+      <Tabs defaultValue="launch" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="launch">Lançar Comissões</TabsTrigger>
+          <TabsTrigger value="launched">Comissões Lançadas</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="launch" className="space-y-4">
+          <div className="grid gap-4">
+            {indicatedLeads.map((lead) => (
           <Card key={lead.id} className={lead.hasCommission ? "bg-muted/50" : ""}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -210,9 +255,9 @@ export function CommissionLaunch() {
                       <p className="text-sm text-muted-foreground">
                         CPF: {lead.cpf} | Convênio: {lead.convenio}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        Fechado em: {new Date(lead.created_at).toLocaleDateString('pt-BR')}
-                      </p>
+                       <p className="text-xs text-muted-foreground">
+                         Aprovado em: {new Date(lead.created_at).toLocaleDateString('pt-BR')}
+                       </p>
                     </div>
                   </div>
                 </div>
@@ -238,16 +283,71 @@ export function CommissionLaunch() {
           </Card>
         ))}
 
-        {indicatedLeads.length === 0 && (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-muted-foreground">
-                Nenhum lead indicado fechado encontrado
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+            {indicatedLeads.length === 0 && (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <p className="text-muted-foreground">
+                    Nenhum lead indicado com oferta aprovada encontrado
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="launched" className="space-y-4">
+          <div className="grid gap-4">
+            {launchedCommissions.map((commission) => (
+              <Card key={commission.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <h3 className="font-semibold">{commission.client_name}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Indicado por: {commission.profiles?.name || 'Usuário desconhecido'}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Banco: {commission.bank_name} | Produto: {commission.product_type}
+                          </p>
+                          <p className="text-sm font-medium text-primary">
+                            Comissão: R$ {commission.commission_amount.toFixed(2)} ({commission.commission_percentage}%)
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Lançada em: {new Date(commission.created_at).toLocaleDateString('pt-BR')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Badge variant={
+                        commission.status === 'paid' ? 'default' : 
+                        commission.status === 'pending' ? 'secondary' : 'outline'
+                      }>
+                        {commission.status === 'paid' ? 'Pago' : 
+                         commission.status === 'pending' ? 'Pendente' : 'Prévia'}
+                      </Badge>
+                      <History className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+
+            {launchedCommissions.length === 0 && (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <p className="text-muted-foreground">
+                    Nenhuma comissão lançada encontrada
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>

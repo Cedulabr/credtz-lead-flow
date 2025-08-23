@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Check, Clock, Eye, DollarSign } from "lucide-react";
+import { Check, Clock, Eye, DollarSign, RotateCcw } from "lucide-react";
 
 interface Commission {
   id: string;
@@ -133,33 +133,57 @@ export function PaymentManagement() {
     switch (commission.status) {
       case 'preview':
         return (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => updateCommissionStatus(commission.id, 'pending')}
-            disabled={isProcessing}
-          >
-            <Clock className="h-4 w-4 mr-1" />
-            Marcar como Pendente
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => updateCommissionStatus(commission.id, 'pending')}
+              disabled={isProcessing}
+            >
+              <Clock className="h-4 w-4 mr-1" />
+              Marcar como Pendente
+            </Button>
+          </div>
         );
       case 'pending':
         return (
-          <Button
-            size="sm"
-            onClick={() => updateCommissionStatus(commission.id, 'paid')}
-            disabled={isProcessing}
-          >
-            <Check className="h-4 w-4 mr-1" />
-            Marcar como Pago
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={() => updateCommissionStatus(commission.id, 'paid')}
+              disabled={isProcessing}
+            >
+              <Check className="h-4 w-4 mr-1" />
+              Marcar como Pago
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => updateCommissionStatus(commission.id, 'preview')}
+              disabled={isProcessing}
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Estornar
+            </Button>
+          </div>
         );
       case 'paid':
         return (
-          <Badge variant="default" className="bg-green-100 text-green-800">
-            <Check className="h-3 w-3 mr-1" />
-            Pago em {commission.payment_date ? new Date(commission.payment_date).toLocaleDateString('pt-BR') : 'N/A'}
-          </Badge>
+          <div className="flex gap-2 items-center">
+            <Badge variant="default" className="bg-green-100 text-green-800">
+              <Check className="h-3 w-3 mr-1" />
+              Pago em {commission.payment_date ? new Date(commission.payment_date).toLocaleDateString('pt-BR') : 'N/A'}
+            </Badge>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => updateCommissionStatus(commission.id, 'pending')}
+              disabled={isProcessing}
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Estornar
+            </Button>
+          </div>
         );
       default:
         return null;
