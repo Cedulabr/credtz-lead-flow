@@ -132,24 +132,26 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Fixed Top Button - Always Visible */}
+      {/* Fixed Top Button - Centered */}
       <div className="sticky top-0 z-40 bg-background border-b p-4 shadow-card">
-        <Button 
-          onClick={() => onNavigate("indicate")}
-          className="w-full h-14 bg-primary hover:bg-primary-dark text-primary-foreground font-bold text-lg shadow-elevation"
-        >
-          <Users className="mr-3 h-6 w-6" />
-          Indicar Cliente
-        </Button>
+        <div className="flex justify-center">
+          <Button 
+            onClick={() => onNavigate("indicate")}
+            className="h-12 px-8 bg-primary hover:bg-primary-dark text-primary-foreground font-semibold text-base shadow-elevation rounded-xl"
+          >
+            <Users className="mr-2 h-5 w-5" />
+            Indicar Cliente
+          </Button>
+        </div>
       </div>
 
       <div className="p-4 space-y-6 pb-24">
         {/* Header */}
-        <div className="text-center space-y-3 py-4">
-          <h1 className="text-3xl font-bold text-foreground">
+        <div className="text-center space-y-2 py-3">
+          <h1 className="text-2xl font-bold text-foreground">
             Olá, Alessandro! 👋
           </h1>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-base text-muted-foreground">
             Você tem 3 oportunidades hoje
           </p>
         </div>
@@ -173,10 +175,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       <Icon className={`h-8 w-8 ${iconColor}`} />
                     </div>
                     <div className="space-y-2">
-                      <h3 className="text-lg font-bold text-foreground">{stat.title}</h3>
-                      <p className="text-4xl font-bold text-foreground">{stat.value}</p>
+                      <h3 className="text-base font-semibold text-foreground">{stat.title}</h3>
+                      <p className="text-2xl font-bold text-foreground">{stat.value}</p>
                       <p className={`text-sm font-medium ${iconColor}`}>{stat.change}</p>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{stat.description}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{stat.description}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -194,44 +196,44 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   <Star className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-white">Oportunidade do Dia</h2>
+                  <h2 className="text-xl font-bold text-white">Oportunidade do Dia</h2>
                   <Badge className="bg-white/20 text-white border-white/30 mt-1">
                     Alta Prioridade
                   </Badge>
                 </div>
               </div>
               
-              <div className="space-y-3">
-                <h3 className="text-xl font-bold text-white">Crédito Consignado Premium</h3>
-                <p className="text-white/90 text-lg">
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold text-white">Crédito Consignado Premium</h3>
+                <p className="text-white/90 text-base">
                   Cliente pré-aprovado aguardando contato
                 </p>
               </div>
               
               <div className="grid grid-cols-3 gap-4 py-4">
                 <div className="text-center">
-                  <DollarSign className="h-6 w-6 text-white mx-auto mb-2" />
-                  <p className="text-white font-bold text-lg">R$ 890</p>
-                  <p className="text-white/80 text-sm">Comissão</p>
+                  <DollarSign className="h-5 w-5 text-white mx-auto mb-1" />
+                  <p className="text-white font-bold text-base">R$ 890</p>
+                  <p className="text-white/80 text-xs">Comissão</p>
                 </div>
                 <div className="text-center">
-                  <Clock className="h-6 w-6 text-white mx-auto mb-2" />
-                  <p className="text-white font-bold text-lg">1 dia</p>
-                  <p className="text-white/80 text-sm">Prazo</p>
+                  <Clock className="h-5 w-5 text-white mx-auto mb-1" />
+                  <p className="text-white font-bold text-base">1 dia</p>
+                  <p className="text-white/80 text-xs">Prazo</p>
                 </div>
                 <div className="text-center">
-                  <Target className="h-6 w-6 text-white mx-auto mb-2" />
-                  <p className="text-white font-bold text-lg">85%</p>
-                  <p className="text-white/80 text-sm">Conversão</p>
+                  <Target className="h-5 w-5 text-white mx-auto mb-1" />
+                  <p className="text-white font-bold text-base">85%</p>
+                  <p className="text-white/80 text-xs">Conversão</p>
                 </div>
               </div>
               
               <Button 
                 onClick={() => onNavigate("leads")}
-                className="w-full h-14 bg-white text-primary hover:bg-white/90 font-bold text-lg"
+                className="w-full h-12 bg-white text-primary hover:bg-white/90 font-semibold text-base"
               >
                 Aceitar Oportunidade
-                <ArrowUpRight className="ml-3 h-6 w-6" />
+                <ArrowUpRight className="ml-2 h-5 w-5" />
               </Button>
             </div>
           </CardContent>
@@ -239,8 +241,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
         {/* Activities Section - Simplified and Clean */}
         <Card className="border-2 shadow-card">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-bold text-center text-foreground">Atividades Recentes</CardTitle>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-bold text-center text-foreground">Atividades Recentes</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -257,17 +259,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       <Icon className={`h-6 w-6 ${iconColor}`} />
                     </div>
                     <div className="flex-1">
-                      <p className="font-semibold text-foreground text-lg">
+                      <p className="font-semibold text-foreground text-base">
                         {activity.message}
                       </p>
-                      <p className="text-muted-foreground">{activity.time}</p>
+                      <p className="text-muted-foreground text-sm">{activity.time}</p>
                     </div>
                   </div>
                 );
               }) : (
-                <div className="text-center py-12 space-y-3">
-                  <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto" />
-                  <p className="text-lg text-muted-foreground font-medium">
+                <div className="text-center py-8 space-y-2">
+                  <AlertCircle className="h-10 w-10 text-muted-foreground mx-auto" />
+                  <p className="text-base text-muted-foreground font-medium">
                     Nenhuma atividade recente
                   </p>
                 </div>

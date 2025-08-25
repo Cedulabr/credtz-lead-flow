@@ -12,12 +12,12 @@ interface NavigationProps {
   onTabChange: (tab: string) => void;
 }
 
-// Simplified navigation - max 4 items for mobile-first
+// Navigation items for mobile-first
 const navItems = [
   { id: "dashboard", label: "Início", icon: Home },
   { id: "indicate", label: "Indicar", icon: Users },
+  { id: "leads", label: "Leads Premium", icon: TrendingUp },
   { id: "commissions", label: "Comissões", icon: DollarSign },
-  { id: "notifications", label: "Avisos", icon: Bell },
 ];
 
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
@@ -31,12 +31,8 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
 
   return (
     <>
-      {/* Mobile Header - Simple and Clean */}
-      <div className="md:hidden bg-card border-b sticky top-0 z-50">
-        <div className="flex items-center justify-center py-3">
-          <h1 className="text-lg font-bold text-foreground">Credtz</h1>
-        </div>
-      </div>
+      {/* Mobile Header - Hidden to save space */}
+      <div className="md:hidden h-0"></div>
 
       {/* Desktop Sidebar - Hidden on Mobile */}
       <div className="hidden md:flex md:flex-col md:w-64 md:bg-card md:border-r md:h-screen md:sticky md:top-0">
