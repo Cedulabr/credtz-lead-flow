@@ -132,28 +132,26 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Fixed Top Button - Centered */}
-      <div className="sticky top-0 z-40 bg-background border-b p-4 shadow-card">
-        <div className="flex justify-center">
-          <Button 
-            onClick={() => onNavigate("indicate")}
-            className="h-12 px-8 bg-primary hover:bg-primary-dark text-primary-foreground font-semibold text-base shadow-elevation rounded-xl"
-          >
-            <Users className="mr-2 h-5 w-5" />
-            Indicar Cliente
-          </Button>
-        </div>
-      </div>
-
       <div className="p-4 space-y-6 pb-24">
         {/* Header */}
-        <div className="text-center space-y-2 py-3">
+        <div className="text-center space-y-4 py-3">
           <h1 className="text-2xl font-bold text-foreground">
             Olá, Alessandro! 👋
           </h1>
           <p className="text-base text-muted-foreground">
             Você tem 3 oportunidades hoje
           </p>
+          
+          {/* Indicar Cliente Button */}
+          <div className="flex justify-center pt-2">
+            <Button 
+              onClick={() => onNavigate("indicate")}
+              className="h-12 px-8 bg-primary hover:bg-primary-dark text-primary-foreground font-semibold text-base shadow-elevation rounded-xl"
+            >
+              <Users className="mr-2 h-5 w-5" />
+              Indicar Cliente
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards - Large Vertical Mobile-First */}
