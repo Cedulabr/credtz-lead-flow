@@ -131,184 +131,146 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }));
 
   return (
-    <div className="p-4 md:p-6 space-y-6 pb-20 md:pb-6">
-      {/* Header */}
-      <div className="flex flex-col space-y-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+    <div className="min-h-screen bg-background">
+      {/* Fixed Top Button - Always Visible */}
+      <div className="sticky top-0 z-40 bg-background border-b p-4 shadow-card">
+        <Button 
+          onClick={() => onNavigate("indicate")}
+          className="w-full h-14 bg-primary hover:bg-primary-dark text-primary-foreground font-bold text-lg shadow-elevation"
+        >
+          <Users className="mr-3 h-6 w-6" />
+          Indicar Cliente
+        </Button>
+      </div>
+
+      <div className="p-4 space-y-6 pb-24">
+        {/* Header */}
+        <div className="text-center space-y-3 py-4">
+          <h1 className="text-3xl font-bold text-foreground">
             Olá, Alessandro! 👋
           </h1>
-          <p className="text-muted-foreground">
-            Você tem 3 oportunidades esperando por você hoje
+          <p className="text-lg text-muted-foreground">
+            Você tem 3 oportunidades hoje
           </p>
         </div>
 
-        {/* Quick Actions */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button 
-            onClick={() => onNavigate("indicate")}
-            className="flex-1 bg-gradient-to-r from-primary to-primary-dark hover:from-primary-dark hover:to-primary"
-          >
-            <Users className="mr-2 h-4 w-4" />
-            Indicar Cliente
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => onNavigate("leads")}
-            className="flex-1"
-          >
-            <TrendingUp className="mr-2 h-4 w-4" />
-            Leads Premium
-          </Button>
+        {/* Stats Cards - Large Vertical Mobile-First */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {stats.map((stat, index) => {
+            const Icon = stat.icon;
+            const iconColor = stat.color === 'primary' ? 'text-primary' : 
+                           stat.color === 'success' ? 'text-success' : 
+                           stat.color === 'warning' ? 'text-warning' : 'text-primary';
+            const bgColor = stat.color === 'primary' ? 'bg-primary/10' : 
+                         stat.color === 'success' ? 'bg-success/10' : 
+                         stat.color === 'warning' ? 'bg-warning/10' : 'bg-primary/10';
+            
+            return (
+              <Card key={index} className="border-2 shadow-card hover:shadow-elevation transition-all duration-200">
+                <CardContent className="p-6">
+                  <div className="text-center space-y-4">
+                    <div className={`mx-auto w-16 h-16 ${bgColor} rounded-2xl flex items-center justify-center`}>
+                      <Icon className={`h-8 w-8 ${iconColor}`} />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-bold text-foreground">{stat.title}</h3>
+                      <p className="text-4xl font-bold text-foreground">{stat.value}</p>
+                      <p className={`text-sm font-medium ${iconColor}`}>{stat.change}</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{stat.description}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, index) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={index} className="bg-gradient-to-br from-card to-muted/20">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{stat.title}</p>
-                    <p className="text-2xl font-bold text-foreground mt-1">{stat.value}</p>
-                    <p className={`text-xs mt-1 text-${stat.color}`}>{stat.change}</p>
-                    <p className="text-xs text-muted-foreground/80 mt-1">{stat.description}</p>
-                  </div>
-                  <div className={`p-2 bg-${stat.color}/10 rounded-lg`}>
-                    <Icon className={`h-5 w-5 text-${stat.color}`} />
-                  </div>
+        {/* Opportunity of the Day - Large and Clear */}
+        <Card className="border-2 border-primary/20 bg-gradient-primary shadow-elevation">
+          <CardContent className="p-6">
+            <div className="text-center space-y-6">
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                  <Star className="h-6 w-6 text-white" />
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Opportunity of the Day */}
-      <Card className="bg-gradient-to-r from-primary/10 via-primary/5 to-success/10 border-primary/20">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Star className="h-5 w-5 text-primary" />
-              Oportunidade do Dia
-            </CardTitle>
-            <Badge variant="secondary" className="bg-primary/10 text-primary">
-              Alta Prioridade
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-semibold text-lg">Crédito Consignado Premium</h3>
-              <p className="text-muted-foreground">
-                Cliente pré-aprovado aguardando contato - Taxa especial
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-4 text-sm">
-              <div className="flex items-center gap-1">
-                <DollarSign className="h-4 w-4 text-success" />
-                <span>Comissão: R$ 890</span>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Oportunidade do Dia</h2>
+                  <Badge className="bg-white/20 text-white border-white/30 mt-1">
+                    Alta Prioridade
+                  </Badge>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <Clock className="h-4 w-4 text-warning" />
-                <span>Prazo: 1 dia</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Target className="h-4 w-4 text-primary" />
-                <span>Conversão: 85%</span>
-              </div>
-            </div>
-            <Button 
-              onClick={() => onNavigate("leads")}
-              className="w-full bg-gradient-to-r from-primary to-success hover:from-primary-dark hover:to-success"
-            >
-              Aceitar Oportunidade
-              <ArrowUpRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Activities & Available Opportunities */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Recent Activities */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Atividades Recentes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {formatActivities.length > 0 ? formatActivities.map((activity) => {
-                const Icon = activity.icon;
-                return (
-                  <div key={activity.id} className="flex items-center space-x-3">
-                    <div className={`p-2 bg-${activity.color}/10 rounded-lg`}>
-                      <Icon className={`h-4 w-4 text-${activity.color}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground">
-                        {activity.message}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{activity.time}</p>
-                    </div>
-                  </div>
-                );
-              }) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Nenhuma atividade recente
+              
+              <div className="space-y-3">
+                <h3 className="text-xl font-bold text-white">Crédito Consignado Premium</h3>
+                <p className="text-white/90 text-lg">
+                  Cliente pré-aprovado aguardando contato
                 </p>
-              )}
+              </div>
+              
+              <div className="grid grid-cols-3 gap-4 py-4">
+                <div className="text-center">
+                  <DollarSign className="h-6 w-6 text-white mx-auto mb-2" />
+                  <p className="text-white font-bold text-lg">R$ 890</p>
+                  <p className="text-white/80 text-sm">Comissão</p>
+                </div>
+                <div className="text-center">
+                  <Clock className="h-6 w-6 text-white mx-auto mb-2" />
+                  <p className="text-white font-bold text-lg">1 dia</p>
+                  <p className="text-white/80 text-sm">Prazo</p>
+                </div>
+                <div className="text-center">
+                  <Target className="h-6 w-6 text-white mx-auto mb-2" />
+                  <p className="text-white font-bold text-lg">85%</p>
+                  <p className="text-white/80 text-sm">Conversão</p>
+                </div>
+              </div>
+              
+              <Button 
+                onClick={() => onNavigate("leads")}
+                className="w-full h-14 bg-white text-primary hover:bg-white/90 font-bold text-lg"
+              >
+                Aceitar Oportunidade
+                <ArrowUpRight className="ml-3 h-6 w-6" />
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Available Opportunities */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Oportunidades Disponíveis</CardTitle>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => onNavigate("leads")}
-              >
-                Ver Todas
-              </Button>
-            </div>
+        {/* Activities Section - Simplified and Clean */}
+        <Card className="border-2 shadow-card">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-bold text-center text-foreground">Atividades Recentes</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {availableLeads.length > 0 ? availableLeads.slice(0, 3).map((lead) => (
-                <div key={lead.id} className="border rounded-lg p-3 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-sm">{lead.name}</h4>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {lead.convenio} - {lead.banco}
-                      </p>
-                      <div className="flex items-center gap-3 mt-2">
-                        <span className="text-xs font-medium text-success">
-                          Telefone: {lead.phone}
-                        </span>
-                        <Badge variant="outline" className="text-xs border-primary text-primary">
-                          Disponível
-                        </Badge>
-                      </div>
+              {formatActivities.length > 0 ? formatActivities.slice(0, 4).map((activity) => {
+                const Icon = activity.icon;
+                const iconColor = activity.color === 'primary' ? 'text-primary' : 
+                               activity.color === 'success' ? 'text-success' : 'text-primary';
+                const bgColor = activity.color === 'primary' ? 'bg-primary/10' : 
+                             activity.color === 'success' ? 'bg-success/10' : 'bg-primary/10';
+                
+                return (
+                  <div key={activity.id} className="flex items-center space-x-4 p-4 border-2 rounded-xl hover:bg-muted/30 transition-colors">
+                    <div className={`w-12 h-12 ${bgColor} rounded-xl flex items-center justify-center`}>
+                      <Icon className={`h-6 w-6 ${iconColor}`} />
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold">CPF: {lead.cpf}</p>
-                      <p className="text-xs text-muted-foreground">{lead.tipo_beneficio}</p>
+                    <div className="flex-1">
+                      <p className="font-semibold text-foreground text-lg">
+                        {activity.message}
+                      </p>
+                      <p className="text-muted-foreground">{activity.time}</p>
                     </div>
                   </div>
+                );
+              }) : (
+                <div className="text-center py-12 space-y-3">
+                  <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto" />
+                  <p className="text-lg text-muted-foreground font-medium">
+                    Nenhuma atividade recente
+                  </p>
                 </div>
-              )) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Nenhum lead premium disponível
-                </p>
               )}
             </div>
           </CardContent>

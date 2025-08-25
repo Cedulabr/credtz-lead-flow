@@ -121,34 +121,6 @@ const Index = () => {
       
       {/* Admin Test Panel - visible on main page for debugging */}
       <AdminTest />
-      
-      {/* Botões flutuantes para teste */}
-      <div className="fixed bottom-20 md:bottom-6 right-6 z-40 flex flex-col gap-3">
-        <Button
-          onClick={() => setActiveTab("system-status")}
-          className="h-12 w-12 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700"
-          size="icon"
-          title="Status do Sistema"
-        >
-          <Activity size={20} />
-        </Button>
-        <Button
-          onClick={() => setActiveTab("test-functionalities")}
-          className="h-12 w-12 rounded-full shadow-lg bg-green-600 hover:bg-green-700"
-          size="icon"
-          title="Testar Funcionalidades"
-        >
-          <TestTube size={20} />
-        </Button>
-        <Button
-          onClick={() => navigate("/test-database")}
-          className="h-12 w-12 rounded-full shadow-lg bg-primary hover:bg-primary-dark"
-          size="icon"
-          title="Teste do Banco"
-        >
-          <Database size={20} />
-        </Button>
-      </div>
     </div>
   );
 };

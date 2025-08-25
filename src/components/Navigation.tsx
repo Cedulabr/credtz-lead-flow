@@ -12,10 +12,10 @@ interface NavigationProps {
   onTabChange: (tab: string) => void;
 }
 
+// Simplified navigation - max 4 items for mobile-first
 const navItems = [
   { id: "dashboard", label: "Início", icon: Home },
   { id: "indicate", label: "Indicar", icon: Users },
-  { id: "leads", label: "Leads Premium", icon: TrendingUp },
   { id: "commissions", label: "Comissões", icon: DollarSign },
   { id: "notifications", label: "Avisos", icon: Bell },
 ];
@@ -117,9 +117,9 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         </div>
       </div>
 
-      {/* Bottom Navigation for Mobile - Complete Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t z-50 safe-area-pb">
-        <div className="grid grid-cols-5 gap-1">
+      {/* Bottom Navigation for Mobile - Simplified 4 icons max */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t z-50 shadow-elevation">
+        <div className="grid grid-cols-4 gap-1 px-2 py-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -127,27 +127,29 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
                 className={cn(
-                  "flex flex-col items-center justify-center py-2 px-1 transition-colors min-h-[64px]",
+                  "flex flex-col items-center justify-center py-3 px-2 transition-all duration-200 rounded-lg min-h-[72px]",
                   activeTab === item.id
-                    ? "text-primary bg-primary/10"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "text-primary bg-primary/10 font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 )}
               >
-                <Icon size={20} />
-                <span className="text-[10px] mt-1 text-center leading-tight font-medium">{item.label}</span>
+                <Icon size={24} className="mb-1" />
+                <span className="text-xs text-center leading-tight font-medium">{item.label}</span>
               </button>
             );
           })}
-          {isAdmin && (
+        </div>
+        {isAdmin && (
+          <div className="border-t px-2 py-1">
             <button
               onClick={() => window.location.href = '/admin'}
-              className="flex flex-col items-center justify-center py-2 px-1 transition-colors min-h-[64px] text-muted-foreground hover:text-foreground"
+              className="w-full flex items-center justify-center py-2 text-muted-foreground hover:text-foreground text-sm"
             >
-              <Settings size={20} />
-              <span className="text-[10px] mt-1 text-center leading-tight font-medium">Admin</span>
+              <Settings size={16} className="mr-2" />
+              Admin
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </>
   );
