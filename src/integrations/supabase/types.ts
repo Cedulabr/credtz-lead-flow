@@ -330,6 +330,7 @@ export type Database = {
           payment_method: string | null
           product_type: string
           proposal_date: string | null
+          proposal_number: string | null
           status: string
           updated_at: string
           user_id: string
@@ -346,6 +347,7 @@ export type Database = {
           payment_method?: string | null
           product_type: string
           proposal_date?: string | null
+          proposal_number?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -362,6 +364,7 @@ export type Database = {
           payment_method?: string | null
           product_type?: string
           proposal_date?: string | null
+          proposal_number?: string | null
           status?: string
           updated_at?: string
           user_id?: string

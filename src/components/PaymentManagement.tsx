@@ -17,6 +17,7 @@ interface Commission {
   status: string;
   payment_date: string | null;
   proposal_date: string;
+  proposal_number?: string;
   user_id: string;
   user?: {
     name: string;
@@ -286,6 +287,7 @@ export function PaymentManagement() {
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {commission.user?.name || 'Usuário não encontrado'} • {commission.bank_name} • {commission.product_type}
+                      {commission.proposal_number && ` • Proposta: ${commission.proposal_number}`}
                     </p>
                     <p className="text-sm">
                       Valor da operação: R$ {commission.credit_value.toFixed(2)} • 

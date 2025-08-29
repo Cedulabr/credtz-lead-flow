@@ -38,6 +38,7 @@ interface Commission {
   proposal_date: string;
   payment_date?: string;
   created_at: string;
+  proposal_number?: string;
   profiles?: {
     name: string;
     email: string;
@@ -57,7 +58,8 @@ export function CommissionLaunch() {
     product_type: "",
     bank_name: "",
     proposal_date: "",
-    payment_date: ""
+    payment_date: "",
+    proposal_number: ""
   });
 
   useEffect(() => {
@@ -137,7 +139,8 @@ export function CommissionLaunch() {
         bank_name: commissionForm.bank_name,
         status: 'pending',
         proposal_date: commissionForm.proposal_date,
-        payment_date: commissionForm.payment_date || null
+        payment_date: commissionForm.payment_date || null,
+        proposal_number: commissionForm.proposal_number || null
       };
 
       const { error } = await supabase
@@ -159,7 +162,8 @@ export function CommissionLaunch() {
         product_type: "",
         bank_name: "",
         proposal_date: "",
-        payment_date: ""
+        payment_date: "",
+        proposal_number: ""
       });
       fetchIndicatedLeads();
       fetchLaunchedCommissions();
@@ -209,7 +213,8 @@ export function CommissionLaunch() {
       product_type: "Consignado",
       bank_name: "",
       proposal_date: new Date().toISOString().split('T')[0],
-      payment_date: ""
+      payment_date: "",
+      proposal_number: ""
     });
     setIsDialogOpen(true);
   };
@@ -308,12 +313,17 @@ export function CommissionLaunch() {
                           <p className="text-sm text-muted-foreground">
                             Indicado por: {commission.profiles?.name || 'Usuário desconhecido'}
                           </p>
-                          <p className="text-sm text-muted-foreground">
-                            Banco: {commission.bank_name} | Produto: {commission.product_type}
-                          </p>
-                          <p className="text-sm font-medium text-primary">
-                            Comissão: R$ {commission.commission_amount.toFixed(2)} ({commission.commission_percentage}%)
-                          </p>
+                           <p className="text-sm text-muted-foreground">
+                             Banco: {commission.bank_name} | Produto: {commission.product_type}
+                           </p>
+                           {commission.proposal_number && (
+                             <p className="text-sm text-muted-foreground">
+                               Proposta: {commission.proposal_number}
+                             </p>
+                           )}
+                           <p className="text-sm font-medium text-primary">
+                             Comissão: R$ {commission.commission_amount.toFixed(2)} ({commission.commission_percentage}%)
+                           </p>
                           <p className="text-xs text-muted-foreground">
                             Lançada em: {new Date(commission.created_at).toLocaleDateString('pt-BR')}
                           </p>
@@ -419,14 +429,24 @@ export function CommissionLaunch() {
                 />
               </div>
               <div>
-                <Label htmlFor="payment_date">Data do Pagamento (Opcional)</Label>
+                <Label htmlFor="proposal_number">Número da Proposta</Label>
                 <Input
-                  id="payment_date"
-                  type="date"
-                  value={commissionForm.payment_date}
-                  onChange={(e) => setCommissionForm({ ...commissionForm, payment_date: e.target.value })}
+                  id="proposal_number"
+                  value={commissionForm.proposal_number || ""}
+                  onChange={(e) => setCommissionForm({ ...commissionForm, proposal_number: e.target.value })}
+                  placeholder="Ex: PROP-2024-001"
                 />
               </div>
+            </div>
+
+            <div>
+              <Label htmlFor="payment_date">Data do Pagamento (Opcional)</Label>
+              <Input
+                id="payment_date"
+                type="date"
+                value={commissionForm.payment_date}
+                onChange={(e) => setCommissionForm({ ...commissionForm, payment_date: e.target.value })}
+              />
             </div>
 
             {commissionForm.credit_value && commissionForm.commission_percentage && (

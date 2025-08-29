@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { Phone, MessageCircle, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -69,42 +69,6 @@ const IndicatedClientsTracking = () => {
     }
   };
 
-  const updateClientStatus = async (clientId: string, newStatus: string) => {
-    try {
-      const { error } = await supabase
-        .from('leads_indicados')
-        .update({ status: newStatus })
-        .eq('id', clientId);
-
-      if (error) {
-        console.error('Erro ao atualizar status:', error);
-        toast({
-          title: "Erro",
-          description: "Erro ao atualizar status do cliente",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setClients(prevClients => 
-        prevClients.map(client => 
-          client.id === clientId ? { ...client, status: newStatus } : client
-        )
-      );
-
-      toast({
-        title: "Status atualizado",
-        description: "Status do cliente atualizado com sucesso!",
-      });
-    } catch (error) {
-      console.error('Erro ao atualizar status:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao atualizar status do cliente",
-        variant: "destructive",
-      });
-    }
-  };
 
   const getStatusInfo = (status: string) => {
     const statusInfo = statusOptions.find(opt => opt.value === status);
@@ -175,23 +139,9 @@ const IndicatedClientsTracking = () => {
                       <TableCell>{formatPhone(client.telefone)}</TableCell>
                       <TableCell>{client.convenio}</TableCell>
                       <TableCell>
-                        <Select
-                          value={client.status}
-                          onValueChange={(newStatus) => updateClientStatus(client.id, newStatus)}
-                        >
-                          <SelectTrigger className="w-[160px]">
-                            <Badge className={`${statusInfo.color} text-white`}>
-                              {statusInfo.label}
-                            </Badge>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {statusOptions.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Badge className={`${statusInfo.color} text-white`}>
+                          {statusInfo.label}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         {new Date(client.created_at).toLocaleDateString('pt-BR')}
