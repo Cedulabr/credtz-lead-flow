@@ -159,10 +159,30 @@ export function Commissions() {
   };
 
   const handleWithdrawalRequest = async () => {
+    // Verificar se há comissões em preview para poder sacar
+    if (commissionTotals.preview === 0) {
+      toast({
+        title: "Sem comissões para saque",
+        description: "Você precisa ter comissões em 'Prévia de comissão' para solicitar um saque.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!withdrawalAmount || parseFloat(withdrawalAmount.replace(/[^\d,]/g, '').replace(',', '.')) < 50) {
       toast({
         title: "Valor inválido",
         description: "O valor mínimo para saque é R$ 50,00",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const requestedAmount = parseFloat(withdrawalAmount.replace(/[^\d,]/g, '').replace(',', '.'));
+    if (requestedAmount > commissionTotals.preview) {
+      toast({
+        title: "Valor superior à prévia",
+        description: `Você só pode sacar até R$ ${commissionTotals.preview.toFixed(2)} que está em prévia.`,
         variant: "destructive",
       });
       return;
@@ -404,41 +424,36 @@ export function Commissions() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-gradient-to-br from-success/10 to-success/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total do Mês</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {formatCurrency(commissionTotals.total)}
-                </p>
-                <p className="text-xs text-success flex items-center mt-1">
-                  <TrendingUp className="h-3 w-3 mr-1" />
-                  +15% vs mês anterior
-                </p>
-              </div>
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <DollarSign className="h-5 w-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-success/10 to-success/5">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Já Recebido</p>
-                <p className="text-2xl font-bold text-foreground">
-                  {formatCurrency(commissionTotals.paid - commissionTotals.withdrawals)}
+                  {formatCurrency(commissions
+                    .filter(c => {
+                      if (c.status !== 'paid' || !c.payment_date) return false;
+                      const paymentDate = new Date(c.payment_date);
+                      const currentMonth = new Date().getMonth();
+                      const currentYear = new Date().getFullYear();
+                      return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear && c.commission_amount > 0;
+                    })
+                    .reduce((sum, c) => sum + Number(c.commission_amount), 0)
+                  )}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {positiveCommissions.filter(c => c.status === 'paid').length} pagamentos
+                  {commissions.filter(c => {
+                    if (c.status !== 'paid' || !c.payment_date) return false;
+                    const paymentDate = new Date(c.payment_date);
+                    const currentMonth = new Date().getMonth();
+                    const currentYear = new Date().getFullYear();
+                    return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear && c.commission_amount > 0;
+                  }).length} comissões pagas no mês
                 </p>
               </div>
               <div className="p-2 bg-success/10 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-success" />
+                <DollarSign className="h-5 w-5 text-success" />
               </div>
             </div>
           </CardContent>
@@ -453,7 +468,7 @@ export function Commissions() {
                   {formatCurrency(commissionTotals.preview)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {positiveCommissions.filter(c => c.status === 'preview').length} propostas
+                  {positiveCommissions.filter(c => c.status === 'preview').length} comissões lançadas
                 </p>
               </div>
               <div className="p-2 bg-muted/20 rounded-lg">
@@ -463,7 +478,7 @@ export function Commissions() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-warning/10 to-warning/5">
+        <Card className="bg-gradient-to-br from-orange/10 to-orange/5">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -472,30 +487,11 @@ export function Commissions() {
                   {formatCurrency(commissionTotals.pending)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {positiveCommissions.filter(c => c.status === 'pending').length} propostas
+                  {positiveCommissions.filter(c => c.status === 'pending').length} comissões e leads
                 </p>
               </div>
               <div className="p-2 bg-warning/10 rounded-lg">
                 <Clock className="h-5 w-5 text-warning" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-card to-muted/20">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Próximo Pagamento</p>
-                <p className="text-lg font-bold text-foreground">
-                  {formatCurrency(commissionTotals.approved)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Em 3 dias úteis
-                </p>
-              </div>
-              <div className="p-2 bg-muted rounded-lg">
-                <Calendar className="h-5 w-5 text-muted-foreground" />
               </div>
             </div>
           </CardContent>
@@ -586,12 +582,16 @@ export function Commissions() {
                       </div>
                       <div>
                         <p className="font-medium">{commission.client_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {commission.bank_name} - {commission.product_type}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(commission.created_at)}
-                        </p>
+                         <p className="text-sm text-muted-foreground">
+                           {commission.bank_name} - {commission.product_type}
+                           {commission.proposal_number && ` • Proposta: ${commission.proposal_number}`}
+                         </p>
+                         <p className="text-xs text-muted-foreground flex gap-2">
+                           <span>Data: {formatDate(commission.created_at)}</span>
+                           {commission.proposal_number && <span>• CPF: Confidencial</span>}
+                           {commission.credit_value && <span>• Valor bruto: {formatCurrency(commission.credit_value)}</span>}
+                           {commission.commission_percentage && <span>• {commission.commission_percentage}%</span>}
+                         </p>
                       </div>
                     </div>
                     <div className="text-right">
