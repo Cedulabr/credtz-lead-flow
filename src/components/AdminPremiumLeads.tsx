@@ -128,6 +128,7 @@ export function AdminPremiumLeads() {
           commission_percentage: commissionPercentage,
           proposal_number: formData.proposal_number,
           proposal_date: new Date().toISOString().split('T')[0],
+          cpf: formData.cpf,
           status: 'preview'
         });
 

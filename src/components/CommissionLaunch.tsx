@@ -132,6 +132,7 @@ export function CommissionLaunch() {
       const commissionData = {
         user_id: selectedLead.created_by,
         client_name: selectedLead.nome,
+        cpf: selectedLead.cpf,
         credit_value: parseFloat(commissionForm.credit_value),
         commission_amount: commissionAmount,
         commission_percentage: parseFloat(commissionForm.commission_percentage),

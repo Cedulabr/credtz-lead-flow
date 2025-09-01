@@ -323,6 +323,7 @@ export type Database = {
           client_name: string
           commission_amount: number
           commission_percentage: number
+          cpf: string | null
           created_at: string
           credit_value: number
           id: string
@@ -340,6 +341,7 @@ export type Database = {
           client_name: string
           commission_amount: number
           commission_percentage: number
+          cpf?: string | null
           created_at?: string
           credit_value: number
           id?: string
@@ -357,6 +359,7 @@ export type Database = {
           client_name?: string
           commission_amount?: number
           commission_percentage?: number
+          cpf?: string | null
           created_at?: string
           credit_value?: number
           id?: string
