@@ -588,7 +588,7 @@ export function Commissions() {
                          </p>
                          <p className="text-xs text-muted-foreground flex gap-2">
                            <span>Data: {formatDate(commission.created_at)}</span>
-                           {commission.proposal_number && <span>• CPF: Confidencial</span>}
+                           {commission.proposal_number && <span>• CPF: {commission.cpf || 'N/A'}</span>}
                            {commission.credit_value && <span>• Valor bruto: {formatCurrency(commission.credit_value)}</span>}
                            {commission.commission_percentage && <span>• {commission.commission_percentage}%</span>}
                          </p>

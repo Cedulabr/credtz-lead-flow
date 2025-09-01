@@ -88,17 +88,6 @@ export function AdminPremiumLeads() {
     }
   };
 
-  const handleBankProductChange = (bankProduct: string) => {
-    const [bank, product] = bankProduct.split(' - ');
-    const rule = commissionRules.find(r => r.bank_name === bank && r.product_name === product);
-    
-    setFormData({
-      ...formData,
-      bank_name: bank,
-      product_type: product,
-      commission_percentage: rule ? rule.user_percentage.toString() : ''
-    });
-  };
 
   const formatCurrencyInput = (value: string) => {
     const numericValue = value.replace(/\D/g, "");
@@ -216,17 +205,47 @@ export function AdminPremiumLeads() {
                   </div>
                   
                   <div>
-                    <Label>Banco e Produto *</Label>
-                    <Select onValueChange={handleBankProductChange}>
+                    <Label>Banco *</Label>
+                    <Select onValueChange={(value) => {
+                      setFormData({...formData, bank_name: value, product_type: '', commission_percentage: ''});
+                    }}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione banco e produto" />
+                        <SelectValue placeholder="Selecione o banco" />
                       </SelectTrigger>
                       <SelectContent>
-                        {commissionRules.map((rule) => (
-                          <SelectItem key={rule.id} value={`${rule.bank_name} - ${rule.product_name}`}>
-                            {rule.bank_name} - {rule.product_name} ({rule.user_percentage}%)
+                        {[...new Set(commissionRules.map(r => r.bank_name))].map((bank) => (
+                          <SelectItem key={bank} value={bank}>
+                            {bank}
                           </SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label>Produto *</Label>
+                    <Select 
+                      onValueChange={(value) => {
+                        const selectedRule = commissionRules.find(r => r.bank_name === formData.bank_name && r.product_name === value);
+                        setFormData({
+                          ...formData, 
+                          product_type: value,
+                          commission_percentage: selectedRule ? selectedRule.user_percentage.toString() : ''
+                        });
+                      }}
+                      disabled={!formData.bank_name}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o produto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {commissionRules
+                          .filter(r => r.bank_name === formData.bank_name)
+                          .map((rule) => (
+                            <SelectItem key={rule.id} value={rule.product_name}>
+                              {rule.product_name} ({rule.user_percentage}%)
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
