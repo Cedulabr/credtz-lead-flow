@@ -431,16 +431,34 @@ export function Commissions() {
               <div>
                 <p className="text-sm text-muted-foreground">Total do Mês</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {formatCurrency(commissions
-                    .filter(c => {
+                  {(() => {
+                    const paidThisMonth = commissions.filter(c => {
                       if (c.status !== 'paid' || !c.payment_date) return false;
                       const paymentDate = new Date(c.payment_date);
                       const currentMonth = new Date().getMonth();
                       const currentYear = new Date().getFullYear();
-                      return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear && c.commission_amount > 0;
-                    })
-                    .reduce((sum, c) => sum + Number(c.commission_amount), 0)
-                  )}
+                      const isPaidThisMonth = paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear && c.commission_amount > 0;
+                      
+                      // Debug log
+                      if (c.status === 'paid') {
+                        console.log('Comissão paga:', {
+                          client: c.client_name,
+                          amount: c.commission_amount,
+                          paymentDate: c.payment_date,
+                          isPaidThisMonth,
+                          paymentMonth: paymentDate.getMonth(),
+                          currentMonth
+                        });
+                      }
+                      
+                      return isPaidThisMonth;
+                    });
+                    
+                    const total = paidThisMonth.reduce((sum, c) => sum + Number(c.commission_amount), 0);
+                    console.log('Total do mês calculado:', total, 'de', paidThisMonth.length, 'comissões');
+                    
+                    return formatCurrency(total);
+                  })()}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {commissions.filter(c => {
