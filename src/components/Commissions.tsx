@@ -127,10 +127,17 @@ export function Commissions() {
     if (!user?.id) return;
     
     try {
-      // Carregar comissões do usuário
+      // Carregar comissões do usuário com informações do usuário
       const { data: userCommissions } = await supabase
         .from('commissions')
-        .select('*')
+        .select(`
+          *,
+          user:profiles!commissions_user_id_fkey(
+            id,
+            name,
+            email
+          )
+        `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
@@ -631,40 +638,70 @@ export function Commissions() {
                 </p>
               ) : (
                 filteredCommissions.map((commission) => {
-                const statusInfo = statusConfig[commission.status as keyof typeof statusConfig];
-                const Icon = statusInfo?.icon || Clock;
-                
-                return (
-                  <div key={commission.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${statusInfo?.color || 'bg-muted/20'}`}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <p className="font-medium">{commission.client_name}</p>
-                         <p className="text-sm text-muted-foreground">
-                           {commission.bank_name} - {commission.product_type}
-                           {commission.proposal_number && ` • Proposta: ${commission.proposal_number}`}
-                           {commission.cpf && ` • CPF: ${commission.cpf}`}
-                         </p>
-                         <p className="text-xs text-muted-foreground flex gap-2">
-                           <span>Data: {formatDate(commission.created_at)}</span>
-                           {commission.credit_value && <span>• Valor Bruto: {formatCurrency(commission.credit_value)}</span>}
-                           {commission.commission_percentage && <span>• {commission.commission_percentage}%</span>}
-                           <span>• Comissão: {formatCurrency(Number(commission.commission_amount))}</span>
-                         </p>
+                  const statusInfo = statusConfig[commission.status as keyof typeof statusConfig];
+                  const Icon = statusInfo?.icon || Clock;
+                  
+                  return (
+                    <div key={commission.id} className="p-4 border rounded-lg bg-card hover:bg-muted/20 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-3 rounded-lg ${statusInfo?.color || 'bg-muted/20'}`}>
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold text-lg">{commission.client_name}</h4>
+                            <div className="text-right">
+                              <p className={`font-bold text-lg ${Number(commission.commission_amount) < 0 ? 'text-destructive' : 'text-green-600'}`}>
+                                {formatCurrency(Number(commission.commission_amount))}
+                              </p>
+                              <Badge variant="outline" className={`${statusInfo?.color} text-xs`}>
+                                {statusInfo?.label || commission.status}
+                              </Badge>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Usuário:</span>
+                              <span className="ml-2 font-medium">{commission.user?.name || 'N/A'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Proposta:</span>
+                              <span className="ml-2 font-medium">{commission.proposal_number || 'N/A'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">CPF:</span>
+                              <span className="ml-2 font-medium">{commission.cpf || 'N/A'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Banco:</span>
+                              <span className="ml-2 font-medium">{commission.bank_name}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Produto:</span>
+                              <span className="ml-2 font-medium">{commission.product_type}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Data:</span>
+                              <span className="ml-2 font-medium">{formatDate(commission.created_at)}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Valor Bruto:</span>
+                              <span className="ml-2 font-medium text-blue-600">R$ {commission.credit_value?.toFixed(2) || '0,00'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Percentual:</span>
+                              <span className="ml-2 font-medium">{commission.commission_percentage || 0}%</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Comissão:</span>
+                              <span className="ml-2 font-bold text-green-600">{formatCurrency(Number(commission.commission_amount))}</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className={`font-bold ${Number(commission.commission_amount) < 0 ? 'text-destructive' : 'text-foreground'}`}>
-                        {formatCurrency(Number(commission.commission_amount))}
-                      </p>
-                      <Badge variant="outline" className={statusInfo?.color}>
-                        {statusInfo?.label || commission.status}
-                      </Badge>
-                    </div>
-                  </div>
-                );
+                  );
                 })
               );
             })()}

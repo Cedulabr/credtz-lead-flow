@@ -25,12 +25,12 @@ interface Commission {
   user?: {
     name: string;
     email: string;
-  };
+  } | null;
 }
 
 export function PaymentManagement() {
   const { toast } = useToast();
-  const [commissions, setCommissions] = useState<Commission[]>([]);
+  const [commissions, setCommissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingIds, setProcessingIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,30 +41,22 @@ export function PaymentManagement() {
 
   const fetchCommissions = async () => {
     try {
-      // Buscar comissões
+      // Buscar comissões com informações do usuário
       const { data: commissionsData, error: commissionsError } = await supabase
         .from('commissions')
-        .select('*')
+        .select(`
+          *,
+          user:profiles!commissions_user_id_fkey(
+            id,
+            name,
+            email
+          )
+        `)
         .order('created_at', { ascending: false });
       
       if (commissionsError) throw commissionsError;
-
-      // Buscar perfis dos usuários
-      const userIds = [...new Set(commissionsData?.map(c => c.user_id) || [])];
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, name, email')
-        .in('id', userIds);
       
-      if (profilesError) throw profilesError;
-
-      // Combinar dados
-      const transformedData = commissionsData?.map(commission => ({
-        ...commission,
-        user: profilesData?.find(profile => profile.id === commission.user_id)
-      })) || [];
-      
-      setCommissions(transformedData);
+      setCommissions(commissionsData || []);
     } catch (error) {
       console.error('Erro ao buscar comissões:', error);
       toast({
@@ -132,7 +124,7 @@ export function PaymentManagement() {
     }
   };
 
-  const getStatusActions = (commission: Commission) => {
+  const getStatusActions = (commission: any) => {
     const isProcessing = processingIds.includes(commission.id);
     
     switch (commission.status) {
@@ -338,31 +330,58 @@ export function PaymentManagement() {
                 </div>
               ) : (
                 filteredCommissions.map((commission) => (
-                <div
-                  key={commission.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
-                >
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-semibold">{commission.client_name}</h4>
-                      <Badge variant={getStatusBadgeVariant(commission.status)}>
-                        {getStatusText(commission.status)}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {commission.user?.name || 'Usuário não encontrado'} • {commission.bank_name} • {commission.product_type}
-                      {commission.proposal_number && ` • Proposta: ${commission.proposal_number}`}
-                      {commission.cpf && ` • CPF: ${commission.cpf}`}
-                    </p>
-                    <p className="text-sm">
-                      Valor Bruto: R$ {commission.credit_value.toFixed(2)} • 
-                      Comissão: R$ {commission.commission_amount.toFixed(2)} ({commission.commission_percentage}%)
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {getStatusActions(commission)}
-                  </div>
-                </div>
+                 <div
+                   key={commission.id}
+                   className="p-4 border rounded-lg bg-card hover:bg-muted/20 transition-colors"
+                 >
+                   <div className="space-y-2">
+                     <div className="flex items-center justify-between">
+                       <h4 className="font-semibold text-lg">{commission.client_name}</h4>
+                       <Badge variant={getStatusBadgeVariant(commission.status)} className="text-xs">
+                         {getStatusText(commission.status)}
+                       </Badge>
+                     </div>
+                     
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                       <div>
+                         <span className="text-muted-foreground">Usuário:</span>
+                         <span className="ml-2 font-medium">{commission.user?.name || 'N/A'}</span>
+                       </div>
+                       <div>
+                         <span className="text-muted-foreground">Proposta:</span>
+                         <span className="ml-2 font-medium">{commission.proposal_number || 'N/A'}</span>
+                       </div>
+                       <div>
+                         <span className="text-muted-foreground">CPF:</span>
+                         <span className="ml-2 font-medium">{commission.cpf || 'N/A'}</span>
+                       </div>
+                       <div>
+                         <span className="text-muted-foreground">Banco:</span>
+                         <span className="ml-2 font-medium">{commission.bank_name}</span>
+                       </div>
+                       <div>
+                         <span className="text-muted-foreground">Produto:</span>
+                         <span className="ml-2 font-medium">{commission.product_type}</span>
+                       </div>
+                       <div>
+                         <span className="text-muted-foreground">Valor Bruto:</span>
+                         <span className="ml-2 font-medium text-blue-600">R$ {commission.credit_value.toFixed(2)}</span>
+                       </div>
+                       <div>
+                         <span className="text-muted-foreground">Percentual:</span>
+                         <span className="ml-2 font-medium">{commission.commission_percentage}%</span>
+                       </div>
+                       <div>
+                         <span className="text-muted-foreground">Comissão:</span>
+                         <span className="ml-2 font-bold text-green-600">R$ {commission.commission_amount.toFixed(2)}</span>
+                       </div>
+                     </div>
+                     
+                     <div className="flex items-center gap-2 pt-2">
+                       {getStatusActions(commission)}
+                     </div>
+                   </div>
+                 </div>
                 ))
               );
             })()}
