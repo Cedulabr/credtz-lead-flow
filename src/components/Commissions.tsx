@@ -20,7 +20,8 @@ import {
   Filter,
   Download,
   Building2,
-  Plus
+  Plus,
+  Search
 } from "lucide-react";
 
 interface CommissionFormData {
@@ -39,6 +40,11 @@ export function Commissions() {
   const [selectedPeriod, setSelectedPeriod] = useState("current");
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [pixKey, setPixKey] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [searchTerm, setSearchTerm] = useState('');
   const [commissions, setCommissions] = useState<any[]>([]);
   const [commissionRules, setCommissionRules] = useState<any[]>([]);
   const [banksProducts, setBanksProducts] = useState<any[]>([]);
@@ -432,42 +438,44 @@ export function Commissions() {
                 <p className="text-sm text-muted-foreground">Total do Mês</p>
                 <p className="text-2xl font-bold text-foreground">
                   {(() => {
+                    const [year, month] = selectedMonth.split('-').map(Number);
                     const paidThisMonth = commissions.filter(c => {
                       if (c.status !== 'paid' || !c.payment_date) return false;
                       const paymentDate = new Date(c.payment_date);
-                      const currentMonth = new Date().getMonth();
-                      const currentYear = new Date().getFullYear();
-                      const isPaidThisMonth = paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear && c.commission_amount > 0;
-                      
-                      // Debug log
-                      if (c.status === 'paid') {
-                        console.log('Comissão paga:', {
-                          client: c.client_name,
-                          amount: c.commission_amount,
-                          paymentDate: c.payment_date,
-                          isPaidThisMonth,
-                          paymentMonth: paymentDate.getMonth(),
-                          currentMonth
-                        });
-                      }
-                      
-                      return isPaidThisMonth;
+                      return paymentDate.getMonth() === (month - 1) && paymentDate.getFullYear() === year && c.commission_amount > 0;
                     });
                     
                     const total = paidThisMonth.reduce((sum, c) => sum + Number(c.commission_amount), 0);
-                    console.log('Total do mês calculado:', total, 'de', paidThisMonth.length, 'comissões');
-                    
                     return formatCurrency(total);
                   })()}
                 </p>
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="w-40 mt-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => {
+                      const date = new Date();
+                      date.setMonth(date.getMonth() - i);
+                      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                      const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                      return (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {commissions.filter(c => {
-                    if (c.status !== 'paid' || !c.payment_date) return false;
-                    const paymentDate = new Date(c.payment_date);
-                    const currentMonth = new Date().getMonth();
-                    const currentYear = new Date().getFullYear();
-                    return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear && c.commission_amount > 0;
-                  }).length} comissões pagas no mês
+                  {(() => {
+                    const [year, month] = selectedMonth.split('-').map(Number);
+                    return commissions.filter(c => {
+                      if (c.status !== 'paid' || !c.payment_date) return false;
+                      const paymentDate = new Date(c.payment_date);
+                      return paymentDate.getMonth() === (month - 1) && paymentDate.getFullYear() === year && c.commission_amount > 0;
+                    }).length;
+                  })()} comissões pagas no mês
                 </p>
               </div>
               <div className="p-2 bg-success/10 rounded-lg">
@@ -580,15 +588,49 @@ export function Commissions() {
             <DollarSign className="h-5 w-5" />
             Histórico de Comissões
           </CardTitle>
+          <div className="flex gap-4 mt-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Buscar por CPF ou número da proposta..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {commissions.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
-                Nenhuma comissão registrada ainda
-              </p>
-            ) : (
-              commissions.map((commission) => {
+            {(() => {
+              // Filtrar comissões do mês selecionado se o status for 'paid'
+              const [year, month] = selectedMonth.split('-').map(Number);
+              let filteredCommissions = commissions;
+
+              // Aplicar filtro de mês para comissões pagas
+              filteredCommissions = filteredCommissions.filter(c => {
+                if (c.status === 'paid' && c.payment_date) {
+                  const paymentDate = new Date(c.payment_date);
+                  return paymentDate.getMonth() === (month - 1) && paymentDate.getFullYear() === year;
+                }
+                return c.status !== 'paid';
+              });
+
+              // Aplicar filtro de busca
+              if (searchTerm) {
+                filteredCommissions = filteredCommissions.filter(c => 
+                  (c.cpf && c.cpf.includes(searchTerm)) ||
+                  (c.proposal_number && c.proposal_number.includes(searchTerm)) ||
+                  c.client_name.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+              }
+
+              return filteredCommissions.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  {searchTerm ? 'Nenhuma comissão encontrada para o termo pesquisado' : 'Nenhuma comissão registrada ainda'}
+                </p>
+              ) : (
+                filteredCommissions.map((commission) => {
                 const statusInfo = statusConfig[commission.status as keyof typeof statusConfig];
                 const Icon = statusInfo?.icon || Clock;
                 
@@ -603,12 +645,13 @@ export function Commissions() {
                          <p className="text-sm text-muted-foreground">
                            {commission.bank_name} - {commission.product_type}
                            {commission.proposal_number && ` • Proposta: ${commission.proposal_number}`}
+                           {commission.cpf && ` • CPF: ${commission.cpf}`}
                          </p>
                          <p className="text-xs text-muted-foreground flex gap-2">
                            <span>Data: {formatDate(commission.created_at)}</span>
-                           {commission.proposal_number && <span>• CPF: {commission.cpf || 'N/A'}</span>}
-                           {commission.credit_value && <span>• Valor bruto: {formatCurrency(commission.credit_value)}</span>}
+                           {commission.credit_value && <span>• Valor Bruto: {formatCurrency(commission.credit_value)}</span>}
                            {commission.commission_percentage && <span>• {commission.commission_percentage}%</span>}
+                           <span>• Comissão: {formatCurrency(Number(commission.commission_amount))}</span>
                          </p>
                       </div>
                     </div>
@@ -622,8 +665,9 @@ export function Commissions() {
                     </div>
                   </div>
                 );
-              })
-            )}
+                })
+              );
+            })()}
           </div>
         </CardContent>
       </Card>

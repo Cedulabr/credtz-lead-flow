@@ -4,7 +4,9 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Check, Clock, Eye, DollarSign, RotateCcw } from "lucide-react";
+import { Check, Clock, Eye, DollarSign, RotateCcw, Search } from "lucide-react";
+import { Input } from "./ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 interface Commission {
   id: string;
@@ -18,6 +20,7 @@ interface Commission {
   payment_date: string | null;
   proposal_date: string;
   proposal_number?: string;
+  cpf?: string;
   user_id: string;
   user?: {
     name: string;
@@ -30,6 +33,7 @@ export function PaymentManagement() {
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingIds, setProcessingIds] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchCommissions();
@@ -200,15 +204,23 @@ export function PaymentManagement() {
     .filter(c => c.status === 'pending')
     .reduce((sum, c) => sum + c.commission_amount, 0);
   
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-  const monthlyTotal = commissions
-    .filter(c => {
-      if (c.status !== 'paid' || !c.payment_date) return false;
-      const paymentDate = new Date(c.payment_date);
-      return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
-    })
-    .reduce((sum, c) => sum + c.commission_amount, 0);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  
+  const getMonthlyTotal = (monthYear: string) => {
+    const [year, month] = monthYear.split('-').map(Number);
+    return commissions
+      .filter(c => {
+        if (c.status !== 'paid' || !c.payment_date) return false;
+        const paymentDate = new Date(c.payment_date);
+        return paymentDate.getMonth() === (month - 1) && paymentDate.getFullYear() === year;
+      })
+      .reduce((sum, c) => sum + c.commission_amount, 0);
+  };
+  
+  const monthlyTotal = getMonthlyTotal(selectedMonth);
 
   if (loading) {
     return (
@@ -251,9 +263,27 @@ export function PaymentManagement() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div>
+              <div className="flex-1">
                 <p className="text-sm text-muted-foreground">Total do Mês</p>
                 <p className="text-2xl font-bold">R$ {monthlyTotal.toFixed(2)}</p>
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="w-40 mt-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => {
+                      const date = new Date();
+                      date.setMonth(date.getMonth() - i);
+                      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                      const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                      return (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
               <DollarSign className="h-8 w-8 text-green-500" />
             </div>
@@ -264,16 +294,50 @@ export function PaymentManagement() {
       {/* Lista de comissões */}
       <Card>
         <CardHeader>
-          <CardTitle>Gerenciar Pagamentos</CardTitle>
+          <CardTitle>Histórico de Comissões</CardTitle>
+          <div className="flex gap-4 mt-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Buscar por CPF ou número da proposta..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {commissions.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Nenhuma comissão encontrada
-              </div>
-            ) : (
-              commissions.map((commission) => (
+            {(() => {
+              // Filtrar comissões do mês selecionado se o status for 'paid'
+              const [year, month] = selectedMonth.split('-').map(Number);
+              let filteredCommissions = commissions;
+
+              // Aplicar filtro de mês para comissões pagas
+              filteredCommissions = filteredCommissions.filter(c => {
+                if (c.status === 'paid' && c.payment_date) {
+                  const paymentDate = new Date(c.payment_date);
+                  return paymentDate.getMonth() === (month - 1) && paymentDate.getFullYear() === year;
+                }
+                return c.status !== 'paid';
+              });
+
+              // Aplicar filtro de busca
+              if (searchTerm) {
+                filteredCommissions = filteredCommissions.filter(c => 
+                  (c.cpf && c.cpf.includes(searchTerm)) ||
+                  (c.proposal_number && c.proposal_number.includes(searchTerm)) ||
+                  c.client_name.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+              }
+
+              return filteredCommissions.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  {searchTerm ? 'Nenhuma comissão encontrada para o termo pesquisado' : 'Nenhuma comissão encontrada'}
+                </div>
+              ) : (
+                filteredCommissions.map((commission) => (
                 <div
                   key={commission.id}
                   className="flex items-center justify-between p-4 border rounded-lg"
@@ -288,9 +352,10 @@ export function PaymentManagement() {
                     <p className="text-sm text-muted-foreground">
                       {commission.user?.name || 'Usuário não encontrado'} • {commission.bank_name} • {commission.product_type}
                       {commission.proposal_number && ` • Proposta: ${commission.proposal_number}`}
+                      {commission.cpf && ` • CPF: ${commission.cpf}`}
                     </p>
                     <p className="text-sm">
-                      Valor da operação: R$ {commission.credit_value.toFixed(2)} • 
+                      Valor Bruto: R$ {commission.credit_value.toFixed(2)} • 
                       Comissão: R$ {commission.commission_amount.toFixed(2)} ({commission.commission_percentage}%)
                     </p>
                   </div>
@@ -298,8 +363,9 @@ export function PaymentManagement() {
                     {getStatusActions(commission)}
                   </div>
                 </div>
-              ))
-            )}
+                ))
+              );
+            })()}
           </div>
         </CardContent>
       </Card>
