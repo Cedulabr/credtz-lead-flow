@@ -141,6 +141,40 @@ export function Commissions() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
+      // Buscar leads indicados finalizados do usuário
+      const { data: leadsIndicadosData, error: leadsError } = await supabase
+        .from('leads_indicados')
+        .select('*')
+        .eq('created_by', user.id)
+        .in('status', ['proposta_aprovada', 'contrato_assinado']);
+      
+      if (leadsError) {
+        console.error('Erro ao buscar leads indicados:', leadsError);
+      }
+      
+      // Transformar leads indicados em formato de comissões para exibição
+      const leadsAsCommissions = (leadsIndicadosData || []).map(lead => ({
+        id: lead.id,
+        client_name: lead.nome,
+        bank_name: 'Indicação',
+        product_type: lead.convenio,
+        credit_value: 0,
+        commission_amount: 0,
+        commission_percentage: 0,
+        cpf: lead.cpf || '',
+        proposal_number: 'IND-' + lead.id.substring(0, 8),
+        status: lead.status === 'contrato_assinado' ? 'paid' : 'pending',
+        payment_date: lead.status === 'contrato_assinado' ? lead.updated_at?.split('T')[0] : null,
+        proposal_date: lead.created_at?.split('T')[0],
+        user_id: lead.created_by,
+        user: null,
+        created_at: lead.created_at,
+        updated_at: lead.updated_at
+      }));
+      
+      // Combinar comissões e leads indicados
+      const allCommissions = [...(userCommissions || []), ...leadsAsCommissions];
+      
       // Carregar bancos e produtos
       const { data: banksProductsData } = await supabase
         .from('banks_products')
@@ -162,7 +196,7 @@ export function Commissions() {
         .eq('is_active', true)
         .order('updated_at', { ascending: false });
 
-      if (userCommissions) setCommissions(userCommissions);
+      setCommissions(allCommissions);
       if (banksProductsData) setBanksProducts(banksProductsData);
       if (commissionTableResponse) setCommissionTableData(commissionTableResponse);
       if (commissionRulesData) setCommissionRules(commissionRulesData);

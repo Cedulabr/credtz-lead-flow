@@ -31,6 +31,8 @@ import { AdminBaseOffBanks } from "./AdminBaseOffBanks";
 import { CommissionLaunch } from "./CommissionLaunch";
 import AdminIndicationsManagement from "./AdminIndicationsManagement";
 import { AdminPremiumLeads } from "./AdminPremiumLeads";
+import { WhatsAppManager } from "./WhatsAppManager";
+import { SMSManager } from "./SMSManager";
 
 interface Announcement {
   id: number;
@@ -305,9 +307,11 @@ export function AdminPanel() {
       </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-8' : 'grid-cols-2'}`}>
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-10' : 'grid-cols-4'}`}>
             <TabsTrigger value="announcements">Avisos</TabsTrigger>
             <TabsTrigger value="commissions">Comissões</TabsTrigger>
+            <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+            <TabsTrigger value="sms">SMS</TabsTrigger>
             {isAdmin && <TabsTrigger value="indications">Gerir Indicações</TabsTrigger>}
             {isAdmin && <TabsTrigger value="commission-launch">Lançar Comissões</TabsTrigger>}
             {isAdmin && <TabsTrigger value="premium-leads">Leads Premium</TabsTrigger>}
@@ -565,6 +569,16 @@ export function AdminPanel() {
               </Card>
             ))}
           </div>
+        </TabsContent>
+
+        {/* WhatsApp Tab */}
+        <TabsContent value="whatsapp">
+          <WhatsAppManager />
+        </TabsContent>
+
+        {/* SMS Tab */}
+        <TabsContent value="sms">
+          <SMSManager />
         </TabsContent>
 
         {/* Indications Management Tab */}

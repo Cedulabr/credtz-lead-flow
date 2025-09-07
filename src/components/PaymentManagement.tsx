@@ -56,7 +56,47 @@ export function PaymentManagement() {
       
       if (commissionsError) throw commissionsError;
       
-      setCommissions(commissionsData || []);
+      // Buscar todos os leads indicados finalizados de todos os usuários
+      const { data: leadsIndicadosData, error: leadsError } = await supabase
+        .from('leads_indicados')
+        .select(`
+          *,
+          user:profiles!leads_indicados_created_by_fkey(
+            id,
+            name,
+            email
+          )
+        `)
+        .in('status', ['proposta_aprovada', 'contrato_assinado'])
+        .order('created_at', { ascending: false });
+      
+      if (leadsError) {
+        console.error('Erro ao buscar leads indicados:', leadsError);
+      }
+      
+      // Transformar leads indicados em formato de comissões
+      const leadsAsCommissions = (leadsIndicadosData || []).map(lead => ({
+        id: lead.id,
+        client_name: lead.nome,
+        bank_name: 'Indicação',
+        product_type: lead.convenio,
+        credit_value: 0,
+        commission_amount: 0,
+        commission_percentage: 0,
+        cpf: lead.cpf || '',
+        proposal_number: 'IND-' + lead.id.substring(0, 8),
+        status: lead.status === 'contrato_assinado' ? 'paid' : 'pending',
+        payment_date: lead.status === 'contrato_assinado' ? lead.updated_at?.split('T')[0] : null,
+        proposal_date: lead.created_at?.split('T')[0],
+        user_id: lead.created_by,
+        user: lead.user,
+        created_at: lead.created_at,
+        updated_at: lead.updated_at
+      }));
+      
+      // Combinar comissões e leads indicados
+      const allCommissions = [...(commissionsData || []), ...leadsAsCommissions];
+      setCommissions(allCommissions);
     } catch (error) {
       console.error('Erro ao buscar comissões:', error);
       toast({
