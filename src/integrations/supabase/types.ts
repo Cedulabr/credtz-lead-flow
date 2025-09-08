@@ -762,6 +762,7 @@ export type Database = {
           email: string | null
           id: string
           is_active: boolean | null
+          leads_premium_enabled: boolean | null
           level: Database["public"]["Enums"]["user_level"] | null
           name: string | null
           organization_id: number | null
@@ -769,7 +770,9 @@ export type Database = {
           pix_key: string | null
           role: Database["public"]["Enums"]["app_role"]
           sector: string | null
+          sms_enabled: boolean | null
           updated_at: string | null
+          whatsapp_enabled: boolean | null
         }
         Insert: {
           company?: string | null
@@ -778,6 +781,7 @@ export type Database = {
           email?: string | null
           id: string
           is_active?: boolean | null
+          leads_premium_enabled?: boolean | null
           level?: Database["public"]["Enums"]["user_level"] | null
           name?: string | null
           organization_id?: number | null
@@ -785,7 +789,9 @@ export type Database = {
           pix_key?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           sector?: string | null
+          sms_enabled?: boolean | null
           updated_at?: string | null
+          whatsapp_enabled?: boolean | null
         }
         Update: {
           company?: string | null
@@ -794,6 +800,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean | null
+          leads_premium_enabled?: boolean | null
           level?: Database["public"]["Enums"]["user_level"] | null
           name?: string | null
           organization_id?: number | null
@@ -801,7 +808,9 @@ export type Database = {
           pix_key?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           sector?: string | null
+          sms_enabled?: boolean | null
           updated_at?: string | null
+          whatsapp_enabled?: boolean | null
         }
         Relationships: []
       }

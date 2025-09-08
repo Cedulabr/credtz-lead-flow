@@ -146,7 +146,7 @@ export function Commissions() {
         .from('leads_indicados')
         .select('*')
         .eq('created_by', user.id)
-        .in('status', ['proposta_aprovada', 'contrato_assinado']);
+        .in('status', ['proposta_aprovada', 'contrato_assinado', 'comissao_paga']);
       
       if (leadsError) {
         console.error('Erro ao buscar leads indicados:', leadsError);
@@ -163,8 +163,8 @@ export function Commissions() {
         commission_percentage: 0,
         cpf: lead.cpf || '',
         proposal_number: 'IND-' + lead.id.substring(0, 8),
-        status: lead.status === 'contrato_assinado' ? 'paid' : 'pending',
-        payment_date: lead.status === 'contrato_assinado' ? lead.updated_at?.split('T')[0] : null,
+        status: (lead.status === 'contrato_assinado' || lead.status === 'comissao_paga') ? 'paid' : 'pending',
+        payment_date: (lead.status === 'contrato_assinado' || lead.status === 'comissao_paga') ? lead.updated_at?.split('T')[0] : null,
         proposal_date: lead.created_at?.split('T')[0],
         user_id: lead.created_by,
         user: null,

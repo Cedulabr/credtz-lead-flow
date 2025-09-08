@@ -20,6 +20,8 @@ import {
   LazyCommissions, 
   LazyTestFunctionalities 
 } from "@/components/LazyComponents";
+import { WhatsAppManager } from "@/components/WhatsAppManager";
+import { SMSManager } from "@/components/SMSManager";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -94,6 +96,10 @@ const Index = () => {
             <LazyCommissions />
           </Suspense>
         );
+      case "whatsapp":
+        return <WhatsAppManager />;
+      case "sms":
+        return <SMSManager />;
       case "notifications":
         return <Notifications />;
       case "test-functionalities":

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, Users, TrendingUp, DollarSign, Bell, Menu, X, LogOut, User, Settings } from "lucide-react";
+import { Home, Users, TrendingUp, DollarSign, Bell, Menu, X, LogOut, User, Settings, MessageCircle } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,6 +17,8 @@ const navItems = [
   { id: "dashboard", label: "Início", icon: Home },
   { id: "indicate", label: "Indicar", icon: Users },
   { id: "leads", label: "Leads Premium", icon: TrendingUp },
+  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { id: "sms", label: "SMS", icon: Bell },
   { id: "commissions", label: "Comissões", icon: DollarSign },
 ];
 
@@ -53,6 +55,17 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         <nav className="flex-1 p-4 space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon;
+            // Check if user has permission for premium features
+            const isPermissionRequired = ['leads', 'whatsapp', 'sms'].includes(item.id);
+            const hasPermission = isPermissionRequired ? 
+              (item.id === 'leads' && profile?.leads_premium_enabled) ||
+              (item.id === 'whatsapp' && profile?.whatsapp_enabled) ||
+              (item.id === 'sms' && profile?.sms_enabled) ||
+              isAdmin
+              : true;
+            
+            if (isPermissionRequired && !hasPermission) return null;
+            
             return (
               <Button
                 key={item.id}
@@ -116,7 +129,18 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
       {/* Bottom Navigation for Mobile - Simplified 4 icons max */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t z-50 shadow-elevation">
         <div className="grid grid-cols-4 gap-1 px-2 py-1">
-          {navItems.map((item) => {
+          {navItems.filter(item => {
+            // Check if user has permission for premium features
+            const isPermissionRequired = ['leads', 'whatsapp', 'sms'].includes(item.id);
+            const hasPermission = isPermissionRequired ? 
+              (item.id === 'leads' && profile?.leads_premium_enabled) ||
+              (item.id === 'whatsapp' && profile?.whatsapp_enabled) ||
+              (item.id === 'sms' && profile?.sms_enabled) ||
+              isAdmin
+              : true;
+            
+            return !isPermissionRequired || hasPermission;
+          }).slice(0, 4).map((item) => {
             const Icon = item.icon;
             return (
               <button

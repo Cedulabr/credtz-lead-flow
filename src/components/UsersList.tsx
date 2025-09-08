@@ -5,10 +5,11 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { Switch } from "./ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Edit, UserCheck, UserX, Plus, Trash2, RefreshCw } from "lucide-react";
+import { Edit, UserCheck, UserX, Plus, Trash2, RefreshCw, Settings } from "lucide-react";
 import { CreateUser } from "./CreateUser";
 
 interface User {
@@ -22,6 +23,9 @@ interface User {
   company?: string;
   level?: string;
   is_active?: boolean;
+  leads_premium_enabled?: boolean;
+  sms_enabled?: boolean;
+  whatsapp_enabled?: boolean;
   created_at: string;
 }
 
@@ -33,6 +37,7 @@ export function UsersList() {
   const [loading, setLoading] = useState(true);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [permissionsDialog, setPermissionsDialog] = useState({ open: false, user: null as User | null });
   const [userForm, setUserForm] = useState({
     name: "",
     email: "",
@@ -240,6 +245,32 @@ export function UsersList() {
     }
   };
 
+  const updateUserPermissions = async (userId: string, permissions: { leads_premium_enabled: boolean, sms_enabled: boolean, whatsapp_enabled: boolean }) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update(permissions)
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Permissões atualizadas!",
+        description: "As permissões do usuário foram atualizadas com sucesso.",
+      });
+
+      setPermissionsDialog({ open: false, user: null });
+      loadUsers();
+    } catch (error) {
+      console.error('Erro ao atualizar permissões:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar permissões do usuário.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getUserStatusBadge = (user: User) => {
     const isActive = user.is_active !== false; // Default to true if undefined
     return (
@@ -287,6 +318,7 @@ export function UsersList() {
                 <TableHead>Empresa</TableHead>
                 <TableHead>Função</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Permissões</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -310,6 +342,13 @@ export function UsersList() {
                   </TableCell>
                   <TableCell>{getUserStatusBadge(user)}</TableCell>
                   <TableCell>
+                    <div className="flex gap-1">
+                      {user.leads_premium_enabled && <Badge variant="secondary" className="text-xs">Premium</Badge>}
+                      {user.whatsapp_enabled && <Badge variant="secondary" className="text-xs">WhatsApp</Badge>}
+                      {user.sms_enabled && <Badge variant="secondary" className="text-xs">SMS</Badge>}
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     <div className="flex gap-2">
                       <Button
                         size="sm"
@@ -326,6 +365,14 @@ export function UsersList() {
                         title={user.is_active !== false ? "Inativar usuário" : "Ativar usuário"}
                       >
                         {user.is_active !== false ? <UserX className="h-3 w-3" /> : <UserCheck className="h-3 w-3" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPermissionsDialog({ open: true, user })}
+                        title="Gerenciar permissões"
+                      >
+                        <Settings className="h-3 w-3" />
                       </Button>
                       <Button
                         size="sm"
@@ -462,6 +509,83 @@ export function UsersList() {
                   disabled={!newPassword}
                 >
                   Definir Senha
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Permissions Dialog */}
+        <Dialog open={permissionsDialog.open} onOpenChange={(open) => setPermissionsDialog({ open, user: null })}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Gerenciar Permissões - {permissionsDialog.user?.name || permissionsDialog.user?.email}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="leads-premium">Leads Premium</Label>
+                <Switch
+                  id="leads-premium"
+                  checked={permissionsDialog.user?.leads_premium_enabled || false}
+                  onCheckedChange={(checked) => {
+                    if (permissionsDialog.user) {
+                      setPermissionsDialog({
+                        ...permissionsDialog,
+                        user: { ...permissionsDialog.user, leads_premium_enabled: checked }
+                      });
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="whatsapp">WhatsApp</Label>
+                <Switch
+                  id="whatsapp"
+                  checked={permissionsDialog.user?.whatsapp_enabled || false}
+                  onCheckedChange={(checked) => {
+                    if (permissionsDialog.user) {
+                      setPermissionsDialog({
+                        ...permissionsDialog,
+                        user: { ...permissionsDialog.user, whatsapp_enabled: checked }
+                      });
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="sms">SMS</Label>
+                <Switch
+                  id="sms"
+                  checked={permissionsDialog.user?.sms_enabled || false}
+                  onCheckedChange={(checked) => {
+                    if (permissionsDialog.user) {
+                      setPermissionsDialog({
+                        ...permissionsDialog,
+                        user: { ...permissionsDialog.user, sms_enabled: checked }
+                      });
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setPermissionsDialog({ open: false, user: null })}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={() => {
+                    if (permissionsDialog.user) {
+                      updateUserPermissions(permissionsDialog.user.id, {
+                        leads_premium_enabled: permissionsDialog.user.leads_premium_enabled || false,
+                        sms_enabled: permissionsDialog.user.sms_enabled || false,
+                        whatsapp_enabled: permissionsDialog.user.whatsapp_enabled || false
+                      });
+                    }
+                  }}
+                >
+                  Salvar Permissões
                 </Button>
               </div>
             </div>

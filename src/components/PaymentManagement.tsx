@@ -56,7 +56,7 @@ export function PaymentManagement() {
       
       if (commissionsError) throw commissionsError;
       
-      // Buscar todos os leads indicados finalizados de todos os usuários
+      // Buscar todos os leads indicados finalizados com status atualizado
       const { data: leadsIndicadosData, error: leadsError } = await supabase
         .from('leads_indicados')
         .select(`
@@ -67,7 +67,7 @@ export function PaymentManagement() {
             email
           )
         `)
-        .in('status', ['proposta_aprovada', 'contrato_assinado'])
+        .in('status', ['proposta_aprovada', 'contrato_assinado', 'lead_digitado', 'lead_contatado', 'comissao_paga'])
         .order('created_at', { ascending: false });
       
       if (leadsError) {
@@ -85,8 +85,8 @@ export function PaymentManagement() {
         commission_percentage: 0,
         cpf: lead.cpf || '',
         proposal_number: 'IND-' + lead.id.substring(0, 8),
-        status: lead.status === 'contrato_assinado' ? 'paid' : 'pending',
-        payment_date: lead.status === 'contrato_assinado' ? lead.updated_at?.split('T')[0] : null,
+        status: lead.status === 'contrato_assinado' || lead.status === 'comissao_paga' ? 'paid' : 'pending',
+        payment_date: (lead.status === 'contrato_assinado' || lead.status === 'comissao_paga') ? lead.updated_at?.split('T')[0] : null,
         proposal_date: lead.created_at?.split('T')[0],
         user_id: lead.created_by,
         user: lead.user,
