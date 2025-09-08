@@ -56,7 +56,7 @@ export function PaymentManagement() {
       
       if (commissionsError) throw commissionsError;
       
-      // Buscar todos os leads indicados finalizados com status atualizado
+      // Buscar todos os leads indicados com status atualizado
       const { data: leadsIndicadosData, error: leadsError } = await supabase
         .from('leads_indicados')
         .select(`
@@ -67,32 +67,52 @@ export function PaymentManagement() {
             email
           )
         `)
-        .in('status', ['proposta_aprovada', 'contrato_assinado', 'lead_digitado', 'lead_contatado', 'comissao_paga'])
         .order('created_at', { ascending: false });
       
       if (leadsError) {
         console.error('Erro ao buscar leads indicados:', leadsError);
       }
       
-      // Transformar leads indicados em formato de comissões
-      const leadsAsCommissions = (leadsIndicadosData || []).map(lead => ({
-        id: lead.id,
-        client_name: lead.nome,
-        bank_name: 'Indicação',
-        product_type: lead.convenio,
-        credit_value: 0,
-        commission_amount: 0,
-        commission_percentage: 0,
-        cpf: lead.cpf || '',
-        proposal_number: 'IND-' + lead.id.substring(0, 8),
-        status: lead.status === 'contrato_assinado' || lead.status === 'comissao_paga' ? 'paid' : 'pending',
-        payment_date: (lead.status === 'contrato_assinado' || lead.status === 'comissao_paga') ? lead.updated_at?.split('T')[0] : null,
-        proposal_date: lead.created_at?.split('T')[0],
-        user_id: lead.created_by,
-        user: lead.user,
-        created_at: lead.created_at,
-        updated_at: lead.updated_at
-      }));
+      // Transformar leads indicados em formato de comissões com valores calculados
+      const leadsAsCommissions = (leadsIndicadosData || []).map(lead => {
+        // Calcular comissão baseada no status
+        let commissionAmount = 0;
+        let status = 'pending';
+        
+        switch (lead.status) {
+          case 'contrato_assinado':
+          case 'comissao_paga':
+            commissionAmount = 50; // Valor padrão de R$ 50 para indicações
+            status = 'paid';
+            break;
+          case 'proposta_aprovada':
+            commissionAmount = 50;
+            status = 'pending';
+            break;
+          default:
+            commissionAmount = 0;
+            status = 'preview';
+        }
+        
+        return {
+          id: lead.id,
+          client_name: lead.nome,
+          bank_name: 'Indicação',
+          product_type: lead.convenio,
+          credit_value: commissionAmount,
+          commission_amount: commissionAmount,
+          commission_percentage: 100,
+          cpf: lead.cpf || '',
+          proposal_number: 'IND-' + lead.id.substring(0, 8),
+          status: status,
+          payment_date: status === 'paid' ? lead.updated_at?.split('T')[0] : null,
+          proposal_date: lead.created_at?.split('T')[0],
+          user_id: lead.created_by,
+          user: lead.user,
+          created_at: lead.created_at,
+          updated_at: lead.updated_at
+        };
+      });
       
       // Combinar comissões e leads indicados
       const allCommissions = [...(commissionsData || []), ...leadsAsCommissions];
@@ -114,19 +134,38 @@ export function PaymentManagement() {
     
     setProcessingIds(prev => [...prev, id]);
     try {
-      const updateData: any = { status: newStatus };
+      const commission = commissions.find(c => c.id === id);
       
-      // Se estiver marcando como pago, adicionar a data de pagamento
-      if (newStatus === 'paid') {
-        updateData.payment_date = new Date().toISOString().split('T')[0];
+      if (commission?.bank_name === 'Indicação') {
+        // Para leads indicados, atualizar a tabela leads_indicados
+        let leadsStatus = newStatus;
+        if (newStatus === 'paid') {
+          leadsStatus = 'comissao_paga';
+        } else if (newStatus === 'pending') {
+          leadsStatus = 'proposta_aprovada';
+        }
+        
+        const { error } = await supabase
+          .from('leads_indicados')
+          .update({ status: leadsStatus })
+          .eq('id', id);
+
+        if (error) throw error;
+      } else {
+        // Para comissões normais, atualizar a tabela commissions
+        const updateData: any = { status: newStatus };
+        
+        if (newStatus === 'paid') {
+          updateData.payment_date = new Date().toISOString().split('T')[0];
+        }
+
+        const { error } = await supabase
+          .from('commissions')
+          .update(updateData)
+          .eq('id', id);
+
+        if (error) throw error;
       }
-
-      const { error } = await supabase
-        .from('commissions')
-        .update(updateData)
-        .eq('id', id);
-
-      if (error) throw error;
 
       toast({
         title: "Sucesso",
