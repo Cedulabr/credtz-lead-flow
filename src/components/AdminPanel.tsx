@@ -22,7 +22,8 @@ import {
   X,
   Users,
   DollarSign,
-  Bell
+  Bell,
+  Building2
 } from "lucide-react";
 import { PaymentLaunch } from "./PaymentLaunch";
 import { PaymentManagement } from "./PaymentManagement";
@@ -30,6 +31,7 @@ import { UsersList } from "./UsersList";
 import { AdminBaseOffBanks } from "./AdminBaseOffBanks";
 import { CommissionLaunch } from "./CommissionLaunch";
 import AdminIndicationsManagement from "./AdminIndicationsManagement";
+import { AdminCommissionTable } from "./AdminCommissionTable";
 import { AdminPremiumLeads } from "./AdminPremiumLeads";
 
 interface Announcement {
@@ -514,57 +516,27 @@ export function AdminPanel() {
             </Dialog>
           </div>
 
-          <div className="grid gap-4">
-            {commissionTable.map((rule) => (
-              <Card key={rule.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Percent className="h-4 w-4 text-primary" />
-                        <h3 className="font-medium">{rule.bank_name} - {rule.product_name}</h3>
-                        <Badge variant={rule.is_active ? "default" : "secondary"}>
-                          {rule.is_active ? "Ativo" : "Inativo"}
-                        </Badge>
-                      </div>
-                      <div className="text-sm text-muted-foreground space-y-1">
-                        {rule.term && <p>Prazo: {rule.term}</p>}
-                        <p>Comissão: {rule.commission_percentage}%</p>
-                        <p>Repasse: {rule.user_percentage}%</p>
-                        {rule.user_percentage_profile && <p>Perfil: {rule.user_percentage_profile}</p>}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Atualizado em: {new Date(rule.updated_at).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => startEdit(rule, 'commission')}
-                      >
-                        <Edit className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={rule.is_active ? "secondary" : "default"}
-                        onClick={() => toggleActive('commission_table', rule.id, rule.is_active)}
-                      >
-                        {rule.is_active ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => deleteItem('commission_table', rule.id)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {/* Commission Table organized by bank and product */}
+          {/* Commission Table organized by bank and product */}
+          <AdminCommissionTable 
+            commissionTable={commissionTable}
+            onEdit={(rule) => startEdit(rule, 'commission')}
+            onToggleActive={(id, currentStatus) => toggleActive('commission_table', id, currentStatus)}
+            onDelete={(id) => deleteItem('commission_table', id)}
+            onNewRule={(bankName, productName) => {
+              setCommissionForm({
+                bank_name: bankName || "",
+                product_name: productName || "",
+                term: "",
+                commission_percentage: "",
+                user_percentage: "",
+                user_percentage_profile: "",
+                description: ""
+              });
+              setEditingItem(null);
+              setIsDialogOpen(true);
+            }}
+          />
         </TabsContent>
 
         {/* Indications Management Tab */}

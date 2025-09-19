@@ -669,13 +669,16 @@ export function Commissions() {
               const [year, month] = selectedMonth.split('-').map(Number);
               let filteredCommissions = commissions;
 
-              // Aplicar filtro de mês para comissões pagas
+              // Aplicar filtro de mês - filtrar TODAS as comissões do mês selecionado
               filteredCommissions = filteredCommissions.filter(c => {
+                // Para comissões pagas, usar data de pagamento
                 if (c.status === 'paid' && c.payment_date) {
                   const paymentDate = new Date(c.payment_date);
                   return paymentDate.getMonth() === (month - 1) && paymentDate.getFullYear() === year;
                 }
-                return c.status !== 'paid';
+                // Para outras comissões, usar data de criação
+                const createdDate = new Date(c.created_at);
+                return createdDate.getMonth() === (month - 1) && createdDate.getFullYear() === year;
               });
 
               // Aplicar filtro de busca
