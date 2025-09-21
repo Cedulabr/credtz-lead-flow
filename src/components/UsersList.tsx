@@ -26,6 +26,9 @@ interface User {
   leads_premium_enabled?: boolean;
   sms_enabled?: boolean;
   whatsapp_enabled?: boolean;
+  can_access_whatsapp?: boolean;
+  can_access_sms?: boolean;
+  can_access_premium_leads?: boolean;
   created_at: string;
 }
 
@@ -38,6 +41,11 @@ export function UsersList() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [permissionsDialog, setPermissionsDialog] = useState({ open: false, user: null as User | null });
+  const [permissions, setPermissions] = useState({
+    can_access_whatsapp: false,
+    can_access_sms: false,
+    can_access_premium_leads: false,
+  });
   const [userForm, setUserForm] = useState({
     name: "",
     email: "",
@@ -245,11 +253,20 @@ export function UsersList() {
     }
   };
 
-  const updateUserPermissions = async (userId: string, permissions: { leads_premium_enabled: boolean, sms_enabled: boolean, whatsapp_enabled: boolean }) => {
+  const handlePermissionsOpen = (user: User) => {
+    setPermissionsDialog({ open: true, user });
+    setPermissions({
+      can_access_whatsapp: user.can_access_whatsapp || false,
+      can_access_sms: user.can_access_sms || false,
+      can_access_premium_leads: user.can_access_premium_leads || false,
+    });
+  };
+
+  const updateUserPermissions = async (userId: string, newPermissions: { can_access_whatsapp: boolean, can_access_sms: boolean, can_access_premium_leads: boolean }) => {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update(permissions)
+        .update(newPermissions)
         .eq('id', userId);
 
       if (error) throw error;
@@ -341,13 +358,13 @@ export function UsersList() {
                     </Badge>
                   </TableCell>
                   <TableCell>{getUserStatusBadge(user)}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      {user.leads_premium_enabled && <Badge variant="secondary" className="text-xs">Premium</Badge>}
-                      {user.whatsapp_enabled && <Badge variant="secondary" className="text-xs">WhatsApp</Badge>}
-                      {user.sms_enabled && <Badge variant="secondary" className="text-xs">SMS</Badge>}
-                    </div>
-                  </TableCell>
+                   <TableCell>
+                     <div className="flex gap-1">
+                       {user.can_access_premium_leads && <Badge variant="secondary" className="text-xs">Premium</Badge>}
+                       {user.can_access_whatsapp && <Badge variant="secondary" className="text-xs">WhatsApp</Badge>}
+                       {user.can_access_sms && <Badge variant="secondary" className="text-xs">SMS</Badge>}
+                     </div>
+                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <Button
@@ -369,7 +386,7 @@ export function UsersList() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setPermissionsDialog({ open: true, user })}
+                        onClick={() => handlePermissionsOpen(user)}
                         title="Gerenciar permissões"
                       >
                         <Settings className="h-3 w-3" />
@@ -526,14 +543,9 @@ export function UsersList() {
                 <Label htmlFor="leads-premium">Leads Premium</Label>
                 <Switch
                   id="leads-premium"
-                  checked={permissionsDialog.user?.leads_premium_enabled || false}
+                  checked={permissions.can_access_premium_leads}
                   onCheckedChange={(checked) => {
-                    if (permissionsDialog.user) {
-                      setPermissionsDialog({
-                        ...permissionsDialog,
-                        user: { ...permissionsDialog.user, leads_premium_enabled: checked }
-                      });
-                    }
+                    setPermissions({ ...permissions, can_access_premium_leads: checked });
                   }}
                 />
               </div>
@@ -541,14 +553,9 @@ export function UsersList() {
                 <Label htmlFor="whatsapp">WhatsApp</Label>
                 <Switch
                   id="whatsapp"
-                  checked={permissionsDialog.user?.whatsapp_enabled || false}
+                  checked={permissions.can_access_whatsapp}
                   onCheckedChange={(checked) => {
-                    if (permissionsDialog.user) {
-                      setPermissionsDialog({
-                        ...permissionsDialog,
-                        user: { ...permissionsDialog.user, whatsapp_enabled: checked }
-                      });
-                    }
+                    setPermissions({ ...permissions, can_access_whatsapp: checked });
                   }}
                 />
               </div>
@@ -556,14 +563,9 @@ export function UsersList() {
                 <Label htmlFor="sms">SMS</Label>
                 <Switch
                   id="sms"
-                  checked={permissionsDialog.user?.sms_enabled || false}
+                  checked={permissions.can_access_sms}
                   onCheckedChange={(checked) => {
-                    if (permissionsDialog.user) {
-                      setPermissionsDialog({
-                        ...permissionsDialog,
-                        user: { ...permissionsDialog.user, sms_enabled: checked }
-                      });
-                    }
+                    setPermissions({ ...permissions, can_access_sms: checked });
                   }}
                 />
               </div>
@@ -577,11 +579,7 @@ export function UsersList() {
                 <Button 
                   onClick={() => {
                     if (permissionsDialog.user) {
-                      updateUserPermissions(permissionsDialog.user.id, {
-                        leads_premium_enabled: permissionsDialog.user.leads_premium_enabled || false,
-                        sms_enabled: permissionsDialog.user.sms_enabled || false,
-                        whatsapp_enabled: permissionsDialog.user.whatsapp_enabled || false
-                      });
+                      updateUserPermissions(permissionsDialog.user.id, permissions);
                     }
                   }}
                 >

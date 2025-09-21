@@ -37,7 +37,7 @@ export function AdminWhitelabel() {
       const { data, error } = await supabase
         .from('whitelabel_config' as any)
         .select('*')
-        .maybeSingle();
+        .single();
 
       if (error) {
         throw error;

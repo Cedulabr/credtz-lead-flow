@@ -23,7 +23,7 @@ export function useWhitelabel() {
       const { data, error } = await supabase
         .from('whitelabel_config' as any)
         .select('*')
-        .maybeSingle();
+        .single();
 
       if (data) {
         const configData = data as any;

@@ -26,7 +26,7 @@ import {
   Building2
 } from "lucide-react";
 import { PaymentLaunch } from "./PaymentLaunch";
-import { PaymentManagement } from "./PaymentManagement";
+import { AdminPaymentManagement } from "./AdminPaymentManagement";
 import { UsersList } from "./UsersList";
 import { AdminBaseOffBanks } from "./AdminBaseOffBanks";
 import { CommissionLaunch } from "./CommissionLaunch";
@@ -566,7 +566,7 @@ export function AdminPanel() {
             </TabsContent>
 
             <TabsContent value="payments">
-              <PaymentManagement />
+              <AdminPaymentManagement />
             </TabsContent>
 
             <TabsContent value="users">

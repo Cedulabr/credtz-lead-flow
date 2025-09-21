@@ -756,6 +756,9 @@ export type Database = {
       }
       profiles: {
         Row: {
+          can_access_premium_leads: boolean | null
+          can_access_sms: boolean | null
+          can_access_whatsapp: boolean | null
           company: string | null
           cpf: string | null
           created_at: string | null
@@ -775,6 +778,9 @@ export type Database = {
           whatsapp_enabled: boolean | null
         }
         Insert: {
+          can_access_premium_leads?: boolean | null
+          can_access_sms?: boolean | null
+          can_access_whatsapp?: boolean | null
           company?: string | null
           cpf?: string | null
           created_at?: string | null
@@ -794,6 +800,9 @@ export type Database = {
           whatsapp_enabled?: boolean | null
         }
         Update: {
+          can_access_premium_leads?: boolean | null
+          can_access_sms?: boolean | null
+          can_access_whatsapp?: boolean | null
           company?: string | null
           cpf?: string | null
           created_at?: string | null
