@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Database, LogIn, TestTube, Activity } from "lucide-react";
 import LoadingAuth from "@/components/LoadingAuth";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWhitelabel } from "@/hooks/useWhitelabel";
 
 // Lazy load heavy components for better performance
 import { 
@@ -27,6 +28,7 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const { companyName } = useWhitelabel();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -43,7 +45,7 @@ const Index = () => {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold text-foreground">
-            Welcome to <span className="text-primary">Credtz</span>
+            Welcome to <span className="text-primary">{companyName}</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Please sign in to access your dashboard

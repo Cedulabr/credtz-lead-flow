@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import credtzLogo from "@/assets/credtz-logo.png";
 import { ConnectionStatus } from "./ConnectionStatus";
+import { useWhitelabel } from "@/hooks/useWhitelabel";
 
 interface NavigationProps {
   activeTab: string;
@@ -25,6 +26,7 @@ const navItems = [
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, profile, signOut, isAdmin } = useAuth();
+  const { companyName, logoUrl } = useWhitelabel();
 
   const handleSignOut = async () => {
     await signOut();
@@ -41,12 +43,12 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         <div className="p-6 border-b">
           <div className="flex items-center space-x-3">
             <img 
-              src={credtzLogo} 
-              alt="Credtz Logo" 
-              className="w-10 h-10 rounded-xl"
+              src={logoUrl || credtzLogo} 
+              alt={`${companyName} Logo`} 
+              className="w-10 h-10 rounded-xl object-contain"
             />
             <div>
-              <h1 className="text-xl font-bold text-foreground">Credtz</h1>
+              <h1 className="text-xl font-bold text-foreground">{companyName}</h1>
               <p className="text-sm text-muted-foreground">Serviços</p>
             </div>
           </div>

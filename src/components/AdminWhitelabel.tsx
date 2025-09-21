@@ -35,20 +35,21 @@ export function AdminWhitelabel() {
   const fetchWhitelabelConfig = async () => {
     try {
       const { data, error } = await supabase
-        .from('whitelabel_config')
+        .from('whitelabel_config' as any)
         .select('*')
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         throw error;
       }
 
       if (data) {
-        setConfig(data);
+        const configData = data as any;
+        setConfig(configData);
         setForm({
-          company_name: data.company_name || "",
-          primary_color: data.primary_color || "#0066cc",
-          secondary_color: data.secondary_color || "#00cc66"
+          company_name: configData.company_name || "",
+          primary_color: configData.primary_color || "#0066cc",
+          secondary_color: configData.secondary_color || "#00cc66"
         });
       }
     } catch (error) {
@@ -101,7 +102,7 @@ export function AdminWhitelabel() {
       };
 
       const { error } = await supabase
-        .from('whitelabel_config')
+        .from('whitelabel_config' as any)
         .upsert(configData);
 
       if (error) throw error;
