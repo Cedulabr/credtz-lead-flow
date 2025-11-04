@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, Users, TrendingUp, DollarSign, Bell, Menu, X, LogOut, User, Settings, MessageCircle } from "lucide-react";
+import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,8 +18,6 @@ const navItems = [
   { id: "dashboard", label: "Início", icon: Home },
   { id: "indicate", label: "Indicar", icon: Users },
   { id: "leads", label: "Leads Premium", icon: TrendingUp },
-  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
-  { id: "sms", label: "SMS", icon: Bell },
   { id: "commissions", label: "Comissões", icon: DollarSign },
 ];
 
@@ -58,11 +56,9 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
           {navItems.map((item) => {
             const Icon = item.icon;
             // Check if user has permission for premium features
-            const isPermissionRequired = ['leads', 'whatsapp', 'sms'].includes(item.id);
+            const isPermissionRequired = ['leads'].includes(item.id);
             const hasPermission = isPermissionRequired ? 
               (item.id === 'leads' && profile?.leads_premium_enabled) ||
-              (item.id === 'whatsapp' && profile?.whatsapp_enabled) ||
-              (item.id === 'sms' && profile?.sms_enabled) ||
               isAdmin
               : true;
             
@@ -133,11 +129,9 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         <div className="grid grid-cols-4 gap-1 px-2 py-1">
           {navItems.filter(item => {
             // Check if user has permission for premium features
-            const isPermissionRequired = ['leads', 'whatsapp', 'sms'].includes(item.id);
+            const isPermissionRequired = ['leads'].includes(item.id);
             const hasPermission = isPermissionRequired ? 
               (item.id === 'leads' && profile?.leads_premium_enabled) ||
-              (item.id === 'whatsapp' && profile?.whatsapp_enabled) ||
-              (item.id === 'sms' && profile?.sms_enabled) ||
               isAdmin
               : true;
             

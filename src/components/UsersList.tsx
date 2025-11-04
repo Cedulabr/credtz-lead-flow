@@ -24,10 +24,6 @@ interface User {
   level?: string;
   is_active?: boolean;
   leads_premium_enabled?: boolean;
-  sms_enabled?: boolean;
-  whatsapp_enabled?: boolean;
-  can_access_whatsapp?: boolean;
-  can_access_sms?: boolean;
   can_access_premium_leads?: boolean;
   created_at: string;
 }
@@ -42,8 +38,6 @@ export function UsersList() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [permissionsDialog, setPermissionsDialog] = useState({ open: false, user: null as User | null });
   const [permissions, setPermissions] = useState({
-    can_access_whatsapp: false,
-    can_access_sms: false,
     can_access_premium_leads: false,
   });
   const [userForm, setUserForm] = useState({
@@ -256,13 +250,11 @@ export function UsersList() {
   const handlePermissionsOpen = (user: User) => {
     setPermissionsDialog({ open: true, user });
     setPermissions({
-      can_access_whatsapp: user.can_access_whatsapp || false,
-      can_access_sms: user.can_access_sms || false,
       can_access_premium_leads: user.can_access_premium_leads || false,
     });
   };
 
-  const updateUserPermissions = async (userId: string, newPermissions: { can_access_whatsapp: boolean, can_access_sms: boolean, can_access_premium_leads: boolean }) => {
+  const updateUserPermissions = async (userId: string, newPermissions: { can_access_premium_leads: boolean }) => {
     try {
       const { error } = await supabase
         .from('profiles')
@@ -361,8 +353,6 @@ export function UsersList() {
                    <TableCell>
                      <div className="flex gap-1">
                        {user.can_access_premium_leads && <Badge variant="secondary" className="text-xs">Premium</Badge>}
-                       {user.can_access_whatsapp && <Badge variant="secondary" className="text-xs">WhatsApp</Badge>}
-                       {user.can_access_sms && <Badge variant="secondary" className="text-xs">SMS</Badge>}
                      </div>
                    </TableCell>
                   <TableCell>
@@ -546,26 +536,6 @@ export function UsersList() {
                   checked={permissions.can_access_premium_leads}
                   onCheckedChange={(checked) => {
                     setPermissions({ ...permissions, can_access_premium_leads: checked });
-                  }}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="whatsapp">WhatsApp</Label>
-                <Switch
-                  id="whatsapp"
-                  checked={permissions.can_access_whatsapp}
-                  onCheckedChange={(checked) => {
-                    setPermissions({ ...permissions, can_access_whatsapp: checked });
-                  }}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="sms">SMS</Label>
-                <Switch
-                  id="sms"
-                  checked={permissions.can_access_sms}
-                  onCheckedChange={(checked) => {
-                    setPermissions({ ...permissions, can_access_sms: checked });
                   }}
                 />
               </div>
