@@ -83,14 +83,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       setAvailableLeads(leads || []);
 
       // Buscar dados do televendas
-      const { data: allTelevendas } = await supabase
+      const { data: allTelevendas } = await (supabase as any)
         .from('televendas')
         .select('id, status')
         .eq('user_id', user?.id);
       
       setTelevendasTotal(allTelevendas?.length || 0);
-      setTelevendasPagas(allTelevendas?.filter(tv => tv.status === 'pago').length || 0);
-      setTelevendasCanceladas(allTelevendas?.filter(tv => tv.status === 'cancelado').length || 0);
+      setTelevendasPagas(allTelevendas?.filter((tv: any) => tv.status === 'pago').length || 0);
+      setTelevendasCanceladas(allTelevendas?.filter((tv: any) => tv.status === 'cancelado').length || 0);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);

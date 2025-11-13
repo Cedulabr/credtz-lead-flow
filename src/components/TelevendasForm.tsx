@@ -69,7 +69,7 @@ export const TelevendasForm = () => {
         return;
       }
 
-      const { error } = await supabase.from("televendas").insert({
+      const { error } = await (supabase as any).from("televendas").insert({
         user_id: user.id,
         nome: values.nome,
         cpf: values.cpf,
