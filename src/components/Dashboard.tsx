@@ -27,6 +27,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [commissionPreview, setCommissionPreview] = useState(0);
   const [recentActivities, setRecentActivities] = useState([]);
   const [availableLeads, setAvailableLeads] = useState([]);
+  const [televendasTotal, setTelevendasTotal] = useState(0);
+  const [televendasPagas, setTelevendasPagas] = useState(0);
+  const [televendasCanceladas, setTelevendasCanceladas] = useState(0);
 
   useEffect(() => {
     if (user) {
@@ -79,6 +82,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       
       setAvailableLeads(leads || []);
 
+      // Buscar dados do televendas
+      const { data: allTelevendas } = await supabase
+        .from('televendas')
+        .select('id, status')
+        .eq('user_id', user?.id);
+      
+      setTelevendasTotal(allTelevendas?.length || 0);
+      setTelevendasPagas(allTelevendas?.filter(tv => tv.status === 'pago').length || 0);
+      setTelevendasCanceladas(allTelevendas?.filter(tv => tv.status === 'cancelado').length || 0);
+
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     }
@@ -94,12 +107,28 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       description: isAdmin ? "Total de leads indicados no sistema" : "Clientes que você indicou"
     },
     {
-      title: "Leads Finalizados",
-      value: "8",
-      change: "4 novos hoje",
+      title: "Televendas Cadastradas",
+      value: televendasTotal.toString(),
+      change: "Total de vendas",
+      icon: TrendingUp,
+      color: "primary",
+      description: "Total de vendas cadastradas no televendas"
+    },
+    {
+      title: "Propostas Pagas",
+      value: televendasPagas.toString(),
+      change: "Vendas concluídas",
       icon: CheckCircle,
       color: "success",
-      description: "Propostas finalizadas este mês"
+      description: "Propostas do televendas pagas"
+    },
+    {
+      title: "Propostas Canceladas",
+      value: televendasCanceladas.toString(),
+      change: "Vendas não concluídas",
+      icon: AlertCircle,
+      color: "destructive",
+      description: "Propostas do televendas canceladas"
     },
     {
       title: "Prévia de Comissão",
