@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings } from "lucide-react";
+import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,6 +18,8 @@ const navItems = [
   { id: "dashboard", label: "Início", icon: Home },
   { id: "indicate", label: "Indicar", icon: Users },
   { id: "leads", label: "Leads Premium", icon: TrendingUp },
+  { id: "televendas", label: "Televendas", icon: Phone },
+  { id: "televendas-manage", label: "Gestão Televendas", icon: Settings },
   { id: "commissions", label: "Comissões", icon: DollarSign },
 ];
 

@@ -7,6 +7,8 @@ import IndicatedClientsTracking from "@/components/IndicatedClientsTracking";
 import { Notifications } from "@/components/Notifications";
 import { AdminTest } from "@/components/AdminTest";
 import { SystemStatus } from "@/components/SystemStatus";
+import { TelevendasForm } from "@/components/TelevendasForm";
+import { TelevendasManagement } from "@/components/TelevendasManagement";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
@@ -89,6 +91,18 @@ const Index = () => {
           <Suspense fallback={<LoadingFallback />}>
             <LazyLeadsManagement />
           </Suspense>
+        );
+      case "televendas":
+        return (
+          <div className="p-4">
+            <TelevendasForm />
+          </div>
+        );
+      case "televendas-manage":
+        return (
+          <div className="p-4">
+            <TelevendasManagement />
+          </div>
         );
       case "commissions":
         return (
