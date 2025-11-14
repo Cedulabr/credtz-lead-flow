@@ -45,7 +45,7 @@ export const TelevendasManagement = () => {
   const { toast } = useToast();
   const [televendas, setTelevendas] = useState<Televenda[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [selectedTv, setSelectedTv] = useState<Televenda | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -56,7 +56,7 @@ export const TelevendasManagement = () => {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (selectedMonth) {
+      if (selectedMonth && selectedMonth !== "all") {
         const [year, month] = selectedMonth.split("-");
         const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
         const endDate = new Date(parseInt(year), parseInt(month), 0);
@@ -152,7 +152,7 @@ export const TelevendasManagement = () => {
                 <SelectValue placeholder="Filtrar por mês" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os meses</SelectItem>
+                <SelectItem value="all">Todos os meses</SelectItem>
                 {getMonthOptions().map((month) => (
                   <SelectItem key={month.value} value={month.value}>
                     {month.label}
