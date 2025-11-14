@@ -56,8 +56,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const fetchPromise = (async () => {
-      fetchingProfile.current[userId] = fetchPromise;
-    
       // Prevent multiple concurrent fetches
       if (retryCount === 0) {
         setProfileLoading(true);
