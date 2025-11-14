@@ -35,13 +35,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
 
+  // Cache to prevent duplicate fetches
+  const profileCache = React.useRef<{ [key: string]: { data: Profile | null, timestamp: number } }>({});
+  const fetchingProfile = React.useRef<{ [key: string]: Promise<void> | null }>({});
+
   const fetchProfile = useCallback(async (userId: string, retryCount = 0) => {
     if (!userId) return;
     
-    // Prevent multiple concurrent fetches
-    if (retryCount === 0) {
-      setProfileLoading(true);
+    // Check cache (valid for 30 seconds)
+    const cached = profileCache.current[userId];
+    if (cached && Date.now() - cached.timestamp < 30000) {
+      setProfile(cached.data);
+      setProfileLoading(false);
+      return;
     }
+
+    // Prevent concurrent fetches for same user
+    if (fetchingProfile.current[userId]) {
+      return fetchingProfile.current[userId];
+    }
+
+    const fetchPromise = (async () => {
+      fetchingProfile.current[userId] = fetchPromise;
+    
+      // Prevent multiple concurrent fetches
+      if (retryCount === 0) {
+        setProfileLoading(true);
+      }
     
     try {
       console.log('Fetching profile for user:', userId, `(attempt ${retryCount + 1})`);
@@ -70,6 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
           console.log(`Network error, retrying in ${delay}ms...`);
           
+          fetchingProfile.current[userId] = null;
           setTimeout(() => {
             fetchProfile(userId, retryCount + 1);
           }, delay);
@@ -108,6 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
       } else if (data) {
         console.log('Profile loaded successfully:', data);
+        profileCache.current[userId] = { data, timestamp: Date.now() };
         setProfile(data);
       } else {
         // No profile found but no error, try to create one
@@ -142,6 +164,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (retryCount < 1) {
         const delay = 2000;
         console.log(`Unexpected error, retrying in ${delay}ms...`);
+        fetchingProfile.current[userId] = null;
         setTimeout(() => {
           fetchProfile(userId, retryCount + 1);
         }, delay);
@@ -155,7 +178,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (retryCount >= 2 || profile !== undefined) {
         setProfileLoading(false);
       }
+      fetchingProfile.current[userId] = null;
     }
+    })();
+
+    fetchingProfile.current[userId] = fetchPromise;
+    return fetchPromise;
   }, [user]);
 
   const refreshProfile = useCallback(async () => {
