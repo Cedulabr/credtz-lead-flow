@@ -1001,6 +1001,57 @@ export type Database = {
         }
         Relationships: []
       }
+      televendas: {
+        Row: {
+          banco: string
+          cpf: string
+          created_at: string
+          data_venda: string
+          id: string
+          nome: string
+          observacao: string | null
+          parcela: number
+          status: string
+          telefone: string
+          tipo_operacao: string
+          troco: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          banco: string
+          cpf: string
+          created_at?: string
+          data_venda: string
+          id?: string
+          nome: string
+          observacao?: string | null
+          parcela: number
+          status?: string
+          telefone: string
+          tipo_operacao: string
+          troco?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          banco?: string
+          cpf?: string
+          created_at?: string
+          data_venda?: string
+          id?: string
+          nome?: string
+          observacao?: string | null
+          parcela?: number
+          status?: string
+          telefone?: string
+          tipo_operacao?: string
+          troco?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       whatsapp_conversations: {
         Row: {
           contact_name: string | null
@@ -1218,13 +1269,13 @@ export type Database = {
         Returns: Json
       }
       get_available_banks: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           codigo_banco: string
         }[]
       }
       get_available_ufs: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           uf: string
         }[]
@@ -1245,10 +1296,7 @@ export type Database = {
           valor_beneficio: string
         }[]
       }
-      get_complete_schema: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      get_complete_schema: { Args: never; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1303,18 +1351,9 @@ export type Database = {
         Args: { leads_count_param: number; user_id_param: string }
         Returns: undefined
       }
-      validate_cpf: {
-        Args: { cpf_input: string }
-        Returns: boolean
-      }
-      validate_email: {
-        Args: { email_input: string }
-        Returns: boolean
-      }
-      validate_phone: {
-        Args: { phone_input: string }
-        Returns: boolean
-      }
+      validate_cpf: { Args: { cpf_input: string }; Returns: boolean }
+      validate_email: { Args: { email_input: string }; Returns: boolean }
+      validate_phone: { Args: { phone_input: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "partner"

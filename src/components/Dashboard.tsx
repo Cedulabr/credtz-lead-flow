@@ -15,6 +15,8 @@ import {
   AlertCircle,
   Star
 } from "lucide-react";
+import { SalesPipeline } from "./SalesPipeline";
+import { TaskManager } from "./TaskManager";
 
 interface DashboardProps {
   onNavigate: (tab: string) => void;
@@ -184,6 +186,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
 
         {/* Stats Cards - Large Vertical Mobile-First */}
+        <SalesPipeline />
+
+        <TaskManager />
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {stats.map((stat, index) => {
             const Icon = stat.icon;
