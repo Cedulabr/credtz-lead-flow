@@ -20,7 +20,8 @@ const navItems = [
   { id: "leads", label: "Leads Premium", icon: TrendingUp },
   { id: "televendas", label: "Televendas", icon: Phone },
   { id: "televendas-manage", label: "Gestão Televendas", icon: Settings },
-  { id: "commissions", label: "Comissões", icon: DollarSign },
+  { id: "commission-table", label: "Tabela de Comissões", icon: DollarSign },
+  { id: "commissions", label: "Minhas Comissões", icon: DollarSign },
 ];
 
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {

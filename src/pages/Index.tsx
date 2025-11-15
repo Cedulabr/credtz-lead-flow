@@ -9,6 +9,7 @@ import { AdminTest } from "@/components/AdminTest";
 import { SystemStatus } from "@/components/SystemStatus";
 import { TelevendasForm } from "@/components/TelevendasForm";
 import { TelevendasManagement } from "@/components/TelevendasManagement";
+import { CommissionTable } from "@/components/CommissionTable";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
@@ -102,6 +103,12 @@ const Index = () => {
         return (
           <div className="p-4">
             <TelevendasManagement />
+          </div>
+        );
+      case "commission-table":
+        return (
+          <div className="p-4">
+            <CommissionTable />
           </div>
         );
       case "commissions":
