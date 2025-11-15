@@ -25,11 +25,10 @@ import {
   Bell,
   Building2
 } from "lucide-react";
-import { PaymentLaunch } from "./PaymentLaunch";
 import { AdminPaymentManagement } from "./AdminPaymentManagement";
 import { UsersList } from "./UsersList";
 import { AdminBaseOffBanks } from "./AdminBaseOffBanks";
-import { CommissionLaunch } from "./CommissionLaunch";
+import { ContaCorrente } from "./ContaCorrente";
 import AdminIndicationsManagement from "./AdminIndicationsManagement";
 import { AdminCommissionTable } from "./AdminCommissionTable";
 import { AdminPremiumLeads } from "./AdminPremiumLeads";
@@ -312,7 +311,7 @@ export function AdminPanel() {
             <TabsTrigger value="announcements">Avisos</TabsTrigger>
             <TabsTrigger value="commissions">Comissões</TabsTrigger>
             {isAdmin && <TabsTrigger value="indications">Gerir Indicações</TabsTrigger>}
-            {isAdmin && <TabsTrigger value="commission-launch">Lançar Comissões</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="conta-corrente">Conta Corrente</TabsTrigger>}
             {isAdmin && <TabsTrigger value="premium-leads">Leads Premium</TabsTrigger>}
             {isAdmin && <TabsTrigger value="baseoff-banks">Bancos BaseOFF</TabsTrigger>}
             {isAdmin && <TabsTrigger value="payments">Pagamentos</TabsTrigger>}
@@ -548,10 +547,10 @@ export function AdminPanel() {
           </TabsContent>
         )}
 
-        {/* Commission Launch Tab */}
+        {/* Conta Corrente Tab */}
         {isAdmin && (
-          <TabsContent value="commission-launch" className="space-y-4">
-            <CommissionLaunch />
+          <TabsContent value="conta-corrente" className="space-y-4">
+            <ContaCorrente />
           </TabsContent>
         )}
 

@@ -73,6 +73,60 @@ export function AdminPaymentManagement() {
         console.error('Erro ao buscar leads indicados:', leadsError);
       }
       
+      // Buscar televendas com informações do usuário
+      const { data: televendasData, error: televendasError } = await supabase
+        .from('televendas')
+        .select(`
+          *,
+          user:profiles!televendas_user_id_fkey(
+            id,
+            name,
+            email
+          )
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (televendasError) {
+        console.error('Erro ao buscar televendas:', televendasError);
+      }
+      
+      // Transformar televendas em formato de comissões
+      const televendasAsCommissions = (televendasData || []).map(tv => {
+        let commissionAmount = 0;
+        let status = 'pending';
+        
+        // Calcular valor baseado no status do televendas
+        if (tv.status === 'pago') {
+          commissionAmount = tv.parcela || 0; // Usar o valor da parcela como comissão
+          status = 'paid';
+        } else if (tv.status === 'pendente') {
+          commissionAmount = tv.parcela || 0;
+          status = 'pending';
+        } else {
+          commissionAmount = 0;
+          status = 'preview';
+        }
+        
+        return {
+          id: tv.id,
+          client_name: tv.nome,
+          bank_name: tv.banco,
+          product_type: tv.tipo_operacao,
+          credit_value: tv.parcela || 0,
+          commission_amount: commissionAmount,
+          commission_percentage: 100, // 100% do valor para televendas
+          status: status,
+          payment_date: tv.status === 'pago' ? tv.updated_at : null,
+          proposal_date: tv.data_venda,
+          proposal_number: null,
+          cpf: tv.cpf,
+          user_id: tv.user_id,
+          user: tv.user,
+          created_at: tv.created_at,
+          type: 'televendas' as const
+        };
+      });
+      
       // Transformar leads indicados em formato de comissões com valores calculados
       const leadsAsCommissions = (leadsIndicadosData || []).map(lead => {
         // Calcular comissão baseada no status
@@ -114,8 +168,12 @@ export function AdminPaymentManagement() {
         };
       });
       
-      // Combinar comissões e leads indicados
-      const allCommissions = [...(commissionsData || []), ...leadsAsCommissions];
+      // Combinar comissões, leads indicados e televendas
+      const allCommissions = [
+        ...(commissionsData || []), 
+        ...leadsAsCommissions,
+        ...televendasAsCommissions
+      ];
       setCommissions(allCommissions);
     } catch (error) {
       console.error('Erro ao buscar comissões:', error);
