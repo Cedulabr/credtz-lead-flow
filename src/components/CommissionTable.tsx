@@ -103,8 +103,7 @@ export function CommissionTable() {
                             </div>
                           </TableHead>
                           <TableHead>Prazo</TableHead>
-                          <TableHead className="text-right">Comissão Total</TableHead>
-                          <TableHead className="text-right">Seu Repasse</TableHead>
+                          <TableHead className="text-right">Repasse Comissão</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -119,11 +118,6 @@ export function CommissionTable() {
                               ) : (
                                 <span className="text-muted-foreground text-sm">Todos</span>
                               )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <span className="font-semibold text-primary">
-                                {rule.commission_percentage}%
-                              </span>
                             </TableCell>
                             <TableCell className="text-right">
                               <Badge variant="default" className="font-semibold">
