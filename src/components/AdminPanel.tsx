@@ -31,7 +31,6 @@ import { AdminBaseOffBanks } from "./AdminBaseOffBanks";
 import { ContaCorrente } from "./ContaCorrente";
 import AdminIndicationsManagement from "./AdminIndicationsManagement";
 import { AdminCommissionTable } from "./AdminCommissionTable";
-import { AdminPremiumLeads } from "./AdminPremiumLeads";
 import { AdminWhitelabel } from "./AdminWhitelabel";
 
 interface Announcement {
@@ -307,12 +306,11 @@ export function AdminPanel() {
       </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-9' : 'grid-cols-2'}`}>
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-8' : 'grid-cols-2'}`}>
             <TabsTrigger value="announcements">Avisos</TabsTrigger>
             <TabsTrigger value="commissions">Comissões</TabsTrigger>
             {isAdmin && <TabsTrigger value="indications">Gerir Indicações</TabsTrigger>}
             {isAdmin && <TabsTrigger value="conta-corrente">Conta Corrente</TabsTrigger>}
-            {isAdmin && <TabsTrigger value="premium-leads">Leads Premium</TabsTrigger>}
             {isAdmin && <TabsTrigger value="baseoff-banks">Bancos BaseOFF</TabsTrigger>}
             {isAdmin && <TabsTrigger value="payments">Pagamentos</TabsTrigger>}
             {isAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
@@ -558,10 +556,6 @@ export function AdminPanel() {
           <>
             <TabsContent value="baseoff-banks">
               <AdminBaseOffBanks />
-            </TabsContent>
-
-            <TabsContent value="premium-leads">
-              <AdminPremiumLeads />
             </TabsContent>
 
             <TabsContent value="payments">
