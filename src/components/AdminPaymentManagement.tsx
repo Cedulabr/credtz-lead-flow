@@ -41,57 +41,75 @@ export function AdminPaymentManagement() {
 
   const fetchCommissions = async () => {
     try {
-      // Buscar comissões com informações do usuário
+      // Buscar comissões sem relacionamento direto
       const { data: commissionsData, error: commissionsError } = await supabase
         .from('commissions')
-        .select(`
-          *,
-          user:profiles!commissions_user_id_fkey(
-            id,
-            name,
-            email
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
       
       if (commissionsError) throw commissionsError;
       
-      // Buscar todos os leads indicados com status atualizado
+      // Buscar perfis de usuários separadamente
+      const userIds = commissionsData?.map(c => c.user_id).filter(Boolean) || [];
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .in('id', userIds);
+      
+      // Mapear perfis aos dados de comissões
+      const commissionsWithUsers = commissionsData?.map(commission => ({
+        ...commission,
+        user: profilesData?.find(p => p.id === commission.user_id) || null
+      }));
+      
+      // Buscar todos os leads indicados
       const { data: leadsIndicadosData, error: leadsError } = await supabase
         .from('leads_indicados')
-        .select(`
-          *,
-          user:profiles!leads_indicados_created_by_fkey(
-            id,
-            name,
-            email
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
       
       if (leadsError) {
         console.error('Erro ao buscar leads indicados:', leadsError);
       }
       
-      // Buscar televendas com informações do usuário
+      // Buscar perfis para leads indicados
+      const leadsUserIds = leadsIndicadosData?.map(l => l.created_by).filter(Boolean) || [];
+      const { data: leadsProfilesData } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .in('id', leadsUserIds);
+      
+      // Mapear perfis aos leads indicados
+      const leadsWithUsers = leadsIndicadosData?.map(lead => ({
+        ...lead,
+        user: leadsProfilesData?.find(p => p.id === lead.created_by) || null
+      }));
+      
+      // Buscar televendas
       const { data: televendasData, error: televendasError } = await supabase
         .from('televendas')
-        .select(`
-          *,
-          user:profiles!televendas_user_id_fkey(
-            id,
-            name,
-            email
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
       
       if (televendasError) {
         console.error('Erro ao buscar televendas:', televendasError);
       }
       
+      // Buscar perfis para televendas
+      const televendasUserIds = televendasData?.map(t => t.user_id).filter(Boolean) || [];
+      const { data: televendasProfilesData } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .in('id', televendasUserIds);
+      
+      // Mapear perfis aos televendas
+      const televendasWithUsers = televendasData?.map(tv => ({
+        ...tv,
+        user: televendasProfilesData?.find(p => p.id === tv.user_id) || null
+      }));
+      
       // Transformar televendas em formato de comissões
-      const televendasAsCommissions = (televendasData || []).map(tv => {
+      const televendasAsCommissions = (televendasWithUsers || []).map(tv => {
         let commissionAmount = 0;
         let status = 'pending';
         
@@ -128,7 +146,7 @@ export function AdminPaymentManagement() {
       });
       
       // Transformar leads indicados em formato de comissões com valores calculados
-      const leadsAsCommissions = (leadsIndicadosData || []).map(lead => {
+      const leadsAsCommissions = (leadsWithUsers || []).map(lead => {
         // Calcular comissão baseada no status
         let commissionAmount = 0;
         let status = 'pending';
@@ -170,7 +188,7 @@ export function AdminPaymentManagement() {
       
       // Combinar comissões, leads indicados e televendas
       const allCommissions = [
-        ...(commissionsData || []), 
+        ...(commissionsWithUsers || []), 
         ...leadsAsCommissions,
         ...televendasAsCommissions
       ];
