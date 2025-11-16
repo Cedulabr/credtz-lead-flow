@@ -497,10 +497,10 @@ export function AdminPanel() {
                         <SelectValue placeholder="Selecione o perfil" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="junior">Junior</SelectItem>
-                        <SelectItem value="pleno">Pleno</SelectItem>
-                        <SelectItem value="senior">Senior</SelectItem>
-                        <SelectItem value="master">Master</SelectItem>
+                        <SelectItem value="bronze">Bronze</SelectItem>
+                        <SelectItem value="prata">Prata</SelectItem>
+                        <SelectItem value="ouro">Ouro</SelectItem>
+                        <SelectItem value="diamante">Diamante</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

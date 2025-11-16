@@ -187,9 +187,10 @@ export function CreateUser() {
                   <SelectValue placeholder="Selecione o nível" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="junior">Júnior</SelectItem>
-                  <SelectItem value="pleno">Pleno</SelectItem>
-                  <SelectItem value="senior">Sênior</SelectItem>
+                  <SelectItem value="bronze">Bronze</SelectItem>
+                  <SelectItem value="prata">Prata</SelectItem>
+                  <SelectItem value="ouro">Ouro</SelectItem>
+                  <SelectItem value="diamante">Diamante</SelectItem>
                 </SelectContent>
               </Select>
             </div>
