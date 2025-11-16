@@ -6,6 +6,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Switch } from "./ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,6 +48,7 @@ export function UsersList() {
     phone: "",
     pix_key: "",
     company: "",
+    level: "",
   });
 
   useEffect(() => {
@@ -84,6 +86,7 @@ export function UsersList() {
       phone: user.phone || "",
       pix_key: user.pix_key || "",
       company: user.company || "",
+      level: user.level || "",
     });
     setIsDialogOpen(true);
   };
@@ -101,6 +104,7 @@ export function UsersList() {
           phone: userForm.phone,
           pix_key: userForm.pix_key,
           company: userForm.company,
+          level: (userForm.level as any) || null,
         })
         .eq('id', editingUser.id);
 
@@ -120,6 +124,7 @@ export function UsersList() {
         phone: "",
         pix_key: "",
         company: "",
+        level: "",
       });
       loadUsers();
     } catch (error) {
@@ -479,6 +484,23 @@ export function UsersList() {
                   onChange={(e) => setUserForm({ ...userForm, company: e.target.value })}
                   placeholder="Nome da empresa"
                 />
+              </div>
+              <div>
+                <Label htmlFor="user-level">Nível do Usuário</Label>
+                <Select 
+                  value={userForm.level} 
+                  onValueChange={(value) => setUserForm({ ...userForm, level: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o nível" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bronze">Bronze</SelectItem>
+                    <SelectItem value="prata">Prata</SelectItem>
+                    <SelectItem value="ouro">Ouro</SelectItem>
+                    <SelectItem value="diamante">Diamante</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <Button onClick={handleSaveUser} className="w-full">
                 Salvar Alterações
