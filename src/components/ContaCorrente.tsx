@@ -194,6 +194,7 @@ export function ContaCorrente() {
           commission_percentage: formData.commission_percentage,
           commission_amount: calculatedCommission,
           proposal_number: formData.proposal_number || null,
+          proposal_date: new Date().toISOString().split('T')[0], // Data da proposta
           status: 'pending'
         });
 
