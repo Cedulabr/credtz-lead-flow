@@ -36,7 +36,7 @@ interface CommissionFormData {
 
 export function Commissions() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState("current");
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [pixKey, setPixKey] = useState("");
@@ -64,7 +64,7 @@ export function Commissions() {
     commission_percentage: '',
     bank_name: '',
     product_type: '',
-    proposal_date: '',
+    proposal_date: new Date().toISOString().split('T')[0], // Data de hoje por padrão
     payment_method: ''
   });
 
@@ -121,14 +121,13 @@ export function Commissions() {
   // Carregar dados das comissões e bancos/produtos
   useEffect(() => {
     fetchCommissions();
-  }, []);
+  }, [isAdmin]);
 
   const fetchCommissions = async () => {
     if (!user?.id) return;
     
     try {
-      // Carregar comissões do usuário com informações do usuário
-      const { data: userCommissions } = await supabase
+      let commissionsQuery = supabase
         .from('commissions')
         .select(`
           *,
@@ -138,18 +137,45 @@ export function Commissions() {
             email
           )
         `)
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
-      // Buscar leads indicados do usuário
-      const { data: leadsIndicadosData, error: leadsError } = await supabase
+      // Se não for admin, filtrar apenas comissões do usuário
+      if (!isAdmin) {
+        commissionsQuery = commissionsQuery.eq('user_id', user.id);
+      }
+      
+      const { data: userCommissions } = await commissionsQuery;
+      
+      // Buscar leads indicados
+      let leadsQuery = supabase
         .from('leads_indicados')
         .select('*')
-        .eq('created_by', user.id)
         .order('created_at', { ascending: false });
+      
+      // Se não for admin, filtrar apenas leads do usuário
+      if (!isAdmin) {
+        leadsQuery = leadsQuery.eq('created_by', user.id);
+      }
+      
+      const { data: leadsIndicadosData, error: leadsError } = await leadsQuery;
       
       if (leadsError) {
         console.error('Erro ao buscar leads indicados:', leadsError);
+      }
+      
+      // Buscar perfis de usuários para leads indicados (se admin)
+      const leadsUserIds = leadsIndicadosData?.map(l => l.created_by).filter(Boolean) || [];
+      let leadsProfilesMap = new Map();
+      
+      if (isAdmin && leadsUserIds.length > 0) {
+        const { data: leadsProfilesData } = await supabase
+          .from('profiles')
+          .select('id, name, email')
+          .in('id', leadsUserIds);
+        
+        leadsProfilesMap = new Map(
+          (leadsProfilesData || []).map(p => [p.id, p])
+        );
       }
       
       // Transformar leads indicados em formato de comissões com valores calculados
@@ -187,14 +213,86 @@ export function Commissions() {
           payment_date: status === 'paid' ? lead.updated_at?.split('T')[0] : null,
           proposal_date: lead.created_at?.split('T')[0],
           user_id: lead.created_by,
-          user: null,
+          user: leadsProfilesMap.get(lead.created_by) || null,
           created_at: lead.created_at,
           updated_at: lead.updated_at
         };
       });
       
-      // Combinar comissões e leads indicados
-      const allCommissions = [...(userCommissions || []), ...leadsAsCommissions];
+      // Buscar televendas
+      let televendasQuery = supabase
+        .from('televendas')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      // Se não for admin, filtrar apenas televendas do usuário
+      if (!isAdmin) {
+        televendasQuery = televendasQuery.eq('user_id', user.id);
+      }
+      
+      const { data: televendasData, error: televendasError } = await televendasQuery;
+      
+      if (televendasError) {
+        console.error('Erro ao buscar televendas:', televendasError);
+      }
+      
+      // Buscar perfis de usuários para televendas (se admin)
+      const televendasUserIds = televendasData?.map(t => t.user_id).filter(Boolean) || [];
+      let televendasProfilesMap = new Map();
+      
+      if (isAdmin && televendasUserIds.length > 0) {
+        const { data: televendasProfilesData } = await supabase
+          .from('profiles')
+          .select('id, name, email')
+          .in('id', televendasUserIds);
+        
+        televendasProfilesMap = new Map(
+          (televendasProfilesData || []).map(p => [p.id, p])
+        );
+      }
+      
+      // Transformar televendas em formato de comissões
+      const televendasAsCommissions = (televendasData || []).map(tv => {
+        let commissionAmount = 0;
+        let status = 'pending';
+        
+        if (tv.status === 'pago') {
+          commissionAmount = tv.parcela || 0;
+          status = 'paid';
+        } else if (tv.status === 'pendente') {
+          commissionAmount = tv.parcela || 0;
+          status = 'pending';
+        } else {
+          commissionAmount = 0;
+          status = 'preview';
+        }
+        
+        return {
+          id: tv.id,
+          client_name: tv.nome,
+          bank_name: tv.banco,
+          product_type: tv.tipo_operacao,
+          credit_value: tv.parcela || 0,
+          commission_amount: commissionAmount,
+          commission_percentage: 100,
+          status: status,
+          payment_date: tv.status === 'pago' ? tv.updated_at : null,
+          proposal_date: tv.data_venda,
+          proposal_number: null,
+          cpf: tv.cpf,
+          user_id: tv.user_id,
+          user: televendasProfilesMap.get(tv.user_id) || null,
+          created_at: tv.created_at,
+          type: 'televendas' as const
+        };
+      });
+      
+      // Combinar comissões, leads indicados e televendas
+      const allCommissions = [
+        ...(userCommissions || []), 
+        ...leadsAsCommissions,
+        ...televendasAsCommissions
+      ];
       
       // Carregar bancos e produtos
       const { data: banksProductsData } = await supabase
@@ -347,7 +445,7 @@ export function Commissions() {
         commission_amount: commissionAmount,
         commission_percentage: commissionPercentage,
         status: 'preview',
-        proposal_date: formData.proposal_date || null,
+        proposal_date: formData.proposal_date, // Sempre usar a data do formulário
         payment_method: formData.payment_method || null
       };
 
@@ -369,7 +467,7 @@ export function Commissions() {
         commission_percentage: '',
         bank_name: '',
         product_type: '',
-        proposal_date: '',
+        proposal_date: new Date().toISOString().split('T')[0],
         payment_method: ''
       });
       fetchCommissions();
@@ -483,10 +581,10 @@ export function Commissions() {
       <div className="flex flex-col space-y-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-            Minhas Comissões
+            {isAdmin ? 'Todas as Comissões' : 'Minhas Comissões'}
           </h1>
           <p className="text-muted-foreground">
-            Acompanhe seus ganhos e histórico de pagamentos
+            {isAdmin ? 'Visualize e gerencie comissões de todos os usuários' : 'Acompanhe seus ganhos e histórico de pagamentos'}
           </p>
         </div>
       </div>
