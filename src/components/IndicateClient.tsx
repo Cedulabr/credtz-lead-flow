@@ -4,19 +4,14 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   User, 
-  Phone, 
-  CreditCard, 
-  DollarSign, 
-  FileText,
-  Camera,
   CheckCircle,
-  Send
+  Send,
+  FileText
 } from "lucide-react";
 
 export function IndicateClient() {
@@ -25,23 +20,12 @@ export function IndicateClient() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    cpf: "",
     phone: "",
-    convenio: "",
     observations: ""
   });
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const formatCPF = (value: string) => {
-    const numericValue = value.replace(/\D/g, "");
-    return numericValue
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d{1,2})/, "$1-$2")
-      .substring(0, 14);
   };
 
   const formatPhone = (value: string) => {
@@ -50,15 +34,6 @@ export function IndicateClient() {
       .replace(/(\d{2})(\d)/, "($1) $2")
       .replace(/(\d{5})(\d{1,4})/, "$1-$2")
       .substring(0, 15);
-  };
-
-  const formatCurrency = (value: string) => {
-    const numericValue = value.replace(/\D/g, "");
-    const numberValue = parseInt(numericValue) / 100;
-    return numberValue.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL"
-    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,9 +56,9 @@ export function IndicateClient() {
         .from('leads_indicados')
         .insert({
           nome: formData.name,
-          cpf: formData.cpf,
+          cpf: '', // CPF não é mais obrigatório
           telefone: formData.phone,
-          convenio: formData.convenio,
+          convenio: 'Indicação Geral', // Valor padrão
           observacoes: formData.observations,
           status: 'lead_digitado',
           created_by: user.id
@@ -101,9 +76,7 @@ export function IndicateClient() {
       // Reset form
       setFormData({
         name: "",
-        cpf: "",
         phone: "",
-        convenio: "",
         observations: ""
       });
     } catch (error) {
@@ -118,15 +91,7 @@ export function IndicateClient() {
     }
   };
 
-  const benefitTypes = [
-    { value: "beneficiario_inss", label: "Beneficiário INSS" },
-    { value: "credito_trabalhador", label: "Crédito do trabalhador" },
-    { value: "saque_fgts", label: "Saque FGTS" },
-    { value: "bolsa_familia", label: "Bolsa Família" },
-    { value: "servidor_publico", label: "Servidor Público" }
-  ];
-
-  const isFormValid = formData.name && formData.cpf && formData.phone && formData.convenio;
+  const isFormValid = formData.name && formData.phone;
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6">
@@ -166,56 +131,18 @@ export function IndicateClient() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="cpf">CPF *</Label>
-                    <Input
-                      id="cpf"
-                      type="text"
-                      placeholder="000.000.000-00"
-                      value={formData.cpf}
-                      onChange={(e) => handleInputChange("cpf", formatCPF(e.target.value))}
-                      className="mt-2"
-                      maxLength={14}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="phone">Telefone/WhatsApp *</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="(11) 99999-9999"
-                      value={formData.phone}
-                      onChange={(e) => handleInputChange("phone", formatPhone(e.target.value))}
-                      className="mt-2"
-                      maxLength={15}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Convenio Info */}
-              <div className="space-y-4">
                 <div>
-                  <Label htmlFor="convenio">Convênio *</Label>
-                  <Select
-                    value={formData.convenio}
-                    onValueChange={(value) => handleInputChange("convenio", value)}
-                  >
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Selecione o convênio" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {benefitTypes.map((benefit) => (
-                        <SelectItem key={benefit.value} value={benefit.value}>
-                          {benefit.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="phone">Telefone/WhatsApp *</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="(11) 99999-9999"
+                    value={formData.phone}
+                    onChange={(e) => handleInputChange("phone", formatPhone(e.target.value))}
+                    className="mt-2"
+                    maxLength={15}
+                    required
+                  />
                 </div>
               </div>
 

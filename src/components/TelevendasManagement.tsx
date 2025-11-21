@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -23,8 +26,20 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
+import { Pencil, Trash2 } from "lucide-react";
 
 interface Televenda {
   id: string;
@@ -43,11 +58,16 @@ interface Televenda {
 
 export const TelevendasManagement = () => {
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const [televendas, setTelevendas] = useState<Televenda[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [selectedTv, setSelectedTv] = useState<Televenda | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [editingTv, setEditingTv] = useState<Televenda | null>(null);
+  const [deletingTvId, setDeletingTvId] = useState<string | null>(null);
 
   const fetchTelevendas = async () => {
     try {
@@ -106,6 +126,102 @@ export const TelevendasManagement = () => {
       toast({
         title: "Erro",
         description: "Erro ao atualizar status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEdit = (tv: Televenda, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isAdmin) {
+      toast({
+        title: "Acesso negado",
+        description: "Apenas administradores podem editar propostas",
+        variant: "destructive",
+      });
+      return;
+    }
+    setEditingTv(tv);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDelete = (tvId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isAdmin) {
+      toast({
+        title: "Acesso negado",
+        description: "Apenas administradores podem excluir propostas",
+        variant: "destructive",
+      });
+      return;
+    }
+    setDeletingTvId(tvId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmEdit = async () => {
+    if (!editingTv) return;
+    
+    try {
+      const { error } = await (supabase as any)
+        .from("televendas")
+        .update({
+          nome: editingTv.nome,
+          cpf: editingTv.cpf,
+          telefone: editingTv.telefone,
+          banco: editingTv.banco,
+          parcela: editingTv.parcela,
+          troco: editingTv.troco,
+          tipo_operacao: editingTv.tipo_operacao,
+          observacao: editingTv.observacao,
+          data_venda: editingTv.data_venda,
+        })
+        .eq("id", editingTv.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Proposta atualizada com sucesso!",
+      });
+
+      setIsEditDialogOpen(false);
+      setEditingTv(null);
+      fetchTelevendas();
+    } catch (error) {
+      console.error("Error updating televenda:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar proposta",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingTvId) return;
+    
+    try {
+      const { error } = await (supabase as any)
+        .from("televendas")
+        .delete()
+        .eq("id", deletingTvId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Proposta excluída com sucesso!",
+      });
+
+      setIsDeleteDialogOpen(false);
+      setDeletingTvId(null);
+      fetchTelevendas();
+    } catch (error) {
+      console.error("Error deleting televenda:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir proposta",
         variant: "destructive",
       });
     }
@@ -175,6 +291,7 @@ export const TelevendasManagement = () => {
                   <TableHead>Parcela</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Ações</TableHead>
+                  {isAdmin && <TableHead>Gerenciar</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -206,6 +323,26 @@ export const TelevendasManagement = () => {
                         </SelectContent>
                       </Select>
                     </TableCell>
+                    {isAdmin && (
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => handleEdit(tv, e)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={(e) => handleDelete(tv.id, e)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -290,6 +427,129 @@ export const TelevendasManagement = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar Proposta</DialogTitle>
+            <DialogDescription>
+              Edite os dados da proposta de televenda
+            </DialogDescription>
+          </DialogHeader>
+          {editingTv && (
+            <div className="grid gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Nome</Label>
+                  <Input
+                    value={editingTv.nome}
+                    onChange={(e) => setEditingTv({ ...editingTv, nome: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>CPF</Label>
+                  <Input
+                    value={editingTv.cpf}
+                    onChange={(e) => setEditingTv({ ...editingTv, cpf: e.target.value })}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Telefone</Label>
+                  <Input
+                    value={editingTv.telefone}
+                    onChange={(e) => setEditingTv({ ...editingTv, telefone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Data da Venda</Label>
+                  <Input
+                    type="date"
+                    value={editingTv.data_venda}
+                    onChange={(e) => setEditingTv({ ...editingTv, data_venda: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Banco</Label>
+                  <Input
+                    value={editingTv.banco}
+                    onChange={(e) => setEditingTv({ ...editingTv, banco: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Tipo de Operação</Label>
+                  <Input
+                    value={editingTv.tipo_operacao}
+                    onChange={(e) => setEditingTv({ ...editingTv, tipo_operacao: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Parcela</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editingTv.parcela}
+                    onChange={(e) => setEditingTv({ ...editingTv, parcela: parseFloat(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <Label>Troco</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editingTv.troco || ''}
+                    onChange={(e) => setEditingTv({ ...editingTv, troco: parseFloat(e.target.value) || null })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>Observações</Label>
+                <Input
+                  value={editingTv.observacao || ''}
+                  onChange={(e) => setEditingTv({ ...editingTv, observacao: e.target.value })}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={confirmEdit}>
+                  Salvar Alterações
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta proposta? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

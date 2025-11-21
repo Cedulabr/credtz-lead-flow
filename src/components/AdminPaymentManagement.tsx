@@ -212,7 +212,11 @@ export function AdminPaymentManagement() {
     try {
       const commission = commissions.find(c => c.id === id);
       
-      if (commission?.bank_name === 'Indicação') {
+      if (!commission) {
+        throw new Error('Comissão não encontrada');
+      }
+
+      if (commission.bank_name === 'Indicação') {
         // Para leads indicados, atualizar a tabela leads_indicados
         let leadsStatus = newStatus;
         if (newStatus === 'paid') {
@@ -227,10 +231,26 @@ export function AdminPaymentManagement() {
           .eq('id', id);
 
         if (error) throw error;
+      } else if (commission.type === 'televendas') {
+        // Para televendas, atualizar a tabela televendas
+        let tvStatus = 'pendente';
+        if (newStatus === 'paid') {
+          tvStatus = 'pago';
+        } else if (newStatus === 'pending') {
+          tvStatus = 'pendente';
+        }
+        
+        const { error } = await supabase
+          .from('televendas')
+          .update({ status: tvStatus })
+          .eq('id', id);
+
+        if (error) throw error;
       } else {
         // Para comissões normais, atualizar a tabela commissions
         const updateData: any = { status: newStatus };
         
+        // IMPORTANTE: Sempre setar payment_date quando marcar como pago
         if (newStatus === 'paid') {
           updateData.payment_date = new Date().toISOString().split('T')[0];
         }
@@ -253,7 +273,7 @@ export function AdminPaymentManagement() {
       console.error('Erro ao atualizar status:', error);
       toast({
         title: "Erro",
-        description: "Erro ao atualizar status",
+        description: "Erro ao atualizar status da comissão",
         variant: "destructive",
       });
     } finally {
