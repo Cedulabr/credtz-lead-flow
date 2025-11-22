@@ -139,9 +139,11 @@ export function Commissions() {
         `)
         .order('created_at', { ascending: false });
       
-      // Se não for admin, filtrar apenas comissões do usuário
+      // Se não for admin, filtrar apenas comissões PAGAS do usuário
       if (!isAdmin) {
-        commissionsQuery = commissionsQuery.eq('user_id', user.id);
+        commissionsQuery = commissionsQuery
+          .eq('user_id', user.id)
+          .eq('status', 'paid');
       }
       
       const { data: userCommissions } = await commissionsQuery;
@@ -152,9 +154,11 @@ export function Commissions() {
         .select('*')
         .order('created_at', { ascending: false });
       
-      // Se não for admin, filtrar apenas leads do usuário
+      // Se não for admin, filtrar apenas leads PAGOS do usuário
       if (!isAdmin) {
-        leadsQuery = leadsQuery.eq('created_by', user.id);
+        leadsQuery = leadsQuery
+          .eq('created_by', user.id)
+          .in('status', ['comissao_paga', 'contrato_assinado']);
       }
       
       const { data: leadsIndicadosData, error: leadsError } = await leadsQuery;
@@ -225,9 +229,11 @@ export function Commissions() {
         .select('*')
         .order('created_at', { ascending: false });
       
-      // Se não for admin, filtrar apenas televendas do usuário
+      // Se não for admin, filtrar apenas televendas PAGAS do usuário
       if (!isAdmin) {
-        televendasQuery = televendasQuery.eq('user_id', user.id);
+        televendasQuery = televendasQuery
+          .eq('user_id', user.id)
+          .eq('status', 'pago');
       }
       
       const { data: televendasData, error: televendasError } = await televendasQuery;
