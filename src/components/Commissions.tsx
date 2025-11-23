@@ -139,13 +139,11 @@ export function Commissions() {
         `)
         .order('created_at', { ascending: false });
       
-      // Se não for admin, filtrar apenas comissões PAGAS do usuário
+      // Se não for admin, filtrar apenas comissões do próprio usuário
       if (!isAdmin) {
-        commissionsQuery = commissionsQuery
-          .eq('user_id', user.id)
-          .eq('status', 'paid');
+        commissionsQuery = commissionsQuery.eq('user_id', user.id);
       }
-      
+
       const { data: userCommissions } = await commissionsQuery;
       
       // Buscar leads indicados
@@ -770,20 +768,23 @@ export function Commissions() {
           <div className="space-y-4">
             {(() => {
               // Filtrar comissões do mês selecionado se o status for 'paid'
-              const [year, month] = selectedMonth.split('-').map(Number);
-              let filteredCommissions = commissions;
+               const [year, month] = selectedMonth.split('-').map(Number);
+               let filteredCommissions = commissions;
 
-              // Aplicar filtro de mês - filtrar TODAS as comissões do mês selecionado
-              filteredCommissions = filteredCommissions.filter(c => {
-                // Para comissões pagas, usar data de pagamento
-                if (c.status === 'paid' && c.payment_date) {
-                  const paymentDate = new Date(c.payment_date);
-                  return paymentDate.getMonth() === (month - 1) && paymentDate.getFullYear() === year;
-                }
-                // Para outras comissões, usar data de criação
-                const createdDate = new Date(c.created_at);
-                return createdDate.getMonth() === (month - 1) && createdDate.getFullYear() === year;
-              });
+               // Exibir apenas comissões que já foram pagas
+               filteredCommissions = filteredCommissions.filter(c => c.status === 'paid');
+
+               // Aplicar filtro de mês - filtrar TODAS as comissões do mês selecionado
+               filteredCommissions = filteredCommissions.filter(c => {
+                 // Para comissões pagas, usar data de pagamento
+                 if (c.status === 'paid' && c.payment_date) {
+                   const paymentDate = new Date(c.payment_date);
+                   return paymentDate.getMonth() === (month - 1) && paymentDate.getFullYear() === year;
+                 }
+                 // Para outras comissões, usar data de criação
+                 const createdDate = new Date(c.created_at);
+                 return createdDate.getMonth() === (month - 1) && createdDate.getFullYear() === year;
+               });
 
               // Aplicar filtro de busca
               if (searchTerm) {
