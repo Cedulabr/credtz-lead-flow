@@ -5,7 +5,7 @@ import { Dashboard } from "@/components/Dashboard";
 import { IndicateClient } from "@/components/IndicateClient";
 import IndicatedClientsTracking from "@/components/IndicatedClientsTracking";
 import { Notifications } from "@/components/Notifications";
-import { AdminTest } from "@/components/AdminTest";
+
 import { SystemStatus } from "@/components/SystemStatus";
 import { TelevendasForm } from "@/components/TelevendasForm";
 import { TelevendasManagement } from "@/components/TelevendasManagement";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Database, LogIn, TestTube, Activity } from "lucide-react";
+import { TestCommissionsScript } from "@/components/TestCommissionsScript";
 import LoadingAuth from "@/components/LoadingAuth";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWhitelabel } from "@/hooks/useWhitelabel";
@@ -127,6 +128,8 @@ const Index = () => {
         );
       case "system-status":
         return <SystemStatus />;
+      case "test-commissions":
+        return <TestCommissionsScript />;
       default:
         return <Dashboard onNavigate={setActiveTab} />;
     }
@@ -142,8 +145,6 @@ const Index = () => {
         </main>
       </div>
       
-      {/* Admin Test Panel - visible on main page for debugging */}
-      <AdminTest />
     </div>
   );
 };

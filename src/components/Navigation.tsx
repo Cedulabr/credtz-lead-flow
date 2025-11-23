@@ -80,14 +80,24 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
             );
           })}
           {isAdmin && (
-            <Button
-              variant="ghost"
-              onClick={() => window.location.href = '/admin'}
-              className="w-full justify-start space-x-3"
-            >
-              <Settings size={20} />
-              <span>Admin</span>
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => window.location.href = '/admin'}
+                className="w-full justify-start space-x-3"
+              >
+                <Settings size={20} />
+                <span>Admin</span>
+              </Button>
+              <Button
+                variant={activeTab === "test-commissions" ? "default" : "ghost"}
+                onClick={() => onTabChange("test-commissions")}
+                className="w-full justify-start space-x-3"
+              >
+                <TrendingUp size={20} />
+                <span>Teste Comissões</span>
+              </Button>
+            </>
           )}
         </nav>
 
