@@ -182,30 +182,55 @@ export function ContaCorrente() {
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('commissions')
-        .insert({
-          user_id: formData.user_id,
-          client_name: formData.client_name,
-          cpf: formData.cpf || null,
-          bank_name: formData.bank_name,
-          product_type: formData.product_name,
-          credit_value: formData.credit_value,
-          commission_percentage: formData.commission_percentage,
-          commission_amount: calculatedCommission,
-          proposal_number: formData.proposal_number || null,
-          proposal_date: new Date().toISOString().split('T')[0], // Data da proposta
-          status: 'pending'
+      if (editingCommissionId) {
+        const { error } = await supabase
+          .from('commissions')
+          .update({
+            user_id: formData.user_id,
+            client_name: formData.client_name,
+            cpf: formData.cpf || null,
+            bank_name: formData.bank_name,
+            product_type: formData.product_name,
+            credit_value: formData.credit_value,
+            commission_percentage: formData.commission_percentage,
+            commission_amount: calculatedCommission,
+            proposal_number: formData.proposal_number || null,
+          })
+          .eq('id', editingCommissionId);
+
+        if (error) throw error;
+
+        toast({
+          title: "Sucesso",
+          description: "Comissão atualizada com sucesso"
         });
+      } else {
+        const { error } = await supabase
+          .from('commissions')
+          .insert({
+            user_id: formData.user_id,
+            client_name: formData.client_name,
+            cpf: formData.cpf || null,
+            bank_name: formData.bank_name,
+            product_type: formData.product_name,
+            credit_value: formData.credit_value,
+            commission_percentage: formData.commission_percentage,
+            commission_amount: calculatedCommission,
+            proposal_number: formData.proposal_number || null,
+            proposal_date: new Date().toISOString().split('T')[0], // Data da proposta
+            status: 'pending'
+          });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast({
-        title: "Sucesso",
-        description: "Comissão lançada com sucesso"
-      });
+        toast({
+          title: "Sucesso",
+          description: "Comissão lançada com sucesso"
+        });
+      }
 
       setIsDialogOpen(false);
+      setEditingCommissionId(null);
       setFormData({
         user_id: "",
         bank_name: "",
@@ -220,10 +245,59 @@ export function ContaCorrente() {
       setCalculatedCommission(0);
       fetchCommissions();
     } catch (error) {
-      console.error('Erro ao lançar comissão:', error);
+      console.error('Erro ao salvar comissão:', error);
       toast({
         title: "Erro",
-        description: "Erro ao lançar comissão",
+        description: "Erro ao salvar comissão",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditCommission = (commission: Commission) => {
+    setEditingCommissionId(commission.id);
+    setFormData({
+      user_id: commission.user_id,
+      bank_name: commission.bank_name,
+      product_name: commission.product_type,
+      term: "",
+      client_name: commission.client_name,
+      cpf: commission.cpf || "",
+      proposal_number: commission.proposal_number || "",
+      credit_value: commission.credit_value,
+      commission_percentage: commission.commission_percentage,
+    });
+    setCalculatedCommission(commission.commission_amount);
+    setIsDialogOpen(true);
+  };
+
+  const handleDeleteCommission = async (commissionId: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta comissão?')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('commissions')
+        .delete()
+        .eq('id', commissionId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Comissão excluída",
+        description: "A comissão foi removida com sucesso."
+      });
+
+      fetchCommissions();
+    } catch (error) {
+      console.error('Erro ao excluir comissão:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir comissão",
         variant: "destructive"
       });
     } finally {

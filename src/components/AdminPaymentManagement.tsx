@@ -281,14 +281,70 @@ export function AdminPaymentManagement() {
     }
   };
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'preview': return 'secondary';
-      case 'pending': return 'default';
-      case 'paid': return 'default';
-      default: return 'secondary';
-    }
-  };
+   const deleteCommission = async (id: string) => {
+     if (processingIds.includes(id)) return;
+     
+     if (!window.confirm('Tem certeza que deseja excluir este pagamento?')) {
+       return;
+     }
+
+     setProcessingIds(prev => [...prev, id]);
+     try {
+       const commission = commissions.find(c => c.id === id);
+       
+       if (!commission) {
+         throw new Error('Comissão não encontrada');
+       }
+
+       if (commission.bank_name === 'Indicação') {
+         const { error } = await supabase
+           .from('leads_indicados')
+           .delete()
+           .eq('id', id);
+
+         if (error) throw error;
+       } else if (commission.type === 'televendas') {
+         const { error } = await supabase
+           .from('televendas')
+           .delete()
+           .eq('id', id);
+
+         if (error) throw error;
+       } else {
+         const { error } = await supabase
+           .from('commissions')
+           .delete()
+           .eq('id', id);
+
+         if (error) throw error;
+       }
+
+       toast({
+         title: "Pagamento excluído",
+         description: "O registro de pagamento foi removido com sucesso.",
+       });
+
+       fetchCommissions();
+     } catch (error) {
+       console.error('Erro ao excluir comissão:', error);
+       toast({
+         title: "Erro",
+         description: "Erro ao excluir comissão",
+         variant: "destructive",
+       });
+     } finally {
+       setProcessingIds(prev => prev.filter(pid => pid !== id));
+     }
+   };
+
+   const getStatusBadgeVariant = (status: string) => {
+     switch (status) {
+       case 'preview': return 'secondary';
+       case 'pending': return 'default';
+       case 'paid': return 'default';
+       default: return 'secondary';
+     }
+   };
 
   const getStatusText = (status: string) => {
     switch (status) {
