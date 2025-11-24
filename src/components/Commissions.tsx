@@ -120,8 +120,10 @@ export function Commissions() {
 
   // Carregar dados das comissões e bancos/produtos
   useEffect(() => {
-    fetchCommissions();
-  }, [isAdmin]);
+    if (user?.id) {
+      fetchCommissions();
+    }
+  }, [user?.id, isAdmin]);
 
   const fetchCommissions = async () => {
     if (!user?.id) return;
@@ -144,159 +146,11 @@ export function Commissions() {
         commissionsQuery = commissionsQuery.eq('user_id', user.id);
       }
 
-      const { data: userCommissions } = await commissionsQuery;
-      
-      // Buscar leads indicados
-      let leadsQuery = supabase
-        .from('leads_indicados')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      // Se não for admin, filtrar apenas leads PAGOS do usuário
-      if (!isAdmin) {
-        leadsQuery = leadsQuery
-          .eq('created_by', user.id)
-          .in('status', ['comissao_paga', 'contrato_assinado']);
+      const { data: userCommissions, error: commissionsError } = await commissionsQuery;
+
+      if (commissionsError) {
+        console.error('Erro ao buscar comissões:', commissionsError);
       }
-      
-      const { data: leadsIndicadosData, error: leadsError } = await leadsQuery;
-      
-      if (leadsError) {
-        console.error('Erro ao buscar leads indicados:', leadsError);
-      }
-      
-      // Buscar perfis de usuários para leads indicados (se admin)
-      const leadsUserIds = leadsIndicadosData?.map(l => l.created_by).filter(Boolean) || [];
-      let leadsProfilesMap = new Map();
-      
-      if (isAdmin && leadsUserIds.length > 0) {
-        const { data: leadsProfilesData } = await supabase
-          .from('profiles')
-          .select('id, name, email')
-          .in('id', leadsUserIds);
-        
-        leadsProfilesMap = new Map(
-          (leadsProfilesData || []).map(p => [p.id, p])
-        );
-      }
-      
-      // Transformar leads indicados em formato de comissões com valores calculados
-      const leadsAsCommissions = (leadsIndicadosData || []).map(lead => {
-        // Calcular comissão baseada no status
-        let commissionAmount = 0;
-        let status = 'preview';
-        
-        switch (lead.status) {
-          case 'contrato_assinado':
-          case 'comissao_paga':
-            commissionAmount = 50; // Valor padrão de R$ 50 para indicações
-            status = 'paid';
-            break;
-          case 'proposta_aprovada':
-            commissionAmount = 50;
-            status = 'pending';
-            break;
-          default:
-            commissionAmount = 0;
-            status = 'preview';
-        }
-        
-        return {
-          id: lead.id,
-          client_name: lead.nome,
-          bank_name: 'Indicação',
-          product_type: lead.convenio,
-          credit_value: commissionAmount,
-          commission_amount: commissionAmount,
-          commission_percentage: 100,
-          cpf: lead.cpf || '',
-          proposal_number: 'IND-' + lead.id.substring(0, 8),
-          status: status,
-          payment_date: status === 'paid' ? lead.updated_at?.split('T')[0] : null,
-          proposal_date: lead.created_at?.split('T')[0],
-          user_id: lead.created_by,
-          user: leadsProfilesMap.get(lead.created_by) || null,
-          created_at: lead.created_at,
-          updated_at: lead.updated_at
-        };
-      });
-      
-      // Buscar televendas
-      let televendasQuery = supabase
-        .from('televendas')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      // Se não for admin, filtrar apenas televendas PAGAS do usuário
-      if (!isAdmin) {
-        televendasQuery = televendasQuery
-          .eq('user_id', user.id)
-          .eq('status', 'pago');
-      }
-      
-      const { data: televendasData, error: televendasError } = await televendasQuery;
-      
-      if (televendasError) {
-        console.error('Erro ao buscar televendas:', televendasError);
-      }
-      
-      // Buscar perfis de usuários para televendas (se admin)
-      const televendasUserIds = televendasData?.map(t => t.user_id).filter(Boolean) || [];
-      let televendasProfilesMap = new Map();
-      
-      if (isAdmin && televendasUserIds.length > 0) {
-        const { data: televendasProfilesData } = await supabase
-          .from('profiles')
-          .select('id, name, email')
-          .in('id', televendasUserIds);
-        
-        televendasProfilesMap = new Map(
-          (televendasProfilesData || []).map(p => [p.id, p])
-        );
-      }
-      
-      // Transformar televendas em formato de comissões
-      const televendasAsCommissions = (televendasData || []).map(tv => {
-        let commissionAmount = 0;
-        let status = 'pending';
-        
-        if (tv.status === 'pago') {
-          commissionAmount = tv.parcela || 0;
-          status = 'paid';
-        } else if (tv.status === 'pendente') {
-          commissionAmount = tv.parcela || 0;
-          status = 'pending';
-        } else {
-          commissionAmount = 0;
-          status = 'preview';
-        }
-        
-        return {
-          id: tv.id,
-          client_name: tv.nome,
-          bank_name: tv.banco,
-          product_type: tv.tipo_operacao,
-          credit_value: tv.parcela || 0,
-          commission_amount: commissionAmount,
-          commission_percentage: 100,
-          status: status,
-          payment_date: tv.status === 'pago' ? tv.updated_at : null,
-          proposal_date: tv.data_venda,
-          proposal_number: null,
-          cpf: tv.cpf,
-          user_id: tv.user_id,
-          user: televendasProfilesMap.get(tv.user_id) || null,
-          created_at: tv.created_at,
-          type: 'televendas' as const
-        };
-      });
-      
-      // Combinar comissões, leads indicados e televendas
-      const allCommissions = [
-        ...(userCommissions || []), 
-        ...leadsAsCommissions,
-        ...televendasAsCommissions
-      ];
       
       // Carregar bancos e produtos
       const { data: banksProductsData } = await supabase
@@ -319,7 +173,7 @@ export function Commissions() {
         .eq('is_active', true)
         .order('updated_at', { ascending: false });
 
-      setCommissions(allCommissions);
+      setCommissions(userCommissions || []);
       if (banksProductsData) setBanksProducts(banksProductsData);
       if (commissionTableResponse) setCommissionTableData(commissionTableResponse);
       if (commissionRulesData) setCommissionRules(commissionRulesData);
