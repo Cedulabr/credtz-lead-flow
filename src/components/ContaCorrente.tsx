@@ -28,6 +28,7 @@ interface CommissionRule {
 
 interface Commission {
   id: string;
+  user_id: string;
   client_name: string;
   cpf: string;
   bank_name: string;
@@ -53,6 +54,7 @@ export function ContaCorrente() {
   const [loading, setLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [calculatedCommission, setCalculatedCommission] = useState(0);
+  const [editingCommissionId, setEditingCommissionId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     user_id: "",
