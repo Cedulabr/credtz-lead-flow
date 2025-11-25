@@ -1200,45 +1200,6 @@ export type Database = {
         }
         Relationships: []
       }
-      withdrawal_requests: {
-        Row: {
-          amount: number
-          created_at: string | null
-          id: number
-          organization_id: number | null
-          processed_at: string | null
-          processed_by_id: string | null
-          status: string | null
-          updated_at: string | null
-          user_id: string | null
-          webhook_sent_at: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string | null
-          id?: number
-          organization_id?: number | null
-          processed_at?: string | null
-          processed_by_id?: string | null
-          status?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-          webhook_sent_at?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string | null
-          id?: number
-          organization_id?: number | null
-          processed_at?: string | null
-          processed_by_id?: string | null
-          status?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-          webhook_sent_at?: string | null
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never

@@ -9,7 +9,6 @@ export const BaseOffModern = lazy(() => import('./BaseOffModern').then(module =>
 export const Commissions = lazy(() => import('./Commissions').then(module => ({ default: module.Commissions })));
 export const LeadsManagement = lazy(() => import('./LeadsManagement').then(module => ({ default: module.LeadsManagement })));
 export const LeadsIndicados = lazy(() => import('./LeadsIndicados'));
-export const PaymentManagement = lazy(() => import('./PaymentManagement').then(module => ({ default: module.PaymentManagement })));
 export const TestFunctionalities = lazy(() => import('./TestFunctionalities').then(module => ({ default: module.TestFunctionalities })));
 
 // Loading skeleton components for better UX
@@ -79,5 +78,4 @@ export const LazyBaseOffModern = withLazyLoading(BaseOffModern, TableSkeleton);
 export const LazyCommissions = withLazyLoading(Commissions, TableSkeleton);
 export const LazyLeadsManagement = withLazyLoading(LeadsManagement, TableSkeleton);
 export const LazyLeadsIndicados = withLazyLoading(LeadsIndicados, FormSkeleton);
-export const LazyPaymentManagement = withLazyLoading(PaymentManagement, TableSkeleton);
 export const LazyTestFunctionalities = withLazyLoading(TestFunctionalities, FormSkeleton);

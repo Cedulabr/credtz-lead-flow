@@ -25,7 +25,6 @@ import {
   Bell,
   Building2
 } from "lucide-react";
-import { AdminPaymentManagement } from "./AdminPaymentManagement";
 import { UsersList } from "./UsersList";
 import { ContaCorrente } from "./ContaCorrente";
 import AdminIndicationsManagement from "./AdminIndicationsManagement";
@@ -552,10 +551,6 @@ export function AdminPanel() {
 
         {isAdmin && (
           <>
-            <TabsContent value="payments">
-              <AdminPaymentManagement />
-            </TabsContent>
-
             <TabsContent value="users">
               <UsersList />
             </TabsContent>
