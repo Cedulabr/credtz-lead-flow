@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "./ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { DollarSign, Plus, TrendingUp, Clock, CheckCircle, Calculator } from "lucide-react";
+import { DollarSign, Plus, TrendingUp, Clock, CheckCircle, Calculator, Edit, Trash2, RotateCcw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface User {
@@ -38,6 +38,7 @@ interface Commission {
   commission_amount: number;
   proposal_number: string;
   status: string;
+  payment_date: string | null;
   created_at: string;
   user?: {
     name: string;
@@ -53,8 +54,11 @@ export function ContaCorrente() {
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [loading, setLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
   const [calculatedCommission, setCalculatedCommission] = useState(0);
   const [editingCommissionId, setEditingCommissionId] = useState<string | null>(null);
+  const [refundingCommission, setRefundingCommission] = useState<Commission | null>(null);
+  const [refundAmount, setRefundAmount] = useState("");
   
   const [formData, setFormData] = useState({
     user_id: "",
@@ -111,16 +115,14 @@ export function ContaCorrente() {
 
   const fetchCommissions = async () => {
     try {
-      // Buscar comissões
       const { data: commissionsData, error: commissionsError } = await supabase
         .from('commissions')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(50);
       
       if (commissionsError) throw commissionsError;
       
-      // Buscar perfis dos usuários
       if (commissionsData && commissionsData.length > 0) {
         const userIds = [...new Set(commissionsData.map(c => c.user_id))];
         const { data: profilesData } = await supabase
@@ -219,7 +221,7 @@ export function ContaCorrente() {
             commission_percentage: formData.commission_percentage,
             commission_amount: calculatedCommission,
             proposal_number: formData.proposal_number || null,
-            proposal_date: new Date().toISOString().split('T')[0], // Data da proposta
+            proposal_date: new Date().toISOString().split('T')[0],
             status: 'pending'
           });
 
@@ -307,6 +309,108 @@ export function ContaCorrente() {
     }
   };
 
+  const handleMarkAsPaid = async (commissionId: string) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('commissions')
+        .update({
+          status: 'paid',
+          payment_date: new Date().toISOString().split('T')[0]
+        })
+        .eq('id', commissionId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Pagamento registrado",
+        description: "Comissão marcada como paga"
+      });
+
+      fetchCommissions();
+    } catch (error) {
+      console.error('Erro ao marcar como pago:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar status",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefund = async () => {
+    if (!refundingCommission) return;
+
+    const refundValue = parseFloat(refundAmount.replace(/[^\d,]/g, '').replace(',', '.'));
+    
+    if (!refundValue || refundValue <= 0) {
+      toast({
+        title: "Erro",
+        description: "Informe um valor válido para estorno",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (refundValue > refundingCommission.commission_amount) {
+      toast({
+        title: "Erro",
+        description: "Valor de estorno maior que a comissão original",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Inserir registro de estorno como comissão negativa
+      const { error } = await supabase
+        .from('commissions')
+        .insert({
+          user_id: refundingCommission.user_id,
+          client_name: `ESTORNO: ${refundingCommission.client_name}`,
+          cpf: refundingCommission.cpf,
+          bank_name: refundingCommission.bank_name,
+          product_type: refundingCommission.product_type,
+          credit_value: -refundValue,
+          commission_percentage: refundingCommission.commission_percentage,
+          commission_amount: -refundValue,
+          proposal_number: refundingCommission.proposal_number,
+          proposal_date: new Date().toISOString().split('T')[0],
+          status: 'refunded'
+        });
+
+      if (error) throw error;
+
+      // Atualizar status da comissão original para indicar que foi estornada
+      await supabase
+        .from('commissions')
+        .update({ status: 'refunded' })
+        .eq('id', refundingCommission.id);
+
+      toast({
+        title: "Estorno registrado",
+        description: `Estorno de R$ ${refundValue.toFixed(2)} realizado com sucesso`
+      });
+
+      setIsRefundDialogOpen(false);
+      setRefundingCommission(null);
+      setRefundAmount("");
+      fetchCommissions();
+    } catch (error) {
+      console.error('Erro ao registrar estorno:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao processar estorno",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const uniqueBanks = [...new Set(commissionRules.map(r => r.bank_name))];
   const uniqueProducts = formData.bank_name 
     ? [...new Set(commissionRules.filter(r => r.bank_name === formData.bank_name).map(r => r.product_name))]
@@ -318,13 +422,13 @@ export function ContaCorrente() {
     : [];
 
   const statusConfig = {
-    preview: { label: "Prévia", variant: "outline" as const, icon: Clock },
     pending: { label: "Pendente", variant: "secondary" as const, icon: Clock },
-    paid: { label: "Pago", variant: "default" as const, icon: CheckCircle }
+    paid: { label: "Pago", variant: "default" as const, icon: CheckCircle },
+    refunded: { label: "Estornado", variant: "destructive" as const, icon: RotateCcw }
   };
 
   const totalPending = commissions
-    .filter(c => c.status === 'pending')
+    .filter(c => c.status === 'pending' && c.commission_amount > 0)
     .reduce((sum, c) => sum + c.commission_amount, 0);
   
   const totalPaid = commissions
@@ -352,19 +456,33 @@ export function ContaCorrente() {
             <DollarSign className="h-6 w-6" />
             Conta Corrente
           </h2>
-          <p className="text-muted-foreground">Gerencie o lançamento de comissões</p>
+          <p className="text-muted-foreground">Gerencie o lançamento e pagamento de comissões</p>
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={() => {
+              setEditingCommissionId(null);
+              setFormData({
+                user_id: "",
+                bank_name: "",
+                product_name: "",
+                term: "",
+                client_name: "",
+                cpf: "",
+                proposal_number: "",
+                credit_value: 0,
+                commission_percentage: 0
+              });
+              setCalculatedCommission(0);
+            }}>
               <Plus className="h-4 w-4 mr-2" />
               Lançar Comissão
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Lançar Nova Comissão</DialogTitle>
+              <DialogTitle>{editingCommissionId ? 'Editar Comissão' : 'Lançar Nova Comissão'}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -520,7 +638,7 @@ export function ContaCorrente() {
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={loading || calculatedCommission === 0}>
-                  {loading ? "Processando..." : "Lançar Comissão"}
+                  {loading ? "Processando..." : editingCommissionId ? "Atualizar" : "Lançar Comissão"}
                 </Button>
               </div>
             </form>
@@ -560,7 +678,7 @@ export function ContaCorrente() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {commissions.length}
+              {commissions.filter(c => c.commission_amount > 0).length}
             </div>
           </CardContent>
         </Card>
@@ -582,32 +700,87 @@ export function ContaCorrente() {
                 return (
                   <div
                     key={commission.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors"
+                    className="flex flex-col gap-3 p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors"
                   >
-                    <div className="space-y-1 mb-2 sm:mb-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold">{commission.client_name}</p>
-                        <Badge variant={statusConfig[commission.status as keyof typeof statusConfig]?.variant || "outline"}>
-                          <StatusIcon className="h-3 w-3 mr-1" />
-                          {statusConfig[commission.status as keyof typeof statusConfig]?.label || commission.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {commission.user?.name} • {commission.bank_name} • {commission.product_type}
-                      </p>
-                      {commission.proposal_number && (
-                        <p className="text-xs text-muted-foreground">
-                          Proposta: {commission.proposal_number}
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold">{commission.client_name}</p>
+                          <Badge variant={statusConfig[commission.status as keyof typeof statusConfig]?.variant || "outline"}>
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {statusConfig[commission.status as keyof typeof statusConfig]?.label || commission.status}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {commission.user?.name} • {commission.bank_name} • {commission.product_type}
                         </p>
-                      )}
+                        {commission.proposal_number && (
+                          <p className="text-xs text-muted-foreground">
+                            Proposta: {commission.proposal_number}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-lg font-bold ${commission.commission_amount < 0 ? 'text-destructive' : 'text-primary'}`}>
+                          R$ {Math.abs(commission.commission_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {commission.commission_percentage}% de R$ {Math.abs(commission.credit_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-primary">
-                        R$ {commission.commission_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {commission.commission_percentage}% de R$ {commission.credit_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
+                    
+                    <div className="flex gap-2 flex-wrap">
+                      {commission.status === 'pending' && commission.commission_amount > 0 && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleMarkAsPaid(commission.id)}
+                          disabled={loading}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          Marcar como Pago
+                        </Button>
+                      )}
+                      
+                      {commission.commission_amount > 0 && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditCommission(commission)}
+                            disabled={loading}
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Editar
+                          </Button>
+                          
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteCommission(commission.id)}
+                            disabled={loading}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Apagar
+                          </Button>
+                          
+                          {(commission.status === 'paid' || commission.status === 'pending') && (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                setRefundingCommission(commission);
+                                setRefundAmount("");
+                                setIsRefundDialogOpen(true);
+                              }}
+                              disabled={loading}
+                            >
+                              <RotateCcw className="h-4 w-4 mr-1" />
+                              Estornar
+                            </Button>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                 );
@@ -616,6 +789,61 @@ export function ContaCorrente() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Dialog de Estorno */}
+      <Dialog open={isRefundDialogOpen} onOpenChange={setIsRefundDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Estornar Comissão</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {refundingCommission && (
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="font-semibold">{refundingCommission.client_name}</p>
+                <p className="text-sm text-muted-foreground">
+                  Valor da comissão: R$ {refundingCommission.commission_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="refund_amount">Valor do Estorno *</Label>
+              <Input
+                id="refund_amount"
+                type="number"
+                step="0.01"
+                value={refundAmount}
+                onChange={(e) => setRefundAmount(e.target.value)}
+                placeholder="R$ 0,00"
+                max={refundingCommission?.commission_amount}
+              />
+              <p className="text-xs text-muted-foreground">
+                Valor máximo: R$ {refundingCommission?.commission_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsRefundDialogOpen(false);
+                  setRefundingCommission(null);
+                  setRefundAmount("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleRefund}
+                disabled={loading}
+              >
+                {loading ? "Processando..." : "Confirmar Estorno"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
