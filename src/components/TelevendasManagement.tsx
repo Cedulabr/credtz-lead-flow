@@ -39,8 +39,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Search } from "lucide-react";
 
+interface User {
+  id: string;
+  name: string;
+}
 interface Televenda {
   id: string;
   nome: string;
@@ -56,22 +60,46 @@ interface Televenda {
   created_at: string;
 }
 
+interface TelevendaWithUser extends Televenda {
+  user_id: string;
+  user?: {
+    name: string;
+  } | null;
+}
+
 export const TelevendasManagement = () => {
   const { toast } = useToast();
   const { isAdmin } = useAuth();
-  const [televendas, setTelevendas] = useState<Televenda[]>([]);
+  const [televendas, setTelevendas] = useState<TelevendaWithUser[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
-  const [selectedTv, setSelectedTv] = useState<Televenda | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTv, setSelectedTv] = useState<TelevendaWithUser | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [editingTv, setEditingTv] = useState<Televenda | null>(null);
+  const [editingTv, setEditingTv] = useState<TelevendaWithUser | null>(null);
   const [deletingTvId, setDeletingTvId] = useState<string | null>(null);
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .order('name');
+      
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  };
 
   const fetchTelevendas = async () => {
     try {
-      let query = (supabase as any)
+      let query = supabase
         .from("televendas")
         .select("*")
         .order("created_at", { ascending: false });
@@ -86,10 +114,35 @@ export const TelevendasManagement = () => {
           .lte("data_venda", endDate.toISOString().split("T")[0]);
       }
 
+      if (selectedUserId && selectedUserId !== "all") {
+        query = query.eq("user_id", selectedUserId);
+      }
+
       const { data, error } = await query;
 
       if (error) throw error;
-      setTelevendas(data || []);
+
+      // Fetch user names for each televenda
+      if (data && data.length > 0) {
+        const userIds = [...new Set(data.map(tv => tv.user_id))];
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .in('id', userIds);
+        
+        const profilesMap = new Map(
+          (profilesData || []).map(p => [p.id, p])
+        );
+        
+        const televendasWithUsers = data.map(tv => ({
+          ...tv,
+          user: profilesMap.get(tv.user_id) || null
+        }));
+        
+        setTelevendas(televendasWithUsers);
+      } else {
+        setTelevendas([]);
+      }
     } catch (error) {
       console.error("Error fetching televendas:", error);
       toast({
@@ -103,8 +156,12 @@ export const TelevendasManagement = () => {
   };
 
   useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
     fetchTelevendas();
-  }, [selectedMonth]);
+  }, [selectedMonth, selectedUserId]);
 
   const updateStatus = async (id: string, newStatus: string) => {
     try {
@@ -131,7 +188,7 @@ export const TelevendasManagement = () => {
     }
   };
 
-  const handleEdit = (tv: Televenda, e: React.MouseEvent) => {
+  const handleEdit = (tv: TelevendaWithUser, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isAdmin) {
       toast({
@@ -240,7 +297,7 @@ export const TelevendasManagement = () => {
     return <div>Carregando...</div>;
   }
 
-  const handleRowClick = (tv: Televenda) => {
+  const handleRowClick = (tv: TelevendaWithUser) => {
     setSelectedTv(tv);
     setIsDialogOpen(true);
   };
@@ -257,25 +314,68 @@ export const TelevendasManagement = () => {
     return months;
   };
 
+  // Filter televendas based on search term
+  const filteredTelevendas = televendas.filter((tv) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      tv.nome.toLowerCase().includes(term) ||
+      tv.cpf.toLowerCase().includes(term)
+    );
+  });
+
   return (
     <>
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Gestão de Propostas - Televendas</CardTitle>
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Filtrar por mês" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os meses</SelectItem>
-                {getMonthOptions().map((month) => (
-                  <SelectItem key={month.value} value={month.value}>
-                    {month.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col gap-4">
+            <div className="flex justify-between items-center">
+              <CardTitle>Gestão de Propostas - Televendas</CardTitle>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4">
+              {/* Search bar */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nome ou CPF..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              
+              {/* User filter (admin only) */}
+              {isAdmin && (
+                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                  <SelectTrigger className="w-full sm:w-[200px]">
+                    <SelectValue placeholder="Filtrar por usuário" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os usuários</SelectItem>
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name || 'Sem nome'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              
+              {/* Month filter */}
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Filtrar por mês" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os meses</SelectItem>
+                  {getMonthOptions().map((month) => (
+                    <SelectItem key={month.value} value={month.value}>
+                      {month.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -283,6 +383,7 @@ export const TelevendasManagement = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Usuário</TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead>CPF</TableHead>
                   <TableHead>Data</TableHead>
@@ -295,12 +396,20 @@ export const TelevendasManagement = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {televendas.map((tv) => (
+                {filteredTelevendas.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={isAdmin ? 10 : 9} className="text-center text-muted-foreground py-8">
+                      {searchTerm ? 'Nenhuma venda encontrada' : 'Nenhuma venda registrada'}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredTelevendas.map((tv) => (
                   <TableRow 
                     key={tv.id} 
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => handleRowClick(tv)}
                   >
+                    <TableCell className="text-sm text-muted-foreground">{tv.user?.name || 'N/A'}</TableCell>
                     <TableCell>{tv.nome}</TableCell>
                     <TableCell>{tv.cpf}</TableCell>
                     <TableCell>{new Date(tv.data_venda).toLocaleDateString()}</TableCell>
@@ -344,7 +453,8 @@ export const TelevendasManagement = () => {
                       </TableCell>
                     )}
                   </TableRow>
-                ))}
+                ))
+                )}
               </TableBody>
             </Table>
           </div>
