@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "./ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { DollarSign, Plus, TrendingUp, Clock, CheckCircle, Calculator, Edit, Trash2, RotateCcw } from "lucide-react";
+import { DollarSign, Plus, TrendingUp, Clock, CheckCircle, Calculator, Edit, Trash2, RotateCcw, Search } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface User {
@@ -59,6 +59,7 @@ export function ContaCorrente() {
   const [editingCommissionId, setEditingCommissionId] = useState<string | null>(null);
   const [refundingCommission, setRefundingCommission] = useState<Commission | null>(null);
   const [refundAmount, setRefundAmount] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   
   const [formData, setFormData] = useState({
     user_id: "",
@@ -686,16 +687,40 @@ export function ContaCorrente() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Comissões Recentes</CardTitle>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <CardTitle>Comissões Recentes</CardTitle>
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por proposta ou CPF..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {commissions.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
-                Nenhuma comissão lançada
-              </p>
-            ) : (
-              commissions.map((commission) => {
+            {(() => {
+              const filteredCommissions = commissions.filter((c) => {
+                if (!searchTerm) return true;
+                const term = searchTerm.toLowerCase();
+                return (
+                  (c.proposal_number && c.proposal_number.toLowerCase().includes(term)) ||
+                  (c.cpf && c.cpf.toLowerCase().includes(term))
+                );
+              });
+              
+              if (filteredCommissions.length === 0) {
+                return (
+                  <p className="text-center text-muted-foreground py-8">
+                    {searchTerm ? 'Nenhuma comissão encontrada' : 'Nenhuma comissão lançada'}
+                  </p>
+                );
+              }
+              
+              return filteredCommissions.map((commission) => {
                 const StatusIcon = statusConfig[commission.status as keyof typeof statusConfig]?.icon || Clock;
                 return (
                   <div
@@ -784,8 +809,8 @@ export function ContaCorrente() {
                     </div>
                   </div>
                 );
-              })
-            )}
+              });
+            })()}
           </div>
         </CardContent>
       </Card>
