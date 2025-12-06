@@ -129,16 +129,10 @@ export function Commissions() {
     if (!user?.id) return;
     
     try {
+      // Buscar comissões - query simples sem join problemático
       let commissionsQuery = supabase
         .from('commissions')
-        .select(`
-          *,
-          user:profiles!commissions_user_id_fkey(
-            id,
-            name,
-            email
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
       
       // Se não for admin, filtrar apenas comissões do próprio usuário
@@ -150,7 +144,10 @@ export function Commissions() {
 
       if (commissionsError) {
         console.error('Erro ao buscar comissões:', commissionsError);
+        throw commissionsError;
       }
+
+      console.log('Comissões carregadas:', userCommissions?.length, userCommissions);
       
       // Carregar bancos e produtos
       const { data: banksProductsData } = await supabase

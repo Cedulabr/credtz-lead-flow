@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Database, LogIn, TestTube, Activity } from "lucide-react";
-import { TestCommissionsScript } from "@/components/TestCommissionsScript";
 import LoadingAuth from "@/components/LoadingAuth";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWhitelabel } from "@/hooks/useWhitelabel";
@@ -128,8 +127,6 @@ const Index = () => {
         );
       case "system-status":
         return <SystemStatus />;
-      case "test-commissions":
-        return <TestCommissionsScript />;
       default:
         return <Dashboard onNavigate={setActiveTab} />;
     }
