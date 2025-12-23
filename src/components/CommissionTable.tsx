@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Building2, Package, Percent } from "lucide-react";
+import { Building2, Package, Percent, Crown } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface CommissionRule {
   id: string;
@@ -12,25 +13,43 @@ interface CommissionRule {
   term: string | null;
   commission_percentage: number;
   user_percentage: number;
+  user_percentage_profile: string | null;
   is_active: boolean;
 }
 
+const levelConfig: Record<string, { label: string; color: string }> = {
+  bronze: { label: "Bronze", color: "bg-amber-700 text-white" },
+  prata: { label: "Prata", color: "bg-gray-400 text-gray-900" },
+  ouro: { label: "Ouro", color: "bg-yellow-500 text-yellow-900" },
+  diamante: { label: "Diamante", color: "bg-cyan-400 text-cyan-900" },
+};
+
 export function CommissionTable() {
+  const { profile, isAdmin } = useAuth();
   const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const userLevel = profile?.level || "bronze";
+
   useEffect(() => {
     fetchCommissionRules();
-  }, []);
+  }, [userLevel, isAdmin]);
 
   const fetchCommissionRules = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('commission_table')
         .select('*')
         .eq('is_active', true)
         .order('bank_name', { ascending: true })
         .order('product_name', { ascending: true });
+
+      // Admins see all, regular users see only their level
+      if (!isAdmin && userLevel) {
+        query = query.eq('user_percentage_profile', userLevel);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setCommissionRules(data || []);
@@ -66,17 +85,32 @@ export function CommissionTable() {
     );
   }
 
+  const currentLevelConfig = levelConfig[userLevel] || levelConfig.bronze;
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Percent className="h-5 w-5" />
-            Tabela de Comissões
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Confira as comissões disponíveis para cada banco e produto
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Percent className="h-5 w-5" />
+                Tabela de Comissões
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                {isAdmin 
+                  ? "Visualizando todas as comissões (Admin)"
+                  : `Comissões disponíveis para seu nível`
+                }
+              </p>
+            </div>
+            {!isAdmin && (
+              <Badge className={`${currentLevelConfig.color} flex items-center gap-1`}>
+                <Crown className="h-3 w-3" />
+                {currentLevelConfig.label}
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {Object.keys(groupedByBank).length === 0 ? (
