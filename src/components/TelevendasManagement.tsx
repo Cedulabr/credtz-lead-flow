@@ -75,6 +75,7 @@ export const TelevendasManagement = () => {
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTv, setSelectedTv] = useState<TelevendaWithUser | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -314,15 +315,24 @@ export const TelevendasManagement = () => {
     return months;
   };
 
-  // Filter televendas based on search term
+  // Filter televendas based on search term and status
   const filteredTelevendas = televendas.filter((tv) => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      tv.nome.toLowerCase().includes(term) ||
-      tv.cpf.toLowerCase().includes(term)
-    );
+    const matchesSearch = !searchTerm || 
+      tv.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tv.cpf.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = selectedStatus === "all" || tv.status === selectedStatus;
+    
+    return matchesSearch && matchesStatus;
   });
+
+  // Status counts for badges
+  const statusCounts = {
+    all: televendas.length,
+    pago: televendas.filter(tv => tv.status === "pago").length,
+    pendente: televendas.filter(tv => tv.status === "pendente").length,
+    cancelado: televendas.filter(tv => tv.status === "cancelado").length,
+  };
 
   return (
     <>
@@ -332,6 +342,39 @@ export const TelevendasManagement = () => {
             <div className="flex justify-between items-center">
               <CardTitle>Gestão de Propostas - Televendas</CardTitle>
             </div>
+            
+            {/* Status filter badges */}
+            <div className="flex flex-wrap gap-2">
+              <Badge 
+                variant={selectedStatus === "all" ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => setSelectedStatus("all")}
+              >
+                Todos ({statusCounts.all})
+              </Badge>
+              <Badge 
+                variant={selectedStatus === "pago" ? "default" : "outline"}
+                className="cursor-pointer bg-green-500/10 text-green-600 hover:bg-green-500/20"
+                onClick={() => setSelectedStatus("pago")}
+              >
+                ✓ Pagas ({statusCounts.pago})
+              </Badge>
+              <Badge 
+                variant={selectedStatus === "pendente" ? "default" : "outline"}
+                className="cursor-pointer bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20"
+                onClick={() => setSelectedStatus("pendente")}
+              >
+                ⏳ Pendentes ({statusCounts.pendente})
+              </Badge>
+              <Badge 
+                variant={selectedStatus === "cancelado" ? "default" : "outline"}
+                className="cursor-pointer bg-red-500/10 text-red-600 hover:bg-red-500/20"
+                onClick={() => setSelectedStatus("cancelado")}
+              >
+                ✕ Canceladas ({statusCounts.cancelado})
+              </Badge>
+            </div>
+            
             <div className="flex flex-col sm:flex-row gap-4">
               {/* Search bar */}
               <div className="relative flex-1">

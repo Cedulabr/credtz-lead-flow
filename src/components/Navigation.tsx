@@ -18,8 +18,10 @@ const navItems = [
   { id: "dashboard", label: "Início", icon: Home },
   { id: "indicate", label: "Indicar", icon: Users },
   { id: "leads", label: "Leads Premium", icon: TrendingUp },
+  { id: "my-clients", label: "Meus Clientes", icon: Users },
   { id: "televendas", label: "Televendas", icon: Phone },
   { id: "televendas-manage", label: "Gestão Televendas", icon: Settings },
+  { id: "documents", label: "Documentos", icon: Settings },
   { id: "commission-table", label: "Tabela de Comissões", icon: DollarSign },
   { id: "commissions", label: "Minhas Comissões", icon: DollarSign },
 ];
@@ -58,14 +60,13 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         <nav className="flex-1 p-4 space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon;
-            // Check if user has permission for premium features
-            const isPermissionRequired = ['leads'].includes(item.id);
-            const hasPermission = isPermissionRequired ? 
-              (item.id === 'leads' && profile?.leads_premium_enabled) ||
-              isAdmin
-              : true;
+            const isLeadsPremium = item.id === 'leads';
+            const hasLeadsPremiumAccess = profile?.can_access_premium_leads !== false;
             
-            if (isPermissionRequired && !hasPermission) return null;
+            // For leads premium: show in nav but check access when clicked
+            if (isLeadsPremium && !isAdmin && !hasLeadsPremiumAccess) {
+              // Still show the item but it will show blocked message
+            }
             
             return (
               <Button
@@ -132,16 +133,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
       {/* Bottom Navigation for Mobile - Simplified 4 icons max */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t z-50 shadow-elevation">
         <div className="grid grid-cols-4 gap-1 px-2 py-1">
-          {navItems.filter(item => {
-            // Check if user has permission for premium features
-            const isPermissionRequired = ['leads'].includes(item.id);
-            const hasPermission = isPermissionRequired ? 
-              (item.id === 'leads' && profile?.leads_premium_enabled) ||
-              isAdmin
-              : true;
-            
-            return !isPermissionRequired || hasPermission;
-          }).slice(0, 4).map((item) => {
+          {navItems.slice(0, 4).map((item) => {
             const Icon = item.icon;
             return (
               <button
