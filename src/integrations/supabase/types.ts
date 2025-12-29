@@ -1416,6 +1416,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      import_leads_from_csv: { Args: { leads_data: Json }; Returns: Json }
       request_leads: {
         Args: {
           banco_filter?: string
