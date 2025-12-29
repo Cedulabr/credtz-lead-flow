@@ -724,6 +724,33 @@ export type Database = {
         }
         Relationships: []
       }
+      leads_distribution: {
+        Row: {
+          cpf: string
+          created_at: string
+          distributed_at: string
+          expires_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          cpf: string
+          created_at?: string
+          distributed_at?: string
+          expires_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          cpf?: string
+          created_at?: string
+          distributed_at?: string
+          expires_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       leads_indicados: {
         Row: {
           convenio: string
@@ -1318,6 +1345,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_lead_to_blacklist: {
+        Args: { blacklist_reason?: string; lead_cpf: string }
+        Returns: undefined
+      }
       check_baseoff_daily_limit: {
         Args: { user_id_param: string }
         Returns: number
