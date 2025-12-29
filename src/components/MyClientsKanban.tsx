@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +24,11 @@ import {
   TrendingUp,
   Users,
   Zap,
-  DollarSign
+  DollarSign,
+  Plus,
+  Filter,
+  Calendar,
+  User
 } from "lucide-react";
 
 interface Proposta {
@@ -43,6 +47,7 @@ interface Proposta {
   assigned_to: string | null;
   created_at: string | null;
   updated_at: string | null;
+  notes: string | null;
 }
 
 interface PipelineHistory {
@@ -52,6 +57,12 @@ interface PipelineHistory {
   changed_by: string;
   notes: string | null;
   created_at: string;
+}
+
+interface Profile {
+  id: string;
+  name: string | null;
+  email: string | null;
 }
 
 const pipelineStages = [
@@ -67,6 +78,17 @@ const origemIcons: Record<string, { icon: typeof TrendingUp; color: string; labe
   ativo: { icon: Zap, color: "text-orange-500", label: "Ativo" },
 };
 
+const convenioOptions = [
+  "INSS",
+  "Servidor Público Federal",
+  "Servidor Público Estadual",
+  "Servidor Público Municipal",
+  "FGTS",
+  "Forças Armadas",
+  "SIAPE",
+  "Outros"
+];
+
 export function MyClientsKanban() {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
@@ -78,6 +100,22 @@ export function MyClientsKanban() {
   const [history, setHistory] = useState<PipelineHistory[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [draggedItem, setDraggedItem] = useState<Proposta | null>(null);
+  
+  // New client form
+  const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false);
+  const [savingNewClient, setSavingNewClient] = useState(false);
+  const [newClientForm, setNewClientForm] = useState({
+    nome: "",
+    telefone: "",
+    convenio: "",
+    observacao: "",
+  });
+
+  // Admin filters
+  const [users, setUsers] = useState<Profile[]>([]);
+  const [filterUser, setFilterUser] = useState<string>("all");
+  const [filterMonth, setFilterMonth] = useState<string>("all");
+  const [filterConvenio, setFilterConvenio] = useState<string>("all");
 
   // Edit form states
   const [editForm, setEditForm] = useState({
@@ -92,7 +130,24 @@ export function MyClientsKanban() {
 
   useEffect(() => {
     fetchPropostas();
-  }, []);
+    if (isAdmin) {
+      fetchUsers();
+    }
+  }, [isAdmin]);
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, name, email")
+        .order("name");
+      
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  };
 
   const fetchPropostas = async () => {
     try {
@@ -242,8 +297,59 @@ export function MyClientsKanban() {
     }
   };
 
+  // Generate month options for filter
+  const monthOptions = useMemo(() => {
+    const months = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        value: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+        label: date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+      });
+    }
+    return months;
+  }, []);
+
+  // Get unique convenios from propostas
+  const uniqueConvenios = useMemo(() => {
+    const convenios = new Set<string>();
+    propostas.forEach(p => {
+      if (p.convenio) convenios.add(p.convenio);
+    });
+    return Array.from(convenios).sort();
+  }, [propostas]);
+
+  // Filter propostas based on admin filters
+  const filteredPropostas = useMemo(() => {
+    if (!isAdmin) return propostas;
+    
+    return propostas.filter(p => {
+      // Filter by user
+      if (filterUser !== "all" && p.created_by_id !== filterUser && p.assigned_to !== filterUser) {
+        return false;
+      }
+      
+      // Filter by month
+      if (filterMonth !== "all" && p.created_at) {
+        const propostaDate = new Date(p.created_at);
+        const [year, month] = filterMonth.split('-');
+        if (propostaDate.getFullYear() !== parseInt(year) || propostaDate.getMonth() + 1 !== parseInt(month)) {
+          return false;
+        }
+      }
+      
+      // Filter by convenio
+      if (filterConvenio !== "all" && p.convenio !== filterConvenio) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [propostas, isAdmin, filterUser, filterMonth, filterConvenio]);
+
   const getPropostasByStage = (stageId: string) => {
-    return propostas.filter((p) => p.pipeline_stage === stageId);
+    return filteredPropostas.filter((p) => p.pipeline_stage === stageId);
   };
 
   const formatCurrency = (value: number | string | null) => {
@@ -259,6 +365,50 @@ export function MyClientsKanban() {
     return pipelineStages.find((s) => s.id === stageId)?.label || stageId;
   };
 
+  const handleNewClientSubmit = async () => {
+    if (!newClientForm.nome.trim() || !newClientForm.telefone.trim() || !newClientForm.convenio) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingNewClient(true);
+    try {
+      const { error } = await supabase.from("propostas").insert({
+        "Nome do cliente": newClientForm.nome,
+        telefone: newClientForm.telefone,
+        convenio: newClientForm.convenio,
+        notes: newClientForm.observacao,
+        pipeline_stage: "contato_iniciado",
+        origem_lead: "ativo",
+        created_by_id: user?.id,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Cliente cadastrado com sucesso!",
+      });
+
+      setNewClientForm({ nome: "", telefone: "", convenio: "", observacao: "" });
+      setIsNewClientDialogOpen(false);
+      fetchPropostas();
+    } catch (error) {
+      console.error("Error creating client:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao cadastrar cliente",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingNewClient(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
@@ -270,10 +420,82 @@ export function MyClientsKanban() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Meus Clientes</h1>
-        <p className="text-muted-foreground">Gestão de oportunidades e pipeline de vendas</p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Meus Clientes</h1>
+          <p className="text-muted-foreground">Gestão de oportunidades e pipeline de vendas</p>
+        </div>
+        <Button onClick={() => setIsNewClientDialogOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Cadastrar Cliente
+        </Button>
       </div>
+
+      {/* Admin Filters */}
+      {isAdmin && (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Filter className="h-5 w-5 text-muted-foreground" />
+            <h3 className="font-semibold">Filtros Avançados</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label className="flex items-center gap-2 mb-2">
+                <User className="h-4 w-4" />
+                Usuário
+              </Label>
+              <Select value={filterUser} onValueChange={setFilterUser}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os usuários" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os usuários</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name || u.email || u.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="flex items-center gap-2 mb-2">
+                <Calendar className="h-4 w-4" />
+                Mês/Ano
+              </Label>
+              <Select value={filterMonth} onValueChange={setFilterMonth}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os meses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os meses</SelectItem>
+                  {monthOptions.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="mb-2 block">Convênio</Label>
+              <Select value={filterConvenio} onValueChange={setFilterConvenio}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os convênios" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os convênios</SelectItem>
+                  {uniqueConvenios.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Kanban Board */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -586,6 +808,73 @@ export function MyClientsKanban() {
               )}
             </div>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Client Dialog */}
+      <Dialog open={isNewClientDialogOpen} onOpenChange={setIsNewClientDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cadastrar Cliente</DialogTitle>
+            <DialogDescription>
+              Preencha os dados para cadastrar um novo cliente
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="nome">Nome do Cliente *</Label>
+              <Input
+                id="nome"
+                value={newClientForm.nome}
+                onChange={(e) => setNewClientForm({ ...newClientForm, nome: e.target.value })}
+                placeholder="Digite o nome do cliente"
+              />
+            </div>
+            <div>
+              <Label htmlFor="telefone">Telefone *</Label>
+              <Input
+                id="telefone"
+                value={newClientForm.telefone}
+                onChange={(e) => setNewClientForm({ ...newClientForm, telefone: e.target.value })}
+                placeholder="(00) 00000-0000"
+              />
+            </div>
+            <div>
+              <Label htmlFor="convenio">Convênio *</Label>
+              <Select
+                value={newClientForm.convenio}
+                onValueChange={(value) => setNewClientForm({ ...newClientForm, convenio: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o convênio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {convenioOptions.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="observacao">Observação</Label>
+              <Textarea
+                id="observacao"
+                value={newClientForm.observacao}
+                onChange={(e) => setNewClientForm({ ...newClientForm, observacao: e.target.value })}
+                placeholder="Observações adicionais..."
+                rows={3}
+              />
+            </div>
+            <Button
+              onClick={handleNewClientSubmit}
+              disabled={savingNewClient}
+              className="w-full"
+            >
+              {savingNewClient ? "Salvando..." : "Cadastrar Cliente"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
