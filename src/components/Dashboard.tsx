@@ -24,8 +24,7 @@ import {
   Activity,
   Calendar
 } from "lucide-react";
-import { SalesPipeline } from "./SalesPipeline";
-import { TaskManager } from "./TaskManager";
+// Removed SalesPipeline and TaskManager imports as requested
 import {
   BarChart,
   Bar,
@@ -670,56 +669,47 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </CardContent>
         </Card>
 
-        <SalesPipeline />
-        <TaskManager />
-
-        {/* Opportunity of the Day */}
-        <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary to-primary/80 shadow-elevation">
-          <CardContent className="p-6">
-            <div className="text-center space-y-6">
-              <div className="flex items-center justify-center gap-3">
-                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                  <Star className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-white">Oportunidade do Dia</h2>
-                  <Badge className="bg-white/20 text-white border-white/30 mt-1">
-                    Alta Prioridade
-                  </Badge>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <h3 className="text-lg font-bold text-white">Crédito Consignado Premium</h3>
-                <p className="text-white/90 text-base">
-                  Cliente pré-aprovado aguardando contato
-                </p>
-              </div>
-              
-              <div className="grid grid-cols-3 gap-4 py-4">
-                <div className="text-center">
-                  <DollarSign className="h-5 w-5 text-white mx-auto mb-1" />
-                  <p className="text-white font-bold text-base">R$ 890</p>
-                  <p className="text-white/80 text-xs">Comissão</p>
-                </div>
-                <div className="text-center">
-                  <Clock className="h-5 w-5 text-white mx-auto mb-1" />
-                  <p className="text-white font-bold text-base">1 dia</p>
-                  <p className="text-white/80 text-xs">Prazo</p>
-                </div>
-                <div className="text-center">
-                  <Target className="h-5 w-5 text-white mx-auto mb-1" />
-                  <p className="text-white font-bold text-base">85%</p>
-                  <p className="text-white/80 text-xs">Conversão</p>
-                </div>
-              </div>
-              
+        {/* Quick Actions */}
+        <Card className="border-2 shadow-card bg-gradient-to-br from-primary/5 to-transparent">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+              <ArrowUpRight className="h-5 w-5 text-primary" />
+              Ações Rápidas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <Button 
-                onClick={() => onNavigate("leads")}
-                className="w-full h-12 bg-white text-primary hover:bg-white/90 font-semibold text-base"
+                variant="outline"
+                onClick={() => onNavigate("indicate")}
+                className="h-20 flex flex-col gap-2 hover:bg-primary hover:text-primary-foreground transition-all"
               >
-                Aceitar Oportunidade
-                <ArrowUpRight className="ml-2 h-5 w-5" />
+                <Users className="h-6 w-6" />
+                <span className="text-xs font-medium">Indicar Cliente</span>
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => onNavigate("leads")}
+                className="h-20 flex flex-col gap-2 hover:bg-primary hover:text-primary-foreground transition-all"
+              >
+                <Activity className="h-6 w-6" />
+                <span className="text-xs font-medium">Gerenciar Leads</span>
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => onNavigate("meus-clientes")}
+                className="h-20 flex flex-col gap-2 hover:bg-primary hover:text-primary-foreground transition-all"
+              >
+                <Star className="h-6 w-6" />
+                <span className="text-xs font-medium">Meus Clientes</span>
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => onNavigate("minhas-comissoes")}
+                className="h-20 flex flex-col gap-2 hover:bg-primary hover:text-primary-foreground transition-all"
+              >
+                <DollarSign className="h-6 w-6" />
+                <span className="text-xs font-medium">Comissões</span>
               </Button>
             </div>
           </CardContent>
