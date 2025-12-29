@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone } from "lucide-react";
+import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,17 +13,17 @@ interface NavigationProps {
   onTabChange: (tab: string) => void;
 }
 
-// Navigation items for mobile-first
+// Navigation items with permission keys
 const navItems = [
-  { id: "dashboard", label: "Início", icon: Home },
-  { id: "indicate", label: "Indicar", icon: Users },
-  { id: "leads", label: "Leads Premium", icon: TrendingUp },
-  { id: "my-clients", label: "Meus Clientes", icon: Users },
-  { id: "televendas", label: "Televendas", icon: Phone },
-  { id: "televendas-manage", label: "Gestão Televendas", icon: Settings },
-  { id: "documents", label: "Documentos", icon: Settings },
-  { id: "commission-table", label: "Tabela de Comissões", icon: DollarSign },
-  { id: "commissions", label: "Minhas Comissões", icon: DollarSign },
+  { id: "dashboard", label: "Início", icon: Home, permissionKey: null },
+  { id: "indicate", label: "Indicar", icon: UserPlus, permissionKey: "can_access_indicar" },
+  { id: "leads", label: "Leads Premium", icon: TrendingUp, permissionKey: "can_access_premium_leads" },
+  { id: "my-clients", label: "Meus Clientes", icon: Users, permissionKey: "can_access_meus_clientes" },
+  { id: "televendas", label: "Televendas", icon: Phone, permissionKey: "can_access_televendas" },
+  { id: "televendas-manage", label: "Gestão Televendas", icon: Settings, permissionKey: "can_access_gestao_televendas" },
+  { id: "documents", label: "Documentos", icon: FileText, permissionKey: "can_access_documentos" },
+  { id: "commission-table", label: "Tabela de Comissões", icon: DollarSign, permissionKey: "can_access_tabela_comissoes" },
+  { id: "commissions", label: "Minhas Comissões", icon: DollarSign, permissionKey: "can_access_minhas_comissoes" },
 ];
 
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
@@ -35,6 +35,26 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
     await signOut();
     toast.success("Signed out successfully");
   };
+
+  // Check if user has access to a specific section
+  const hasAccess = (permissionKey: string | null): boolean => {
+    if (!permissionKey) return true; // Dashboard always accessible
+    if (isAdmin) return true; // Admin has full access
+    
+    // Check the specific permission in profile
+    const profileData = profile as any;
+    return profileData?.[permissionKey] !== false;
+  };
+
+  // Filter visible items based on permissions
+  const visibleNavItems = navItems.filter(item => {
+    // Always show dashboard
+    if (!item.permissionKey) return true;
+    // Admin sees everything
+    if (isAdmin) return true;
+    // Check permission
+    return hasAccess(item.permissionKey);
+  });
 
   return (
     <>
@@ -57,16 +77,9 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
-          {navItems.map((item) => {
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
-            const isLeadsPremium = item.id === 'leads';
-            const hasLeadsPremiumAccess = profile?.can_access_premium_leads !== false;
-            
-            // For leads premium: show in nav but check access when clicked
-            if (isLeadsPremium && !isAdmin && !hasLeadsPremiumAccess) {
-              // Still show the item but it will show blocked message
-            }
             
             return (
               <Button
@@ -130,10 +143,10 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         </div>
       </div>
 
-      {/* Bottom Navigation for Mobile - Simplified 4 icons max */}
+      {/* Bottom Navigation for Mobile - Show first 4 visible items */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t z-50 shadow-elevation">
         <div className="grid grid-cols-4 gap-1 px-2 py-1">
-          {navItems.slice(0, 4).map((item) => {
+          {visibleNavItems.slice(0, 4).map((item) => {
             const Icon = item.icon;
             return (
               <button
