@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { ImportBase } from "./ImportBase";
 import { 
   Search, 
   Filter, 
@@ -24,7 +25,9 @@ import {
   AlertCircle,
   Plus,
   Users,
-  User
+  User,
+  Upload,
+  Database
 } from "lucide-react";
 
 interface Lead {
@@ -46,7 +49,7 @@ interface LeadRequest {
 
 export function LeadsManagement() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -54,10 +57,13 @@ export function LeadsManagement() {
   const [dailyLimit, setDailyLimit] = useState(30);
   const [remainingLeads, setRemainingLeads] = useState(30);
   const [showRequestDialog, setShowRequestDialog] = useState(false);
+  const [showImportBase, setShowImportBase] = useState(false);
   const [leadRequest, setLeadRequest] = useState<LeadRequest>({
     convenio: "",
     count: 10
   });
+
+  const isAdmin = profile?.role === 'admin';
 
   const statusConfig = {
     new_lead: { label: "Novo Lead", color: "bg-blue-500", textColor: "text-blue-700", bgColor: "bg-blue-50" },
@@ -248,6 +254,15 @@ export function LeadsManagement() {
     remaining: remainingLeads
   };
 
+  // Show ImportBase if that view is active
+  if (showImportBase) {
+    return (
+      <div className="p-4 md:p-6 pb-20 md:pb-6">
+        <ImportBase onBack={() => setShowImportBase(false)} />
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-6 space-y-6 pb-20 md:pb-6">
       {/* Header */}
@@ -262,13 +277,25 @@ export function LeadsManagement() {
             </p>
           </div>
           
-          <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
-            <DialogTrigger asChild>
-              <Button className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Solicitar Leads
+          <div className="flex gap-2">
+            {isAdmin && (
+              <Button 
+                variant="outline" 
+                className="flex items-center gap-2"
+                onClick={() => setShowImportBase(true)}
+              >
+                <Upload className="h-4 w-4" />
+                Importar Base
               </Button>
-            </DialogTrigger>
+            )}
+            
+            <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
+              <DialogTrigger asChild>
+                <Button className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Solicitar Leads
+                </Button>
+              </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Solicitar Novos Leads</DialogTitle>
@@ -320,6 +347,7 @@ export function LeadsManagement() {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         {/* Stats Cards */}
