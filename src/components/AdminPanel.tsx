@@ -172,27 +172,59 @@ export function AdminPanel() {
 
   const handleSaveCommission = async () => {
     try {
-      const commissionData = {
+      // Validação dos campos obrigatórios
+      if (!commissionForm.bank_name || !commissionForm.product_name || !commissionForm.commission_percentage) {
+        toast({
+          title: "Campos obrigatórios",
+          description: "Preencha banco, produto e percentual de comissão.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!commissionForm.user_percentage_profile) {
+        toast({
+          title: "Nível obrigatório",
+          description: "Selecione o nível do usuário (Bronze, Prata, Ouro ou Diamante).",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const commissionData: any = {
         bank_name: commissionForm.bank_name,
         product_name: commissionForm.product_name,
         term: commissionForm.term || null,
         commission_percentage: parseFloat(commissionForm.commission_percentage),
         user_percentage: parseFloat(commissionForm.user_percentage || "0"),
-        user_percentage_profile: commissionForm.user_percentage_profile || null,
+        user_percentage_profile: commissionForm.user_percentage_profile,
         is_active: true,
-        created_by: user?.id
+        created_by: user?.id,
+        updated_at: new Date().toISOString()
       };
 
-      // Use upsert to update existing or insert new
-      const { error } = await supabase
-        .from('commission_table')
-        .upsert(commissionData);
+      let error;
+
+      if (editingItem?.id) {
+        // Atualizar registro existente usando o ID
+        const { error: updateError } = await supabase
+          .from('commission_table')
+          .update(commissionData)
+          .eq('id', editingItem.id);
+        error = updateError;
+      } else {
+        // Inserir novo registro
+        const { error: insertError } = await supabase
+          .from('commission_table')
+          .insert(commissionData);
+        error = insertError;
+      }
 
       if (error) throw error;
 
       toast({
-        title: "Regra de comissão salva!",
-        description: "As regras foram atualizadas.",
+        title: editingItem ? "Comissão atualizada!" : "Nova comissão criada!",
+        description: `Regra para ${commissionForm.bank_name} - ${commissionForm.product_name} (${commissionForm.user_percentage_profile.toUpperCase()}) salva com sucesso.`,
       });
 
       setCommissionForm({
@@ -211,7 +243,7 @@ export function AdminPanel() {
       console.error('Erro ao salvar regra:', error);
       toast({
         title: "Erro",
-        description: "Erro ao salvar regra de comissão.",
+        description: "Erro ao salvar regra de comissão. Verifique se todos os campos estão preenchidos corretamente.",
         variant: "destructive",
       });
     }
@@ -440,26 +472,117 @@ export function AdminPanel() {
                   </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="commission-bank">Banco *</Label>
-                    <Input
-                      id="commission-bank"
-                      placeholder="Nome do banco..."
-                      value={commissionForm.bank_name}
-                      onChange={(e) => setCommissionForm({ ...commissionForm, bank_name: e.target.value })}
-                    />
+                  {/* Informação sobre edição */}
+                  {editingItem && (
+                    <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+                      <p className="text-sm text-primary font-medium">
+                        ✏️ Editando regra existente
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        ID: {editingItem.id?.slice(0, 8)}...
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="commission-bank">Banco *</Label>
+                      <Select 
+                        value={commissionForm.bank_name} 
+                        onValueChange={(value) => setCommissionForm({ ...commissionForm, bank_name: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o banco" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Banco Pan">Banco Pan</SelectItem>
+                          <SelectItem value="Banco BMG">Banco BMG</SelectItem>
+                          <SelectItem value="Banco Master">Banco Master</SelectItem>
+                          <SelectItem value="Banco Mercantil">Banco Mercantil</SelectItem>
+                          <SelectItem value="Banco BRB">Banco BRB</SelectItem>
+                          <SelectItem value="Banco Safra">Banco Safra</SelectItem>
+                          <SelectItem value="Banco Itaú">Banco Itaú</SelectItem>
+                          <SelectItem value="Banco C6">Banco C6</SelectItem>
+                          <SelectItem value="Crefisa">Crefisa</SelectItem>
+                          <SelectItem value="Facta Financeira">Facta Financeira</SelectItem>
+                          <SelectItem value="Outro">Outro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {commissionForm.bank_name === "Outro" && (
+                        <Input
+                          className="mt-2"
+                          placeholder="Digite o nome do banco..."
+                          onChange={(e) => setCommissionForm({ ...commissionForm, bank_name: e.target.value })}
+                        />
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="commission-product">Produto *</Label>
+                      <Select 
+                        value={commissionForm.product_name} 
+                        onValueChange={(value) => setCommissionForm({ ...commissionForm, product_name: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o produto" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Novo">Novo</SelectItem>
+                          <SelectItem value="Refinanciamento">Refinanciamento</SelectItem>
+                          <SelectItem value="Portabilidade">Portabilidade</SelectItem>
+                          <SelectItem value="Refinanciamento da portabilidade">Refinanciamento da portabilidade</SelectItem>
+                          <SelectItem value="Cartão">Cartão</SelectItem>
+                          <SelectItem value="Cartão Com saque">Cartão Com saque</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
+
                   <div>
-                    <Label htmlFor="commission-product">Produto *</Label>
-                    <Input
-                      id="commission-product"
-                      placeholder="Nome do produto..."
-                      value={commissionForm.product_name}
-                      onChange={(e) => setCommissionForm({ ...commissionForm, product_name: e.target.value })}
-                    />
+                    <Label htmlFor="user-profile" className="flex items-center gap-2">
+                      Nível do Usuário *
+                      <Badge variant="outline" className="text-xs">Obrigatório</Badge>
+                    </Label>
+                    <Select 
+                      value={commissionForm.user_percentage_profile} 
+                      onValueChange={(value) => setCommissionForm({ ...commissionForm, user_percentage_profile: value })}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Selecione o nível" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bronze">
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full bg-amber-700"></span>
+                            Bronze (Menor comissão)
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="prata">
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full bg-gray-400"></span>
+                            Prata
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="ouro">
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
+                            Ouro
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="diamante">
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full bg-cyan-400"></span>
+                            Diamante (Maior comissão)
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Usuários de níveis mais altos recebem comissões maiores
+                    </p>
                   </div>
+
                   <div>
-                    <Label htmlFor="commission-term">Prazo</Label>
+                    <Label htmlFor="commission-term">Prazo (opcional)</Label>
                     <Input
                       id="commission-term"
                       placeholder="Ex: 84 meses"
@@ -467,45 +590,45 @@ export function AdminPanel() {
                       onChange={(e) => setCommissionForm({ ...commissionForm, term: e.target.value })}
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="commission-percentage">Comissão (%)</Label>
-                    <Input
-                      id="commission-percentage"
-                      type="number"
-                      step="0.01"
-                      placeholder="Ex: 3.5"
-                      value={commissionForm.commission_percentage}
-                      onChange={(e) => setCommissionForm({ ...commissionForm, commission_percentage: e.target.value })}
-                    />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="commission-percentage">Comissão Total (%)</Label>
+                      <Input
+                        id="commission-percentage"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        placeholder="Ex: 3.5"
+                        value={commissionForm.commission_percentage}
+                        onChange={(e) => setCommissionForm({ ...commissionForm, commission_percentage: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Percentual pago pelo banco
+                      </p>
+                    </div>
+                    <div>
+                      <Label htmlFor="user-percentage">Repasse ao Usuário (%)</Label>
+                      <Input
+                        id="user-percentage"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        placeholder="Ex: 2.8"
+                        value={commissionForm.user_percentage}
+                        onChange={(e) => setCommissionForm({ ...commissionForm, user_percentage: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        O que o usuário recebe
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="user-percentage">Repasse do Usuário (%)</Label>
-                    <Input
-                      id="user-percentage"
-                      type="number"
-                      step="0.01"
-                      placeholder="Ex: 2.8"
-                      value={commissionForm.user_percentage}
-                      onChange={(e) => setCommissionForm({ ...commissionForm, user_percentage: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="user-profile">Perfil do Usuário</Label>
-                    <Select value={commissionForm.user_percentage_profile} onValueChange={(value) => setCommissionForm({ ...commissionForm, user_percentage_profile: value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o perfil" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="bronze">Bronze</SelectItem>
-                        <SelectItem value="prata">Prata</SelectItem>
-                        <SelectItem value="ouro">Ouro</SelectItem>
-                        <SelectItem value="diamante">Diamante</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+
                   <Button onClick={handleSaveCommission} className="w-full">
                     <Save className="h-4 w-4 mr-2" />
-                    Salvar
+                    {editingItem ? 'Atualizar Comissão' : 'Criar Comissão'}
                   </Button>
                 </div>
               </DialogContent>

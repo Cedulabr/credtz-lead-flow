@@ -98,7 +98,7 @@ export function AdminCommissionTable({
                     <th className="text-left p-4 font-medium">Prazo</th>
                     <th className="text-left p-4 font-medium">Comissão (%)</th>
                     <th className="text-left p-4 font-medium">Repasse (%)</th>
-                    <th className="text-left p-4 font-medium">Perfil</th>
+                    <th className="text-left p-4 font-medium">Nível</th>
                     <th className="text-left p-4 font-medium">Status</th>
                     <th className="text-left p-4 font-medium">Ações</th>
                   </tr>
@@ -142,7 +142,21 @@ export function AdminCommissionTable({
                         <td className="p-4">{rule.term || '-'}</td>
                         <td className="p-4 font-medium">{rule.commission_percentage}%</td>
                         <td className="p-4 font-medium text-green-600">{rule.user_percentage}%</td>
-                        <td className="p-4">{rule.user_percentage_profile || '-'}</td>
+                        <td className="p-4">
+                          {rule.user_percentage_profile ? (
+                            <Badge 
+                              className={
+                                rule.user_percentage_profile === 'bronze' ? 'bg-amber-700 text-white' :
+                                rule.user_percentage_profile === 'prata' ? 'bg-gray-400 text-gray-900' :
+                                rule.user_percentage_profile === 'ouro' ? 'bg-yellow-500 text-yellow-900' :
+                                rule.user_percentage_profile === 'diamante' ? 'bg-cyan-400 text-cyan-900' :
+                                ''
+                              }
+                            >
+                              {rule.user_percentage_profile.charAt(0).toUpperCase() + rule.user_percentage_profile.slice(1)}
+                            </Badge>
+                          ) : '-'}
+                        </td>
                         <td className="p-4">
                           <Badge variant={rule.is_active ? "default" : "secondary"}>
                             {rule.is_active ? "Ativo" : "Inativo"}
@@ -196,7 +210,21 @@ export function AdminCommissionTable({
                         <td className="p-4">{rule.term || '-'}</td>
                         <td className="p-4 font-medium">{rule.commission_percentage}%</td>
                         <td className="p-4 font-medium text-green-600">{rule.user_percentage}%</td>
-                        <td className="p-4">{rule.user_percentage_profile || '-'}</td>
+                        <td className="p-4">
+                          {rule.user_percentage_profile ? (
+                            <Badge 
+                              className={
+                                rule.user_percentage_profile === 'bronze' ? 'bg-amber-700 text-white' :
+                                rule.user_percentage_profile === 'prata' ? 'bg-gray-400 text-gray-900' :
+                                rule.user_percentage_profile === 'ouro' ? 'bg-yellow-500 text-yellow-900' :
+                                rule.user_percentage_profile === 'diamante' ? 'bg-cyan-400 text-cyan-900' :
+                                ''
+                              }
+                            >
+                              {rule.user_percentage_profile.charAt(0).toUpperCase() + rule.user_percentage_profile.slice(1)}
+                            </Badge>
+                          ) : '-'}
+                        </td>
                         <td className="p-4">
                           <Badge variant={rule.is_active ? "default" : "secondary"}>
                             {rule.is_active ? "Ativo" : "Inativo"}
