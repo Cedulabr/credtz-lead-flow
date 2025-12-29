@@ -26,6 +26,13 @@ interface User {
   is_active?: boolean;
   leads_premium_enabled?: boolean;
   can_access_premium_leads?: boolean;
+  can_access_indicar?: boolean;
+  can_access_meus_clientes?: boolean;
+  can_access_televendas?: boolean;
+  can_access_gestao_televendas?: boolean;
+  can_access_documentos?: boolean;
+  can_access_tabela_comissoes?: boolean;
+  can_access_minhas_comissoes?: boolean;
   created_at: string;
 }
 
@@ -40,6 +47,13 @@ export function UsersList() {
   const [permissionsDialog, setPermissionsDialog] = useState({ open: false, user: null as User | null });
   const [permissions, setPermissions] = useState({
     can_access_premium_leads: false,
+    can_access_indicar: true,
+    can_access_meus_clientes: true,
+    can_access_televendas: true,
+    can_access_gestao_televendas: true,
+    can_access_documentos: true,
+    can_access_tabela_comissoes: true,
+    can_access_minhas_comissoes: true,
   });
   const [userForm, setUserForm] = useState({
     name: "",
@@ -255,11 +269,18 @@ export function UsersList() {
   const handlePermissionsOpen = (user: User) => {
     setPermissionsDialog({ open: true, user });
     setPermissions({
-      can_access_premium_leads: user.can_access_premium_leads || false,
+      can_access_premium_leads: user.can_access_premium_leads !== false,
+      can_access_indicar: user.can_access_indicar !== false,
+      can_access_meus_clientes: user.can_access_meus_clientes !== false,
+      can_access_televendas: user.can_access_televendas !== false,
+      can_access_gestao_televendas: user.can_access_gestao_televendas !== false,
+      can_access_documentos: user.can_access_documentos !== false,
+      can_access_tabela_comissoes: user.can_access_tabela_comissoes !== false,
+      can_access_minhas_comissoes: user.can_access_minhas_comissoes !== false,
     });
   };
 
-  const updateUserPermissions = async (userId: string, newPermissions: { can_access_premium_leads: boolean }) => {
+  const updateUserPermissions = async (userId: string, newPermissions: typeof permissions) => {
     try {
       const { error } = await supabase
         .from('profiles')
@@ -356,8 +377,11 @@ export function UsersList() {
                   </TableCell>
                   <TableCell>{getUserStatusBadge(user)}</TableCell>
                    <TableCell>
-                     <div className="flex gap-1">
-                       {user.can_access_premium_leads && <Badge variant="secondary" className="text-xs">Premium</Badge>}
+                     <div className="flex flex-wrap gap-1 max-w-[200px]">
+                       {user.can_access_premium_leads !== false && <Badge variant="secondary" className="text-xs">Premium</Badge>}
+                       {user.can_access_indicar !== false && <Badge variant="outline" className="text-xs">Indicar</Badge>}
+                       {user.can_access_meus_clientes !== false && <Badge variant="outline" className="text-xs">Clientes</Badge>}
+                       {user.can_access_televendas !== false && <Badge variant="outline" className="text-xs">Televendas</Badge>}
                      </div>
                    </TableCell>
                   <TableCell>
@@ -546,22 +570,90 @@ export function UsersList() {
 
         {/* Permissions Dialog */}
         <Dialog open={permissionsDialog.open} onOpenChange={(open) => setPermissionsDialog({ open, user: null })}>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Gerenciar Permissões - {permissionsDialog.user?.name || permissionsDialog.user?.email}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="leads-premium">Leads Premium</Label>
-                <Switch
-                  id="leads-premium"
-                  checked={permissions.can_access_premium_leads}
-                  onCheckedChange={(checked) => {
-                    setPermissions({ ...permissions, can_access_premium_leads: checked });
-                  }}
-                />
+            <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+              <p className="text-sm text-muted-foreground">
+                Ative ou desative as permissões de acesso às seções do sistema.
+              </p>
+              
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <Label htmlFor="leads-premium" className="font-medium">Leads Premium</Label>
+                  <Switch
+                    id="leads-premium"
+                    checked={permissions.can_access_premium_leads}
+                    onCheckedChange={(checked) => setPermissions({ ...permissions, can_access_premium_leads: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <Label htmlFor="indicar" className="font-medium">Indicar</Label>
+                  <Switch
+                    id="indicar"
+                    checked={permissions.can_access_indicar}
+                    onCheckedChange={(checked) => setPermissions({ ...permissions, can_access_indicar: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <Label htmlFor="meus-clientes" className="font-medium">Meus Clientes</Label>
+                  <Switch
+                    id="meus-clientes"
+                    checked={permissions.can_access_meus_clientes}
+                    onCheckedChange={(checked) => setPermissions({ ...permissions, can_access_meus_clientes: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <Label htmlFor="televendas" className="font-medium">Televendas</Label>
+                  <Switch
+                    id="televendas"
+                    checked={permissions.can_access_televendas}
+                    onCheckedChange={(checked) => setPermissions({ ...permissions, can_access_televendas: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <Label htmlFor="gestao-televendas" className="font-medium">Gestão de Televendas</Label>
+                  <Switch
+                    id="gestao-televendas"
+                    checked={permissions.can_access_gestao_televendas}
+                    onCheckedChange={(checked) => setPermissions({ ...permissions, can_access_gestao_televendas: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <Label htmlFor="documentos" className="font-medium">Documentos</Label>
+                  <Switch
+                    id="documentos"
+                    checked={permissions.can_access_documentos}
+                    onCheckedChange={(checked) => setPermissions({ ...permissions, can_access_documentos: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <Label htmlFor="tabela-comissoes" className="font-medium">Tabela de Comissões</Label>
+                  <Switch
+                    id="tabela-comissoes"
+                    checked={permissions.can_access_tabela_comissoes}
+                    onCheckedChange={(checked) => setPermissions({ ...permissions, can_access_tabela_comissoes: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <Label htmlFor="minhas-comissoes" className="font-medium">Minhas Comissões</Label>
+                  <Switch
+                    id="minhas-comissoes"
+                    checked={permissions.can_access_minhas_comissoes}
+                    onCheckedChange={(checked) => setPermissions({ ...permissions, can_access_minhas_comissoes: checked })}
+                  />
+                </div>
               </div>
-              <div className="flex justify-end gap-2">
+
+              <div className="flex justify-end gap-2 pt-4 border-t">
                 <Button 
                   variant="outline" 
                   onClick={() => setPermissionsDialog({ open: false, user: null })}

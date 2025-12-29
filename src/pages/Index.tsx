@@ -62,6 +62,13 @@ const Index = () => {
     );
   }
 
+  // Helper to check permission
+  const hasPermission = (permissionKey: string): boolean => {
+    if (isAdmin) return true;
+    const profileData = profile as any;
+    return profileData?.[permissionKey] !== false;
+  };
+
   const renderActiveComponent = () => {
     // Loading skeleton for lazy components
     const LoadingFallback = () => (
@@ -82,61 +89,93 @@ const Index = () => {
     switch (activeTab) {
       case "dashboard":
         return <Dashboard onNavigate={setActiveTab} />;
+      
       case "indicate":
+        if (!hasPermission('can_access_indicar')) {
+          return <BlockedAccess message="Acesso à seção Indicar bloqueado pelo administrador" />;
+        }
         return (
           <div className="space-y-6">
             <IndicateClient />
             <IndicatedClientsTracking />
           </div>
         );
+      
       case "leads":
-        // Check if user has access to premium leads
-        if (!isAdmin && profile?.can_access_premium_leads === false) {
-          return <BlockedAccess message="Acesso bloqueado pelo administrador" />;
+        if (!hasPermission('can_access_premium_leads')) {
+          return <BlockedAccess message="Acesso aos Leads Premium bloqueado pelo administrador" />;
         }
         return (
           <Suspense fallback={<LoadingFallback />}>
             <LazyLeadsManagement />
           </Suspense>
         );
+      
       case "my-clients":
+        if (!hasPermission('can_access_meus_clientes')) {
+          return <BlockedAccess message="Acesso à seção Meus Clientes bloqueado pelo administrador" />;
+        }
         return <MyClientsKanban />;
+      
       case "documents":
+        if (!hasPermission('can_access_documentos')) {
+          return <BlockedAccess message="Acesso à seção Documentos bloqueado pelo administrador" />;
+        }
         return <ClientDocuments />;
+      
       case "televendas":
+        if (!hasPermission('can_access_televendas')) {
+          return <BlockedAccess message="Acesso à seção Televendas bloqueado pelo administrador" />;
+        }
         return (
           <div className="p-4">
             <TelevendasForm />
           </div>
         );
+      
       case "televendas-manage":
+        if (!hasPermission('can_access_gestao_televendas')) {
+          return <BlockedAccess message="Acesso à Gestão de Televendas bloqueado pelo administrador" />;
+        }
         return (
           <div className="p-4">
             <TelevendasManagement />
           </div>
         );
+      
       case "commission-table":
+        if (!hasPermission('can_access_tabela_comissoes')) {
+          return <BlockedAccess message="Acesso à Tabela de Comissões bloqueado pelo administrador" />;
+        }
         return (
           <div className="p-4">
             <CommissionTable />
           </div>
         );
+      
       case "commissions":
+        if (!hasPermission('can_access_minhas_comissoes')) {
+          return <BlockedAccess message="Acesso a Minhas Comissões bloqueado pelo administrador" />;
+        }
         return (
           <Suspense fallback={<LoadingFallback />}>
             <LazyCommissions />
           </Suspense>
         );
+      
       case "notifications":
         return <Notifications />;
+      
       case "test-functionalities":
         return (
           <Suspense fallback={<LoadingFallback />}>
             <LazyTestFunctionalities />
           </Suspense>
         );
+      
       case "system-status":
         return <SystemStatus />;
+      
       default:
         return <Dashboard onNavigate={setActiveTab} />;
     }

@@ -830,8 +830,15 @@ export type Database = {
       }
       profiles: {
         Row: {
+          can_access_documentos: boolean | null
+          can_access_gestao_televendas: boolean | null
+          can_access_indicar: boolean | null
+          can_access_meus_clientes: boolean | null
+          can_access_minhas_comissoes: boolean | null
           can_access_premium_leads: boolean | null
           can_access_sms: boolean | null
+          can_access_tabela_comissoes: boolean | null
+          can_access_televendas: boolean | null
           can_access_whatsapp: boolean | null
           company: string | null
           cpf: string | null
@@ -852,8 +859,15 @@ export type Database = {
           whatsapp_enabled: boolean | null
         }
         Insert: {
+          can_access_documentos?: boolean | null
+          can_access_gestao_televendas?: boolean | null
+          can_access_indicar?: boolean | null
+          can_access_meus_clientes?: boolean | null
+          can_access_minhas_comissoes?: boolean | null
           can_access_premium_leads?: boolean | null
           can_access_sms?: boolean | null
+          can_access_tabela_comissoes?: boolean | null
+          can_access_televendas?: boolean | null
           can_access_whatsapp?: boolean | null
           company?: string | null
           cpf?: string | null
@@ -874,8 +888,15 @@ export type Database = {
           whatsapp_enabled?: boolean | null
         }
         Update: {
+          can_access_documentos?: boolean | null
+          can_access_gestao_televendas?: boolean | null
+          can_access_indicar?: boolean | null
+          can_access_meus_clientes?: boolean | null
+          can_access_minhas_comissoes?: boolean | null
           can_access_premium_leads?: boolean | null
           can_access_sms?: boolean | null
+          can_access_tabela_comissoes?: boolean | null
+          can_access_televendas?: boolean | null
           can_access_whatsapp?: boolean | null
           company?: string | null
           cpf?: string | null
