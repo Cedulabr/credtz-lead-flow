@@ -5,11 +5,13 @@ import { Dashboard } from "@/components/Dashboard";
 import { IndicateClient } from "@/components/IndicateClient";
 import IndicatedClientsTracking from "@/components/IndicatedClientsTracking";
 import { Notifications } from "@/components/Notifications";
-
+import { BlockedAccess } from "@/components/BlockedAccess";
 import { SystemStatus } from "@/components/SystemStatus";
 import { TelevendasForm } from "@/components/TelevendasForm";
 import { TelevendasManagement } from "@/components/TelevendasManagement";
 import { CommissionTable } from "@/components/CommissionTable";
+import { ClientDocuments } from "@/components/ClientDocuments";
+import { MyClientsKanban } from "@/components/MyClientsKanban";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,7 +30,7 @@ import {
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { user, profile, isAdmin, loading } = useAuth();
   const { companyName } = useWhitelabel();
 
   useEffect(() => {
@@ -88,11 +90,19 @@ const Index = () => {
           </div>
         );
       case "leads":
+        // Check if user has access to premium leads
+        if (!isAdmin && profile?.can_access_premium_leads === false) {
+          return <BlockedAccess message="Acesso bloqueado pelo administrador" />;
+        }
         return (
           <Suspense fallback={<LoadingFallback />}>
             <LazyLeadsManagement />
           </Suspense>
         );
+      case "my-clients":
+        return <MyClientsKanban />;
+      case "documents":
+        return <ClientDocuments />;
       case "televendas":
         return (
           <div className="p-4">

@@ -233,6 +233,42 @@ export type Database = {
         }
         Relationships: []
       }
+      client_documents: {
+        Row: {
+          client_cpf: string
+          client_name: string
+          created_at: string
+          document_type: string
+          file_name: string
+          file_url: string
+          id: string
+          updated_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          client_cpf: string
+          client_name: string
+          created_at?: string
+          document_type: string
+          file_name: string
+          file_url: string
+          id?: string
+          updated_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          client_cpf?: string
+          client_name?: string
+          created_at?: string
+          document_type?: string
+          file_name?: string
+          file_url?: string
+          id?: string
+          updated_at?: string
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           beneficio: string | null
@@ -727,6 +763,44 @@ export type Database = {
         }
         Relationships: []
       }
+      pipeline_history: {
+        Row: {
+          changed_by: string
+          created_at: string
+          from_stage: string | null
+          id: string
+          notes: string | null
+          proposta_id: number
+          to_stage: string
+        }
+        Insert: {
+          changed_by: string
+          created_at?: string
+          from_stage?: string | null
+          id?: string
+          notes?: string | null
+          proposta_id: number
+          to_stage: string
+        }
+        Update: {
+          changed_by?: string
+          created_at?: string
+          from_stage?: string | null
+          id?: string
+          notes?: string | null
+          proposta_id?: number
+          to_stage?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_history_proposta_id_fkey"
+            columns: ["proposta_id"]
+            isOneToOne: false
+            referencedRelation: "propostas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           created_at: string | null
@@ -825,6 +899,7 @@ export type Database = {
       }
       propostas: {
         Row: {
+          assigned_to: string | null
           banco: string | null
           bank_id: number | null
           client_id: number | null
@@ -839,15 +914,21 @@ export type Database = {
           "Nome do cliente": string | null
           notes: string | null
           organization_id: number | null
+          origem_lead: string | null
+          pipeline_stage: string | null
           product_id: number | null
           produto: string | null
           status: string | null
+          telefone: string | null
           updated_at: string | null
           valor: string | null
+          valor_proposta: number | null
           value: string | null
           webhookhook: string | null
+          whatsapp: string | null
         }
         Insert: {
+          assigned_to?: string | null
           banco?: string | null
           bank_id?: number | null
           client_id?: number | null
@@ -862,15 +943,21 @@ export type Database = {
           "Nome do cliente"?: string | null
           notes?: string | null
           organization_id?: number | null
+          origem_lead?: string | null
+          pipeline_stage?: string | null
           product_id?: number | null
           produto?: string | null
           status?: string | null
+          telefone?: string | null
           updated_at?: string | null
           valor?: string | null
+          valor_proposta?: number | null
           value?: string | null
           webhookhook?: string | null
+          whatsapp?: string | null
         }
         Update: {
+          assigned_to?: string | null
           banco?: string | null
           bank_id?: number | null
           client_id?: number | null
@@ -885,13 +972,18 @@ export type Database = {
           "Nome do cliente"?: string | null
           notes?: string | null
           organization_id?: number | null
+          origem_lead?: string | null
+          pipeline_stage?: string | null
           product_id?: number | null
           produto?: string | null
           status?: string | null
+          telefone?: string | null
           updated_at?: string | null
           valor?: string | null
+          valor_proposta?: number | null
           value?: string | null
           webhookhook?: string | null
+          whatsapp?: string | null
         }
         Relationships: [
           {
