@@ -41,8 +41,6 @@ interface Lead {
 
 interface LeadRequest {
   convenio: string;
-  banco: string;
-  produto: string;
   count: number;
 }
 
@@ -58,8 +56,6 @@ export function LeadsManagement() {
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [leadRequest, setLeadRequest] = useState<LeadRequest>({
     convenio: "",
-    banco: "",
-    produto: "",
     count: 10
   });
 
@@ -72,9 +68,7 @@ export function LeadsManagement() {
     contato_futuro: { label: "Contato Futuro", color: "bg-gray-500", textColor: "text-gray-700", bgColor: "bg-gray-50" }
   };
 
-  const conveniOptions = ["INSS", "SIAPE", "GOV BA"];
-  const bancoOptions = ["C6", "PAN", "Itaú", "Safra", "BMG", "Santander"];
-  const produtoOptions = ["Portabilidade", "Refinanciamento"];
+  const conveniOptions = ["INSS", "SIAPE", "GOV BA", "Servidor Federal", "Servidor Estadual", "Servidor Municipal", "FGTS", "Forças Armadas"];
 
   useEffect(() => {
     if (user) {
@@ -131,8 +125,8 @@ export function LeadsManagement() {
       const { data, error } = await supabase
         .rpc('request_leads', {
           convenio_filter: leadRequest.convenio || null,
-          banco_filter: leadRequest.banco || null,
-          produto_filter: leadRequest.produto || null,
+          banco_filter: null,
+          produto_filter: null,
           leads_requested: leadRequest.count
         });
 
@@ -171,8 +165,6 @@ export function LeadsManagement() {
         // Reset form
         setLeadRequest({
           convenio: "",
-          banco: "",
-          produto: "",
           count: 10
         });
       } else {
@@ -196,12 +188,28 @@ export function LeadsManagement() {
 
   const updateLeadStatus = async (leadId: string, newStatus: string) => {
     try {
+      // Buscar o lead para obter o CPF
+      const leadToUpdate = leads.find(l => l.id === leadId);
+      
       const { error } = await supabase
         .from('leads')
         .update({ status: newStatus })
         .eq('id', leadId);
 
       if (error) throw error;
+
+      // Se o status for "recusou_oferta", adicionar à blacklist por 120 dias
+      if (newStatus === 'recusou_oferta' && leadToUpdate?.cpf) {
+        await supabase.rpc('add_lead_to_blacklist', {
+          lead_cpf: leadToUpdate.cpf,
+          blacklist_reason: 'recusou_oferta'
+        });
+        
+        toast({
+          title: "Lead movido para blacklist",
+          description: "Este cliente não receberá ofertas por 120 dias.",
+        });
+      }
 
       setLeads(prev => prev.map(lead => 
         lead.id === leadId ? { ...lead, status: newStatus } : lead
@@ -280,22 +288,6 @@ export function LeadsManagement() {
                     </SelectTrigger>
                     <SelectContent>
                       {conveniOptions.map(option => (
-                        <SelectItem key={option} value={option}>{option}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Banco</label>
-                  <Select value={leadRequest.banco} onValueChange={(value) => 
-                    setLeadRequest(prev => ({ ...prev, banco: value }))
-                  }>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o banco" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {bancoOptions.map(option => (
                         <SelectItem key={option} value={option}>{option}</SelectItem>
                       ))}
                     </SelectContent>
