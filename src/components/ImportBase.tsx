@@ -125,7 +125,11 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         const values = parseCSVLine(lines[i]);
         
         const nome = values[nomeIndex]?.trim() || '';
-        const cpf = values[cpfIndex]?.replace(/\D/g, '') || '';
+        // Remove non-digits and pad with leading zeros to ensure 11 digits
+        let cpf = values[cpfIndex]?.replace(/\D/g, '') || '';
+        if (cpf && cpf.length < 11) {
+          cpf = cpf.padStart(11, '0');
+        }
         const convenio = values[convenioIndex]?.trim() || '';
         const telefone = values[telefoneIndex]?.replace(/\D/g, '') || '';
 
