@@ -670,6 +670,33 @@ export type Database = {
         }
         Relationships: []
       }
+      leads_blacklist: {
+        Row: {
+          cpf: string
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          cpf: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          reason?: string | null
+        }
+        Update: {
+          cpf?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
       leads_database: {
         Row: {
           banco: string | null
