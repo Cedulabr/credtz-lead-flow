@@ -28,7 +28,8 @@ import {
   Plus,
   Filter,
   Calendar,
-  User
+  User,
+  Search
 } from "lucide-react";
 
 interface Proposta {
@@ -116,6 +117,9 @@ export function MyClientsKanban() {
   const [filterUser, setFilterUser] = useState<string>("all");
   const [filterMonth, setFilterMonth] = useState<string>("all");
   const [filterConvenio, setFilterConvenio] = useState<string>("all");
+  
+  // Search filter (for all users)
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   // Edit form states
   const [editForm, setEditForm] = useState({
@@ -320,33 +324,52 @@ export function MyClientsKanban() {
     return Array.from(convenios).sort();
   }, [propostas]);
 
-  // Filter propostas based on admin filters
+  // Filter propostas based on search and admin filters
   const filteredPropostas = useMemo(() => {
-    if (!isAdmin) return propostas;
+    let filtered = propostas;
     
-    return propostas.filter(p => {
+    // Search filter (applies to all users) - by name or CPF
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(p => {
+        const nome = (p["Nome do cliente"] || "").toLowerCase();
+        const cpf = (p.cpf || "").replace(/\D/g, ""); // Remove non-digits
+        const queryClean = query.replace(/\D/g, ""); // Remove non-digits from query
+        
+        return nome.includes(query) || 
+               (queryClean && cpf.includes(queryClean)) ||
+               (p.cpf || "").includes(query);
+      });
+    }
+    
+    // Admin-only filters
+    if (isAdmin) {
       // Filter by user
-      if (filterUser !== "all" && p.created_by_id !== filterUser && p.assigned_to !== filterUser) {
-        return false;
+      if (filterUser !== "all") {
+        filtered = filtered.filter(p => 
+          p.created_by_id === filterUser || p.assigned_to === filterUser
+        );
       }
       
       // Filter by month
-      if (filterMonth !== "all" && p.created_at) {
-        const propostaDate = new Date(p.created_at);
-        const [year, month] = filterMonth.split('-');
-        if (propostaDate.getFullYear() !== parseInt(year) || propostaDate.getMonth() + 1 !== parseInt(month)) {
-          return false;
-        }
+      if (filterMonth !== "all") {
+        filtered = filtered.filter(p => {
+          if (!p.created_at) return false;
+          const propostaDate = new Date(p.created_at);
+          const [year, month] = filterMonth.split('-');
+          return propostaDate.getFullYear() === parseInt(year) && 
+                 propostaDate.getMonth() + 1 === parseInt(month);
+        });
       }
       
       // Filter by convenio
-      if (filterConvenio !== "all" && p.convenio !== filterConvenio) {
-        return false;
+      if (filterConvenio !== "all") {
+        filtered = filtered.filter(p => p.convenio === filterConvenio);
       }
-      
-      return true;
-    });
-  }, [propostas, isAdmin, filterUser, filterMonth, filterConvenio]);
+    }
+    
+    return filtered;
+  }, [propostas, searchQuery, isAdmin, filterUser, filterMonth, filterConvenio]);
 
   const getPropostasByStage = (stageId: string) => {
     return filteredPropostas.filter((p) => p.pipeline_stage === stageId);
@@ -430,6 +453,28 @@ export function MyClientsKanban() {
           Cadastrar Cliente
         </Button>
       </div>
+
+      {/* Search Bar - Available for all users */}
+      <Card className="p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Search className="h-5 w-5 text-muted-foreground" />
+          <h3 className="font-semibold">Buscar Cliente</h3>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome ou CPF..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        {searchQuery && (
+          <p className="text-sm text-muted-foreground mt-2">
+            {filteredPropostas.length} resultado(s) encontrado(s)
+          </p>
+        )}
+      </Card>
 
       {/* Admin Filters */}
       {isAdmin && (
