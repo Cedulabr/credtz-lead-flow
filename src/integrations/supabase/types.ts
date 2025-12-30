@@ -320,6 +320,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           product_name: string
+          table_name: string | null
           term: string | null
           updated_at: string | null
           user_percentage: number
@@ -333,6 +334,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           product_name: string
+          table_name?: string | null
           term?: string | null
           updated_at?: string | null
           user_percentage: number
@@ -346,6 +348,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           product_name?: string
+          table_name?: string | null
           term?: string | null
           updated_at?: string | null
           user_percentage?: number
