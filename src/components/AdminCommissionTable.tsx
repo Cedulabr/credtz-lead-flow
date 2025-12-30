@@ -18,6 +18,7 @@ interface CommissionTable {
   bank_name: string;
   product_name: string;
   term?: string;
+  table_name?: string;
   commission_percentage: number;
   user_percentage: number;
   user_percentage_profile?: string;
@@ -95,6 +96,7 @@ export function AdminCommissionTable({
                 <thead className="bg-muted/50">
                   <tr>
                     <th className="text-left p-4 font-medium">Produto</th>
+                    <th className="text-left p-4 font-medium">Tabela</th>
                     <th className="text-left p-4 font-medium">Prazo</th>
                     <th className="text-left p-4 font-medium">Comissão (%)</th>
                     <th className="text-left p-4 font-medium">Repasse (%)</th>
@@ -111,6 +113,7 @@ export function AdminCommissionTable({
                       return (
                         <tr key={productName} className="border-t hover:bg-muted/20">
                           <td className="p-4 font-medium">{productName}</td>
+                          <td className="p-4 text-muted-foreground">-</td>
                           <td className="p-4 text-muted-foreground">-</td>
                           <td className="p-4 text-muted-foreground">-</td>
                           <td className="p-4 text-muted-foreground">-</td>
@@ -139,6 +142,13 @@ export function AdminCommissionTable({
                             {productName}
                           </td>
                         )}
+                        <td className="p-4">
+                          {rule.table_name ? (
+                            <Badge variant="outline">{rule.table_name}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </td>
                         <td className="p-4">{rule.term || '-'}</td>
                         <td className="p-4 font-medium">{rule.commission_percentage}%</td>
                         <td className="p-4 font-medium text-green-600">{rule.user_percentage}%</td>
@@ -207,6 +217,13 @@ export function AdminCommissionTable({
                             {productName} <Badge variant="outline" className="ml-2">Custom</Badge>
                           </td>
                         )}
+                        <td className="p-4">
+                          {rule.table_name ? (
+                            <Badge variant="outline">{rule.table_name}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </td>
                         <td className="p-4">{rule.term || '-'}</td>
                         <td className="p-4 font-medium">{rule.commission_percentage}%</td>
                         <td className="p-4 font-medium text-green-600">{rule.user_percentage}%</td>

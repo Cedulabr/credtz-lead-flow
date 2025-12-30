@@ -11,6 +11,7 @@ interface CommissionRule {
   bank_name: string;
   product_name: string;
   term: string | null;
+  table_name: string | null;
   commission_percentage: number;
   user_percentage: number;
   user_percentage_profile: string | null;
@@ -136,6 +137,7 @@ export function CommissionTable() {
                               Produto
                             </div>
                           </TableHead>
+                          <TableHead>Tabela</TableHead>
                           <TableHead>Prazo</TableHead>
                           <TableHead className="text-right">Repasse Comissão</TableHead>
                         </TableRow>
@@ -145,6 +147,13 @@ export function CommissionTable() {
                           <TableRow key={rule.id}>
                             <TableCell className="font-medium">
                               {rule.product_name}
+                            </TableCell>
+                            <TableCell>
+                              {rule.table_name ? (
+                                <Badge variant="outline">{rule.table_name}</Badge>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">-</span>
+                              )}
                             </TableCell>
                             <TableCell>
                               {rule.term ? (

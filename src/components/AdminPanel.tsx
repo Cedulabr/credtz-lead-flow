@@ -44,6 +44,7 @@ interface CommissionTable {
   bank_name: string;
   product_name: string;
   term?: string;
+  table_name?: string;
   commission_percentage: number;
   user_percentage: number;
   user_percentage_profile?: string;
@@ -73,6 +74,7 @@ export function AdminPanel() {
     bank_name: "",
     product_name: "",
     term: "",
+    table_name: "",
     commission_percentage: "",
     user_percentage: "",
     user_percentage_profile: "",
@@ -195,6 +197,7 @@ export function AdminPanel() {
         bank_name: commissionForm.bank_name,
         product_name: commissionForm.product_name,
         term: commissionForm.term || null,
+        table_name: commissionForm.table_name || null,
         commission_percentage: parseFloat(commissionForm.commission_percentage),
         user_percentage: parseFloat(commissionForm.user_percentage || "0"),
         user_percentage_profile: commissionForm.user_percentage_profile,
@@ -231,6 +234,7 @@ export function AdminPanel() {
         bank_name: "",
         product_name: "",
         term: "",
+        table_name: "",
         commission_percentage: "",
         user_percentage: "",
         user_percentage_profile: "",
@@ -301,6 +305,7 @@ export function AdminPanel() {
         bank_name: item.bank_name || "",
         product_name: item.product_name,
         term: item.term || "",
+        table_name: item.table_name || "",
         commission_percentage: item.commission_percentage.toString(),
         user_percentage: item.user_percentage.toString(),
         user_percentage_profile: item.user_percentage_profile || "",
@@ -455,6 +460,7 @@ export function AdminPanel() {
                     bank_name: "",
                     product_name: "",
                     term: "",
+                    table_name: "",
                     commission_percentage: "",
                     user_percentage: "",
                     user_percentage_profile: "",
@@ -581,14 +587,28 @@ export function AdminPanel() {
                     </p>
                   </div>
 
-                  <div>
-                    <Label htmlFor="commission-term">Prazo (opcional)</Label>
-                    <Input
-                      id="commission-term"
-                      placeholder="Ex: 84 meses"
-                      value={commissionForm.term}
-                      onChange={(e) => setCommissionForm({ ...commissionForm, term: e.target.value })}
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="commission-term">Prazo (opcional)</Label>
+                      <Input
+                        id="commission-term"
+                        placeholder="Ex: 84 meses"
+                        value={commissionForm.term}
+                        onChange={(e) => setCommissionForm({ ...commissionForm, term: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="table-name">Nome da Tabela (opcional)</Label>
+                      <Input
+                        id="table-name"
+                        placeholder="Ex: Tabela 1, Premium"
+                        value={commissionForm.table_name}
+                        onChange={(e) => setCommissionForm({ ...commissionForm, table_name: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Para diferenciar tabelas do mesmo produto
+                      </p>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -647,6 +667,7 @@ export function AdminPanel() {
                 bank_name: bankName || "",
                 product_name: productName || "",
                 term: "",
+                table_name: "",
                 commission_percentage: "",
                 user_percentage: "",
                 user_percentage_profile: "",
