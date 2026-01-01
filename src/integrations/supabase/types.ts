@@ -237,6 +237,7 @@ export type Database = {
         Row: {
           client_cpf: string
           client_name: string
+          company_id: string | null
           created_at: string
           document_type: string
           file_name: string
@@ -248,6 +249,7 @@ export type Database = {
         Insert: {
           client_cpf: string
           client_name: string
+          company_id?: string | null
           created_at?: string
           document_type: string
           file_name: string
@@ -259,6 +261,7 @@ export type Database = {
         Update: {
           client_cpf?: string
           client_name?: string
+          company_id?: string | null
           created_at?: string
           document_type?: string
           file_name?: string
@@ -267,7 +270,15 @@ export type Database = {
           updated_at?: string
           uploaded_by?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "client_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       clientes: {
         Row: {
@@ -362,6 +373,7 @@ export type Database = {
           client_name: string
           commission_amount: number
           commission_percentage: number
+          company_id: string | null
           cpf: string | null
           created_at: string
           credit_value: number
@@ -380,6 +392,7 @@ export type Database = {
           client_name: string
           commission_amount: number
           commission_percentage: number
+          company_id?: string | null
           cpf?: string | null
           created_at?: string
           credit_value: number
@@ -398,6 +411,7 @@ export type Database = {
           client_name?: string
           commission_amount?: number
           commission_percentage?: number
+          company_id?: string | null
           cpf?: string | null
           created_at?: string
           credit_value?: number
@@ -410,6 +424,44 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commissions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companies: {
+        Row: {
+          cnpj: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          cnpj?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          cnpj?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -623,6 +675,7 @@ export type Database = {
         Row: {
           assigned_to: string | null
           banco_operacao: string | null
+          company_id: string | null
           convenio: string | null
           cpf: string
           created_at: string | null
@@ -640,6 +693,7 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           banco_operacao?: string | null
+          company_id?: string | null
           convenio?: string | null
           cpf: string
           created_at?: string | null
@@ -657,6 +711,7 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           banco_operacao?: string | null
+          company_id?: string | null
           convenio?: string | null
           cpf?: string
           created_at?: string | null
@@ -671,7 +726,15 @@ export type Database = {
           updated_at?: string | null
           valor_operacao?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "leads_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       leads_blacklist: {
         Row: {
@@ -783,6 +846,7 @@ export type Database = {
       }
       leads_indicados: {
         Row: {
+          company_id: string | null
           convenio: string
           cpf: string
           created_at: string
@@ -795,6 +859,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          company_id?: string | null
           convenio: string
           cpf: string
           created_at?: string
@@ -807,6 +872,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          company_id?: string | null
           convenio?: string
           cpf?: string
           created_at?: string
@@ -818,7 +884,15 @@ export type Database = {
           telefone?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "leads_indicados_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pipeline_history: {
         Row: {
@@ -981,6 +1055,7 @@ export type Database = {
           banco: string | null
           bank_id: number | null
           client_id: number | null
+          company_id: string | null
           convenio: string | null
           convenio_id: number | null
           cpf: string | null
@@ -1010,6 +1085,7 @@ export type Database = {
           banco?: string | null
           bank_id?: number | null
           client_id?: number | null
+          company_id?: string | null
           convenio?: string | null
           convenio_id?: number | null
           cpf?: string | null
@@ -1039,6 +1115,7 @@ export type Database = {
           banco?: string | null
           bank_id?: number | null
           client_id?: number | null
+          company_id?: string | null
           convenio?: string | null
           convenio_id?: number | null
           cpf?: string | null
@@ -1083,6 +1160,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propostas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1174,6 +1258,7 @@ export type Database = {
       televendas: {
         Row: {
           banco: string
+          company_id: string | null
           cpf: string
           created_at: string
           data_venda: string
@@ -1190,6 +1275,7 @@ export type Database = {
         }
         Insert: {
           banco: string
+          company_id?: string | null
           cpf: string
           created_at?: string
           data_venda: string
@@ -1206,6 +1292,7 @@ export type Database = {
         }
         Update: {
           banco?: string
+          company_id?: string | null
           cpf?: string
           created_at?: string
           data_venda?: string
@@ -1220,7 +1307,53 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "televendas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_companies: {
+        Row: {
+          company_id: string
+          company_role: Database["public"]["Enums"]["company_role"]
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          company_role?: Database["public"]["Enums"]["company_role"]
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          company_role?: Database["public"]["Enums"]["company_role"]
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_companies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_conversations: {
         Row: {
@@ -1432,6 +1565,7 @@ export type Database = {
         }[]
       }
       get_complete_schema: { Args: never; Returns: Json }
+      get_user_company_ids: { Args: { _user_id: string }; Returns: string[] }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1447,6 +1581,10 @@ export type Database = {
         Returns: boolean
       }
       import_leads_from_csv: { Args: { leads_data: Json }; Returns: Json }
+      is_company_gestor: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
       request_leads: {
         Args: {
           banco_filter?: string
@@ -1487,12 +1625,17 @@ export type Database = {
         Args: { leads_count_param: number; user_id_param: string }
         Returns: undefined
       }
+      user_belongs_to_company: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
       validate_cpf: { Args: { cpf_input: string }; Returns: boolean }
       validate_email: { Args: { email_input: string }; Returns: boolean }
       validate_phone: { Args: { phone_input: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "partner"
+      company_role: "gestor" | "colaborador"
       user_level: "bronze" | "prata" | "ouro" | "diamante"
     }
     CompositeTypes: {
@@ -1622,6 +1765,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "partner"],
+      company_role: ["gestor", "colaborador"],
       user_level: ["bronze", "prata", "ouro", "diamante"],
     },
   },

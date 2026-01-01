@@ -16,6 +16,8 @@ interface CreateUserPayload {
   cpf?: string;
   phone?: string;
   role: "admin" | "partner";
+  company_id?: string | null;
+  company_role?: "gestor" | "colaborador";
 }
 
 serve(async (req: Request) => {
@@ -88,6 +90,22 @@ serve(async (req: Request) => {
       });
 
     if (profileErr) throw new Error(profileErr.message);
+
+    // If company_id is provided and valid, link user to company
+    if (payload.company_id && payload.company_id !== "none") {
+      const { error: companyErr } = await adminClient
+        .from("user_companies")
+        .insert({
+          user_id: created.user.id,
+          company_id: payload.company_id,
+          company_role: payload.company_role || "colaborador"
+        });
+
+      if (companyErr) {
+        console.error("Error linking user to company:", companyErr);
+        // Don't throw - user was created, just log the error
+      }
+    }
 
     return new Response(
       JSON.stringify({ success: true, user_id: created.user.id }),

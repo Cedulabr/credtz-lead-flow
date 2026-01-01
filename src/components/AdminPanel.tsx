@@ -30,6 +30,7 @@ import { ContaCorrente } from "./ContaCorrente";
 import AdminIndicationsManagement from "./AdminIndicationsManagement";
 import { AdminCommissionTable } from "./AdminCommissionTable";
 import { AdminWhitelabel } from "./AdminWhitelabel";
+import { AdminCompanies } from "./AdminCompanies";
 
 interface Announcement {
   id: number;
@@ -341,10 +342,11 @@ export function AdminPanel() {
       </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-7' : 'grid-cols-2'}`}>
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-8' : 'grid-cols-2'}`}>
             <TabsTrigger value="announcements">Avisos</TabsTrigger>
             <TabsTrigger value="commissions">Comissões</TabsTrigger>
-            {isAdmin && <TabsTrigger value="indications">Gerir Indicações</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="companies">Empresas</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="indications">Indicações</TabsTrigger>}
             {isAdmin && <TabsTrigger value="conta-corrente">Conta Corrente</TabsTrigger>}
             {isAdmin && <TabsTrigger value="payments">Pagamentos</TabsTrigger>}
             {isAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
@@ -678,6 +680,13 @@ export function AdminPanel() {
             }}
           />
         </TabsContent>
+
+        {/* Companies Tab */}
+        {isAdmin && (
+          <TabsContent value="companies" className="space-y-4">
+            <AdminCompanies />
+          </TabsContent>
+        )}
 
         {/* Indications Management Tab */}
         {isAdmin && (
