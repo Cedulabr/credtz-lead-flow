@@ -15,6 +15,7 @@ interface User {
   id: string;
   name: string;
   email: string;
+  level: string;
 }
 
 interface CommissionRule {
@@ -95,13 +96,13 @@ export function ContaCorrente() {
 
   useEffect(() => {
     calculateCommission();
-  }, [formData.bank_name, formData.product_name, formData.credit_value, formData.term]);
+  }, [formData.bank_name, formData.product_name, formData.credit_value, formData.term, formData.commission_percentage]);
 
   const fetchUsers = async () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, email')
+        .select('id, name, email, level')
         .eq('role', 'partner')
         .order('name');
       
@@ -177,36 +178,43 @@ export function ContaCorrente() {
   };
 
   const calculateCommission = () => {
-    if (!formData.bank_name || !formData.product_name || !formData.credit_value) {
-      setCalculatedCommission(0);
-      setFormData(prev => ({ ...prev, commission_percentage: 0 }));
+    if (!formData.bank_name || !formData.product_name || !formData.credit_value || !formData.commission_percentage) {
+      if (!formData.commission_percentage) {
+        setCalculatedCommission(0);
+      } else {
+        // If user manually set commission percentage, calculate it
+        const commissionAmount = (formData.credit_value * formData.commission_percentage) / 100;
+        setCalculatedCommission(commissionAmount);
+      }
       return;
     }
 
-    // Find matching rule from commission_rules (regras flexíveis)
-    const rule = commissionRules.find(r => 
+    // Calculate based on manually entered percentage
+    const commissionAmount = (formData.credit_value * formData.commission_percentage) / 100;
+    setCalculatedCommission(commissionAmount);
+  };
+
+  // Get available commission rules for selected bank and product
+  const getAvailableCommissionsByLevel = () => {
+    if (!formData.bank_name || !formData.product_name) return [];
+    
+    const rules = commissionRules.filter(r => 
       r.bank_name === formData.bank_name && 
-      r.product_name === formData.product_name &&
-      (r.operation_type === formData.term || !r.operation_type || !formData.term)
+      r.product_name === formData.product_name
     );
+    
+    const levelConfig: Record<string, { label: string; color: string }> = {
+      bronze: { label: "Bronze", color: "bg-amber-700 text-white" },
+      prata: { label: "Prata", color: "bg-gray-400 text-gray-900" },
+      ouro: { label: "Ouro", color: "bg-yellow-500 text-yellow-900" },
+      diamante: { label: "Diamante", color: "bg-cyan-400 text-cyan-900" },
+    };
 
-    if (rule) {
-      let commissionAmount = 0;
-      const commissionPercentage = rule.commission_value;
-
-      if (rule.commission_type === 'fixed') {
-        commissionAmount = rule.commission_value;
-      } else {
-        // percentage
-        commissionAmount = (formData.credit_value * rule.commission_value) / 100;
-      }
-
-      setCalculatedCommission(commissionAmount);
-      setFormData(prev => ({ ...prev, commission_percentage: commissionPercentage }));
-    } else {
-      setCalculatedCommission(0);
-      setFormData(prev => ({ ...prev, commission_percentage: 0 }));
-    }
+    return rules.map(rule => ({
+      ...rule,
+      levelLabel: levelConfig[rule.user_level]?.label || rule.user_level,
+      levelColor: levelConfig[rule.user_level]?.color || "bg-gray-500 text-white",
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -649,6 +657,49 @@ export function ContaCorrente() {
                     placeholder="R$ 0,00"
                   />
                 </div>
+              </div>
+
+              {/* Show available commissions by level when bank and product are selected */}
+              {formData.bank_name && formData.product_name && (
+                <Card className="bg-muted/50 border-muted">
+                  <CardContent className="pt-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Calculator className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-sm font-medium">Comissões por Nível</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {getAvailableCommissionsByLevel().length > 0 ? (
+                          getAvailableCommissionsByLevel().map((rule) => (
+                            <Badge 
+                              key={rule.id}
+                              className={`${rule.levelColor} cursor-pointer hover:opacity-80 transition-opacity`}
+                              onClick={() => setFormData(prev => ({ ...prev, commission_percentage: rule.commission_value }))}
+                            >
+                              {rule.levelLabel}: {rule.commission_value}%
+                            </Badge>
+                          ))
+                        ) : (
+                          <p className="text-xs text-muted-foreground">Nenhuma regra cadastrada para este banco/produto</p>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Clique em um nível para usar a comissão cadastrada</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Manual commission percentage input */}
+              <div className="space-y-2">
+                <Label htmlFor="commission_percentage">Comissão % *</Label>
+                <Input
+                  id="commission_percentage"
+                  type="number"
+                  step="0.01"
+                  value={formData.commission_percentage || ""}
+                  onChange={(e) => setFormData({ ...formData, commission_percentage: parseFloat(e.target.value) || 0 })}
+                  placeholder="Ex: 1.5"
+                />
               </div>
 
               {calculatedCommission > 0 && (
