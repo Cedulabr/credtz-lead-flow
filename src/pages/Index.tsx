@@ -12,6 +12,7 @@ import { TelevendasManagement } from "@/components/TelevendasManagement";
 import { CommissionTable } from "@/components/CommissionTable";
 import { ClientDocuments } from "@/components/ClientDocuments";
 import { MyClientsKanban } from "@/components/MyClientsKanban";
+import { FinanceKanban } from "@/components/FinanceKanban";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
@@ -142,6 +143,12 @@ const Index = () => {
             <TelevendasManagement />
           </div>
         );
+      
+      case "finances":
+        if (!hasPermission('can_access_financas')) {
+          return <BlockedAccess message="Acesso à seção Finanças bloqueado pelo administrador" />;
+        }
+        return <FinanceKanban />;
       
       case "commission-table":
         if (!hasPermission('can_access_tabela_comissoes')) {
