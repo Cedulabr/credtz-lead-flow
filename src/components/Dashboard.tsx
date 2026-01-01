@@ -241,35 +241,71 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   };
 
   // Função para calcular valor baseado na regra de comissão flexível
-  const calculateSaleValue = (sale: any, commissionRules: any[]) => {
-    const tipoOperacao = sale.tipo_operacao?.toLowerCase() || '';
+  const calculateSaleValue = (sale: any, commissionRules: any[], companyId?: string | null) => {
+    const tipoOperacao = sale.tipo_operacao?.toLowerCase()?.trim() || '';
+    const bancoNome = sale.banco?.toLowerCase()?.trim() || '';
     
-    // Buscar regra aplicável para este banco/produto/empresa
-    const applicableRule = commissionRules.find(rule => 
-      rule.bank_name?.toLowerCase() === sale.banco?.toLowerCase() &&
-      rule.product_name?.toLowerCase().includes(tipoOperacao)
-    );
+    // Buscar regra aplicável: priorizar regra específica da empresa, depois regra global
+    // 1. Primeiro busca regra específica da empresa + banco + produto
+    // 2. Depois busca regra global (company_id = null) + banco + produto
+    const applicableRule = commissionRules.find(rule => {
+      const ruleBank = rule.bank_name?.toLowerCase()?.trim() || '';
+      const ruleProduct = rule.product_name?.toLowerCase()?.trim() || '';
+      
+      // Match exato do banco
+      const bankMatch = ruleBank === bancoNome;
+      
+      // Match do produto (Portabilidade, Novo, Refinanciamento, etc.)
+      const productMatch = ruleProduct === tipoOperacao || 
+                          ruleProduct.includes(tipoOperacao) || 
+                          tipoOperacao.includes(ruleProduct);
+      
+      // Verificar empresa (específica ou global)
+      const isCompanyRule = rule.company_id === companyId && companyId;
+      const isGlobalRule = !rule.company_id;
+      
+      return bankMatch && productMatch && (isCompanyRule || isGlobalRule);
+    }) || commissionRules.find(rule => {
+      // Fallback: buscar apenas pelo banco se não encontrou pelo produto
+      const ruleBank = rule.bank_name?.toLowerCase()?.trim() || '';
+      return ruleBank === bancoNome;
+    });
     
     // Se houver regra flexível, usar o modelo de cálculo configurado
     if (applicableRule) {
-      const calculationModel = applicableRule.calculation_model?.toLowerCase();
+      const calculationModel = applicableRule.calculation_model?.toLowerCase()?.trim();
+      
+      console.log(`[Dashboard] Regra encontrada para ${sale.banco} - ${sale.tipo_operacao}:`, {
+        ruleId: applicableRule.id,
+        calculationModel,
+        bankName: applicableRule.bank_name,
+        productName: applicableRule.product_name
+      });
       
       if (calculationModel === 'saldo_devedor') {
+        // Banrisul e outros: apenas saldo devedor
         return sale.saldo_devedor || 0;
       } else if (calculationModel === 'valor_bruto' || calculationModel === 'bruto') {
+        // Valor bruto = saldo devedor + troco
         return (sale.saldo_devedor || 0) + (sale.troco || 0);
       } else if (calculationModel === 'troco') {
+        // Apenas troco
         return sale.troco || 0;
+      } else if (calculationModel === 'ambos') {
+        // Para modelo "ambos", calcular conforme configurado
+        return (sale.saldo_devedor || 0) + (sale.troco || 0);
       }
     }
     
-    // Regra padrão por tipo de operação
+    // Regra padrão por tipo de operação (quando não há regra cadastrada)
+    console.log(`[Dashboard] Nenhuma regra encontrada para ${sale.banco} - ${sale.tipo_operacao}, usando padrão`);
+    
     if (tipoOperacao === 'portabilidade') {
       // Portabilidade: considera saldo devedor por padrão
       return sale.saldo_devedor || 0;
     }
     
-    // Para outros tipos, usar a parcela
+    // Para outros tipos (Novo, Refinanciamento, Cartão), usar a parcela
     return sale.parcela || 0;
   };
 
@@ -311,7 +347,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       
       // Calcular valor total respeitando as regras de comissão flexíveis
       const totalValue = paidSales.reduce((sum, sale) => {
-        return sum + calculateSaleValue(sale, rules);
+        return sum + calculateSaleValue(sale, rules, sale.company_id);
       }, 0);
       
       setTotalSales(paidSales.length);
@@ -334,7 +370,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       const { data: prevData } = await prevQuery;
       const prevPaidSales = prevData?.filter(s => s.status === 'pago') || [];
       const prevTotalValue = prevPaidSales.reduce((sum, sale) => {
-        return sum + calculateSaleValue(sale, rules);
+        return sum + calculateSaleValue(sale, rules, sale.company_id);
       }, 0);
       setPreviousRevenue(prevTotalValue);
       
@@ -349,7 +385,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           date: dayStr,
           day: format(day, 'dd', { locale: ptBR }),
           sales: daySales.length,
-          value: daySales.reduce((sum, sale) => sum + calculateSaleValue(sale, rules), 0)
+          value: daySales.reduce((sum, sale) => sum + calculateSaleValue(sale, rules, sale.company_id), 0)
         };
       });
       setDailySalesData(dailyData);
@@ -360,7 +396,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         const product = sale.tipo_operacao || 'Outros';
         const existing = productMap.get(product) || { value: 0, count: 0 };
         productMap.set(product, {
-          value: existing.value + calculateSaleValue(sale, rules),
+          value: existing.value + calculateSaleValue(sale, rules, sale.company_id),
           count: existing.count + 1
         });
       });
@@ -565,6 +601,19 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       const { startDate, endDate } = getDateRange();
       const companyFilter = getCompanyFilter();
       
+      // Buscar regras de comissão flexíveis para calcular corretamente
+      let rulesQuery = supabase
+        .from('commission_rules')
+        .select('*')
+        .eq('is_active', true);
+      
+      if (companyFilter) {
+        rulesQuery = rulesQuery.or(`company_id.is.null,company_id.in.(${companyFilter.join(',')})`);
+      }
+      
+      const { data: commissionRules } = await rulesQuery;
+      const rules = commissionRules || [];
+      
       // Get users
       let usersQuery = supabase.from('profiles').select('id, name, email');
       
@@ -583,10 +632,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       
       const { data: profiles } = await usersQuery;
       
-      // Get sales
+      // Get sales with all fields needed for flexible rule calculation
       let salesQuery = supabase
         .from('televendas')
-        .select('user_id, parcela, status')
+        .select('user_id, parcela, status, tipo_operacao, banco, saldo_devedor, troco, company_id')
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
       
@@ -623,12 +672,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         });
       });
       
+      // Calcular valor usando as regras flexíveis
       allSales?.forEach(sale => {
         if (sale.status === 'pago' && sale.user_id) {
           const vendor = vendorMap.get(sale.user_id);
           if (vendor) {
             vendor.totalSales++;
-            vendor.totalValue += sale.parcela || 0;
+            // Usar a função calculateSaleValue que respeita as regras flexíveis
+            vendor.totalValue += calculateSaleValue(sale, rules, sale.company_id);
           }
         }
       });
