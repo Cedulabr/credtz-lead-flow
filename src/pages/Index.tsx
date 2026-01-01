@@ -13,15 +13,15 @@ import { CommissionTable } from "@/components/CommissionTable";
 import { ClientDocuments } from "@/components/ClientDocuments";
 import { MyClientsKanban } from "@/components/MyClientsKanban";
 import { FinanceKanban } from "@/components/FinanceKanban";
+import { ProposalGenerator } from "@/components/ProposalGenerator";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
-import { Database, LogIn, TestTube, Activity } from "lucide-react";
+import { LogIn } from "lucide-react";
 import LoadingAuth from "@/components/LoadingAuth";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWhitelabel } from "@/hooks/useWhitelabel";
 
-// Lazy load heavy components for better performance
 import { 
   LazyLeadsManagement, 
   LazyCommissions, 
@@ -63,7 +63,6 @@ const Index = () => {
     );
   }
 
-  // Helper to check permission
   const hasPermission = (permissionKey: string): boolean => {
     if (isAdmin) return true;
     const profileData = profile as any;
@@ -71,7 +70,6 @@ const Index = () => {
   };
 
   const renderActiveComponent = () => {
-    // Loading skeleton for lazy components
     const LoadingFallback = () => (
       <Card className="m-4">
         <CardContent className="p-6">
@@ -101,6 +99,12 @@ const Index = () => {
             <IndicatedClientsTracking />
           </div>
         );
+      
+      case "proposal-generator":
+        if (!hasPermission('can_access_gerador_propostas')) {
+          return <BlockedAccess message="Acesso ao Gerador de Propostas bloqueado pelo administrador" />;
+        }
+        return <ProposalGenerator />;
       
       case "leads":
         if (!hasPermission('can_access_premium_leads')) {
@@ -190,14 +194,12 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Mobile: Full width layout, Desktop: Sidebar + Content */}
       <div className="flex md:flex">
         <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
         <main className="flex-1 w-full md:w-auto">
           {renderActiveComponent()}
         </main>
       </div>
-      
     </div>
   );
 };
