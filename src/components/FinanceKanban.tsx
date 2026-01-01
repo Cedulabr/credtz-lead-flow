@@ -8,8 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Plus, Filter, Calendar, AlertTriangle, CheckCircle, Clock, RefreshCw, Search, FileText, Trash2, Edit, GripVertical } from "lucide-react";
-import { format, addMonths, startOfMonth, endOfMonth, isAfter, isBefore, addDays, parseISO } from "date-fns";
+import { Plus, Calendar, AlertTriangle, CheckCircle, Clock, RefreshCw, Search, FileText, Trash2, Edit, GripVertical } from "lucide-react";
+import { format, addMonths, endOfMonth, isAfter, isBefore, addDays, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { FinanceTransactionForm } from "./FinanceTransactionForm";
 import { FinanceReceipts } from "./FinanceReceipts";
@@ -166,8 +166,11 @@ export const FinanceKanban = () => {
 
       // Only filter by month if not "all"
       if (filterMonth !== "all") {
-        const startDate = startOfMonth(new Date(filterMonth + "-01"));
+        // IMPORTANT: don't use new Date("YYYY-MM-01") here (timezone may shift month)
+        const [year, month] = filterMonth.split("-").map(Number);
+        const startDate = new Date(year, month - 1, 1);
         const endDate = endOfMonth(startDate);
+
         query = query
           .gte("due_date", format(startDate, "yyyy-MM-dd"))
           .lte("due_date", format(endDate, "yyyy-MM-dd"));
