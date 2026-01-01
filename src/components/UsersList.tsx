@@ -36,9 +36,24 @@ interface User {
   created_at: string;
 }
 
+interface Company {
+  id: string;
+  name: string;
+}
+
+interface UserCompany {
+  id: string;
+  company_id: string;
+  user_id: string;
+  company_role: 'gestor' | 'colaborador';
+  companies?: Company;
+}
+
 export function UsersList() {
   const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [userCompanies, setUserCompanies] = useState<Record<string, UserCompany>>({});
   const [passwordDialog, setPasswordDialog] = useState({ open: false, user: null as any });
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(true);
@@ -63,11 +78,49 @@ export function UsersList() {
     pix_key: "",
     company: "",
     level: "",
+    company_id: "",
+    company_role: "" as 'gestor' | 'colaborador' | "",
   });
 
   useEffect(() => {
     loadUsers();
+    loadCompanies();
   }, []);
+
+  const loadCompanies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setCompanies(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar empresas:', error);
+    }
+  };
+
+  const loadUserCompanies = async (userIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_companies')
+        .select('id, company_id, user_id, company_role, companies(id, name)')
+        .in('user_id', userIds)
+        .eq('is_active', true);
+
+      if (error) throw error;
+      
+      const mapping: Record<string, UserCompany> = {};
+      (data || []).forEach((uc: any) => {
+        mapping[uc.user_id] = uc;
+      });
+      setUserCompanies(mapping);
+    } catch (error) {
+      console.error('Erro ao carregar empresas dos usuários:', error);
+    }
+  };
 
   const loadUsers = async () => {
     try {
@@ -79,6 +132,10 @@ export function UsersList() {
 
       if (error) throw error;
       setUsers(data || []);
+      
+      if (data && data.length > 0) {
+        await loadUserCompanies(data.map(u => u.id));
+      }
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
       toast({
@@ -93,6 +150,7 @@ export function UsersList() {
 
   const handleEditUser = (user: User) => {
     setEditingUser(user);
+    const userCompany = userCompanies[user.id];
     setUserForm({
       name: user.name || "",
       email: user.email || "",
@@ -101,6 +159,8 @@ export function UsersList() {
       pix_key: user.pix_key || "",
       company: user.company || "",
       level: user.level || "",
+      company_id: userCompany?.company_id || "",
+      company_role: userCompany?.company_role || "",
     });
     setIsDialogOpen(true);
   };
@@ -109,6 +169,7 @@ export function UsersList() {
     if (!editingUser) return;
 
     try {
+      // Update profile
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -123,6 +184,43 @@ export function UsersList() {
         .eq('id', editingUser.id);
 
       if (error) throw error;
+
+      // Update company assignment
+      if (userForm.company_id && userForm.company_role) {
+        const existingUserCompany = userCompanies[editingUser.id];
+        
+        if (existingUserCompany) {
+          // Update existing
+          const { error: ucError } = await supabase
+            .from('user_companies')
+            .update({
+              company_id: userForm.company_id,
+              company_role: userForm.company_role,
+            })
+            .eq('id', existingUserCompany.id);
+          
+          if (ucError) throw ucError;
+        } else {
+          // Insert new
+          const { error: ucError } = await supabase
+            .from('user_companies')
+            .insert({
+              user_id: editingUser.id,
+              company_id: userForm.company_id,
+              company_role: userForm.company_role,
+            });
+          
+          if (ucError) throw ucError;
+        }
+      } else if (userCompanies[editingUser.id] && !userForm.company_id) {
+        // Remove company assignment if cleared
+        const { error: deleteError } = await supabase
+          .from('user_companies')
+          .update({ is_active: false })
+          .eq('id', userCompanies[editingUser.id].id);
+        
+        if (deleteError) throw deleteError;
+      }
 
       toast({
         title: "Usuário atualizado!",
@@ -139,6 +237,8 @@ export function UsersList() {
         pix_key: "",
         company: "",
         level: "",
+        company_id: "",
+        company_role: "",
       });
       loadUsers();
     } catch (error) {
@@ -367,7 +467,14 @@ export function UsersList() {
                   <TableCell>{user.cpf || "Não informado"}</TableCell>
                   <TableCell>{user.phone || "Não informado"}</TableCell>
                   <TableCell>{user.pix_key || "Não informado"}</TableCell>
-                  <TableCell>{user.company || "Não informado"}</TableCell>
+                  <TableCell>
+                    {userCompanies[user.id]?.companies?.name || user.company || "Não informado"}
+                    {userCompanies[user.id]?.company_role && (
+                      <Badge variant="outline" className="ml-2 text-xs">
+                        {userCompanies[user.id]?.company_role === 'gestor' ? 'Gestor' : 'Colaborador'}
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline">
                       {user.role === 'admin' ? 'Administrador' : 
@@ -501,13 +608,39 @@ export function UsersList() {
                 />
               </div>
               <div>
-                <Label htmlFor="user-company">Empresa</Label>
-                <Input
-                  id="user-company"
-                  value={userForm.company}
-                  onChange={(e) => setUserForm({ ...userForm, company: e.target.value })}
-                  placeholder="Nome da empresa"
-                />
+                <Label htmlFor="user-company-select">Empresa</Label>
+                <Select 
+                  value={userForm.company_id} 
+                  onValueChange={(value) => setUserForm({ ...userForm, company_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Nenhuma</SelectItem>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="user-company-role">Cargo na Empresa</Label>
+                <Select 
+                  value={userForm.company_role} 
+                  onValueChange={(value) => setUserForm({ ...userForm, company_role: value as 'gestor' | 'colaborador' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o cargo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Nenhum</SelectItem>
+                    <SelectItem value="gestor">Gestor</SelectItem>
+                    <SelectItem value="colaborador">Colaborador</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="user-level">Nível do Usuário</Label>
