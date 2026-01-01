@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { AlertTriangle, Clock, TrendingUp, TrendingDown, CheckCircle } from "lucide-react";
+import { AlertTriangle, Clock, TrendingUp, TrendingDown } from "lucide-react";
 import { format, isBefore, addDays, isAfter } from "date-fns";
-
+import { parseDateSafe } from "@/lib/date";
 interface Transaction {
   id: string;
   description: string;
@@ -19,43 +19,35 @@ interface FinanceAlertsProps {
 }
 
 export const FinanceAlerts = ({ transactions, companyId }: FinanceAlertsProps) => {
-  const parseDateSafe = (dateStr: string) => {
-    // date column comes as YYYY-MM-DD; parse as local date to avoid timezone shifts
-    if (dateStr && dateStr.length === 10) {
-      const [year, month, day] = dateStr.split("-").map(Number);
-      return new Date(year, month - 1, day);
-    }
-    return new Date(dateStr);
-  };
-
   const alerts = useMemo(() => {
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
     const threeDaysFromNow = addDays(today, 3);
 
-    const overdue = transactions.filter(t => 
-      t.status !== "pago" && 
-      isBefore(parseDateSafe(t.due_date), today)
-    );
-    
-    const dueSoon = transactions.filter(t => 
-      t.status !== "pago" && 
-      isAfter(parseDateSafe(t.due_date), today) && 
-      isBefore(parseDateSafe(t.due_date), threeDaysFromNow)
-    );
-    
+    const overdue = transactions.filter((t) => {
+      const due = parseDateSafe(t.due_date);
+      if (!due) return false;
+      return t.status !== "pago" && isBefore(due, today);
+    });
+
+    const dueSoon = transactions.filter((t) => {
+      const due = parseDateSafe(t.due_date);
+      if (!due) return false;
+      return t.status !== "pago" && isAfter(due, today) && isBefore(due, threeDaysFromNow);
+    });
+
     const totalExpenses = transactions
-      .filter(t => t.type === "despesa")
+      .filter((t) => t.type === "despesa")
       .reduce((sum, t) => sum + Number(t.value), 0);
-    
+
     const totalCommissions = transactions
-      .filter(t => t.type === "comissao")
+      .filter((t) => t.type === "comissao")
       .reduce((sum, t) => sum + Number(t.value), 0);
-    
-    const paidCount = transactions.filter(t => t.status === "pago").length;
-    const pendingCount = transactions.filter(t => t.status === "pendente").length;
-    
+
+    const paidCount = transactions.filter((t) => t.status === "pago").length;
+    const pendingCount = transactions.filter((t) => t.status === "pendente").length;
+
     return {
       overdue,
       dueSoon,

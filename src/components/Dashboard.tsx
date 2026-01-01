@@ -39,7 +39,7 @@ import {
   Legend
 } from "recharts";
 import { format, startOfMonth, endOfMonth, isBefore, isAfter, addDays } from "date-fns";
-
+import { parseDateSafe } from "@/lib/date";
 interface DashboardProps {
   onNavigate: (tab: string) => void;
 }
@@ -358,14 +358,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
       if (error) throw error;
 
-      const overdue = (transactions || []).filter(t =>
-        isBefore(new Date(t.due_date), today)
-      );
+      const overdue = (transactions || []).filter((t) => {
+        const due = parseDateSafe(t.due_date);
+        if (!due) return false;
+        return isBefore(due, today);
+      });
 
-      const dueSoon = (transactions || []).filter(t =>
-        isAfter(new Date(t.due_date), today) &&
-        isBefore(new Date(t.due_date), threeDaysFromNow)
-      );
+      const dueSoon = (transactions || []).filter((t) => {
+        const due = parseDateSafe(t.due_date);
+        if (!due) return false;
+        return isAfter(due, today) && isBefore(due, threeDaysFromNow);
+      });
 
       setFinanceAlerts({
         overdue,

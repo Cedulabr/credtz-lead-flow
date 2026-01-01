@@ -6,9 +6,9 @@ import { Card, CardContent } from "./ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Upload, FileText, Trash2, Download, Calendar, ExternalLink } from "lucide-react";
+import { Upload, FileText, Trash2, Calendar, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
-
+import { parseDateSafe } from "@/lib/date";
 interface Transaction {
   id: string;
   company_id: string;
@@ -43,6 +43,12 @@ export const FinanceReceipts = ({ transaction, companyId, isGestor }: FinanceRec
     payment_date: format(new Date(), "yyyy-MM-dd"),
     file: null as File | null,
   });
+
+  const formatDateDisplay = (dateStr: string) => {
+    const d = parseDateSafe(dateStr);
+    return d ? format(d, "dd/MM/yyyy") : "-";
+  };
+
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -306,7 +312,7 @@ export const FinanceReceipts = ({ transaction, companyId, isGestor }: FinanceRec
                     <p className="font-medium">{receipt.name}</p>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="h-3 w-3" />
-                      <span>{format(new Date(receipt.payment_date), "dd/MM/yyyy")}</span>
+                      <span>{formatDateDisplay(receipt.payment_date)}</span>
                       <span>•</span>
                       <span>{receipt.file_name}</span>
                     </div>
