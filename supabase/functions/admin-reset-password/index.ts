@@ -28,13 +28,22 @@ serve(async (req: Request) => {
       global: { headers: { Authorization: req.headers.get("Authorization") || "" } },
     });
 
+    const authHeader = req.headers.get("Authorization");
+    console.log("Auth header present:", !!authHeader);
+    
     const {
       data: { user },
       error: getUserError,
     } = await userClient.auth.getUser();
     
+    console.log("User:", user?.id, "Error:", getUserError?.message);
+    
     if (getUserError || !user) {
-      return new Response(JSON.stringify({ error: "Not authenticated" }), {
+      console.error("Authentication failed:", getUserError?.message || "No user found");
+      return new Response(JSON.stringify({ 
+        error: "Não autenticado. Por favor, faça login novamente.",
+        details: getUserError?.message 
+      }), {
         status: 401,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });

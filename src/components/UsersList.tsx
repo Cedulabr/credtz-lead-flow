@@ -313,6 +313,17 @@ export function UsersList() {
     if (!passwordDialog.user || !newPassword) return;
 
     try {
+      // Verificar se usuário está autenticado
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Sessão expirada",
+          description: "Por favor, faça login novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('admin-reset-password', {
         body: { 
           user_id: passwordDialog.user.id,
@@ -321,6 +332,10 @@ export function UsersList() {
       });
 
       if (error) throw error;
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
       toast({
         title: "Senha definida com sucesso!",
@@ -345,11 +360,26 @@ export function UsersList() {
     }
 
     try {
+      // Verificar se usuário está autenticado
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Sessão expirada",
+          description: "Por favor, faça login novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('admin-reset-password', {
         body: { user_id: user.id }
       });
 
       if (error) throw error;
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
       toast({
         title: "Senha resetada!",
