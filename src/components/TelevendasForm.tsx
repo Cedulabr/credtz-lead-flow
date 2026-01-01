@@ -52,6 +52,7 @@ const formSchema = z.object({
   banco: z.string().min(1, "Banco é obrigatório"),
   parcela: z.string().min(1, "Parcela é obrigatória"),
   troco: z.string().optional(),
+  saldo_devedor: z.string().optional(),
   tipo_operacao: z.enum(["Portabilidade", "Novo empréstimo", "Refinanciamento", "Cartão"]),
   observacao: z.string().optional(),
 });
@@ -73,10 +74,14 @@ export const TelevendasForm = () => {
       banco: "",
       parcela: "",
       troco: "",
+      saldo_devedor: "",
       tipo_operacao: "Novo empréstimo",
       observacao: "",
     },
   });
+
+  // Watch tipo_operacao para mostrar/esconder campo saldo_devedor
+  const tipoOperacao = form.watch("tipo_operacao");
 
   useEffect(() => {
     fetchBanks();
@@ -135,8 +140,10 @@ export const TelevendasForm = () => {
         return;
       }
 
+      // Converter valores formatados para números
       const parcelaValue = parseFloat(values.parcela.replace(/\./g, "").replace(",", "."));
       const trocoValue = values.troco ? parseFloat(values.troco.replace(/\./g, "").replace(",", ".")) : null;
+      const saldoDevedorValue = values.saldo_devedor ? parseFloat(values.saldo_devedor.replace(/\./g, "").replace(",", ".")) : null;
 
       const { error } = await (supabase as any).from("televendas").insert({
         user_id: user.id,
@@ -147,6 +154,7 @@ export const TelevendasForm = () => {
         banco: values.banco,
         parcela: parcelaValue,
         troco: trocoValue,
+        saldo_devedor: saldoDevedorValue,
         tipo_operacao: values.tipo_operacao,
         observacao: values.observacao || null,
       });
@@ -169,6 +177,7 @@ export const TelevendasForm = () => {
         banco: "",
         parcela: "",
         troco: "",
+        saldo_devedor: "",
         tipo_operacao: "Novo empréstimo",
         observacao: "",
       });
@@ -456,13 +465,15 @@ export const TelevendasForm = () => {
                         </FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
+                              R$
+                            </span>
                             <Input 
                               {...field}
                               value={field.value ? formatCurrency(field.value) : ""}
                               onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))}
                               placeholder="0,00"
-                              className="h-12 text-base pl-10 text-right"
+                              className="h-12 text-base pl-10 text-right font-semibold"
                             />
                           </div>
                         </FormControl>
@@ -470,6 +481,43 @@ export const TelevendasForm = () => {
                       </FormItem>
                     )}
                   />
+
+                  {/* Campo Saldo Devedor - Apenas para Portabilidade */}
+                  {tipoOperacao === "Portabilidade" && (
+                    <FormField
+                      control={form.control}
+                      name="saldo_devedor"
+                      render={({ field }) => (
+                        <FormItem className="md:col-span-2">
+                          <FormLabel className="text-base font-medium flex items-center gap-2">
+                            <DollarSign className="h-5 w-5 text-blue-500" />
+                            Saldo Devedor
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                              Portabilidade
+                            </span>
+                          </FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
+                                R$
+                              </span>
+                              <Input 
+                                {...field}
+                                value={field.value ? formatCurrency(field.value) : ""}
+                                onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))}
+                                placeholder="0,00"
+                                className="h-12 text-base pl-10 text-right font-semibold border-blue-200 focus:border-blue-500"
+                              />
+                            </div>
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Informe o saldo devedor do contrato a ser portado
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </div>
               </div>
 
