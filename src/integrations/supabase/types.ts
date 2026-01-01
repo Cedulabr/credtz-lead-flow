@@ -322,6 +322,68 @@ export type Database = {
         }
         Relationships: []
       }
+      commission_rules: {
+        Row: {
+          bank_name: string
+          calculation_model: string
+          commission_type: string
+          commission_value: number
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          operation_type: string | null
+          product_name: string
+          secondary_commission_value: number | null
+          updated_at: string
+          user_level: string
+        }
+        Insert: {
+          bank_name: string
+          calculation_model?: string
+          commission_type?: string
+          commission_value?: number
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          operation_type?: string | null
+          product_name: string
+          secondary_commission_value?: number | null
+          updated_at?: string
+          user_level?: string
+        }
+        Update: {
+          bank_name?: string
+          calculation_model?: string
+          commission_type?: string
+          commission_value?: number
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          operation_type?: string | null
+          product_name?: string
+          secondary_commission_value?: number | null
+          updated_at?: string
+          user_level?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_table: {
         Row: {
           bank_name: string

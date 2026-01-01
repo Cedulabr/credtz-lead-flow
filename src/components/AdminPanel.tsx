@@ -23,7 +23,8 @@ import {
   Users,
   DollarSign,
   Bell,
-  Building2
+  Building2,
+  Calculator
 } from "lucide-react";
 import { UsersList } from "./UsersList";
 import { ContaCorrente } from "./ContaCorrente";
@@ -32,6 +33,7 @@ import { AdminCommissionTable } from "./AdminCommissionTable";
 import { AdminWhitelabel } from "./AdminWhitelabel";
 import { AdminCompanies } from "./AdminCompanies";
 import { AdminTelevendasBanks } from "./AdminTelevendasBanks";
+import { AdminCommissionRules } from "./AdminCommissionRules";
 
 interface Announcement {
   id: number;
@@ -343,9 +345,10 @@ export function AdminPanel() {
       </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-9' : 'grid-cols-2'}`}>
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-10' : 'grid-cols-2'}`}>
             <TabsTrigger value="announcements">Avisos</TabsTrigger>
             <TabsTrigger value="commissions">Comissões</TabsTrigger>
+            {isAdmin && <TabsTrigger value="commission-rules">Regras Flexíveis</TabsTrigger>}
             {isAdmin && <TabsTrigger value="companies">Empresas</TabsTrigger>}
             {isAdmin && <TabsTrigger value="televendas-banks">Banco Televendas</TabsTrigger>}
             {isAdmin && <TabsTrigger value="indications">Indicações</TabsTrigger>}
@@ -682,6 +685,13 @@ export function AdminPanel() {
             }}
           />
         </TabsContent>
+
+        {/* Commission Rules Tab - Regras Flexíveis */}
+        {isAdmin && (
+          <TabsContent value="commission-rules" className="space-y-4">
+            <AdminCommissionRules />
+          </TabsContent>
+        )}
 
         {/* Companies Tab */}
         {isAdmin && (
