@@ -55,13 +55,14 @@ interface SavedProposal {
   contracts: Contract[];
   created_at: string;
   updated_at: string;
+  user_name?: string;
 }
 
 const PRODUCTS = [
-  { id: "novo", label: "Novo", emoji: "🆕", color: "bg-emerald-500", footer: "💵 Valor creditado em até 24 horas" },
-  { id: "portabilidade", label: "Portabilidade", emoji: "🔄", color: "bg-blue-500", footer: "📅 Valor creditado em até 8 dias" },
-  { id: "refinanciamento", label: "Refinanciamento", emoji: "💰", color: "bg-amber-500", footer: "💵 Valor creditado em até 24 horas" },
-  { id: "cartao", label: "Cartão", emoji: "💳", color: "bg-purple-500", footer: "💵 Valor creditado em até 24 horas" },
+  { id: "novo", label: "Novo", emoji: "🆕", color: "bg-emerald-500", footer: "💵 O valor do Novo Empréstimo creditado em até 24 horas" },
+  { id: "portabilidade", label: "Portabilidade", emoji: "🔄", color: "bg-blue-500", footer: "📅 O Valor da Portabilidade creditado em até 8 dias" },
+  { id: "refinanciamento", label: "Refinanciamento", emoji: "💰", color: "bg-amber-500", footer: "💵 O Valor do Refinanciamento creditado em até 24 horas" },
+  { id: "cartao", label: "Cartão", emoji: "💳", color: "bg-purple-500", footer: "💵 O Valor do Cartão de Crédito creditado em até 24 horas" },
 ];
 
 const formatCurrency = (value: string): string => {
@@ -141,6 +142,15 @@ export function ProposalGenerator() {
       
       if (error) throw error;
       
+      // Fetch user profiles to get names
+      const userIds = [...new Set((data || []).map((item: any) => item.user_id))];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, name")
+        .in("id", userIds);
+      
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.name]));
+      
       const proposals: SavedProposal[] = (data || []).map((item: any) => ({
         id: item.id,
         client_name: item.client_name,
@@ -148,6 +158,7 @@ export function ProposalGenerator() {
         contracts: Array.isArray(item.contracts) ? item.contracts : [],
         created_at: item.created_at,
         updated_at: item.updated_at,
+        user_name: profileMap.get(item.user_id) || "Usuário",
       }));
       
       setSavedProposals(proposals);
@@ -1242,6 +1253,9 @@ export function ProposalGenerator() {
                       {new Date(proposal.updated_at).toLocaleDateString("pt-BR")}
                     </div>
                   </div>
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  Criado por: <span className="font-medium">{proposal.user_name || "Usuário"}</span>
                 </div>
                 <div className="flex gap-2 mt-4">
                   <Button
