@@ -29,8 +29,20 @@ import {
   Filter,
   Calendar,
   User,
-  Search
+  Search,
+  Trash2
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Proposta {
   id: number;
@@ -120,6 +132,9 @@ export function MyClientsKanban() {
   
   // Search filter (for all users)
   const [searchQuery, setSearchQuery] = useState<string>("");
+  
+  // Delete state
+  const [deletingClient, setDeletingClient] = useState(false);
 
   // Edit form states
   const [editForm, setEditForm] = useState({
@@ -432,6 +447,38 @@ export function MyClientsKanban() {
     }
   };
 
+  const handleDeleteClient = async () => {
+    if (!selectedProposta) return;
+    
+    setDeletingClient(true);
+    try {
+      const { error } = await supabase
+        .from("propostas")
+        .delete()
+        .eq("id", selectedProposta.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Cliente excluído com sucesso!",
+      });
+
+      setIsDetailDialogOpen(false);
+      setSelectedProposta(null);
+      fetchPropostas();
+    } catch (error) {
+      console.error("Error deleting client:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir cliente",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingClient(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
@@ -625,14 +672,47 @@ export function MyClientsKanban() {
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span>Detalhes da Proposta</span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setIsEditMode(!isEditMode)}
-              >
-                <Pencil className="h-4 w-4 mr-2" />
-                {isEditMode ? "Cancelar" : "Editar"}
-              </Button>
+              <div className="flex gap-2">
+                {isAdmin && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={deletingClient}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Excluir
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDeleteClient}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          {deletingClient ? "Excluindo..." : "Excluir"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsEditMode(!isEditMode)}
+                >
+                  <Pencil className="h-4 w-4 mr-2" />
+                  {isEditMode ? "Cancelar" : "Editar"}
+                </Button>
+              </div>
             </DialogTitle>
             <DialogDescription>
               Visualize e edite as informações do cliente
