@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Plus, 
   FileText, 
@@ -20,12 +21,17 @@ import {
   ChevronUp,
   Copy,
   Download,
-  RefreshCw
+  RefreshCw,
+  History,
+  Edit,
+  Clock,
+  Save
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Contract {
   id: string;
@@ -42,11 +48,20 @@ interface ProposalData {
   contracts: Contract[];
 }
 
+interface SavedProposal {
+  id: string;
+  client_name: string;
+  client_phone: string;
+  contracts: Contract[];
+  created_at: string;
+  updated_at: string;
+}
+
 const PRODUCTS = [
-  { id: "novo", label: "Novo", emoji: "🆕", color: "bg-emerald-500" },
-  { id: "portabilidade", label: "Portabilidade", emoji: "🔄", color: "bg-blue-500" },
-  { id: "refinanciamento", label: "Refinanciamento", emoji: "💰", color: "bg-amber-500" },
-  { id: "cartao", label: "Cartão", emoji: "💳", color: "bg-purple-500" },
+  { id: "novo", label: "Novo", emoji: "🆕", color: "bg-emerald-500", footer: "💵 Valor creditado em até 24 horas" },
+  { id: "portabilidade", label: "Portabilidade", emoji: "🔄", color: "bg-blue-500", footer: "📅 Valor creditado em até 8 dias" },
+  { id: "refinanciamento", label: "Refinanciamento", emoji: "💰", color: "bg-amber-500", footer: "💵 Valor creditado em até 24 horas" },
+  { id: "cartao", label: "Cartão", emoji: "💳", color: "bg-purple-500", footer: "💵 Valor creditado em até 24 horas" },
 ];
 
 const formatCurrency = (value: string): string => {
@@ -64,6 +79,8 @@ const parseCurrency = (value: string): number => {
 };
 
 export function ProposalGenerator() {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<"generator" | "saved">("generator");
   const [step, setStep] = useState<"client-name" | "client-phone" | "contracts" | "summary">("client-name");
   const [proposalData, setProposalData] = useState<ProposalData>({
     clientName: "",
@@ -78,6 +95,12 @@ export function ProposalGenerator() {
   const [bankInput, setBankInput] = useState("");
   const [showBankSuggestions, setShowBankSuggestions] = useState(false);
   const bankInputRef = useRef<HTMLInputElement>(null);
+  
+  // Saved proposals state
+  const [savedProposals, setSavedProposals] = useState<SavedProposal[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
+  const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const fetchBanks = async () => {
@@ -99,6 +122,116 @@ export function ProposalGenerator() {
     };
     fetchBanks();
   }, []);
+
+  useEffect(() => {
+    if (user && activeTab === "saved") {
+      fetchSavedProposals();
+    }
+  }, [user, activeTab]);
+
+  const fetchSavedProposals = async () => {
+    if (!user) return;
+    setLoadingSaved(true);
+    try {
+      const { data, error } = await supabase
+        .from("saved_proposals")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false });
+      
+      if (error) throw error;
+      
+      const proposals: SavedProposal[] = (data || []).map((item: any) => ({
+        id: item.id,
+        client_name: item.client_name,
+        client_phone: item.client_phone,
+        contracts: Array.isArray(item.contracts) ? item.contracts : [],
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+      }));
+      
+      setSavedProposals(proposals);
+    } catch (error) {
+      console.error("Error fetching saved proposals:", error);
+      toast.error("Erro ao carregar propostas salvas");
+    } finally {
+      setLoadingSaved(false);
+    }
+  };
+
+  const saveProposal = async () => {
+    if (!user) {
+      toast.error("Faça login para salvar propostas");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const contractsData = proposalData.contracts.filter(c => c.isComplete) as unknown as any;
+      
+      const proposalPayload = {
+        user_id: user.id,
+        client_name: proposalData.clientName,
+        client_phone: proposalData.clientPhone,
+        contracts: contractsData,
+      };
+
+      if (editingProposalId) {
+        const { error } = await supabase
+          .from("saved_proposals")
+          .update(proposalPayload)
+          .eq("id", editingProposalId);
+        
+        if (error) throw error;
+        toast.success("Proposta atualizada com sucesso!");
+      } else {
+        const { error } = await supabase
+          .from("saved_proposals")
+          .insert([proposalPayload]);
+        
+        if (error) throw error;
+        toast.success("Proposta salva com sucesso!");
+      }
+      
+      fetchSavedProposals();
+    } catch (error) {
+      console.error("Error saving proposal:", error);
+      toast.error("Erro ao salvar proposta");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const loadProposalForEdit = (proposal: SavedProposal) => {
+    setProposalData({
+      clientName: proposal.client_name,
+      clientPhone: proposal.client_phone,
+      contracts: proposal.contracts,
+    });
+    setEditingProposalId(proposal.id);
+    setStep("contracts");
+    setCurrentContractIndex(null);
+    setActiveTab("generator");
+    toast.success("Proposta carregada para edição");
+  };
+
+  const deleteProposal = async (proposalId: string) => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from("saved_proposals")
+        .delete()
+        .eq("id", proposalId);
+      
+      if (error) throw error;
+      toast.success("Proposta excluída");
+      fetchSavedProposals();
+    } catch (error) {
+      console.error("Error deleting proposal:", error);
+      toast.error("Erro ao excluir proposta");
+    }
+  };
 
   const filteredBanks = banks.filter(bank => 
     bank.toLowerCase().includes(bankInput.toLowerCase())
@@ -126,7 +259,9 @@ export function ProposalGenerator() {
       return;
     }
     setStep("contracts");
-    addNewContract();
+    if (proposalData.contracts.length === 0) {
+      addNewContract();
+    }
   };
 
   const addNewContract = () => {
@@ -259,10 +394,17 @@ export function ProposalGenerator() {
     return getCompletedContracts().reduce((sum, c) => sum + parseCurrency(c.parcela), 0);
   };
 
+  const getUniqueProductFooters = () => {
+    const completedContracts = getCompletedContracts();
+    const uniqueProducts = new Set(completedContracts.map(c => c.product));
+    return Array.from(uniqueProducts).map(productId => getProductInfo(productId)?.footer).filter(Boolean);
+  };
+
   const generateProposalText = () => {
     const completedContracts = getCompletedContracts();
     const totalTroco = calculateTotalTroco();
     const totalParcela = calculateTotalParcela();
+    const footers = getUniqueProductFooters();
     
     let text = `✨ *PROPOSTA COMERCIAL* ✨\n\n`;
     text += `👤 *Cliente:* ${proposalData.clientName}\n`;
@@ -291,6 +433,17 @@ export function ProposalGenerator() {
       text += `💰 Troco Total Estimado: ${formatCurrency(String(totalTroco * 100))}\n`;
     }
     text += `\n📅 Data: ${new Date().toLocaleDateString("pt-BR")}\n`;
+    
+    // Add product-specific footers
+    if (footers.length > 0) {
+      text += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
+      text += `ℹ️ *INFORMAÇÕES*\n`;
+      text += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+      footers.forEach(footer => {
+        text += `${footer}\n`;
+      });
+    }
+    
     text += `\n✅ *Proposta sujeita à análise de crédito*`;
 
     return text;
@@ -322,6 +475,7 @@ export function ProposalGenerator() {
     const completedContracts = getCompletedContracts();
     const totalTroco = calculateTotalTroco();
     const totalParcela = calculateTotalParcela();
+    const footers = getUniqueProductFooters();
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -409,6 +563,23 @@ export function ProposalGenerator() {
 
     y += 55;
 
+    // Product-specific footers
+    if (footers.length > 0) {
+      doc.setTextColor(59, 130, 246);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("INFORMAÇÕES IMPORTANTES:", 20, y);
+      y += 7;
+      
+      doc.setTextColor(100, 100, 100);
+      doc.setFont("helvetica", "normal");
+      footers.forEach(footer => {
+        doc.text(`• ${footer?.replace(/[💵📅]/g, '')}`, 20, y);
+        y += 6;
+      });
+      y += 5;
+    }
+
     // Footer
     doc.setTextColor(128, 128, 128);
     doc.setFontSize(9);
@@ -431,6 +602,7 @@ export function ProposalGenerator() {
     setCurrentContractStep("product");
     setExpandedContracts(new Set());
     setBankInput("");
+    setEditingProposalId(null);
   };
 
   const renderStepIndicator = () => {
@@ -557,6 +729,7 @@ export function ProposalGenerator() {
     const totalTroco = calculateTotalTroco();
     const totalParcela = calculateTotalParcela();
     const proposalText = generateProposalText();
+    const footers = getUniqueProductFooters();
 
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -623,6 +796,22 @@ export function ProposalGenerator() {
           })}
         </div>
 
+        {/* Product-specific footers */}
+        {footers.length > 0 && (
+          <div className="max-w-2xl mx-auto">
+            <Card className="bg-muted/50 border-dashed">
+              <CardContent className="p-4">
+                <p className="text-sm font-medium text-foreground mb-2">ℹ️ Informações importantes:</p>
+                <div className="space-y-1">
+                  {footers.map((footer, i) => (
+                    <p key={i} className="text-sm text-muted-foreground">{footer}</p>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Copy Text Area */}
         <div className="max-w-2xl mx-auto space-y-3">
           <div className="flex items-center justify-between">
@@ -649,6 +838,12 @@ export function ProposalGenerator() {
             <Download className="w-4 h-4 mr-2" />
             Baixar PDF
           </Button>
+          {user && (
+            <Button onClick={saveProposal} variant="outline" className="flex-1 h-12" disabled={isSaving}>
+              <Save className="w-4 h-4 mr-2" />
+              {isSaving ? "Salvando..." : editingProposalId ? "Atualizar" : "Salvar"}
+            </Button>
+          )}
           <Button onClick={resetGenerator} variant="outline" className="flex-1 h-12">
             <RefreshCw className="w-4 h-4 mr-2" />
             Nova Proposta
@@ -669,6 +864,12 @@ export function ProposalGenerator() {
             <p className="text-muted-foreground">
               {proposalData.contracts.filter((c) => c.isComplete).length} contrato(s) adicionado(s)
             </p>
+            {editingProposalId && (
+              <Badge variant="secondary" className="mt-2">
+                <Edit className="w-3 h-3 mr-1" />
+                Editando proposta existente
+              </Badge>
+            )}
           </div>
 
           <div className="max-w-2xl mx-auto space-y-3">
@@ -719,6 +920,11 @@ export function ProposalGenerator() {
                               {contract.troco || "Não informado"}
                             </span>
                           </div>
+                          {productInfo?.footer && (
+                            <div className="pt-2 mt-2 border-t">
+                              <p className="text-xs text-primary">{productInfo.footer}</p>
+                            </div>
+                          )}
                           <Button
                             variant="destructive"
                             size="sm"
@@ -773,7 +979,7 @@ export function ProposalGenerator() {
                 key={product.id}
                 variant="outline"
                 className={cn(
-                  "h-20 flex-col gap-2 text-lg font-medium transition-all hover:scale-105",
+                  "h-24 flex-col gap-2 text-lg font-medium transition-all hover:scale-105",
                   contract.product === product.id && "ring-2 ring-primary"
                 )}
                 onClick={() => handleProductSelect(product.id)}
@@ -788,6 +994,7 @@ export function ProposalGenerator() {
     }
 
     if (currentContractStep === "bank") {
+      const currentProduct = getProductInfo(contract.product);
       return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="text-center space-y-2">
@@ -796,8 +1003,8 @@ export function ProposalGenerator() {
             </div>
             <h2 className="text-2xl font-bold text-foreground">Qual o banco?</h2>
             <p className="text-muted-foreground">
-              Produto: <Badge className={cn("text-white ml-1", getProductInfo(contract.product)?.color)}>
-                {getProductInfo(contract.product)?.label}
+              Produto: <Badge className={cn("text-white ml-1", currentProduct?.color)}>
+                {currentProduct?.label}
               </Badge>
             </p>
           </div>
@@ -839,6 +1046,13 @@ export function ProposalGenerator() {
                 </div>
               )}
             </div>
+
+            {/* Product footer info */}
+            {currentProduct?.footer && (
+              <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+                <p className="text-sm text-primary">{currentProduct.footer}</p>
+              </div>
+            )}
 
             <div className="flex gap-2">
               <Button
@@ -960,6 +1174,101 @@ export function ProposalGenerator() {
     return null;
   };
 
+  const renderSavedProposals = () => (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <div className="text-center space-y-2">
+        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <History className="w-8 h-8 text-primary" />
+        </div>
+        <h2 className="text-2xl font-bold text-foreground">Propostas Salvas</h2>
+        <p className="text-muted-foreground">Clique em uma proposta para editar</p>
+      </div>
+
+      {!user && (
+        <div className="max-w-2xl mx-auto">
+          <Card className="border-dashed">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <User className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Faça login para ver suas propostas salvas</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {user && loadingSaved && (
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <RefreshCw className="w-8 h-8 mx-auto mb-4 animate-spin" />
+              <p>Carregando propostas...</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {user && !loadingSaved && savedProposals.length === 0 && (
+        <div className="max-w-2xl mx-auto">
+          <Card className="border-dashed">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Nenhuma proposta salva ainda</p>
+              <p className="text-sm">Gere uma proposta e clique em "Salvar"</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {user && !loadingSaved && savedProposals.length > 0 && (
+        <div className="max-w-2xl mx-auto space-y-3">
+          {savedProposals.map((proposal) => (
+            <Card key={proposal.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                      <User className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">{proposal.client_name}</p>
+                      <p className="text-sm text-muted-foreground">{proposal.client_phone}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">
+                      {proposal.contracts.length} contrato(s)
+                    </Badge>
+                    <div className="flex items-center text-xs text-muted-foreground">
+                      <Clock className="w-3 h-3 mr-1" />
+                      {new Date(proposal.updated_at).toLocaleDateString("pt-BR")}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => loadProposalForEdit(proposal)}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Editar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => deleteProposal(proposal.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 pb-32">
       {/* Header */}
@@ -975,7 +1284,7 @@ export function ProposalGenerator() {
                 <p className="text-sm text-muted-foreground">Crie propostas de forma rápida</p>
               </div>
             </div>
-            {(step === "contracts" || step === "summary") && proposalData.contracts.some((c) => c.isComplete) && (
+            {activeTab === "generator" && (step === "contracts" || step === "summary") && proposalData.contracts.some((c) => c.isComplete) && (
               <Button variant="ghost" size="sm" onClick={resetGenerator}>
                 Nova Proposta
               </Button>
@@ -984,21 +1293,41 @@ export function ProposalGenerator() {
         </div>
       </div>
 
-      {/* Step Indicator */}
-      <div className="container max-w-4xl mx-auto px-4 pt-8">
-        {renderStepIndicator()}
-      </div>
+      {/* Tabs */}
+      <div className="container max-w-4xl mx-auto px-4 pt-4">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "generator" | "saved")} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="generator" className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Nova Proposta
+            </TabsTrigger>
+            <TabsTrigger value="saved" className="flex items-center gap-2">
+              <History className="w-4 h-4" />
+              Propostas Salvas
+            </TabsTrigger>
+          </TabsList>
 
-      {/* Main Content */}
-      <div className="container max-w-4xl mx-auto px-4 py-8">
-        {step === "client-name" && renderClientNameStep()}
-        {step === "client-phone" && renderClientPhoneStep()}
-        {step === "contracts" && renderContractStep()}
-        {step === "summary" && renderSummaryStep()}
+          <TabsContent value="generator">
+            {/* Step Indicator */}
+            {renderStepIndicator()}
+
+            {/* Main Content */}
+            <div className="py-4">
+              {step === "client-name" && renderClientNameStep()}
+              {step === "client-phone" && renderClientPhoneStep()}
+              {step === "contracts" && renderContractStep()}
+              {step === "summary" && renderSummaryStep()}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="saved">
+            {renderSavedProposals()}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Fixed Bottom Actions */}
-      {step === "contracts" && (
+      {activeTab === "generator" && step === "contracts" && (
         <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t p-4 md:pb-4 pb-20">
           <div className="container max-w-4xl mx-auto flex gap-3">
             <Button

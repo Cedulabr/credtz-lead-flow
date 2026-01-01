@@ -1416,6 +1416,36 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_proposals: {
+        Row: {
+          client_name: string
+          client_phone: string
+          contracts: Json
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_name: string
+          client_phone: string
+          contracts?: Json
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_name?: string
+          client_phone?: string
+          contracts?: Json
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sms_messages: {
         Row: {
           created_at: string
