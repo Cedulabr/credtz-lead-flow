@@ -8,7 +8,7 @@ import { Switch } from "./ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { format, addMonths } from "date-fns";
+import { format } from "date-fns";
 
 interface Transaction {
   id: string;
@@ -69,10 +69,13 @@ export const FinanceTransactionForm = ({
 
   useEffect(() => {
     if (transaction) {
+      // Parse the date correctly - just use the date string as-is since it's already in YYYY-MM-DD format
+      const dueDate = transaction.due_date;
+      
       setFormData({
         description: transaction.description,
         value: String(transaction.value),
-        due_date: transaction.due_date,
+        due_date: dueDate,
         status: transaction.status,
         type: transaction.type,
         notes: transaction.notes || "",
@@ -97,14 +100,19 @@ export const FinanceTransactionForm = ({
     setLoading(true);
 
     try {
-      const dueDate = new Date(formData.due_date);
-      const recurringDay = dueDate.getDate();
+      // Parse the date correctly from the input (YYYY-MM-DD format)
+      // The input type="date" always returns YYYY-MM-DD format
+      const dueDateStr = formData.due_date; // Already in YYYY-MM-DD format
+      const [year, month, day] = dueDateStr.split('-').map(Number);
+      const recurringDay = day;
+
+      console.log("Saving transaction with date:", dueDateStr, "parsed day:", day);
 
       const baseData = {
         company_id: companyId,
         description: formData.description,
         value: parseFloat(formData.value.replace(/[^\d.,]/g, "").replace(",", ".")),
-        due_date: formData.due_date,
+        due_date: dueDateStr, // Use the date string directly - no conversion needed
         status: formData.is_recurring ? "recorrente" : formData.status,
         type: formData.type,
         notes: formData.notes || null,
@@ -134,12 +142,19 @@ export const FinanceTransactionForm = ({
         if (formData.is_recurring) {
           // Create multiple transactions for recurring
           const transactionsToInsert = [];
+          const [baseYear, baseMonth, baseDay] = dueDateStr.split('-').map(Number);
           
           for (let i = 0; i < formData.recurring_months; i++) {
-            const monthDate = addMonths(dueDate, i);
+            // Calculate the date for each recurring transaction
+            const newMonth = baseMonth - 1 + i; // -1 because JS months are 0-indexed
+            const targetDate = new Date(baseYear, newMonth, baseDay);
+            
+            // Format the date as YYYY-MM-DD
+            const formattedDate = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
+            
             transactionsToInsert.push({
               ...baseData,
-              due_date: format(monthDate, "yyyy-MM-dd"),
+              due_date: formattedDate,
               parent_transaction_id: i === 0 ? null : undefined,
             });
           }

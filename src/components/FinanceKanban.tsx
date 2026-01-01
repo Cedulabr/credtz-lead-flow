@@ -8,8 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Plus, Filter, Calendar, AlertTriangle, CheckCircle, Clock, RefreshCw, Search, FileText, Trash2, Edit, Eye } from "lucide-react";
-import { format, addMonths, startOfMonth, endOfMonth, isAfter, isBefore, addDays } from "date-fns";
+import { Plus, Filter, Calendar, AlertTriangle, CheckCircle, Clock, RefreshCw, Search, FileText, Trash2, Edit, GripVertical } from "lucide-react";
+import { format, addMonths, startOfMonth, endOfMonth, isAfter, isBefore, addDays, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { FinanceTransactionForm } from "./FinanceTransactionForm";
 import { FinanceReceipts } from "./FinanceReceipts";
@@ -64,6 +64,7 @@ export const FinanceKanban = () => {
   const [showReceipts, setShowReceipts] = useState(false);
   const [selectedTransactionForReceipts, setSelectedTransactionForReceipts] = useState<Transaction | null>(null);
   const [isGestor, setIsGestor] = useState(false);
+  const [draggedItem, setDraggedItem] = useState<Transaction | null>(null);
   const { toast } = useToast();
   const { user, isAdmin } = useAuth();
 
@@ -199,6 +200,73 @@ export const FinanceKanban = () => {
     setIsGestor(company?.company_role === "gestor" || isAdmin);
   };
 
+  // Drag and Drop handlers
+  const handleDragStart = (e: React.DragEvent, transaction: Transaction) => {
+    if (!isGestor) return;
+    setDraggedItem(transaction);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetStatus: string) => {
+    e.preventDefault();
+    
+    if (!draggedItem || draggedItem.status === targetStatus) {
+      setDraggedItem(null);
+      return;
+    }
+
+    if (!isGestor) {
+      setDraggedItem(null);
+      return;
+    }
+
+    try {
+      const updateData: any = { status: targetStatus };
+      
+      if (targetStatus === "pago") {
+        updateData.payment_date = format(new Date(), "yyyy-MM-dd");
+      }
+
+      const { error } = await supabase
+        .from("financial_transactions")
+        .update(updateData)
+        .eq("id", draggedItem.id);
+
+      if (error) throw error;
+
+      // Update local state immediately
+      setTransactions((prev) =>
+        prev.map((t) =>
+          t.id === draggedItem.id ? { ...t, status: targetStatus, payment_date: targetStatus === "pago" ? format(new Date(), "yyyy-MM-dd") : t.payment_date } : t
+        )
+      );
+
+      const targetLabel = statusColumns.find((s) => s.id === targetStatus)?.label;
+      toast({
+        title: "Status atualizado",
+        description: `Lançamento movido para "${targetLabel}"`,
+      });
+    } catch (error: any) {
+      console.error("Error updating status:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o status.",
+        variant: "destructive",
+      });
+    } finally {
+      setDraggedItem(null);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+  };
+
   const handleStatusChange = async (transactionId: string, newStatus: string) => {
     if (!isGestor) return;
 
@@ -216,12 +284,17 @@ export const FinanceKanban = () => {
 
       if (error) throw error;
 
+      // Update local state immediately
+      setTransactions((prev) =>
+        prev.map((t) =>
+          t.id === transactionId ? { ...t, status: newStatus, payment_date: newStatus === "pago" ? format(new Date(), "yyyy-MM-dd") : t.payment_date } : t
+        )
+      );
+
       toast({
         title: "Status atualizado",
         description: "O status da transação foi alterado com sucesso.",
       });
-
-      fetchTransactions();
     } catch (error: any) {
       console.error("Error updating status:", error);
       toast({
@@ -301,17 +374,34 @@ export const FinanceKanban = () => {
     return months;
   };
 
+  // Parse date correctly handling timezone
+  const parseDateSafe = (dateStr: string) => {
+    // If it's a date-only string (YYYY-MM-DD), parse it as local date
+    if (dateStr && dateStr.length === 10) {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    }
+    return parseISO(dateStr);
+  };
+
+  const formatDateDisplay = (dateStr: string) => {
+    const date = parseDateSafe(dateStr);
+    return format(date, "dd/MM/yyyy");
+  };
+
   const isDueSoon = (dueDate: string) => {
-    const due = new Date(dueDate);
+    const due = parseDateSafe(dueDate);
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const threeDaysFromNow = addDays(today, 3);
     return isAfter(due, today) && isBefore(due, threeDaysFromNow);
   };
 
   const isOverdue = (dueDate: string, status: string) => {
     if (status === "pago") return false;
-    const due = new Date(dueDate);
+    const due = parseDateSafe(dueDate);
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     return isBefore(due, today);
   };
 
@@ -450,7 +540,16 @@ export const FinanceKanban = () => {
             const Icon = column.icon;
 
             return (
-              <Card key={column.id} className="flex flex-col">
+              <Card 
+                key={column.id} 
+                className={`flex flex-col transition-all ${
+                  draggedItem && draggedItem.status !== column.id 
+                    ? "ring-2 ring-primary/50 ring-dashed" 
+                    : ""
+                }`}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, column.id)}
+              >
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -475,7 +574,16 @@ export const FinanceKanban = () => {
                     columnTransactions.map((transaction) => (
                       <Card 
                         key={transaction.id} 
-                        className={`cursor-pointer transition-all hover:shadow-md ${
+                        draggable={isGestor}
+                        onDragStart={(e) => handleDragStart(e, transaction)}
+                        onDragEnd={handleDragEnd}
+                        className={`transition-all hover:shadow-md ${
+                          isGestor ? "cursor-grab active:cursor-grabbing" : "cursor-default"
+                        } ${
+                          draggedItem?.id === transaction.id 
+                            ? "opacity-50 scale-95" 
+                            : ""
+                        } ${
                           isOverdue(transaction.due_date, transaction.status) 
                             ? "border-red-500 bg-red-50 dark:bg-red-950/20" 
                             : isDueSoon(transaction.due_date) && transaction.status !== "pago"
@@ -485,6 +593,9 @@ export const FinanceKanban = () => {
                       >
                         <CardContent className="p-3 space-y-2">
                           <div className="flex items-start justify-between gap-2">
+                            {isGestor && (
+                              <GripVertical className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                            )}
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-sm truncate">{transaction.description}</p>
                               <p className={`text-lg font-bold ${
@@ -505,7 +616,7 @@ export const FinanceKanban = () => {
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
-                              {format(new Date(transaction.due_date), "dd/MM/yyyy")}
+                              {formatDateDisplay(transaction.due_date)}
                             </span>
                             <Badge variant={transaction.type === "despesa" ? "destructive" : "default"} className="text-xs">
                               {transaction.type === "despesa" ? "Despesa" : "Comissão"}
