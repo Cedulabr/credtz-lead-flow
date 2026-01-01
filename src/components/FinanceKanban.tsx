@@ -9,7 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Plus, Calendar, AlertTriangle, CheckCircle, Clock, RefreshCw, Search, FileText, Trash2, Edit, GripVertical } from "lucide-react";
-import { format, addMonths, endOfMonth, isAfter, isBefore, addDays, parseISO } from "date-fns";
+import { format, addMonths, endOfMonth, isAfter, isBefore, addDays } from "date-fns";
+import { parseDateSafe } from "@/lib/date";
 import { ptBR } from "date-fns/locale";
 import { FinanceTransactionForm } from "./FinanceTransactionForm";
 import { FinanceReceipts } from "./FinanceReceipts";
@@ -379,23 +380,15 @@ export const FinanceKanban = () => {
     return months;
   };
 
-  // Parse date correctly handling timezone
-  const parseDateSafe = (dateStr: string) => {
-    // If it's a date-only string (YYYY-MM-DD), parse it as local date
-    if (dateStr && dateStr.length === 10) {
-      const [year, month, day] = dateStr.split('-').map(Number);
-      return new Date(year, month - 1, day);
-    }
-    return parseISO(dateStr);
-  };
-
   const formatDateDisplay = (dateStr: string) => {
     const date = parseDateSafe(dateStr);
-    return format(date, "dd/MM/yyyy");
+    return date ? format(date, "dd/MM/yyyy") : "-";
   };
 
   const isDueSoon = (dueDate: string) => {
     const due = parseDateSafe(dueDate);
+    if (!due) return false;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const threeDaysFromNow = addDays(today, 3);
@@ -405,6 +398,8 @@ export const FinanceKanban = () => {
   const isOverdue = (dueDate: string, status: string) => {
     if (status === "pago") return false;
     const due = parseDateSafe(dueDate);
+    if (!due) return false;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return isBefore(due, today);
