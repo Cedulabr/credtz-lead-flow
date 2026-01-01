@@ -17,6 +17,7 @@ interface NavigationProps {
 const navItems = [
   { id: "dashboard", label: "Início", icon: Home, permissionKey: null },
   { id: "indicate", label: "Indicar", icon: UserPlus, permissionKey: "can_access_indicar" },
+  { id: "proposal-generator", label: "Gerador de Propostas", icon: FileText, permissionKey: "can_access_gerador_propostas" },
   { id: "leads", label: "Leads Premium", icon: TrendingUp, permissionKey: "can_access_premium_leads" },
   { id: "my-clients", label: "Meus Clientes", icon: Users, permissionKey: "can_access_meus_clientes" },
   { id: "televendas", label: "Televendas", icon: Phone, permissionKey: "can_access_televendas" },
