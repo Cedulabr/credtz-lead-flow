@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { AdminCommissionEdit } from "./AdminCommissionEdit";
+import { jsPDF } from "jspdf";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -21,7 +22,8 @@ import {
   Download,
   Building2,
   Plus,
-  Search
+  Search,
+  FileDown
 } from "lucide-react";
 
 interface CommissionFormData {
@@ -668,10 +670,126 @@ export function Commissions() {
       {/* Commissions History */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Histórico de Comissões
-          </CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Histórico de Comissões
+            </CardTitle>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                // Gerar PDF das comissões do mês selecionado
+                const [year, month] = selectedMonth.split('-').map(Number);
+                const monthName = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                
+                // Filtrar comissões pagas do mês
+                const paidCommissions = commissions.filter(c => {
+                  if (c.status !== 'paid' || !c.payment_date) return false;
+                  const dateParts = c.payment_date.split('-');
+                  const paymentYear = parseInt(dateParts[0]);
+                  const paymentMonth = parseInt(dateParts[1]);
+                  return paymentMonth === month && paymentYear === year && c.commission_amount > 0;
+                });
+                
+                if (paidCommissions.length === 0) {
+                  toast({
+                    title: "Sem comissões",
+                    description: `Não há comissões pagas em ${monthName}`,
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                
+                const doc = new jsPDF();
+                const pageWidth = doc.internal.pageSize.getWidth();
+                
+                // Header
+                doc.setFontSize(18);
+                doc.setFont("helvetica", "bold");
+                doc.text("Extrato de Comissões", pageWidth / 2, 20, { align: "center" });
+                
+                doc.setFontSize(12);
+                doc.setFont("helvetica", "normal");
+                doc.text(`Período: ${monthName}`, pageWidth / 2, 30, { align: "center" });
+                doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth / 2, 38, { align: "center" });
+                
+                // Summary
+                const totalPaid = paidCommissions.reduce((sum, c) => sum + Number(c.commission_amount), 0);
+                doc.setFontSize(14);
+                doc.setFont("helvetica", "bold");
+                doc.text(`Total de Comissões: ${formatCurrency(totalPaid)}`, 14, 52);
+                doc.text(`Quantidade: ${paidCommissions.length} comissões`, 14, 60);
+                
+                // Table header
+                let yPos = 75;
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "bold");
+                doc.setFillColor(240, 240, 240);
+                doc.rect(14, yPos - 5, pageWidth - 28, 8, "F");
+                doc.text("Cliente", 16, yPos);
+                doc.text("Banco", 70, yPos);
+                doc.text("Produto", 105, yPos);
+                doc.text("Valor", 150, yPos);
+                doc.text("Comissão", 175, yPos);
+                
+                yPos += 10;
+                doc.setFont("helvetica", "normal");
+                
+                // Table rows
+                paidCommissions.forEach((commission, index) => {
+                  if (yPos > 270) {
+                    doc.addPage();
+                    yPos = 20;
+                  }
+                  
+                  // Alternate row background
+                  if (index % 2 === 0) {
+                    doc.setFillColor(250, 250, 250);
+                    doc.rect(14, yPos - 4, pageWidth - 28, 7, "F");
+                  }
+                  
+                  const clientName = commission.client_name.length > 20 
+                    ? commission.client_name.substring(0, 20) + "..." 
+                    : commission.client_name;
+                  const bankName = commission.bank_name.length > 12
+                    ? commission.bank_name.substring(0, 12) + "..."
+                    : commission.bank_name;
+                  const productType = commission.product_type.length > 15
+                    ? commission.product_type.substring(0, 15) + "..."
+                    : commission.product_type;
+                  
+                  doc.text(clientName, 16, yPos);
+                  doc.text(bankName, 70, yPos);
+                  doc.text(productType, 105, yPos);
+                  doc.text(`R$ ${Number(commission.credit_value || 0).toFixed(2)}`, 150, yPos);
+                  doc.text(`R$ ${Number(commission.commission_amount).toFixed(2)}`, 175, yPos);
+                  
+                  yPos += 7;
+                });
+                
+                // Footer
+                yPos += 10;
+                doc.setDrawColor(200, 200, 200);
+                doc.line(14, yPos, pageWidth - 14, yPos);
+                yPos += 8;
+                doc.setFont("helvetica", "bold");
+                doc.text(`TOTAL: ${formatCurrency(totalPaid)}`, pageWidth - 14, yPos, { align: "right" });
+                
+                // Save PDF
+                const fileName = `comissoes_${year}_${String(month).padStart(2, '0')}.pdf`;
+                doc.save(fileName);
+                
+                toast({
+                  title: "PDF gerado!",
+                  description: `Extrato de ${monthName} baixado com sucesso.`,
+                });
+              }}
+              className="gap-2"
+            >
+              <FileDown className="h-4 w-4" />
+              Gerar PDF
+            </Button>
+          </div>
           <div className="flex gap-4 mt-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
