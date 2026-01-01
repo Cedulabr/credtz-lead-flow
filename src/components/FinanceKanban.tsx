@@ -81,6 +81,31 @@ export const FinanceKanban = () => {
 
   const fetchUserCompanies = async () => {
     try {
+      // Admin can see all companies
+      if (isAdmin) {
+        const { data: allCompanies, error: companiesError } = await supabase
+          .from("companies")
+          .select("id, name")
+          .eq("is_active", true);
+
+        if (companiesError) throw companiesError;
+
+        const companies = (allCompanies || []).map(c => ({
+          company_id: c.id,
+          company_role: "gestor" as const,
+          companies: { id: c.id, name: c.name }
+        })) as UserCompany[];
+
+        setUserCompanies(companies);
+        setIsGestor(true);
+
+        if (companies.length > 0) {
+          setSelectedCompanyId(companies[0].company_id);
+        }
+        return;
+      }
+
+      // Regular users - fetch their company associations
       const { data, error } = await supabase
         .from("user_companies")
         .select(`
@@ -101,7 +126,7 @@ export const FinanceKanban = () => {
 
       if (companies.length > 0) {
         setSelectedCompanyId(companies[0].company_id);
-        setIsGestor(companies[0].company_role === "gestor" || isAdmin);
+        setIsGestor(companies[0].company_role === "gestor");
       }
     } catch (error: any) {
       console.error("Error fetching user companies:", error);
