@@ -367,10 +367,12 @@ export const FinanceKanban = () => {
 
   const getMonthOptions = () => {
     const months = [];
-    const today = new Date();
+    // Start from January 2026
+    const startDate = new Date(2026, 0, 1); // January 2026
     
-    for (let i = -6; i <= 6; i++) {
-      const date = addMonths(today, i);
+    // Generate 24 months starting from January 2026
+    for (let i = 0; i < 24; i++) {
+      const date = addMonths(startDate, i);
       months.push({
         value: format(date, "yyyy-MM"),
         label: format(date, "MMMM yyyy", { locale: ptBR }),
