@@ -356,14 +356,14 @@ export function AdminCommissionRules() {
                   Empresa (opcional - deixe vazio para regra global)
                 </Label>
                 <Select
-                  value={formData.company_id}
-                  onValueChange={(value) => setFormData({ ...formData, company_id: value })}
+                  value={formData.company_id || "global"}
+                  onValueChange={(value) => setFormData({ ...formData, company_id: value === "global" ? "" : value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a empresa (opcional)" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Regra Global (todas empresas)</SelectItem>
+                  <SelectContent className="bg-background border z-50">
+                    <SelectItem value="global">Regra Global (todas empresas)</SelectItem>
                     {companies.map((company) => (
                       <SelectItem key={company.id} value={company.id}>
                         {company.name}
