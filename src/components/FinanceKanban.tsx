@@ -84,6 +84,8 @@ export const FinanceKanban = () => {
 
   const fetchUserCompanies = async () => {
     try {
+      console.log("FinanceKanban: Fetching companies for user, isAdmin:", isAdmin);
+      
       // Admin can see all companies
       if (isAdmin) {
         const { data: allCompanies, error: companiesError } = await supabase
@@ -92,6 +94,8 @@ export const FinanceKanban = () => {
           .eq("is_active", true);
 
         if (companiesError) throw companiesError;
+
+        console.log("FinanceKanban: Admin - found", allCompanies?.length || 0, "companies");
 
         const companies = (allCompanies || []).map(c => ({
           company_id: c.id,
@@ -103,8 +107,10 @@ export const FinanceKanban = () => {
         setIsGestor(true);
 
         if (companies.length > 0) {
+          console.log("FinanceKanban: Admin - selecting first company:", companies[0].company_id);
           setSelectedCompanyId(companies[0].company_id);
         }
+        setLoading(false);
         return;
       }
 
@@ -125,12 +131,14 @@ export const FinanceKanban = () => {
       if (error) throw error;
 
       const companies = (data || []).filter(uc => uc.companies) as UserCompany[];
+      console.log("FinanceKanban: User - found", companies.length, "companies");
       setUserCompanies(companies);
 
       if (companies.length > 0) {
         setSelectedCompanyId(companies[0].company_id);
         setIsGestor(companies[0].company_role === "gestor");
       }
+      setLoading(false);
     } catch (error: any) {
       console.error("Error fetching user companies:", error);
       toast({
@@ -138,16 +146,22 @@ export const FinanceKanban = () => {
         description: "Não foi possível carregar as empresas.",
         variant: "destructive",
       });
+      setLoading(false);
     }
   };
 
   const fetchTransactions = async () => {
-    if (!selectedCompanyId) return;
+    if (!selectedCompanyId) {
+      console.log("FinanceKanban: No company selected, skipping fetch");
+      return;
+    }
 
     setLoading(true);
     try {
       const startDate = startOfMonth(new Date(filterMonth + "-01"));
       const endDate = endOfMonth(startDate);
+
+      console.log("FinanceKanban: Fetching transactions for company:", selectedCompanyId, "month:", filterMonth);
 
       const { data, error } = await supabase
         .from("financial_transactions")
@@ -157,8 +171,12 @@ export const FinanceKanban = () => {
         .lte("due_date", format(endDate, "yyyy-MM-dd"))
         .order("due_date", { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("FinanceKanban: Error fetching transactions:", error);
+        throw error;
+      }
 
+      console.log("FinanceKanban: Fetched", data?.length || 0, "transactions");
       setTransactions(data || []);
     } catch (error: any) {
       console.error("Error fetching transactions:", error);
@@ -489,13 +507,15 @@ export const FinanceKanban = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 w-7 p-0"
+                              className="h-7 px-2 text-xs gap-1"
                               onClick={() => {
                                 setSelectedTransactionForReceipts(transaction);
                                 setShowReceipts(true);
                               }}
+                              title="Ver comprovantes"
                             >
                               <FileText className="h-3.5 w-3.5" />
+                              <span className="hidden sm:inline">Comprovantes</span>
                             </Button>
                             
                             {isGestor && (
