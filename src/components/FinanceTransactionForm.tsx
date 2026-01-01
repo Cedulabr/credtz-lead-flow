@@ -144,13 +144,29 @@ export const FinanceTransactionForm = ({
           const transactionsToInsert = [];
           const [baseYear, baseMonth, baseDay] = dueDateStr.split('-').map(Number);
           
+          // Helper function to get the last day of a month
+          const getLastDayOfMonth = (year: number, month: number) => {
+            // month is 1-indexed here (1 = January)
+            return new Date(year, month, 0).getDate();
+          };
+          
           for (let i = 0; i < formData.recurring_months; i++) {
-            // Calculate the date for each recurring transaction
-            const newMonth = baseMonth - 1 + i; // -1 because JS months are 0-indexed
-            const targetDate = new Date(baseYear, newMonth, baseDay);
+            // Calculate target year and month (1-indexed)
+            let targetMonth = baseMonth + i;
+            let targetYear = baseYear;
+            
+            // Handle year overflow
+            while (targetMonth > 12) {
+              targetMonth -= 12;
+              targetYear += 1;
+            }
+            
+            // Clamp the day to the last valid day of the target month
+            const lastDayOfTargetMonth = getLastDayOfMonth(targetYear, targetMonth);
+            const targetDay = Math.min(baseDay, lastDayOfTargetMonth);
             
             // Format the date as YYYY-MM-DD
-            const formattedDate = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
+            const formattedDate = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
             
             transactionsToInsert.push({
               ...baseData,
