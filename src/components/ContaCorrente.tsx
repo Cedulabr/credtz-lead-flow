@@ -21,9 +21,19 @@ interface CommissionRule {
   id: string;
   bank_name: string;
   product_name: string;
-  term?: string;
-  user_percentage: number;
-  commission_percentage: number;
+  operation_type?: string;
+  user_level: string;
+  calculation_model: string;
+  commission_type: string;
+  commission_value: number;
+  secondary_commission_value?: number;
+  is_active: boolean;
+}
+
+interface TelevendasBank {
+  id: string;
+  name: string;
+  is_active: boolean;
 }
 
 interface Commission {
@@ -51,6 +61,7 @@ export function ContaCorrente() {
   const { isAdmin } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
+  const [televendasBanks, setTelevendasBanks] = useState<TelevendasBank[]>([]);
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [loading, setLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -76,6 +87,7 @@ export function ContaCorrente() {
   useEffect(() => {
     if (isAdmin) {
       fetchUsers();
+      fetchTelevendasBanks();
       fetchCommissionRules();
       fetchCommissions();
     }
@@ -100,10 +112,25 @@ export function ContaCorrente() {
     }
   };
 
+  const fetchTelevendasBanks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('televendas_banks')
+        .select('id, name, is_active')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) throw error;
+      setTelevendasBanks(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar bancos televendas:', error);
+    }
+  };
+
   const fetchCommissionRules = async () => {
     try {
       const { data, error } = await supabase
-        .from('commission_table')
+        .from('commission_rules')
         .select('*')
         .eq('is_active', true);
       
@@ -156,16 +183,26 @@ export function ContaCorrente() {
       return;
     }
 
+    // Find matching rule from commission_rules (regras flexíveis)
     const rule = commissionRules.find(r => 
       r.bank_name === formData.bank_name && 
       r.product_name === formData.product_name &&
-      (r.term === formData.term || !r.term || !formData.term)
+      (r.operation_type === formData.term || !r.operation_type || !formData.term)
     );
 
     if (rule) {
-      const commissionAmount = (formData.credit_value * rule.user_percentage) / 100;
+      let commissionAmount = 0;
+      const commissionPercentage = rule.commission_value;
+
+      if (rule.commission_type === 'fixed') {
+        commissionAmount = rule.commission_value;
+      } else {
+        // percentage
+        commissionAmount = (formData.credit_value * rule.commission_value) / 100;
+      }
+
       setCalculatedCommission(commissionAmount);
-      setFormData(prev => ({ ...prev, commission_percentage: rule.user_percentage }));
+      setFormData(prev => ({ ...prev, commission_percentage: commissionPercentage }));
     } else {
       setCalculatedCommission(0);
       setFormData(prev => ({ ...prev, commission_percentage: 0 }));
@@ -412,14 +449,19 @@ export function ContaCorrente() {
     }
   };
 
-  const uniqueBanks = [...new Set(commissionRules.map(r => r.bank_name))];
+  // Banks from televendas_banks table
+  const uniqueBanks = televendasBanks.map(b => b.name);
+  
+  // Products filtered by bank from commission_rules
   const uniqueProducts = formData.bank_name 
     ? [...new Set(commissionRules.filter(r => r.bank_name === formData.bank_name).map(r => r.product_name))]
     : [];
+  
+  // Operation types (terms) filtered by bank and product
   const uniqueTerms = formData.bank_name && formData.product_name
     ? [...new Set(commissionRules
-        .filter(r => r.bank_name === formData.bank_name && r.product_name === formData.product_name && r.term)
-        .map(r => r.term as string))]
+        .filter(r => r.bank_name === formData.bank_name && r.product_name === formData.product_name && r.operation_type)
+        .map(r => r.operation_type as string))]
     : [];
 
   const statusConfig = {
