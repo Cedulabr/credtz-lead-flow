@@ -100,12 +100,20 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     totalDueSoon: number;
   }>({ overdue: [], dueSoon: [], totalOverdue: 0, totalDueSoon: 0 });
 
+  // Finance summary (receita vs despesa)
+  const [financeSummary, setFinanceSummary] = useState({
+    totalReceita: 0,
+    totalDespesa: 0,
+    saldo: 0
+  });
+
   const userName = profile?.name || user?.email?.split('@')[0] || 'Usuário';
 
   useEffect(() => {
     if (user) {
       fetchDashboardData();
       fetchFinanceAlerts();
+      fetchFinanceSummary();
     }
   }, [user, isAdmin, period]);
 
@@ -370,6 +378,61 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     }
   };
 
+  // Fetch finance summary (receita vs despesa)
+  const fetchFinanceSummary = async () => {
+    try {
+      const { startDate } = getDateRange();
+      
+      let companyIds: string[] = [];
+
+      if (isAdmin) {
+        const { data: companies } = await supabase
+          .from('companies')
+          .select('id')
+          .eq('is_active', true);
+        companyIds = (companies || []).map(c => c.id);
+      } else {
+        const { data: userCompanies } = await supabase
+          .from('user_companies')
+          .select('company_id')
+          .eq('user_id', user?.id)
+          .eq('is_active', true);
+        companyIds = (userCompanies || []).map(uc => uc.company_id);
+      }
+
+      if (companyIds.length === 0) {
+        setFinanceSummary({ totalReceita: 0, totalDespesa: 0, saldo: 0 });
+        return;
+      }
+
+      // Buscar transações do período
+      const { data: transactions, error } = await supabase
+        .from('financial_transactions')
+        .select('type, value, status')
+        .in('company_id', companyIds)
+        .gte('due_date', format(startDate, 'yyyy-MM-dd'));
+
+      if (error) throw error;
+
+      // Calcular totais
+      const receitas = (transactions || [])
+        .filter(t => t.type === 'receita')
+        .reduce((sum, t) => sum + Number(t.value), 0);
+      
+      const despesas = (transactions || [])
+        .filter(t => t.type === 'despesa')
+        .reduce((sum, t) => sum + Number(t.value), 0);
+
+      setFinanceSummary({
+        totalReceita: receitas,
+        totalDespesa: despesas,
+        saldo: receitas - despesas
+      });
+    } catch (error) {
+      console.error('Error fetching finance summary:', error);
+    }
+  };
+
   const goalProgress = revenueMeta > 0 ? (totalRevenue / revenueMeta) * 100 : 0;
   const revenueChange = previousRevenue > 0 
     ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 
@@ -508,6 +571,37 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </CardContent>
           </Card>
         </div>
+
+        {/* Finance Summary - Receita vs Despesa */}
+        <Card className="border-2 shadow-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Wallet className="h-5 w-5 text-primary" />
+              Resultado Financeiro do Período
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center p-3 bg-success/10 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-success mx-auto mb-1" />
+                <p className="text-xs text-muted-foreground">Receitas</p>
+                <p className="text-lg font-bold text-success">{formatCurrency(financeSummary.totalReceita)}</p>
+              </div>
+              <div className="text-center p-3 bg-destructive/10 rounded-lg">
+                <TrendingDown className="h-5 w-5 text-destructive mx-auto mb-1" />
+                <p className="text-xs text-muted-foreground">Despesas</p>
+                <p className="text-lg font-bold text-destructive">{formatCurrency(financeSummary.totalDespesa)}</p>
+              </div>
+              <div className={`text-center p-3 rounded-lg ${financeSummary.saldo >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}>
+                <DollarSign className={`h-5 w-5 mx-auto mb-1 ${financeSummary.saldo >= 0 ? 'text-success' : 'text-destructive'}`} />
+                <p className="text-xs text-muted-foreground">Saldo</p>
+                <p className={`text-lg font-bold ${financeSummary.saldo >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  {formatCurrency(financeSummary.saldo)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Leads Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
