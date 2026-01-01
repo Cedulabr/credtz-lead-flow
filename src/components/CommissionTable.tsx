@@ -3,18 +3,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Building2, Package, Percent, Crown } from "lucide-react";
+import { Building2, Package, Percent, Crown, Calculator, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface CommissionRule {
   id: string;
+  company_id: string | null;
   bank_name: string;
   product_name: string;
-  term: string | null;
-  table_name: string | null;
-  commission_percentage: number;
-  user_percentage: number;
-  user_percentage_profile: string | null;
+  operation_type: string | null;
+  user_level: string;
+  calculation_model: string;
+  commission_type: string;
+  commission_value: number;
+  secondary_commission_value: number | null;
+  description: string | null;
   is_active: boolean;
 }
 
@@ -25,35 +28,105 @@ const levelConfig: Record<string, { label: string; color: string }> = {
   diamante: { label: "Diamante", color: "bg-cyan-400 text-cyan-900" },
 };
 
+const calculationModelLabels: Record<string, string> = {
+  saldo_devedor: "Saldo Devedor",
+  valor_bruto: "Valor Bruto",
+  ambos: "Saldo + Bruto",
+};
+
 export function CommissionTable() {
-  const { profile, isAdmin } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
   const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
 
   const userLevel = profile?.level || "bronze";
 
   useEffect(() => {
-    fetchCommissionRules();
-  }, [userLevel, isAdmin]);
+    fetchUserCompany();
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchCommissionRules();
+    }
+  }, [userLevel, isAdmin, userCompanyId]);
+
+  // Setup realtime subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('commission-rules-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'commission_rules'
+        },
+        () => {
+          fetchCommissionRules();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userLevel, isAdmin, userCompanyId]);
+
+  const fetchUserCompany = async () => {
+    if (!user || isAdmin) return;
+
+    try {
+      const { data } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+
+      if (data) {
+        setUserCompanyId(data.company_id);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar empresa do usuário:', error);
+    }
+  };
 
   const fetchCommissionRules = async () => {
     try {
+      setLoading(true);
+      
+      // Fetch from commission_rules (Regras Flexíveis)
       let query = supabase
-        .from('commission_table')
+        .from('commission_rules')
         .select('*')
         .eq('is_active', true)
         .order('bank_name', { ascending: true })
         .order('product_name', { ascending: true });
 
-      // Admins see all, regular users see only their level
+      // Filter by user level (non-admin)
       if (!isAdmin && userLevel) {
-        query = query.eq('user_percentage_profile', userLevel);
+        query = query.eq('user_level', userLevel);
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
-      setCommissionRules(data || []);
+
+      // Filter rules: show global rules (company_id = null) or rules for user's company
+      const filteredRules = (data || []).filter(rule => {
+        // Admins see all
+        if (isAdmin) return true;
+        // Global rules (no company restriction)
+        if (!rule.company_id) return true;
+        // Rules for user's company
+        if (userCompanyId && rule.company_id === userCompanyId) return true;
+        return false;
+      });
+
+      setCommissionRules(filteredRules);
     } catch (error) {
       console.error('Erro ao buscar tabela de comissões:', error);
     } finally {
@@ -61,7 +134,7 @@ export function CommissionTable() {
     }
   };
 
-  // Agrupar comissões por banco
+  // Group rules by bank
   const groupedByBank = commissionRules.reduce((acc, rule) => {
     if (!acc[rule.bank_name]) {
       acc[rule.bank_name] = [];
@@ -79,8 +152,8 @@ export function CommissionTable() {
             Tabela de Comissões
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Carregando...</p>
+        <CardContent className="flex justify-center py-8">
+          <RefreshCw className="h-6 w-6 animate-spin text-primary" />
         </CardContent>
       </Card>
     );
@@ -116,7 +189,7 @@ export function CommissionTable() {
         <CardContent>
           {Object.keys(groupedByBank).length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              Nenhuma comissão cadastrada
+              Nenhuma comissão cadastrada para seu nível
             </p>
           ) : (
             <div className="space-y-8">
@@ -137,9 +210,14 @@ export function CommissionTable() {
                               Produto
                             </div>
                           </TableHead>
-                          <TableHead>Tabela</TableHead>
-                          <TableHead>Prazo</TableHead>
-                          <TableHead className="text-right">Repasse Comissão</TableHead>
+                          <TableHead>Operação</TableHead>
+                          <TableHead>
+                            <div className="flex items-center gap-1">
+                              <Calculator className="h-3 w-3" />
+                              Cálculo
+                            </div>
+                          </TableHead>
+                          <TableHead className="text-right">Comissão</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -149,23 +227,32 @@ export function CommissionTable() {
                               {rule.product_name}
                             </TableCell>
                             <TableCell>
-                              {rule.table_name ? (
-                                <Badge variant="outline">{rule.table_name}</Badge>
+                              {rule.operation_type ? (
+                                <Badge variant="outline">{rule.operation_type}</Badge>
                               ) : (
-                                <span className="text-muted-foreground text-sm">-</span>
+                                <span className="text-muted-foreground text-sm">Padrão</span>
                               )}
                             </TableCell>
                             <TableCell>
-                              {rule.term ? (
-                                <Badge variant="outline">{rule.term}</Badge>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">Todos</span>
-                              )}
+                              <Badge variant="secondary" className="text-xs">
+                                {calculationModelLabels[rule.calculation_model] || rule.calculation_model}
+                              </Badge>
                             </TableCell>
                             <TableCell className="text-right">
                               <Badge variant="default" className="font-semibold">
-                                {rule.user_percentage}%
+                                {rule.commission_type === 'percentage' 
+                                  ? `${rule.commission_value}%`
+                                  : `R$ ${rule.commission_value.toFixed(2)}`
+                                }
                               </Badge>
+                              {rule.secondary_commission_value && rule.calculation_model === 'ambos' && (
+                                <Badge variant="outline" className="ml-1 font-semibold">
+                                  +{rule.commission_type === 'percentage' 
+                                    ? `${rule.secondary_commission_value}%`
+                                    : `R$ ${rule.secondary_commission_value.toFixed(2)}`
+                                  }
+                                </Badge>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -184,9 +271,10 @@ export function CommissionTable() {
           <div className="space-y-2 text-sm text-muted-foreground">
             <p className="font-medium text-foreground">ℹ️ Como funciona:</p>
             <ul className="list-disc list-inside space-y-1 ml-2">
-              <li><strong>Comissão Total:</strong> Percentual pago pelo banco sobre o valor da operação</li>
-              <li><strong>Seu Repasse:</strong> Percentual que você recebe da comissão total</li>
-              <li>Os valores são calculados automaticamente ao lançar uma comissão</li>
+              <li><strong>Saldo Devedor:</strong> Comissão calculada sobre o saldo devedor da operação</li>
+              <li><strong>Valor Bruto:</strong> Comissão calculada sobre o valor bruto total</li>
+              <li><strong>Saldo + Bruto:</strong> Duas comissões aplicadas separadamente</li>
+              <li>Os valores são atualizados automaticamente pelo administrador</li>
             </ul>
           </div>
         </CardContent>
