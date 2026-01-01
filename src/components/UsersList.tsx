@@ -610,14 +610,14 @@ export function UsersList() {
               <div>
                 <Label htmlFor="user-company-select">Empresa</Label>
                 <Select 
-                  value={userForm.company_id} 
-                  onValueChange={(value) => setUserForm({ ...userForm, company_id: value })}
+                  value={userForm.company_id || "none"} 
+                  onValueChange={(value) => setUserForm({ ...userForm, company_id: value === "none" ? "" : value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a empresa" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhuma</SelectItem>
+                    <SelectItem value="none">Nenhuma</SelectItem>
                     {companies.map((company) => (
                       <SelectItem key={company.id} value={company.id}>
                         {company.name}
@@ -629,14 +629,14 @@ export function UsersList() {
               <div>
                 <Label htmlFor="user-company-role">Cargo na Empresa</Label>
                 <Select 
-                  value={userForm.company_role} 
-                  onValueChange={(value) => setUserForm({ ...userForm, company_role: value as 'gestor' | 'colaborador' })}
+                  value={userForm.company_role || "none"} 
+                  onValueChange={(value) => setUserForm({ ...userForm, company_role: value === "none" ? "" : value as 'gestor' | 'colaborador' })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o cargo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem>
+                    <SelectItem value="none">Nenhum</SelectItem>
                     <SelectItem value="gestor">Gestor</SelectItem>
                     <SelectItem value="colaborador">Colaborador</SelectItem>
                   </SelectContent>
