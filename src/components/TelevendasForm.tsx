@@ -140,10 +140,11 @@ export const TelevendasForm = () => {
         return;
       }
 
-      // Converter valores formatados para números
-      const parcelaValue = parseFloat(values.parcela.replace(/\./g, "").replace(",", "."));
-      const trocoValue = values.troco ? parseFloat(values.troco.replace(/\./g, "").replace(",", ".")) : null;
-      const saldoDevedorValue = values.saldo_devedor ? parseFloat(values.saldo_devedor.replace(/\./g, "").replace(",", ".")) : null;
+      // Converter valores de centavos para reais (dividir por 100)
+      // Os valores são armazenados como centavos pela máscara de moeda
+      const parcelaValue = values.parcela ? parseInt(values.parcela) / 100 : 0;
+      const trocoValue = values.troco ? parseInt(values.troco) / 100 : null;
+      const saldoDevedorValue = values.saldo_devedor ? parseInt(values.saldo_devedor) / 100 : null;
 
       const { error } = await (supabase as any).from("televendas").insert({
         user_id: user.id,
