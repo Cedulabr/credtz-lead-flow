@@ -1,15 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
 import { 
   Plus, 
   FileText, 
@@ -77,21 +70,35 @@ export function ProposalGenerator() {
   const [banks, setBanks] = useState<string[]>([]);
   const [expandedContracts, setExpandedContracts] = useState<Set<string>>(new Set());
   const [isGenerating, setIsGenerating] = useState(false);
+  const [bankInput, setBankInput] = useState("");
+  const [showBankSuggestions, setShowBankSuggestions] = useState(false);
+  const bankInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchBanks = async () => {
-      const { data } = await supabase
-        .from("televendas_banks")
-        .select("name")
-        .eq("active", true)
-        .order("name");
-
-      if (data) {
-        setBanks(data.map((b: { name: string }) => b.name));
+      try {
+        // Use raw SQL approach to avoid type instantiation issues
+        const query = supabase.from("televendas_banks").select("name");
+        const result = await (query as any).eq("active", true);
+        if (result.data && Array.isArray(result.data)) {
+          const bankNames: string[] = [];
+          for (const item of result.data) {
+            if (item && typeof item === 'object' && 'name' in item && item.name) {
+              bankNames.push(String(item.name));
+            }
+          }
+          setBanks(bankNames);
+        }
+      } catch {
+        setBanks(["Banrisul", "BMG", "Bradesco", "C6 Bank", "Caixa", "Daycoval", "Facta", "Itaú", "Master", "Pan", "Safra", "Santander"]);
       }
     };
     fetchBanks();
   }, []);
+
+  const filteredBanks = banks.filter(bank => 
+    bank.toLowerCase().includes(bankInput.toLowerCase())
+  );
 
   const formatPhone = (value: string): string => {
     const numbers = value.replace(/\D/g, "").slice(0, 11);
@@ -139,6 +146,7 @@ export function ProposalGenerator() {
     }));
     setCurrentContractIndex(proposalData.contracts.length);
     setCurrentContractStep("product");
+    setBankInput("");
   };
 
   const updateCurrentContract = (field: keyof Contract, value: string) => {
@@ -155,10 +163,24 @@ export function ProposalGenerator() {
   const handleProductSelect = (product: string) => {
     updateCurrentContract("product", product);
     setCurrentContractStep("bank");
+    setBankInput("");
+    setTimeout(() => bankInputRef.current?.focus(), 100);
   };
 
   const handleBankSelect = (bank: string) => {
     updateCurrentContract("bank", bank);
+    setBankInput(bank);
+    setShowBankSuggestions(false);
+    setCurrentContractStep("parcela");
+  };
+
+  const handleBankSubmit = () => {
+    if (bankInput.trim().length < 2) {
+      toast.error("Digite um banco válido");
+      return;
+    }
+    updateCurrentContract("bank", bankInput.trim());
+    setShowBankSuggestions(false);
     setCurrentContractStep("parcela");
   };
 
@@ -282,6 +304,7 @@ ${i + 1}. ${getProductInfo(c.product)?.label || c.product}
     setCurrentContractIndex(null);
     setCurrentContractStep("product");
     setExpandedContracts(new Set());
+    setBankInput("");
   };
 
   const renderStepIndicator = () => {
@@ -547,26 +570,66 @@ ${i + 1}. ${getProductInfo(c.product)?.label || c.product}
           </div>
 
           <div className="max-w-md mx-auto space-y-4">
-            <Select onValueChange={handleBankSelect}>
-              <SelectTrigger className="h-14 text-lg">
-                <SelectValue placeholder="Selecione o banco" />
-              </SelectTrigger>
-              <SelectContent>
-                {banks.map((bank) => (
-                  <SelectItem key={bank} value={bank}>
-                    {bank}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              onClick={() => setCurrentContractStep("product")}
-              className="w-full h-12"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Voltar
-            </Button>
+            <div className="relative">
+              <Input
+                ref={bankInputRef}
+                placeholder="Digite ou selecione o banco"
+                value={bankInput}
+                onChange={(e) => {
+                  setBankInput(e.target.value);
+                  setShowBankSuggestions(true);
+                }}
+                onFocus={() => setShowBankSuggestions(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleBankSubmit();
+                  } else if (e.key === "Escape") {
+                    setShowBankSuggestions(false);
+                  }
+                }}
+                className="h-14 text-lg"
+                autoFocus
+              />
+              
+              {/* Bank suggestions dropdown */}
+              {showBankSuggestions && filteredBanks.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {filteredBanks.map((bank) => (
+                    <button
+                      key={bank}
+                      type="button"
+                      className="w-full px-4 py-3 text-left hover:bg-muted transition-colors first:rounded-t-lg last:rounded-b-lg text-foreground"
+                      onClick={() => handleBankSelect(bank)}
+                    >
+                      {bank}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCurrentContractStep("product");
+                  setBankInput("");
+                  setShowBankSuggestions(false);
+                }}
+                className="flex-1 h-12"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Voltar
+              </Button>
+              <Button
+                onClick={handleBankSubmit}
+                className="flex-1 h-12"
+                disabled={bankInput.trim().length < 2}
+              >
+                Continuar
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
           </div>
         </div>
       );
