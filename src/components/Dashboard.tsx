@@ -6,6 +6,7 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { useWhitelabel } from "@/hooks/useWhitelabel";
 import { 
   Users, 
   TrendingUp, 
@@ -23,7 +24,17 @@ import {
   Percent,
   Activity,
   Calendar,
-  Wallet
+  Wallet,
+  RefreshCw,
+  Bell,
+  Building2,
+  ShoppingCart,
+  CreditCard,
+  FileText,
+  ChevronRight,
+  Filter,
+  XCircle,
+  Eye
 } from "lucide-react";
 import {
   BarChart,
@@ -36,10 +47,19 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend
+  Legend,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  FunnelChart,
+  Funnel,
+  LabelList
 } from "recharts";
-import { format, startOfMonth, endOfMonth, isBefore, isAfter, addDays } from "date-fns";
+import { format, startOfMonth, endOfMonth, isBefore, isAfter, addDays, subMonths, eachDayOfInterval, startOfWeek, endOfWeek } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { parseDateSafe } from "@/lib/date";
+
 interface DashboardProps {
   onNavigate: (tab: string) => void;
 }
@@ -50,6 +70,7 @@ interface VendorStats {
   totalSales: number;
   totalValue: number;
   leadsCount: number;
+  commissionTotal: number;
 }
 
 interface ProductStats {
@@ -58,124 +79,228 @@ interface ProductStats {
   count: number;
 }
 
+interface DailySales {
+  date: string;
+  day: string;
+  sales: number;
+  value: number;
+}
+
+interface FunnelData {
+  name: string;
+  value: number;
+  fill: string;
+}
+
 export function Dashboard({ onNavigate }: DashboardProps) {
   const { user, profile, isAdmin } = useAuth();
-  const [period, setPeriod] = useState<'day' | 'month' | 'year'>('month');
+  const { config } = useWhitelabel();
+  
+  // Period and filters
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [selectedCompany, setSelectedCompany] = useState<string>("all");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [chartView, setChartView] = useState<'day' | 'week' | 'month'>('day');
+  
+  // Company data
+  const [companies, setCompanies] = useState<{id: string; name: string}[]>([]);
+  const [userCompanyIds, setUserCompanyIds] = useState<string[]>([]);
+  const [isGestor, setIsGestor] = useState(false);
   
   // Stats data
+  const [totalSales, setTotalSales] = useState(0);
   const [totalRevenue, setTotalRevenue] = useState(0);
-  const [revenueMeta, setRevenueMeta] = useState(50000);
-  const [salesCount, setSalesCount] = useState(0);
-  const [salesValue, setSalesValue] = useState(0);
+  const [totalCommissions, setTotalCommissions] = useState(0);
+  const [commissionsPreview, setCommissionsPreview] = useState(0);
+  const [commissionsPaid, setCommissionsPaid] = useState(0);
+  const [previousRevenue, setPreviousRevenue] = useState(0);
   const [averageTicket, setAverageTicket] = useState(0);
   
   // Team performance
   const [vendorStats, setVendorStats] = useState<VendorStats[]>([]);
-  const [leadsRegistered, setLeadsRegistered] = useState(0);
-  const [leadsWorked, setLeadsWorked] = useState(0);
   
-  // Analysis
+  // Charts data
+  const [dailySalesData, setDailySalesData] = useState<DailySales[]>([]);
   const [productStats, setProductStats] = useState<ProductStats[]>([]);
-  const [winRate, setWinRate] = useState(0);
-  const [lossRate, setLossRate] = useState(0);
-  const [newLeads, setNewLeads] = useState(0);
-  const [convertedLeads, setConvertedLeads] = useState(0);
+  const [funnelData, setFunnelData] = useState<FunnelData[]>([]);
   
-  // Forecast & Alerts
-  const [pipelineValue, setPipelineValue] = useState(0);
-  const [stalledDeals, setStalledDeals] = useState(0);
-  const [atRiskDeals, setAtRiskDeals] = useState(0);
-  
-  // Previous period comparison
-  const [previousRevenue, setPreviousRevenue] = useState(0);
-  
-  // Recent activities
-  const [recentActivities, setRecentActivities] = useState<any[]>([]);
-
-  // Finance alerts data
+  // Finance
   const [financeAlerts, setFinanceAlerts] = useState<{
     overdue: any[];
     dueSoon: any[];
     totalOverdue: number;
     totalDueSoon: number;
-  }>({ overdue: [], dueSoon: [], totalOverdue: 0, totalDueSoon: 0 });
-
-  // Finance summary (receita vs despesa)
-  const [financeSummary, setFinanceSummary] = useState({
-    totalReceita: 0,
-    totalDespesa: 0,
-    saldo: 0
+    totalPayable: number;
+  }>({ overdue: [], dueSoon: [], totalOverdue: 0, totalDueSoon: 0, totalPayable: 0 });
+  
+  // Leads
+  const [leadsStats, setLeadsStats] = useState({
+    premium: 0,
+    worked: 0,
+    conversionRate: 0,
+    activeClients: 0,
+    newClients: 0
   });
+  
+  // Commissions table
+  const [commissionsData, setCommissionsData] = useState<any[]>([]);
+  
+  // Alerts
+  const [alerts, setAlerts] = useState<{type: string; message: string; action: string; count?: number}[]>([]);
+  
+  // Notifications count
+  const [notificationsCount, setNotificationsCount] = useState(0);
 
   const userName = profile?.name || user?.email?.split('@')[0] || 'Usuário';
+  const companyName = config?.company_name || 'Credtz';
 
+  // Fetch user companies and check gestor status
+  useEffect(() => {
+    const fetchUserCompanies = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('user_companies')
+          .select('company_id, company_role, companies(id, name)')
+          .eq('user_id', user.id)
+          .eq('is_active', true);
+        
+        if (error) throw error;
+        
+        const gestorCompanies = (data || []).filter(uc => uc.company_role === 'gestor');
+        setIsGestor(gestorCompanies.length > 0);
+        setUserCompanyIds((data || []).map(uc => uc.company_id));
+        
+        // Get unique companies
+        const uniqueCompanies = (data || [])
+          .filter(uc => uc.companies)
+          .map(uc => ({ id: uc.company_id, name: (uc.companies as any).name }));
+        setCompanies(uniqueCompanies);
+        
+        // If admin, fetch all companies
+        if (isAdmin) {
+          const { data: allCompanies } = await supabase
+            .from('companies')
+            .select('id, name')
+            .eq('is_active', true)
+            .order('name');
+          setCompanies(allCompanies || []);
+        }
+      } catch (error) {
+        console.error('Error fetching user companies:', error);
+      }
+    };
+    
+    fetchUserCompanies();
+  }, [user?.id, isAdmin]);
+
+  // Main data fetch
   useEffect(() => {
     if (user) {
-      fetchDashboardData();
-      fetchFinanceAlerts();
-      fetchFinanceSummary();
+      fetchAllData();
     }
-  }, [user, isAdmin, period]);
+  }, [user, isAdmin, isGestor, selectedMonth, selectedCompany, userCompanyIds]);
 
   const getDateRange = () => {
-    const now = new Date();
-    let startDate: Date;
-    let previousStart: Date;
-    let previousEnd: Date;
-
-    switch (period) {
-      case 'day':
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        previousStart = new Date(startDate);
-        previousStart.setDate(previousStart.getDate() - 1);
-        previousEnd = new Date(startDate);
-        break;
-      case 'month':
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        previousStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        previousEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-        break;
-      case 'year':
-        startDate = new Date(now.getFullYear(), 0, 1);
-        previousStart = new Date(now.getFullYear() - 1, 0, 1);
-        previousEnd = new Date(now.getFullYear() - 1, 11, 31);
-        break;
-    }
-
-    return { startDate, previousStart, previousEnd };
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+    const previousStart = subMonths(startDate, 1);
+    const previousEnd = new Date(year, month - 1, 0);
+    
+    return { startDate, endDate, previousStart, previousEnd };
   };
 
-  const fetchDashboardData = async () => {
-    try {
-      const { startDate, previousStart, previousEnd } = getDateRange();
+  const getCompanyFilter = () => {
+    if (selectedCompany !== 'all') return [selectedCompany];
+    if (isAdmin) return null; // No filter for admin when "all" is selected
+    return userCompanyIds.length > 0 ? userCompanyIds : null;
+  };
 
-      // Fetch televendas (sales) for current period
+  const fetchAllData = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        fetchSalesData(),
+        fetchCommissionsData(),
+        fetchFinanceData(),
+        fetchLeadsData(),
+        fetchFunnelData(),
+        fetchTeamPerformance(),
+        fetchAlerts()
+      ]);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const fetchSalesData = async () => {
+    try {
+      const { startDate, endDate, previousStart, previousEnd } = getDateRange();
+      const companyFilter = getCompanyFilter();
+      
+      // Current period sales
       let salesQuery = supabase
         .from('televendas')
         .select('*')
-        .gte('created_at', startDate.toISOString());
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
       
-      if (!isAdmin) {
+      if (!isAdmin && !isGestor) {
         salesQuery = salesQuery.eq('user_id', user?.id);
+      } else if (companyFilter) {
+        salesQuery = salesQuery.in('company_id', companyFilter);
       }
-
+      
       const { data: salesData } = await salesQuery;
       
       const paidSales = salesData?.filter(s => s.status === 'pago') || [];
-      const totalSalesValue = paidSales.reduce((sum, s) => sum + (s.parcela || 0), 0);
+      const totalValue = paidSales.reduce((sum, s) => sum + (s.parcela || 0), 0);
       
-      setSalesCount(paidSales.length);
-      setSalesValue(totalSalesValue);
-      setTotalRevenue(totalSalesValue);
-      setAverageTicket(paidSales.length > 0 ? totalSalesValue / paidSales.length : 0);
-
-      // Calculate win/loss rate
-      const totalSales = salesData?.length || 0;
-      const canceledSales = salesData?.filter(s => s.status === 'cancelado').length || 0;
-      setWinRate(totalSales > 0 ? (paidSales.length / totalSales) * 100 : 0);
-      setLossRate(totalSales > 0 ? (canceledSales / totalSales) * 100 : 0);
-
-      // Product stats (by tipo_operacao)
+      setTotalSales(paidSales.length);
+      setTotalRevenue(totalValue);
+      setAverageTicket(paidSales.length > 0 ? totalValue / paidSales.length : 0);
+      
+      // Previous period sales
+      let prevQuery = supabase
+        .from('televendas')
+        .select('parcela, status')
+        .gte('created_at', previousStart.toISOString())
+        .lte('created_at', previousEnd.toISOString());
+      
+      if (!isAdmin && !isGestor) {
+        prevQuery = prevQuery.eq('user_id', user?.id);
+      } else if (companyFilter) {
+        prevQuery = prevQuery.in('company_id', companyFilter);
+      }
+      
+      const { data: prevData } = await prevQuery;
+      const prevPaidSales = prevData?.filter(s => s.status === 'pago') || [];
+      setPreviousRevenue(prevPaidSales.reduce((sum, s) => sum + (s.parcela || 0), 0));
+      
+      // Daily sales for chart
+      const daysInMonth = eachDayOfInterval({ start: startDate, end: endDate });
+      const dailyData = daysInMonth.map(day => {
+        const dayStr = format(day, 'yyyy-MM-dd');
+        const daySales = paidSales.filter(s => 
+          format(new Date(s.created_at), 'yyyy-MM-dd') === dayStr
+        );
+        return {
+          date: dayStr,
+          day: format(day, 'dd', { locale: ptBR }),
+          sales: daySales.length,
+          value: daySales.reduce((sum, s) => sum + (s.parcela || 0), 0)
+        };
+      });
+      setDailySalesData(dailyData);
+      
+      // Product stats
       const productMap = new Map<string, { value: number; count: number }>();
       paidSales.forEach(sale => {
         const product = sale.tipo_operacao || 'Outros';
@@ -190,520 +315,958 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         value: data.value,
         count: data.count
       })));
-
-      // Previous period revenue
-      let previousSalesQuery = supabase
-        .from('televendas')
-        .select('parcela, status')
-        .gte('created_at', previousStart.toISOString())
-        .lt('created_at', previousEnd.toISOString());
       
-      if (!isAdmin) {
-        previousSalesQuery = previousSalesQuery.eq('user_id', user?.id);
-      }
-
-      const { data: previousSalesData } = await previousSalesQuery;
-      const previousPaidSales = previousSalesData?.filter(s => s.status === 'pago') || [];
-      setPreviousRevenue(previousPaidSales.reduce((sum, s) => sum + (s.parcela || 0), 0));
-
-      // Leads data
-      let leadsQuery = supabase
-        .from('leads_indicados')
-        .select('*')
-        .gte('created_at', startDate.toISOString());
-      
-      if (!isAdmin) {
-        leadsQuery = leadsQuery.eq('created_by', user?.id);
-      }
-
-      const { data: leadsData } = await leadsQuery;
-      setLeadsRegistered(leadsData?.length || 0);
-      setNewLeads(leadsData?.filter(l => l.status === 'lead_digitado').length || 0);
-      setConvertedLeads(leadsData?.filter(l => l.status === 'cliente_fechado').length || 0);
-      setLeadsWorked(leadsData?.filter(l => l.status !== 'lead_digitado').length || 0);
-
-      // Pipeline data (propostas)
-      let propostasQuery = supabase
-        .from('propostas')
-        .select('*');
-      
-      if (!isAdmin) {
-        propostasQuery = propostasQuery.eq('created_by_id', user?.id);
-      }
-
-      const { data: propostasData } = await propostasQuery;
-      
-      const activePropostas = propostasData?.filter(p => 
-        p.pipeline_stage !== 'recusou_proposta' && p.pipeline_stage !== 'aceitou_proposta'
-      ) || [];
-      
-      setPipelineValue(activePropostas.reduce((sum, p) => sum + (p.valor_proposta || 0), 0));
-      
-      // Stalled deals (no update in 7 days)
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const stalled = activePropostas.filter(p => 
-        new Date(p.updated_at || p.created_at) < sevenDaysAgo
-      );
-      setStalledDeals(stalled.length);
-      setAtRiskDeals(stalled.filter(p => p.pipeline_stage === 'proposta_enviada').length);
-
-      // Vendor stats (only for admin)
-      if (isAdmin) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, name, email');
-
-        const { data: allSales } = await supabase
-          .from('televendas')
-          .select('*')
-          .gte('created_at', startDate.toISOString());
-
-        const { data: allLeads } = await supabase
-          .from('leads_indicados')
-          .select('created_by')
-          .gte('created_at', startDate.toISOString());
-
-        const vendorMap = new Map<string, VendorStats>();
-        
-        profiles?.forEach(p => {
-          vendorMap.set(p.id, {
-            id: p.id,
-            name: p.name || p.email?.split('@')[0] || 'Usuário',
-            totalSales: 0,
-            totalValue: 0,
-            leadsCount: 0
-          });
-        });
-
-        allSales?.forEach(sale => {
-          if (sale.status === 'pago' && sale.user_id) {
-            const vendor = vendorMap.get(sale.user_id);
-            if (vendor) {
-              vendor.totalSales++;
-              vendor.totalValue += sale.parcela || 0;
-            }
-          }
-        });
-
-        allLeads?.forEach(lead => {
-          if (lead.created_by) {
-            const vendor = vendorMap.get(lead.created_by);
-            if (vendor) {
-              vendor.leadsCount++;
-            }
-          }
-        });
-
-        const sortedVendors = Array.from(vendorMap.values())
-          .filter(v => v.totalSales > 0 || v.leadsCount > 0)
-          .sort((a, b) => b.totalValue - a.totalValue);
-        
-        setVendorStats(sortedVendors.slice(0, 10));
-      }
-
-      // Recent activities
-      const { data: activities } = await supabase
-        .from('leads_indicados')
-        .select('nome, created_at, status')
-        .eq('created_by', user?.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      
-      setRecentActivities(activities || []);
-
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('Error fetching sales data:', error);
     }
   };
 
-  // Fetch finance alerts (overdue and due soon)
-  const fetchFinanceAlerts = async () => {
+  const fetchCommissionsData = async () => {
+    try {
+      const { startDate, endDate } = getDateRange();
+      const companyFilter = getCompanyFilter();
+      
+      let query = supabase
+        .from('commissions')
+        .select('*')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
+      
+      if (!isAdmin && !isGestor) {
+        query = query.eq('user_id', user?.id);
+      } else if (companyFilter) {
+        query = query.in('company_id', companyFilter);
+      }
+      
+      const { data } = await query;
+      
+      const commissions = data || [];
+      const positiveCommissions = commissions.filter(c => Number(c.commission_amount) > 0);
+      
+      setTotalCommissions(positiveCommissions.reduce((sum, c) => sum + Number(c.commission_amount), 0));
+      setCommissionsPreview(positiveCommissions.filter(c => c.status === 'preview').reduce((sum, c) => sum + Number(c.commission_amount), 0));
+      setCommissionsPaid(positiveCommissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + Number(c.commission_amount), 0));
+      
+      // Get user names for commissions table
+      if (commissions.length > 0) {
+        const userIds = [...new Set(commissions.map(c => c.user_id))];
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .in('id', userIds);
+        
+        const profileMap = new Map((profiles || []).map(p => [p.id, p.name]));
+        
+        setCommissionsData(commissions.slice(0, 10).map(c => ({
+          ...c,
+          user_name: profileMap.get(c.user_id) || 'N/A'
+        })));
+      } else {
+        setCommissionsData([]);
+      }
+      
+    } catch (error) {
+      console.error('Error fetching commissions data:', error);
+    }
+  };
+
+  const fetchFinanceData = async () => {
     try {
       const today = new Date();
-      const startDate = startOfMonth(today);
-      const endDate = endOfMonth(today);
       const threeDaysFromNow = addDays(today, 3);
-
-      // For admin, fetch all company transactions; for users, fetch their company transactions
-      let companyIds: string[] = [];
-
-      if (isAdmin) {
-        const { data: companies } = await supabase
-          .from('companies')
-          .select('id')
-          .eq('is_active', true);
-        companyIds = (companies || []).map(c => c.id);
-      } else {
-        const { data: userCompanies } = await supabase
-          .from('user_companies')
-          .select('company_id')
-          .eq('user_id', user?.id)
-          .eq('is_active', true);
-        companyIds = (userCompanies || []).map(uc => uc.company_id);
-      }
-
-      if (companyIds.length === 0) {
-        setFinanceAlerts({ overdue: [], dueSoon: [], totalOverdue: 0, totalDueSoon: 0 });
+      const companyFilter = getCompanyFilter();
+      
+      if (!companyFilter && !isAdmin) {
+        setFinanceAlerts({ overdue: [], dueSoon: [], totalOverdue: 0, totalDueSoon: 0, totalPayable: 0 });
         return;
       }
-
-      const { data: transactions, error } = await supabase
+      
+      let query = supabase
         .from('financial_transactions')
-        .select('id, description, value, due_date, status, type')
-        .in('company_id', companyIds)
-        .neq('status', 'pago')
-        .gte('due_date', format(startOfMonth(addDays(today, -30)), 'yyyy-MM-dd'))
-        .lte('due_date', format(endOfMonth(addDays(today, 30)), 'yyyy-MM-dd'));
-
-      if (error) throw error;
-
-      const overdue = (transactions || []).filter((t) => {
+        .select('*')
+        .eq('type', 'despesa')
+        .neq('status', 'pago');
+      
+      if (companyFilter) {
+        query = query.in('company_id', companyFilter);
+      }
+      
+      const { data: transactions } = await query;
+      
+      const overdue = (transactions || []).filter(t => {
         const due = parseDateSafe(t.due_date);
-        if (!due) return false;
-        return isBefore(due, today);
+        return due && isBefore(due, today);
       });
-
-      const dueSoon = (transactions || []).filter((t) => {
+      
+      const dueSoon = (transactions || []).filter(t => {
         const due = parseDateSafe(t.due_date);
-        if (!due) return false;
-        return isAfter(due, today) && isBefore(due, threeDaysFromNow);
+        return due && isAfter(due, today) && isBefore(due, threeDaysFromNow);
       });
-
+      
       setFinanceAlerts({
         overdue,
         dueSoon,
         totalOverdue: overdue.reduce((sum, t) => sum + Number(t.value), 0),
         totalDueSoon: dueSoon.reduce((sum, t) => sum + Number(t.value), 0),
+        totalPayable: (transactions || []).reduce((sum, t) => sum + Number(t.value), 0)
       });
+      
     } catch (error) {
-      console.error('Error fetching finance alerts:', error);
+      console.error('Error fetching finance data:', error);
     }
   };
 
-  // Fetch finance summary (receita vs despesa)
-  const fetchFinanceSummary = async () => {
+  const fetchLeadsData = async () => {
     try {
-      const { startDate } = getDateRange();
+      const { startDate, endDate } = getDateRange();
+      const companyFilter = getCompanyFilter();
       
-      let companyIds: string[] = [];
-
-      if (isAdmin) {
-        const { data: companies } = await supabase
-          .from('companies')
-          .select('id')
-          .eq('is_active', true);
-        companyIds = (companies || []).map(c => c.id);
-      } else {
-        const { data: userCompanies } = await supabase
-          .from('user_companies')
-          .select('company_id')
-          .eq('user_id', user?.id)
-          .eq('is_active', true);
-        companyIds = (userCompanies || []).map(uc => uc.company_id);
-      }
-
-      if (companyIds.length === 0) {
-        setFinanceSummary({ totalReceita: 0, totalDespesa: 0, saldo: 0 });
-        return;
-      }
-
-      // Buscar transações do período
-      const { data: transactions, error } = await supabase
-        .from('financial_transactions')
-        .select('type, value, status')
-        .in('company_id', companyIds)
-        .gte('due_date', format(startDate, 'yyyy-MM-dd'));
-
-      if (error) throw error;
-
-      // Calcular totais
-      const receitas = (transactions || [])
-        .filter(t => t.type === 'receita')
-        .reduce((sum, t) => sum + Number(t.value), 0);
+      // Leads indicados
+      let leadsQuery = supabase
+        .from('leads_indicados')
+        .select('*')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
       
-      const despesas = (transactions || [])
-        .filter(t => t.type === 'despesa')
-        .reduce((sum, t) => sum + Number(t.value), 0);
-
-      setFinanceSummary({
-        totalReceita: receitas,
-        totalDespesa: despesas,
-        saldo: receitas - despesas
+      if (!isAdmin && !isGestor) {
+        leadsQuery = leadsQuery.eq('created_by', user?.id);
+      } else if (companyFilter) {
+        leadsQuery = leadsQuery.in('company_id', companyFilter);
+      }
+      
+      const { data: leadsData } = await leadsQuery;
+      
+      const leads = leadsData || [];
+      const worked = leads.filter(l => l.status !== 'lead_digitado').length;
+      const converted = leads.filter(l => l.status === 'cliente_fechado').length;
+      
+      // Active clients (from propostas)
+      let propostasQuery = supabase
+        .from('propostas')
+        .select('id')
+        .eq('pipeline_stage', 'aceitou_proposta');
+      
+      if (!isAdmin && !isGestor) {
+        propostasQuery = propostasQuery.eq('created_by_id', user?.id);
+      } else if (companyFilter) {
+        propostasQuery = propostasQuery.in('company_id', companyFilter);
+      }
+      
+      const { data: activeData, count } = await propostasQuery;
+      
+      setLeadsStats({
+        premium: leads.length,
+        worked,
+        conversionRate: leads.length > 0 ? (converted / leads.length) * 100 : 0,
+        activeClients: activeData?.length || 0,
+        newClients: converted
       });
+      
     } catch (error) {
-      console.error('Error fetching finance summary:', error);
+      console.error('Error fetching leads data:', error);
     }
   };
 
-  const goalProgress = revenueMeta > 0 ? (totalRevenue / revenueMeta) * 100 : 0;
+  const fetchFunnelData = async () => {
+    try {
+      const { startDate, endDate } = getDateRange();
+      const companyFilter = getCompanyFilter();
+      
+      let query = supabase
+        .from('televendas')
+        .select('status')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
+      
+      if (!isAdmin && !isGestor) {
+        query = query.eq('user_id', user?.id);
+      } else if (companyFilter) {
+        query = query.in('company_id', companyFilter);
+      }
+      
+      const { data } = await query;
+      
+      const statuses = data || [];
+      const created = statuses.length;
+      const analyzing = statuses.filter(s => s.status === 'em_analise' || s.status === 'aguardando').length;
+      const paid = statuses.filter(s => s.status === 'pago').length;
+      const canceled = statuses.filter(s => s.status === 'cancelado').length;
+      
+      setFunnelData([
+        { name: 'Criadas', value: created, fill: 'hsl(var(--primary))' },
+        { name: 'Em Análise', value: analyzing, fill: 'hsl(var(--warning))' },
+        { name: 'Pagas', value: paid, fill: 'hsl(var(--success))' },
+        { name: 'Canceladas', value: canceled, fill: 'hsl(var(--destructive))' }
+      ]);
+      
+    } catch (error) {
+      console.error('Error fetching funnel data:', error);
+    }
+  };
+
+  const fetchTeamPerformance = async () => {
+    try {
+      if (!isAdmin && !isGestor) return;
+      
+      const { startDate, endDate } = getDateRange();
+      const companyFilter = getCompanyFilter();
+      
+      // Get users
+      let usersQuery = supabase.from('profiles').select('id, name, email');
+      
+      if (!isAdmin && companyFilter) {
+        const { data: companyUsers } = await supabase
+          .from('user_companies')
+          .select('user_id')
+          .in('company_id', companyFilter)
+          .eq('is_active', true);
+        
+        const userIds = (companyUsers || []).map(u => u.user_id);
+        if (userIds.length > 0) {
+          usersQuery = usersQuery.in('id', userIds);
+        }
+      }
+      
+      const { data: profiles } = await usersQuery;
+      
+      // Get sales
+      let salesQuery = supabase
+        .from('televendas')
+        .select('user_id, parcela, status')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
+      
+      if (companyFilter) {
+        salesQuery = salesQuery.in('company_id', companyFilter);
+      }
+      
+      const { data: allSales } = await salesQuery;
+      
+      // Get commissions
+      let commissionsQuery = supabase
+        .from('commissions')
+        .select('user_id, commission_amount')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
+      
+      if (companyFilter) {
+        commissionsQuery = commissionsQuery.in('company_id', companyFilter);
+      }
+      
+      const { data: allCommissions } = await commissionsQuery;
+      
+      // Build vendor stats
+      const vendorMap = new Map<string, VendorStats>();
+      
+      profiles?.forEach(p => {
+        vendorMap.set(p.id, {
+          id: p.id,
+          name: p.name || p.email?.split('@')[0] || 'Usuário',
+          totalSales: 0,
+          totalValue: 0,
+          leadsCount: 0,
+          commissionTotal: 0
+        });
+      });
+      
+      allSales?.forEach(sale => {
+        if (sale.status === 'pago' && sale.user_id) {
+          const vendor = vendorMap.get(sale.user_id);
+          if (vendor) {
+            vendor.totalSales++;
+            vendor.totalValue += sale.parcela || 0;
+          }
+        }
+      });
+      
+      allCommissions?.forEach(comm => {
+        if (comm.user_id) {
+          const vendor = vendorMap.get(comm.user_id);
+          if (vendor) {
+            vendor.commissionTotal += Number(comm.commission_amount) || 0;
+          }
+        }
+      });
+      
+      const sortedVendors = Array.from(vendorMap.values())
+        .filter(v => v.totalSales > 0 || v.commissionTotal > 0)
+        .sort((a, b) => b.totalValue - a.totalValue);
+      
+      setVendorStats(sortedVendors.slice(0, 5));
+      
+    } catch (error) {
+      console.error('Error fetching team performance:', error);
+    }
+  };
+
+  const fetchAlerts = async () => {
+    const alertsList: {type: string; message: string; action: string; count?: number}[] = [];
+    
+    // Finance alerts
+    if (financeAlerts.overdue.length > 0) {
+      alertsList.push({
+        type: 'error',
+        message: `${financeAlerts.overdue.length} conta(s) vencida(s)`,
+        action: 'finances',
+        count: financeAlerts.overdue.length
+      });
+    }
+    
+    if (financeAlerts.dueSoon.length > 0) {
+      alertsList.push({
+        type: 'warning',
+        message: `${financeAlerts.dueSoon.length} conta(s) vencendo em breve`,
+        action: 'finances',
+        count: financeAlerts.dueSoon.length
+      });
+    }
+    
+    setAlerts(alertsList);
+    setNotificationsCount(alertsList.length);
+  };
+
+  useEffect(() => {
+    fetchAlerts();
+  }, [financeAlerts]);
+
   const revenueChange = previousRevenue > 0 
     ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 
     : 0;
-
-  const CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--destructive))', 'hsl(var(--secondary))'];
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
-  const formatActivities = recentActivities.map((activity, index) => ({
-    id: index + 1,
-    type: activity.status === 'cliente_fechado' ? 'approval' : 'indication',
-    message: activity.status === 'cliente_fechado' ? 
-      `Cliente ${activity.nome} fechado` : 
-      `Cliente ${activity.nome} indicado`,
-    time: new Date(activity.created_at).toLocaleString('pt-BR'),
-    icon: activity.status === 'cliente_fechado' ? CheckCircle : Users,
-    color: activity.status === 'cliente_fechado' ? 'success' : 'primary'
-  }));
+  const CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--destructive))', 'hsl(var(--secondary))'];
 
-  const periodLabel = period === 'day' ? 'Hoje' : period === 'month' ? 'Este Mês' : 'Este Ano';
+  // Generate month options
+  const monthOptions = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const months = [];
+    
+    const startYear = 2026;
+    const startMonth = 0;
+    
+    for (let y = startYear; y <= currentYear; y++) {
+      const mStart = (y === startYear) ? startMonth : 0;
+      const mEnd = (y === currentYear) ? currentMonth : 11;
+      
+      for (let m = mStart; m <= mEnd; m++) {
+        const date = new Date(y, m, 1);
+        const value = `${y}-${String(m + 1).padStart(2, '0')}`;
+        const label = format(date, 'MMMM yyyy', { locale: ptBR });
+        months.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
+      }
+    }
+    
+    return months.reverse();
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="p-4 space-y-6 pb-24">
-        {/* Header */}
-        <div className="text-center space-y-4 py-3">
-          <h1 className="text-2xl font-bold text-foreground">
-            Olá, {userName}! 👋
-          </h1>
-          <p className="text-base text-muted-foreground">
-            {isAdmin ? 'Visão geral da equipe' : 'Seu painel de desempenho'}
-          </p>
+      {/* Top Bar */}
+      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+        <div className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-3">
+            {config?.logo_url ? (
+              <img src={config.logo_url} alt={companyName} className="h-8 w-auto" />
+            ) : (
+              <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
+                <Building2 className="h-5 w-5 text-primary-foreground" />
+              </div>
+            )}
+            <div>
+              <h1 className="font-bold text-foreground">{companyName}</h1>
+              <p className="text-xs text-muted-foreground">Olá, {userName}</p>
+            </div>
+          </div>
           
-          {/* Period Selector */}
-          <div className="flex justify-center gap-2">
-            <Select value={period} onValueChange={(v) => setPeriod(v as any)}>
-              <SelectTrigger className="w-40">
-                <Calendar className="w-4 h-4 mr-2" />
+          <div className="flex items-center gap-2">
+            {/* Filters */}
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-36 h-9 text-xs">
+                <Calendar className="h-3 w-3 mr-1" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="day">Hoje</SelectItem>
-                <SelectItem value="month">Este Mês</SelectItem>
-                <SelectItem value="year">Este Ano</SelectItem>
+                {monthOptions.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
-          </div>
-          
-          {/* Indicar Cliente Button */}
-          <div className="flex justify-center pt-2">
+            
+            {(isAdmin || companies.length > 1) && (
+              <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+                <SelectTrigger className="w-32 h-9 text-xs">
+                  <Building2 className="h-3 w-3 mr-1" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {companies.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            
+            {/* Refresh */}
             <Button 
-              onClick={() => onNavigate("indicate")}
-              className="h-12 px-8 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-base shadow-elevation rounded-xl"
+              variant="outline" 
+              size="icon" 
+              className="h-9 w-9"
+              onClick={() => fetchAllData()}
+              disabled={isRefreshing}
             >
-              <Users className="mr-2 h-5 w-5" />
-              Indicar Cliente
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            
+            {/* Notifications */}
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="h-9 w-9 relative"
+              onClick={() => onNavigate('notifications')}
+            >
+              <Bell className="h-4 w-4" />
+              {notificationsCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
+                  {notificationsCount}
+                </span>
+              )}
             </Button>
           </div>
         </div>
+        
+        {/* Quick Stats Bar */}
+        <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-t overflow-x-auto gap-4">
+          <div className="flex items-center gap-2 min-w-fit">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <span className="text-xs text-muted-foreground">Vendas:</span>
+            <span className="text-sm font-bold">{totalSales}</span>
+          </div>
+          <div className="flex items-center gap-2 min-w-fit">
+            <DollarSign className="h-4 w-4 text-success" />
+            <span className="text-xs text-muted-foreground">Faturamento:</span>
+            <span className="text-sm font-bold text-success">{formatCurrency(totalRevenue)}</span>
+          </div>
+          <div className="flex items-center gap-2 min-w-fit">
+            <CreditCard className="h-4 w-4 text-warning" />
+            <span className="text-xs text-muted-foreground">Comissão:</span>
+            <span className="text-sm font-bold">{formatCurrency(totalCommissions)}</span>
+          </div>
+          <div className="flex items-center gap-2 min-w-fit">
+            {revenueChange >= 0 ? (
+              <TrendingUp className="h-4 w-4 text-success" />
+            ) : (
+              <TrendingDown className="h-4 w-4 text-destructive" />
+            )}
+            <span className="text-xs text-muted-foreground">Crescimento:</span>
+            <span className={`text-sm font-bold ${revenueChange >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {revenueChange >= 0 ? '+' : ''}{revenueChange.toFixed(1)}%
+            </span>
+          </div>
+        </div>
+      </div>
 
-        {/* Main Stats Cards */}
+      <div className="p-4 space-y-6 pb-24">
+        {/* Main KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Receita Total */}
-          <Card className="border-2 shadow-card">
+          {/* Vendas do Mês */}
+          <Card className="border-2 shadow-card hover:shadow-elevation transition-shadow cursor-pointer" onClick={() => onNavigate('televendas')}>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 bg-success/10 rounded-xl flex items-center justify-center">
+              <div className="flex items-center justify-between mb-3">
+                <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                  <ShoppingCart className="h-5 w-5 text-primary" />
+                </div>
+                <Badge variant="outline" className="text-xs">
+                  vs. mês anterior
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">Vendas do Mês</p>
+              <p className="text-2xl font-bold text-foreground">{totalSales}</p>
+              <div className="flex items-center gap-1 mt-1">
+                {revenueChange >= 0 ? (
+                  <TrendingUp className="h-3 w-3 text-success" />
+                ) : (
+                  <TrendingDown className="h-3 w-3 text-destructive" />
+                )}
+                <span className={`text-xs ${revenueChange >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  {Math.abs(revenueChange).toFixed(1)}%
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Valor Produzido */}
+          <Card className="border-2 shadow-card hover:shadow-elevation transition-shadow cursor-pointer" onClick={() => onNavigate('televendas')}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="h-10 w-10 bg-success/10 rounded-xl flex items-center justify-center">
                   <DollarSign className="h-5 w-5 text-success" />
                 </div>
-                {revenueChange !== 0 && (
-                  <Badge variant={revenueChange >= 0 ? "default" : "destructive"} className="text-xs">
-                    {revenueChange >= 0 ? '+' : ''}{revenueChange.toFixed(1)}%
-                  </Badge>
-                )}
               </div>
-              <div className="mt-3">
-                <p className="text-xs text-muted-foreground">Receita Total</p>
-                <p className="text-xl font-bold text-foreground">{formatCurrency(totalRevenue)}</p>
-                <p className="text-xs text-muted-foreground">Meta: {formatCurrency(revenueMeta)}</p>
+              <p className="text-xs text-muted-foreground">Valor Produzido</p>
+              <p className="text-2xl font-bold text-success">{formatCurrency(totalRevenue)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Ticket médio: {formatCurrency(averageTicket)}</p>
+            </CardContent>
+          </Card>
+
+          {/* Comissões */}
+          <Card className="border-2 shadow-card hover:shadow-elevation transition-shadow cursor-pointer" onClick={() => onNavigate('minhas-comissoes')}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="h-10 w-10 bg-warning/10 rounded-xl flex items-center justify-center">
+                  <CreditCard className="h-5 w-5 text-warning" />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Comissões Geradas</p>
+              <p className="text-2xl font-bold text-foreground">{formatCurrency(totalCommissions)}</p>
+              <div className="flex gap-2 mt-1">
+                <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/30">
+                  Pago: {formatCurrency(commissionsPaid)}
+                </Badge>
               </div>
             </CardContent>
           </Card>
 
-          {/* Vendas Realizadas */}
-          <Card className="border-2 shadow-card">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                  <TrendingUp className="h-5 w-5 text-primary" />
+          {/* Performance Equipe */}
+          {(isAdmin || isGestor) && vendorStats.length > 0 ? (
+            <Card className="border-2 shadow-card hover:shadow-elevation transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <Trophy className="h-5 w-5 text-primary" />
+                  </div>
                 </div>
-                <Badge className="text-xs bg-primary/10 text-primary">{periodLabel}</Badge>
-              </div>
-              <div className="mt-3">
-                <p className="text-xs text-muted-foreground">Vendas Realizadas</p>
-                <p className="text-xl font-bold text-foreground">{salesCount}</p>
-                <p className="text-xs text-muted-foreground">{formatCurrency(salesValue)}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Progresso da Meta */}
-          <Card className="border-2 shadow-card">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 bg-warning/10 rounded-xl flex items-center justify-center">
-                  <Target className="h-5 w-5 text-warning" />
+                <p className="text-xs text-muted-foreground">Top Vendedor</p>
+                <p className="text-lg font-bold text-foreground truncate">{vendorStats[0]?.name}</p>
+                <p className="text-xs text-success">{formatCurrency(vendorStats[0]?.totalValue || 0)}</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-2 shadow-card">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <Percent className="h-5 w-5 text-primary" />
+                  </div>
                 </div>
-                <span className="text-lg font-bold text-warning">{goalProgress.toFixed(0)}%</span>
-              </div>
-              <div className="mt-3">
-                <p className="text-xs text-muted-foreground">Progresso da Meta</p>
-                <Progress value={Math.min(goalProgress, 100)} className="h-2 mt-2" />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Faltam {formatCurrency(Math.max(revenueMeta - totalRevenue, 0))}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Ticket Médio */}
-          <Card className="border-2 shadow-card">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 bg-secondary/10 rounded-xl flex items-center justify-center">
-                  <BarChart3 className="h-5 w-5 text-secondary-foreground" />
-                </div>
-              </div>
-              <div className="mt-3">
-                <p className="text-xs text-muted-foreground">Ticket Médio</p>
-                <p className="text-xl font-bold text-foreground">{formatCurrency(averageTicket)}</p>
-                <p className="text-xs text-muted-foreground">por venda</p>
-              </div>
-            </CardContent>
-          </Card>
+                <p className="text-xs text-muted-foreground">Taxa Conversão</p>
+                <p className="text-2xl font-bold text-foreground">{leadsStats.conversionRate.toFixed(0)}%</p>
+                <p className="text-xs text-muted-foreground mt-1">{leadsStats.worked} leads trabalhados</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
-        {/* Finance Summary - Receita vs Despesa */}
+        {/* Sales Chart */}
         <Card className="border-2 shadow-card">
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Wallet className="h-5 w-5 text-primary" />
-              Resultado Financeiro do Período
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                Vendas por Período
+              </CardTitle>
+              <div className="flex gap-1">
+                {['day', 'week', 'month'].map((view) => (
+                  <Button
+                    key={view}
+                    variant={chartView === view ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 text-xs px-2"
+                    onClick={() => setChartView(view as any)}
+                  >
+                    {view === 'day' ? 'Dia' : view === 'week' ? 'Semana' : 'Mês'}
+                  </Button>
+                ))}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-3 bg-success/10 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-success mx-auto mb-1" />
-                <p className="text-xs text-muted-foreground">Receitas</p>
-                <p className="text-lg font-bold text-success">{formatCurrency(financeSummary.totalReceita)}</p>
-              </div>
-              <div className="text-center p-3 bg-destructive/10 rounded-lg">
-                <TrendingDown className="h-5 w-5 text-destructive mx-auto mb-1" />
-                <p className="text-xs text-muted-foreground">Despesas</p>
-                <p className="text-lg font-bold text-destructive">{formatCurrency(financeSummary.totalDespesa)}</p>
-              </div>
-              <div className={`text-center p-3 rounded-lg ${financeSummary.saldo >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}>
-                <DollarSign className={`h-5 w-5 mx-auto mb-1 ${financeSummary.saldo >= 0 ? 'text-success' : 'text-destructive'}`} />
-                <p className="text-xs text-muted-foreground">Saldo</p>
-                <p className={`text-lg font-bold ${financeSummary.saldo >= 0 ? 'text-success' : 'text-destructive'}`}>
-                  {formatCurrency(financeSummary.saldo)}
-                </p>
-              </div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={dailySalesData}>
+                  <defs>
+                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis dataKey="day" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip 
+                    formatter={(value: number, name: string) => [
+                      name === 'value' ? formatCurrency(value) : value,
+                      name === 'value' ? 'Valor' : 'Vendas'
+                    ]}
+                    labelFormatter={(label) => `Dia ${label}`}
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--background))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="value" 
+                    stroke="hsl(var(--primary))" 
+                    fillOpacity={1} 
+                    fill="url(#colorValue)" 
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        {/* Leads Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Funnel + Finance Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Sales Funnel */}
           <Card className="border-2 shadow-card">
-            <CardContent className="p-4 text-center">
-              <Users className="h-6 w-6 text-primary mx-auto" />
-              <p className="text-2xl font-bold mt-2">{leadsRegistered}</p>
-              <p className="text-xs text-muted-foreground">Leads Cadastrados</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="border-2 shadow-card">
-            <CardContent className="p-4 text-center">
-              <Activity className="h-6 w-6 text-warning mx-auto" />
-              <p className="text-2xl font-bold mt-2">{leadsWorked}</p>
-              <p className="text-xs text-muted-foreground">Leads Trabalhados</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="border-2 shadow-card">
-            <CardContent className="p-4 text-center">
-              <CheckCircle className="h-6 w-6 text-success mx-auto" />
-              <p className="text-2xl font-bold mt-2">{convertedLeads}</p>
-              <p className="text-xs text-muted-foreground">Convertidos</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="border-2 shadow-card">
-            <CardContent className="p-4 text-center">
-              <Percent className="h-6 w-6 text-primary mx-auto" />
-              <p className="text-2xl font-bold mt-2">{winRate.toFixed(0)}%</p>
-              <p className="text-xs text-muted-foreground">Taxa de Conversão</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Team Performance - Admin Only */}
-        {isAdmin && vendorStats.length > 0 && (
-          <Card className="border-2 shadow-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-warning" />
-                Ranking de Vendedores
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Filter className="h-5 w-5 text-primary" />
+                Funil de Televendas
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {vendorStats.slice(0, 5).map((vendor, index) => (
-                  <div key={vendor.id} className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                      index === 0 ? 'bg-yellow-500 text-white' :
-                      index === 1 ? 'bg-gray-400 text-white' :
-                      index === 2 ? 'bg-amber-700 text-white' :
-                      'bg-muted text-muted-foreground'
-                    }`}>
-                      {index + 1}
+                {funnelData.map((item, index) => (
+                  <div key={item.name} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{item.name}</span>
+                      <span className="font-bold">{item.value}</span>
                     </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-foreground">{vendor.name}</p>
-                      <p className="text-xs text-muted-foreground">{vendor.totalSales} vendas</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-success">{formatCurrency(vendor.totalValue)}</p>
-                      <p className="text-xs text-muted-foreground">{vendor.leadsCount} leads</p>
+                    <div className="h-8 rounded-lg overflow-hidden bg-muted/30">
+                      <div 
+                        className="h-full rounded-lg transition-all duration-500 flex items-center justify-center text-xs font-medium text-white"
+                        style={{ 
+                          width: `${funnelData[0]?.value ? (item.value / funnelData[0].value) * 100 : 0}%`,
+                          backgroundColor: item.fill,
+                          minWidth: item.value > 0 ? '40px' : '0'
+                        }}
+                      >
+                        {item.value > 0 && `${((item.value / (funnelData[0]?.value || 1)) * 100).toFixed(0)}%`}
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
 
-              {/* Sales by User Chart */}
-              {vendorStats.length > 0 && (
-                <div className="mt-6 h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={vendorStats.slice(0, 5)}>
-                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                      <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 10 }} />
-                      <Tooltip 
-                        formatter={(value: number) => formatCurrency(value)}
-                        labelStyle={{ color: 'hsl(var(--foreground))' }}
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--background))', 
-                          border: '1px solid hsl(var(--border))' 
-                        }}
-                      />
-                      <Bar dataKey="totalValue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+          {/* Finance Summary */}
+          <Card className="border-2 shadow-card">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Wallet className="h-5 w-5 text-primary" />
+                  Resumo Financeiro
+                </CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => onNavigate('finances')}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-destructive/10 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <XCircle className="h-5 w-5 text-destructive" />
+                  <div>
+                    <p className="text-sm font-medium">Contas Vencidas</p>
+                    <p className="text-xs text-muted-foreground">{financeAlerts.overdue.length} pendência(s)</p>
+                  </div>
                 </div>
-              )}
+                <span className="font-bold text-destructive">{formatCurrency(financeAlerts.totalOverdue)}</span>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-warning/10 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-warning" />
+                  <div>
+                    <p className="text-sm font-medium">Vencendo em Breve</p>
+                    <p className="text-xs text-muted-foreground">Próximos 3 dias</p>
+                  </div>
+                </div>
+                <span className="font-bold text-warning">{formatCurrency(financeAlerts.totalDueSoon)}</span>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">Total a Pagar</p>
+                    <p className="text-xs text-muted-foreground">Este período</p>
+                  </div>
+                </div>
+                <span className="font-bold">{formatCurrency(financeAlerts.totalPayable)}</span>
+              </div>
+              
+              <Button variant="outline" className="w-full" onClick={() => onNavigate('finances')}>
+                Acessar Kanban Financeiro
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Leads + Clients Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Leads Premium */}
+          <Card className="border-2 shadow-card">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Star className="h-5 w-5 text-warning" />
+                  Leads Premium
+                </CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => onNavigate('leads')}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="text-center p-3 bg-primary/10 rounded-lg">
+                  <p className="text-2xl font-bold text-primary">{leadsStats.premium}</p>
+                  <p className="text-xs text-muted-foreground">Disponíveis</p>
+                </div>
+                <div className="text-center p-3 bg-warning/10 rounded-lg">
+                  <p className="text-2xl font-bold text-warning">{leadsStats.worked}</p>
+                  <p className="text-xs text-muted-foreground">Trabalhados</p>
+                </div>
+                <div className="text-center p-3 bg-success/10 rounded-lg">
+                  <p className="text-2xl font-bold text-success">{leadsStats.conversionRate.toFixed(0)}%</p>
+                  <p className="text-xs text-muted-foreground">Conversão</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Meus Clientes */}
+          <Card className="border-2 shadow-card">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Users className="h-5 w-5 text-primary" />
+                  Meus Clientes
+                </CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => onNavigate('meus-clientes')}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="text-center p-3 bg-primary/10 rounded-lg">
+                  <p className="text-2xl font-bold text-primary">{leadsStats.activeClients}</p>
+                  <p className="text-xs text-muted-foreground">Ativos</p>
+                </div>
+                <div className="text-center p-3 bg-success/10 rounded-lg">
+                  <p className="text-2xl font-bold text-success">{leadsStats.newClients}</p>
+                  <p className="text-xs text-muted-foreground">Novos</p>
+                </div>
+                <div className="text-center p-3 bg-muted/30 rounded-lg">
+                  <Button variant="ghost" size="sm" className="h-full w-full" onClick={() => onNavigate('indicate')}>
+                    <Users className="h-5 w-5 mr-1" />
+                    Indicar
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Team Performance - Admin/Gestor Only */}
+        {(isAdmin || isGestor) && vendorStats.length > 0 && (
+          <Card className="border-2 shadow-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Trophy className="h-5 w-5 text-warning" />
+                Top 3 Vendedores
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {vendorStats.slice(0, 3).map((vendor, index) => (
+                  <div key={vendor.id} className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                      index === 0 ? 'bg-yellow-500 text-white' :
+                      index === 1 ? 'bg-gray-400 text-white' :
+                      'bg-amber-700 text-white'
+                    }`}>
+                      {index + 1}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">{vendor.name}</p>
+                      <p className="text-xs text-muted-foreground">{vendor.totalSales} vendas</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-success">{formatCurrency(vendor.totalValue)}</p>
+                      <p className="text-xs text-muted-foreground">Comissão: {formatCurrency(vendor.commissionTotal)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Product Analysis */}
+        {/* Commissions Table */}
+        {commissionsData.length > 0 && (
+          <Card className="border-2 shadow-card">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  Comissões Recentes
+                </CardTitle>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => onNavigate('tabela-comissoes')}>
+                    Tabela
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => onNavigate('minhas-comissoes')}>
+                    Minhas
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-2 text-muted-foreground font-medium">Colaborador</th>
+                      <th className="text-left p-2 text-muted-foreground font-medium">Banco</th>
+                      <th className="text-left p-2 text-muted-foreground font-medium">Produto</th>
+                      <th className="text-right p-2 text-muted-foreground font-medium">%</th>
+                      <th className="text-right p-2 text-muted-foreground font-medium">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {commissionsData.slice(0, 5).map((comm) => (
+                      <tr key={comm.id} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="p-2">{comm.user_name}</td>
+                        <td className="p-2">{comm.bank_name}</td>
+                        <td className="p-2">{comm.product_type}</td>
+                        <td className="p-2 text-right">{comm.commission_percentage}%</td>
+                        <td className="p-2 text-right font-medium text-success">{formatCurrency(Number(comm.commission_amount))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Alerts Section */}
+        {alerts.length > 0 && (
+          <Card className="border-2 border-destructive/30 shadow-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                Alertas e Notificações
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {alerts.map((alert, index) => (
+                <div 
+                  key={index} 
+                  className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
+                    alert.type === 'error' ? 'bg-destructive/10 hover:bg-destructive/20' : 'bg-warning/10 hover:bg-warning/20'
+                  }`}
+                  onClick={() => onNavigate(alert.action)}
+                >
+                  <div className="flex items-center gap-2">
+                    {alert.type === 'error' ? (
+                      <AlertCircle className="h-5 w-5 text-destructive" />
+                    ) : (
+                      <AlertTriangle className="h-5 w-5 text-warning" />
+                    )}
+                    <span className="font-medium">{alert.message}</span>
+                  </div>
+                  <Button variant="ghost" size="sm">
+                    <Eye className="h-4 w-4 mr-1" />
+                    Ver
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Quick Actions */}
+        <Card className="border-2 shadow-card bg-gradient-to-br from-primary/5 to-transparent">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
+              <ArrowUpRight className="h-5 w-5 text-primary" />
+              Ações Rápidas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
+              <Button 
+                variant="outline"
+                onClick={() => onNavigate("indicate")}
+                className="h-16 flex flex-col gap-1 hover:bg-primary hover:text-primary-foreground transition-all"
+              >
+                <Users className="h-5 w-5" />
+                <span className="text-xs font-medium">Indicar</span>
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => onNavigate("televendas")}
+                className="h-16 flex flex-col gap-1 hover:bg-primary hover:text-primary-foreground transition-all"
+              >
+                <ShoppingCart className="h-5 w-5" />
+                <span className="text-xs font-medium">Televendas</span>
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => onNavigate("meus-clientes")}
+                className="h-16 flex flex-col gap-1 hover:bg-primary hover:text-primary-foreground transition-all"
+              >
+                <Star className="h-5 w-5" />
+                <span className="text-xs font-medium">Clientes</span>
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => onNavigate("finances")}
+                className="h-16 flex flex-col gap-1 hover:bg-primary hover:text-primary-foreground transition-all"
+              >
+                <Wallet className="h-5 w-5" />
+                <span className="text-xs font-medium">Finanças</span>
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => onNavigate("minhas-comissoes")}
+                className="h-16 flex flex-col gap-1 hover:bg-primary hover:text-primary-foreground transition-all"
+              >
+                <CreditCard className="h-5 w-5" />
+                <span className="text-xs font-medium">Comissões</span>
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => onNavigate("tabela-comissoes")}
+                className="h-16 flex flex-col gap-1 hover:bg-primary hover:text-primary-foreground transition-all"
+              >
+                <FileText className="h-5 w-5" />
+                <span className="text-xs font-medium">Tabela</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Product Distribution */}
         {productStats.length > 0 && (
           <Card className="border-2 shadow-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <BarChart3 className="h-5 w-5 text-primary" />
                 Vendas por Produto
               </CardTitle>
@@ -733,229 +1296,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </CardContent>
           </Card>
         )}
-
-        {/* Win/Loss Rate */}
-        <div className="grid grid-cols-2 gap-4">
-          <Card className="border-2 border-success/30 shadow-card">
-            <CardContent className="p-4 text-center">
-              <TrendingUp className="h-8 w-8 text-success mx-auto" />
-              <p className="text-3xl font-bold text-success mt-2">{winRate.toFixed(0)}%</p>
-              <p className="text-sm text-muted-foreground">Taxa de Vitória</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="border-2 border-destructive/30 shadow-card">
-            <CardContent className="p-4 text-center">
-              <TrendingDown className="h-8 w-8 text-destructive mx-auto" />
-              <p className="text-3xl font-bold text-destructive mt-2">{lossRate.toFixed(0)}%</p>
-              <p className="text-sm text-muted-foreground">Taxa de Perda</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Forecast & Alerts */}
-        <Card className="border-2 shadow-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-warning" />
-              Previsão e Alertas
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg">
-              <div className="flex items-center gap-3">
-                <DollarSign className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="font-medium">Forecast de Vendas</p>
-                  <p className="text-xs text-muted-foreground">Valor no pipeline</p>
-                </div>
-              </div>
-              <p className="font-bold text-primary">{formatCurrency(pipelineValue)}</p>
-            </div>
-
-            {stalledDeals > 0 && (
-              <div className="flex items-center justify-between p-3 bg-warning/10 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Clock className="h-5 w-5 text-warning" />
-                  <div>
-                    <p className="font-medium">Negócios Parados</p>
-                    <p className="text-xs text-muted-foreground">Sem atualização há 7+ dias</p>
-                  </div>
-                </div>
-                <Badge variant="outline" className="border-warning text-warning">{stalledDeals}</Badge>
-              </div>
-            )}
-
-            {atRiskDeals > 0 && (
-              <div className="flex items-center justify-between p-3 bg-destructive/10 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <AlertCircle className="h-5 w-5 text-destructive" />
-                  <div>
-                    <p className="font-medium">Em Risco</p>
-                    <p className="text-xs text-muted-foreground">Propostas enviadas paradas</p>
-                  </div>
-                </div>
-                <Badge variant="destructive">{atRiskDeals}</Badge>
-              </div>
-            )}
-
-            {stalledDeals === 0 && atRiskDeals === 0 && financeAlerts.overdue.length === 0 && financeAlerts.dueSoon.length === 0 && (
-              <div className="flex items-center justify-center p-4 text-center">
-                <div>
-                  <CheckCircle className="h-8 w-8 text-success mx-auto" />
-                  <p className="text-sm text-muted-foreground mt-2">Nenhum alerta no momento</p>
-                </div>
-              </div>
-            )}
-
-            {/* Finance Alerts */}
-            {financeAlerts.overdue.length > 0 && (
-              <div className="flex items-center justify-between p-3 bg-destructive/10 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Wallet className="h-5 w-5 text-destructive" />
-                  <div>
-                    <p className="font-medium">Contas Vencidas</p>
-                    <p className="text-xs text-muted-foreground">{financeAlerts.overdue.length} conta(s) - {formatCurrency(financeAlerts.totalOverdue)}</p>
-                  </div>
-                </div>
-                <Badge variant="destructive">{financeAlerts.overdue.length}</Badge>
-              </div>
-            )}
-
-            {financeAlerts.dueSoon.length > 0 && (
-              <div className="flex items-center justify-between p-3 bg-warning/10 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Clock className="h-5 w-5 text-warning" />
-                  <div>
-                    <p className="font-medium">Vencendo em Breve</p>
-                    <p className="text-xs text-muted-foreground">{financeAlerts.dueSoon.length} conta(s) - {formatCurrency(financeAlerts.totalDueSoon)}</p>
-                  </div>
-                </div>
-                <Badge variant="outline" className="border-warning text-warning">{financeAlerts.dueSoon.length}</Badge>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Comparison */}
-        <Card className="border-2 shadow-card">
-          <CardHeader>
-            <CardTitle className="text-center">Comparação com Período Anterior</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-4 bg-muted/30 rounded-lg">
-                <p className="text-sm text-muted-foreground">Período Atual</p>
-                <p className="text-xl font-bold text-foreground">{formatCurrency(totalRevenue)}</p>
-              </div>
-              <div className="text-center p-4 bg-muted/30 rounded-lg">
-                <p className="text-sm text-muted-foreground">Período Anterior</p>
-                <p className="text-xl font-bold text-foreground">{formatCurrency(previousRevenue)}</p>
-              </div>
-            </div>
-            {revenueChange !== 0 && (
-              <div className={`mt-4 p-3 rounded-lg text-center ${revenueChange >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}>
-                <p className={`font-bold ${revenueChange >= 0 ? 'text-success' : 'text-destructive'}`}>
-                  {revenueChange >= 0 ? '↑' : '↓'} {Math.abs(revenueChange).toFixed(1)}% 
-                  {revenueChange >= 0 ? ' de crescimento' : ' de queda'}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Quick Actions */}
-        <Card className="border-2 shadow-card bg-gradient-to-br from-primary/5 to-transparent">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-              <ArrowUpRight className="h-5 w-5 text-primary" />
-              Ações Rápidas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-              <Button 
-                variant="outline"
-                onClick={() => onNavigate("indicate")}
-                className="h-20 flex flex-col gap-2 hover:bg-primary hover:text-primary-foreground transition-all"
-              >
-                <Users className="h-6 w-6" />
-                <span className="text-xs font-medium">Indicar Cliente</span>
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => onNavigate("leads")}
-                className="h-20 flex flex-col gap-2 hover:bg-primary hover:text-primary-foreground transition-all"
-              >
-                <Activity className="h-6 w-6" />
-                <span className="text-xs font-medium">Gerenciar Leads</span>
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => onNavigate("meus-clientes")}
-                className="h-20 flex flex-col gap-2 hover:bg-primary hover:text-primary-foreground transition-all"
-              >
-                <Star className="h-6 w-6" />
-                <span className="text-xs font-medium">Meus Clientes</span>
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => onNavigate("finances")}
-                className="h-20 flex flex-col gap-2 hover:bg-primary hover:text-primary-foreground transition-all"
-              >
-                <Wallet className="h-6 w-6" />
-                <span className="text-xs font-medium">Finanças</span>
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => onNavigate("minhas-comissoes")}
-                className="h-20 flex flex-col gap-2 hover:bg-primary hover:text-primary-foreground transition-all"
-              >
-                <DollarSign className="h-6 w-6" />
-                <span className="text-xs font-medium">Comissões</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Activities Section */}
-        <Card className="border-2 shadow-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-bold text-center text-foreground">Atividades Recentes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {formatActivities.length > 0 ? formatActivities.slice(0, 4).map((activity) => {
-                const Icon = activity.icon;
-                const iconColor = activity.color === 'primary' ? 'text-primary' : 
-                               activity.color === 'success' ? 'text-success' : 'text-primary';
-                const bgColor = activity.color === 'primary' ? 'bg-primary/10' : 
-                             activity.color === 'success' ? 'bg-success/10' : 'bg-primary/10';
-                
-                return (
-                  <div key={activity.id} className="flex items-center space-x-4 p-4 border-2 rounded-xl hover:bg-muted/30 transition-colors">
-                    <div className={`w-12 h-12 ${bgColor} rounded-xl flex items-center justify-center`}>
-                      <Icon className={`h-6 w-6 ${iconColor}`} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-foreground text-base">
-                        {activity.message}
-                      </p>
-                      <p className="text-muted-foreground text-sm">{activity.time}</p>
-                    </div>
-                  </div>
-                );
-              }) : (
-                <div className="text-center py-8 space-y-2">
-                  <AlertCircle className="h-10 w-10 text-muted-foreground mx-auto" />
-                  <p className="text-base text-muted-foreground font-medium">
-                    Nenhuma atividade recente
-                  </p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
