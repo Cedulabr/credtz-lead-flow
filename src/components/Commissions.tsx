@@ -54,6 +54,9 @@ export function Commissions() {
   const [extractEndDate, setExtractEndDate] = useState("");
   const [isWithdrawalDialogOpen, setIsWithdrawalDialogOpen] = useState(false);
   const [isExtractDialogOpen, setIsExtractDialogOpen] = useState(false);
+  const [isGestor, setIsGestor] = useState(false);
+  const [gestorCompanyIds, setGestorCompanyIds] = useState<string[]>([]);
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
   const [isSubmittingWithdrawal, setIsSubmittingWithdrawal] = useState(false);
   const [isSubmittingExtract, setIsSubmittingExtract] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -118,25 +121,62 @@ export function Commissions() {
   // Estados para tabela de comissão
   const [commissionTableData, setCommissionTableData] = useState<any[]>([]);
 
+  // Check if user is gestor
+  useEffect(() => {
+    const checkGestorStatus = async () => {
+      if (!user?.id || isAdmin) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('user_companies')
+          .select('company_id, company_role')
+          .eq('user_id', user.id)
+          .eq('is_active', true);
+        
+        if (error) throw error;
+        
+        const gestorCompanies = (data || []).filter(uc => uc.company_role === 'gestor');
+        setIsGestor(gestorCompanies.length > 0);
+        setGestorCompanyIds((data || []).map(uc => uc.company_id));
+        
+        // Store user's primary company_id for when they create commissions
+        if (data && data.length > 0) {
+          setUserCompanyId(data[0].company_id);
+        }
+      } catch (error) {
+        console.error('Error checking gestor status:', error);
+      }
+    };
+    
+    checkGestorStatus();
+  }, [user?.id, isAdmin]);
+
   // Carregar dados das comissões e bancos/produtos
   useEffect(() => {
     if (user?.id) {
       fetchCommissions();
     }
-  }, [user?.id, isAdmin]);
+  }, [user?.id, isAdmin, isGestor, gestorCompanyIds]);
 
   const fetchCommissions = async () => {
     if (!user?.id) return;
     
     try {
-      // Buscar comissões - query simples sem join problemático
+      // Buscar comissões baseado no papel do usuário
       let commissionsQuery = supabase
         .from('commissions')
         .select('*')
         .order('created_at', { ascending: false });
       
-      // Se não for admin, filtrar apenas comissões do próprio usuário
-      if (!isAdmin) {
+      if (isAdmin) {
+        // Admin vê todas as comissões (sem filtro)
+      } else if (isGestor && gestorCompanyIds.length > 0) {
+        // Gestor vê comissões da empresa + próprias
+        commissionsQuery = commissionsQuery.or(
+          `user_id.eq.${user.id},company_id.in.(${gestorCompanyIds.join(',')})`
+        );
+      } else {
+        // Colaborador vê apenas suas próprias comissões
         commissionsQuery = commissionsQuery.eq('user_id', user.id);
       }
 
@@ -293,6 +333,7 @@ export function Commissions() {
 
       const newCommission = {
         user_id: user?.id,
+        company_id: userCompanyId,
         client_name: formData.client_name,
         product_type: formData.product_type,
         bank_name: formData.bank_name,
@@ -300,7 +341,7 @@ export function Commissions() {
         commission_amount: commissionAmount,
         commission_percentage: commissionPercentage,
         status: 'preview',
-        proposal_date: formData.proposal_date, // Sempre usar a data do formulário
+        proposal_date: formData.proposal_date,
         payment_method: formData.payment_method || null
       };
 
@@ -436,10 +477,14 @@ export function Commissions() {
       <div className="flex flex-col space-y-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-            {isAdmin ? 'Todas as Comissões' : 'Minhas Comissões'}
+            {isAdmin ? 'Todas as Comissões' : isGestor ? 'Comissões da Equipe' : 'Minhas Comissões'}
           </h1>
           <p className="text-muted-foreground">
-            {isAdmin ? 'Visualize e gerencie comissões de todos os usuários' : 'Acompanhe seus ganhos e histórico de pagamentos'}
+            {isAdmin 
+              ? 'Visualize e gerencie comissões de todos os usuários' 
+              : isGestor 
+                ? 'Visualize comissões da sua equipe e empresa' 
+                : 'Acompanhe seus ganhos e histórico de pagamentos'}
           </p>
         </div>
       </div>

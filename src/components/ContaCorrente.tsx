@@ -255,10 +255,25 @@ export function ContaCorrente() {
           description: "Comissão atualizada com sucesso"
         });
       } else {
+        // Buscar company_id do usuário selecionado para vincular a comissão corretamente
+        let userCompanyId: string | null = null;
+        if (formData.user_id) {
+          const { data: userCompanyData } = await supabase
+            .from('user_companies')
+            .select('company_id')
+            .eq('user_id', formData.user_id)
+            .eq('is_active', true)
+            .limit(1)
+            .maybeSingle();
+          
+          userCompanyId = userCompanyData?.company_id || null;
+        }
+
         const { error } = await supabase
           .from('commissions')
           .insert({
             user_id: formData.user_id,
+            company_id: userCompanyId,
             client_name: formData.client_name,
             cpf: formData.cpf || null,
             bank_name: formData.bank_name,
