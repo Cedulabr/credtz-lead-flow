@@ -22,9 +22,9 @@ import {
   TrendingDown,
   Percent,
   Activity,
-  Calendar
+  Calendar,
+  Wallet
 } from "lucide-react";
-// Removed SalesPipeline and TaskManager imports as requested
 import {
   BarChart,
   Bar,
@@ -38,6 +38,7 @@ import {
   Cell,
   Legend
 } from "recharts";
+import { format, startOfMonth, endOfMonth, isBefore, isAfter, addDays } from "date-fns";
 
 interface DashboardProps {
   onNavigate: (tab: string) => void;
@@ -91,11 +92,20 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   // Recent activities
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
 
+  // Finance alerts data
+  const [financeAlerts, setFinanceAlerts] = useState<{
+    overdue: any[];
+    dueSoon: any[];
+    totalOverdue: number;
+    totalDueSoon: number;
+  }>({ overdue: [], dueSoon: [], totalOverdue: 0, totalDueSoon: 0 });
+
   const userName = profile?.name || user?.email?.split('@')[0] || 'Usuário';
 
   useEffect(() => {
     if (user) {
       fetchDashboardData();
+      fetchFinanceAlerts();
     }
   }, [user, isAdmin, period]);
 
@@ -296,6 +306,67 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+    }
+  };
+
+  // Fetch finance alerts (overdue and due soon)
+  const fetchFinanceAlerts = async () => {
+    try {
+      const today = new Date();
+      const startDate = startOfMonth(today);
+      const endDate = endOfMonth(today);
+      const threeDaysFromNow = addDays(today, 3);
+
+      // For admin, fetch all company transactions; for users, fetch their company transactions
+      let companyIds: string[] = [];
+
+      if (isAdmin) {
+        const { data: companies } = await supabase
+          .from('companies')
+          .select('id')
+          .eq('is_active', true);
+        companyIds = (companies || []).map(c => c.id);
+      } else {
+        const { data: userCompanies } = await supabase
+          .from('user_companies')
+          .select('company_id')
+          .eq('user_id', user?.id)
+          .eq('is_active', true);
+        companyIds = (userCompanies || []).map(uc => uc.company_id);
+      }
+
+      if (companyIds.length === 0) {
+        setFinanceAlerts({ overdue: [], dueSoon: [], totalOverdue: 0, totalDueSoon: 0 });
+        return;
+      }
+
+      const { data: transactions, error } = await supabase
+        .from('financial_transactions')
+        .select('id, description, value, due_date, status, type')
+        .in('company_id', companyIds)
+        .neq('status', 'pago')
+        .gte('due_date', format(startOfMonth(addDays(today, -30)), 'yyyy-MM-dd'))
+        .lte('due_date', format(endOfMonth(addDays(today, 30)), 'yyyy-MM-dd'));
+
+      if (error) throw error;
+
+      const overdue = (transactions || []).filter(t =>
+        isBefore(new Date(t.due_date), today)
+      );
+
+      const dueSoon = (transactions || []).filter(t =>
+        isAfter(new Date(t.due_date), today) &&
+        isBefore(new Date(t.due_date), threeDaysFromNow)
+      );
+
+      setFinanceAlerts({
+        overdue,
+        dueSoon,
+        totalOverdue: overdue.reduce((sum, t) => sum + Number(t.value), 0),
+        totalDueSoon: dueSoon.reduce((sum, t) => sum + Number(t.value), 0),
+      });
+    } catch (error) {
+      console.error('Error fetching finance alerts:', error);
     }
   };
 
@@ -631,12 +702,39 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </div>
             )}
 
-            {stalledDeals === 0 && atRiskDeals === 0 && (
+            {stalledDeals === 0 && atRiskDeals === 0 && financeAlerts.overdue.length === 0 && financeAlerts.dueSoon.length === 0 && (
               <div className="flex items-center justify-center p-4 text-center">
                 <div>
                   <CheckCircle className="h-8 w-8 text-success mx-auto" />
                   <p className="text-sm text-muted-foreground mt-2">Nenhum alerta no momento</p>
                 </div>
+              </div>
+            )}
+
+            {/* Finance Alerts */}
+            {financeAlerts.overdue.length > 0 && (
+              <div className="flex items-center justify-between p-3 bg-destructive/10 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Wallet className="h-5 w-5 text-destructive" />
+                  <div>
+                    <p className="font-medium">Contas Vencidas</p>
+                    <p className="text-xs text-muted-foreground">{financeAlerts.overdue.length} conta(s) - {formatCurrency(financeAlerts.totalOverdue)}</p>
+                  </div>
+                </div>
+                <Badge variant="destructive">{financeAlerts.overdue.length}</Badge>
+              </div>
+            )}
+
+            {financeAlerts.dueSoon.length > 0 && (
+              <div className="flex items-center justify-between p-3 bg-warning/10 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Clock className="h-5 w-5 text-warning" />
+                  <div>
+                    <p className="font-medium">Vencendo em Breve</p>
+                    <p className="text-xs text-muted-foreground">{financeAlerts.dueSoon.length} conta(s) - {formatCurrency(financeAlerts.totalDueSoon)}</p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="border-warning text-warning">{financeAlerts.dueSoon.length}</Badge>
               </div>
             )}
           </CardContent>
@@ -678,7 +776,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               <Button 
                 variant="outline"
                 onClick={() => onNavigate("indicate")}
@@ -702,6 +800,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               >
                 <Star className="h-6 w-6" />
                 <span className="text-xs font-medium">Meus Clientes</span>
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => onNavigate("finances")}
+                className="h-20 flex flex-col gap-2 hover:bg-primary hover:text-primary-foreground transition-all"
+              >
+                <Wallet className="h-6 w-6" />
+                <span className="text-xs font-medium">Finanças</span>
               </Button>
               <Button 
                 variant="outline"

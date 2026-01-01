@@ -60,7 +60,25 @@ export const FinanceReceipts = ({ transaction, companyId, isGestor }: FinanceRec
 
       if (error) throw error;
 
-      setReceipts(data || []);
+      // Generate fresh signed URLs for each receipt
+      const receiptsWithUrls = await Promise.all(
+        (data || []).map(async (receipt) => {
+          // Extract file path from stored URL or generate from pattern
+          const filePath = `${receipt.company_id}/${receipt.transaction_id}/${receipt.file_name.split('/').pop() || receipt.id}`;
+          
+          // Try to create a signed URL
+          const { data: urlData } = await supabase.storage
+            .from("financial-receipts")
+            .createSignedUrl(filePath, 3600); // 1 hour expiry
+          
+          return {
+            ...receipt,
+            file_url: urlData?.signedUrl || receipt.file_url
+          };
+        })
+      );
+
+      setReceipts(receiptsWithUrls);
     } catch (error: any) {
       console.error("Error fetching receipts:", error);
       toast({
@@ -115,10 +133,12 @@ export const FinanceReceipts = ({ transaction, companyId, isGestor }: FinanceRec
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
+      // Get signed URL (bucket is private)
+      const { data: urlData, error: urlError } = await supabase.storage
         .from("financial-receipts")
-        .getPublicUrl(fileName);
+        .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year expiry
+
+      if (urlError) throw urlError;
 
       // Save receipt record
       const { error: insertError } = await supabase
@@ -128,7 +148,7 @@ export const FinanceReceipts = ({ transaction, companyId, isGestor }: FinanceRec
           company_id: companyId,
           name: formData.name,
           payment_date: formData.payment_date,
-          file_url: urlData.publicUrl,
+          file_url: urlData.signedUrl,
           file_name: formData.file.name,
           uploaded_by: user?.id,
         });
