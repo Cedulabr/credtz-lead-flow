@@ -14,22 +14,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { 
   Settings, 
   Megaphone, 
-  Percent, 
   Plus,
   Edit,
   Trash2,
   Save,
   X,
-  Users,
-  DollarSign,
-  Bell,
-  Building2,
-  Calculator
+  Bell
 } from "lucide-react";
 import { UsersList } from "./UsersList";
 import { ContaCorrente } from "./ContaCorrente";
 import AdminIndicationsManagement from "./AdminIndicationsManagement";
-import { AdminCommissionTable } from "./AdminCommissionTable";
 import { AdminWhitelabel } from "./AdminWhitelabel";
 import { AdminCompanies } from "./AdminCompanies";
 import { AdminTelevendasBanks } from "./AdminTelevendasBanks";
@@ -98,7 +92,6 @@ export function AdminPanel() {
 
   const menuItems = [
     { id: 'announcements', label: 'Announcements', icon: Bell },
-    { id: 'commissions', label: 'Commission Table', icon: DollarSign },
   ];
 
   useEffect(() => {
@@ -345,15 +338,13 @@ export function AdminPanel() {
       </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-10' : 'grid-cols-2'}`}>
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-8' : 'grid-cols-1'}`}>
             <TabsTrigger value="announcements">Avisos</TabsTrigger>
-            <TabsTrigger value="commissions">Comissões</TabsTrigger>
             {isAdmin && <TabsTrigger value="commission-rules">Regras Flexíveis</TabsTrigger>}
             {isAdmin && <TabsTrigger value="companies">Empresas</TabsTrigger>}
             {isAdmin && <TabsTrigger value="televendas-banks">Banco Televendas</TabsTrigger>}
             {isAdmin && <TabsTrigger value="indications">Indicações</TabsTrigger>}
             {isAdmin && <TabsTrigger value="conta-corrente">Conta Corrente</TabsTrigger>}
-            {isAdmin && <TabsTrigger value="payments">Pagamentos</TabsTrigger>}
             {isAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
             {isAdmin && <TabsTrigger value="whitelabel">Whitelabel</TabsTrigger>}
           </TabsList>
@@ -453,237 +444,6 @@ export function AdminPanel() {
               </Card>
             ))}
           </div>
-        </TabsContent>
-
-        {/* Commission Table Tab */}
-        <TabsContent value="commissions" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Tabela de Comissões</h2>
-            <Dialog open={isDialogOpen && activeTab === 'commissions'} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={() => {
-                  setEditingItem(null);
-                  setCommissionForm({
-                    bank_name: "",
-                    product_name: "",
-                    term: "",
-                    table_name: "",
-                    commission_percentage: "",
-                    user_percentage: "",
-                    user_percentage_profile: "",
-                    description: ""
-                  });
-                }}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Regra
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingItem ? 'Editar Regra' : 'Nova Regra de Comissão'}
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  {/* Informação sobre edição */}
-                  {editingItem && (
-                    <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
-                      <p className="text-sm text-primary font-medium">
-                        ✏️ Editando regra existente
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        ID: {editingItem.id?.slice(0, 8)}...
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="commission-bank">Banco *</Label>
-                      <Select 
-                        value={commissionForm.bank_name} 
-                        onValueChange={(value) => setCommissionForm({ ...commissionForm, bank_name: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o banco" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Banco Pan">Banco Pan</SelectItem>
-                          <SelectItem value="Banco BMG">Banco BMG</SelectItem>
-                          <SelectItem value="Banco Master">Banco Master</SelectItem>
-                          <SelectItem value="Banco Mercantil">Banco Mercantil</SelectItem>
-                          <SelectItem value="Banco BRB">Banco BRB</SelectItem>
-                          <SelectItem value="Banco Safra">Banco Safra</SelectItem>
-                          <SelectItem value="Banco Itaú">Banco Itaú</SelectItem>
-                          <SelectItem value="Banco C6">Banco C6</SelectItem>
-                          <SelectItem value="Crefisa">Crefisa</SelectItem>
-                          <SelectItem value="Facta Financeira">Facta Financeira</SelectItem>
-                          <SelectItem value="Outro">Outro</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {commissionForm.bank_name === "Outro" && (
-                        <Input
-                          className="mt-2"
-                          placeholder="Digite o nome do banco..."
-                          onChange={(e) => setCommissionForm({ ...commissionForm, bank_name: e.target.value })}
-                        />
-                      )}
-                    </div>
-                    <div>
-                      <Label htmlFor="commission-product">Produto *</Label>
-                      <Select 
-                        value={commissionForm.product_name} 
-                        onValueChange={(value) => setCommissionForm({ ...commissionForm, product_name: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o produto" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Novo">Novo</SelectItem>
-                          <SelectItem value="Refinanciamento">Refinanciamento</SelectItem>
-                          <SelectItem value="Portabilidade">Portabilidade</SelectItem>
-                          <SelectItem value="Refinanciamento da portabilidade">Refinanciamento da portabilidade</SelectItem>
-                          <SelectItem value="Cartão">Cartão</SelectItem>
-                          <SelectItem value="Cartão Com saque">Cartão Com saque</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="user-profile" className="flex items-center gap-2">
-                      Nível do Usuário *
-                      <Badge variant="outline" className="text-xs">Obrigatório</Badge>
-                    </Label>
-                    <Select 
-                      value={commissionForm.user_percentage_profile} 
-                      onValueChange={(value) => setCommissionForm({ ...commissionForm, user_percentage_profile: value })}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Selecione o nível" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="bronze">
-                          <div className="flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full bg-amber-700"></span>
-                            Bronze (Menor comissão)
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="prata">
-                          <div className="flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full bg-gray-400"></span>
-                            Prata
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="ouro">
-                          <div className="flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
-                            Ouro
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="diamante">
-                          <div className="flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full bg-cyan-400"></span>
-                            Diamante (Maior comissão)
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Usuários de níveis mais altos recebem comissões maiores
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="commission-term">Prazo (opcional)</Label>
-                      <Input
-                        id="commission-term"
-                        placeholder="Ex: 84 meses"
-                        value={commissionForm.term}
-                        onChange={(e) => setCommissionForm({ ...commissionForm, term: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="table-name">Nome da Tabela (opcional)</Label>
-                      <Input
-                        id="table-name"
-                        placeholder="Ex: Tabela 1, Premium"
-                        value={commissionForm.table_name}
-                        onChange={(e) => setCommissionForm({ ...commissionForm, table_name: e.target.value })}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Para diferenciar tabelas do mesmo produto
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="commission-percentage">Comissão Total (%)</Label>
-                      <Input
-                        id="commission-percentage"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        placeholder="Ex: 3.5"
-                        value={commissionForm.commission_percentage}
-                        onChange={(e) => setCommissionForm({ ...commissionForm, commission_percentage: e.target.value })}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Percentual pago pelo banco
-                      </p>
-                    </div>
-                    <div>
-                      <Label htmlFor="user-percentage">Repasse ao Usuário (%)</Label>
-                      <Input
-                        id="user-percentage"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        placeholder="Ex: 2.8"
-                        value={commissionForm.user_percentage}
-                        onChange={(e) => setCommissionForm({ ...commissionForm, user_percentage: e.target.value })}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        O que o usuário recebe
-                      </p>
-                    </div>
-                  </div>
-
-                  <Button onClick={handleSaveCommission} className="w-full">
-                    <Save className="h-4 w-4 mr-2" />
-                    {editingItem ? 'Atualizar Comissão' : 'Criar Comissão'}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {/* Commission Table organized by bank and product */}
-          {/* Commission Table organized by bank and product */}
-          <AdminCommissionTable 
-            commissionTable={commissionTable}
-            onEdit={(rule) => startEdit(rule, 'commission')}
-            onToggleActive={(id, currentStatus) => toggleActive('commission_table', id, currentStatus)}
-            onDelete={(id) => deleteItem('commission_table', id)}
-            onNewRule={(bankName, productName) => {
-              setCommissionForm({
-                bank_name: bankName || "",
-                product_name: productName || "",
-                term: "",
-                table_name: "",
-                commission_percentage: "",
-                user_percentage: "",
-                user_percentage_profile: "",
-                description: ""
-              });
-              setEditingItem(null);
-              setIsDialogOpen(true);
-            }}
-          />
         </TabsContent>
 
         {/* Commission Rules Tab - Regras Flexíveis */}
