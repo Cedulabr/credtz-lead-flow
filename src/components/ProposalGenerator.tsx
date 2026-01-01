@@ -25,8 +25,12 @@ import {
   History,
   Edit,
   Clock,
-  Save
+  Save,
+  Filter,
+  Calendar,
+  Users
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -56,6 +60,7 @@ interface SavedProposal {
   created_at: string;
   updated_at: string;
   user_name?: string;
+  user_id?: string;
 }
 
 const PRODUCTS = [
@@ -102,6 +107,11 @@ export function ProposalGenerator() {
   const [loadingSaved, setLoadingSaved] = useState(false);
   const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Filters state
+  const [filterUser, setFilterUser] = useState<string>("all");
+  const [filterDate, setFilterDate] = useState<string>("all");
+  const [uniqueUsers, setUniqueUsers] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     const fetchBanks = async () => {
@@ -137,7 +147,6 @@ export function ProposalGenerator() {
       const { data, error } = await supabase
         .from("saved_proposals")
         .select("*")
-        .eq("user_id", user.id)
         .order("updated_at", { ascending: false });
       
       if (error) throw error;
@@ -151,6 +160,10 @@ export function ProposalGenerator() {
       
       const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.name]));
       
+      // Set unique users for filter
+      const users = (profiles || []).map((p: any) => ({ id: p.id, name: p.name || "Usuário" }));
+      setUniqueUsers(users);
+      
       const proposals: SavedProposal[] = (data || []).map((item: any) => ({
         id: item.id,
         client_name: item.client_name,
@@ -159,6 +172,7 @@ export function ProposalGenerator() {
         created_at: item.created_at,
         updated_at: item.updated_at,
         user_name: profileMap.get(item.user_id) || "Usuário",
+        user_id: item.user_id,
       }));
       
       setSavedProposals(proposals);
@@ -169,6 +183,47 @@ export function ProposalGenerator() {
       setLoadingSaved(false);
     }
   };
+
+  const getFilteredProposals = () => {
+    let filtered = savedProposals;
+    
+    // Filter by user
+    if (filterUser !== "all") {
+      filtered = filtered.filter((p: any) => p.user_id === filterUser);
+    }
+    
+    // Filter by date
+    if (filterDate !== "all") {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      filtered = filtered.filter((p) => {
+        const proposalDate = new Date(p.created_at);
+        proposalDate.setHours(0, 0, 0, 0);
+        
+        if (filterDate === "today") {
+          return proposalDate.getTime() === today.getTime();
+        } else if (filterDate === "yesterday") {
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          return proposalDate.getTime() === yesterday.getTime();
+        } else if (filterDate === "week") {
+          const weekAgo = new Date(today);
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          return proposalDate >= weekAgo;
+        } else if (filterDate === "month") {
+          const monthAgo = new Date(today);
+          monthAgo.setMonth(monthAgo.getMonth() - 1);
+          return proposalDate >= monthAgo;
+        }
+        return true;
+      });
+    }
+    
+    return filtered;
+  };
+
+  const filteredProposals = getFilteredProposals();
 
   const saveProposal = async () => {
     if (!user) {
@@ -1230,54 +1285,132 @@ export function ProposalGenerator() {
       )}
 
       {user && !loadingSaved && savedProposals.length > 0 && (
-        <div className="max-w-2xl mx-auto space-y-3">
-          {savedProposals.map((proposal) => (
-            <Card key={proposal.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                      <User className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">{proposal.client_name}</p>
-                      <p className="text-sm text-muted-foreground">{proposal.client_phone}</p>
-                    </div>
+        <div className="max-w-2xl mx-auto space-y-4">
+          {/* Stats Card */}
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-primary-foreground" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">
-                      {proposal.contracts.length} contrato(s)
-                    </Badge>
-                    <div className="flex items-center text-xs text-muted-foreground">
-                      <Clock className="w-3 h-3 mr-1" />
-                      {new Date(proposal.updated_at).toLocaleDateString("pt-BR")}
-                    </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{savedProposals.length}</p>
+                    <p className="text-sm text-muted-foreground">Total de propostas</p>
                   </div>
                 </div>
-                <div className="mt-2 text-xs text-muted-foreground">
-                  Criado por: <span className="font-medium">{proposal.user_name || "Usuário"}</span>
+                <div className="text-right">
+                  <p className="text-lg font-semibold text-primary">{filteredProposals.length}</p>
+                  <p className="text-xs text-muted-foreground">Exibindo</p>
                 </div>
-                <div className="flex gap-2 mt-4">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => loadProposalForEdit(proposal)}
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Editar
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => deleteProposal(proposal.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Filters */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-foreground">Filtros</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Users className="w-3 h-3" /> Por Usuário
+                  </label>
+                  <Select value={filterUser} onValueChange={setFilterUser}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Todos os usuários" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os usuários</SelectItem>
+                      {uniqueUsers.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Calendar className="w-3 h-3" /> Por Data
+                  </label>
+                  <Select value={filterDate} onValueChange={setFilterDate}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Todas as datas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as datas</SelectItem>
+                      <SelectItem value="today">Hoje</SelectItem>
+                      <SelectItem value="yesterday">Ontem</SelectItem>
+                      <SelectItem value="week">Últimos 7 dias</SelectItem>
+                      <SelectItem value="month">Último mês</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Proposals List */}
+          <div className="space-y-3">
+            {filteredProposals.length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="p-6 text-center text-muted-foreground">
+                  <Filter className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>Nenhuma proposta encontrada com os filtros selecionados</p>
+                </CardContent>
+              </Card>
+            ) : (
+              filteredProposals.map((proposal) => (
+                <Card key={proposal.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                          <User className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">{proposal.client_name}</p>
+                          <p className="text-sm text-muted-foreground">{proposal.client_phone}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">
+                          {proposal.contracts.length} contrato(s)
+                        </Badge>
+                        <div className="flex items-center text-xs text-muted-foreground">
+                          <Clock className="w-3 h-3 mr-1" />
+                          {new Date(proposal.updated_at).toLocaleDateString("pt-BR")}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Criado por: <span className="font-medium">{proposal.user_name || "Usuário"}</span>
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => loadProposalForEdit(proposal)}
+                      >
+                        <Edit className="w-4 h-4 mr-2" />
+                        Editar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => deleteProposal(proposal.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>
