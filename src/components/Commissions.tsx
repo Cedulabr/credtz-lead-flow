@@ -702,81 +702,147 @@ export function Commissions() {
                 
                 const doc = new jsPDF();
                 const pageWidth = doc.internal.pageSize.getWidth();
+                const pageHeight = doc.internal.pageSize.getHeight();
                 
-                // Header
-                doc.setFontSize(18);
+                // Cores em tons laranja (RGB)
+                const primaryOrange = [255, 107, 0]; // #FF6B00
+                const lightOrange = [255, 140, 50]; // #FF8C32
+                const darkOrange = [200, 80, 0]; // #C85000
+                
+                // Header com fundo laranja
+                doc.setFillColor(primaryOrange[0], primaryOrange[1], primaryOrange[2]);
+                doc.rect(0, 0, pageWidth, 45, "F");
+                
+                // Logo Credtz (texto estilizado como logo)
+                doc.setFontSize(28);
                 doc.setFont("helvetica", "bold");
-                doc.text("Extrato de Comissões", pageWidth / 2, 20, { align: "center" });
+                doc.setTextColor(255, 255, 255);
+                doc.text("CREDTZ", pageWidth / 2, 22, { align: "center" });
                 
-                doc.setFontSize(12);
-                doc.setFont("helvetica", "normal");
-                doc.text(`Período: ${monthName}`, pageWidth / 2, 30, { align: "center" });
-                doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth / 2, 38, { align: "center" });
-                
-                // Summary
-                const totalPaid = paidCommissions.reduce((sum, c) => sum + Number(c.commission_amount), 0);
-                doc.setFontSize(14);
-                doc.setFont("helvetica", "bold");
-                doc.text(`Total de Comissões: ${formatCurrency(totalPaid)}`, 14, 52);
-                doc.text(`Quantidade: ${paidCommissions.length} comissões`, 14, 60);
-                
-                // Table header
-                let yPos = 75;
                 doc.setFontSize(10);
-                doc.setFont("helvetica", "bold");
-                doc.setFillColor(240, 240, 240);
-                doc.rect(14, yPos - 5, pageWidth - 28, 8, "F");
-                doc.text("Cliente", 16, yPos);
-                doc.text("Banco", 70, yPos);
-                doc.text("Produto", 105, yPos);
-                doc.text("Valor", 150, yPos);
-                doc.text("Comissão", 175, yPos);
-                
-                yPos += 10;
                 doc.setFont("helvetica", "normal");
+                doc.text("Extrato de Comissões", pageWidth / 2, 32, { align: "center" });
+                doc.text(`Período: ${monthName}`, pageWidth / 2, 40, { align: "center" });
+                
+                // Informações do relatório
+                doc.setTextColor(80, 80, 80);
+                doc.setFontSize(9);
+                doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`, 14, 55);
+                
+                // Summary box com borda laranja
+                const totalPaid = paidCommissions.reduce((sum, c) => sum + Number(c.commission_amount), 0);
+                doc.setDrawColor(primaryOrange[0], primaryOrange[1], primaryOrange[2]);
+                doc.setLineWidth(0.5);
+                doc.roundedRect(14, 62, pageWidth - 28, 22, 3, 3, "S");
+                
+                doc.setFontSize(11);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(darkOrange[0], darkOrange[1], darkOrange[2]);
+                doc.text(`Total de Comissões: ${formatCurrency(totalPaid)}`, 20, 73);
+                doc.setTextColor(80, 80, 80);
+                doc.setFont("helvetica", "normal");
+                doc.text(`Quantidade: ${paidCommissions.length} comissões pagas`, 20, 80);
+                
+                // Table header com fundo laranja
+                let yPos = 95;
+                doc.setFillColor(primaryOrange[0], primaryOrange[1], primaryOrange[2]);
+                doc.rect(14, yPos - 6, pageWidth - 28, 10, "F");
+                
+                doc.setFontSize(9);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(255, 255, 255);
+                doc.text("Nome", 16, yPos);
+                doc.text("CPF", 62, yPos);
+                doc.text("Nº Proposta", 100, yPos);
+                doc.text("% Paga", 140, yPos);
+                doc.text("Comissão", 170, yPos);
+                
+                yPos += 8;
+                doc.setFont("helvetica", "normal");
+                doc.setTextColor(60, 60, 60);
                 
                 // Table rows
                 paidCommissions.forEach((commission, index) => {
-                  if (yPos > 270) {
+                  if (yPos > pageHeight - 30) {
+                    // Footer na página atual
+                    doc.setFillColor(primaryOrange[0], primaryOrange[1], primaryOrange[2]);
+                    doc.rect(0, pageHeight - 15, pageWidth, 15, "F");
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFontSize(8);
+                    doc.text("CREDTZ - Sistema de Gestão de Comissões", pageWidth / 2, pageHeight - 6, { align: "center" });
+                    
                     doc.addPage();
-                    yPos = 20;
+                    yPos = 25;
+                    
+                    // Cabeçalho da nova página
+                    doc.setFillColor(primaryOrange[0], primaryOrange[1], primaryOrange[2]);
+                    doc.rect(14, yPos - 6, pageWidth - 28, 10, "F");
+                    doc.setFontSize(9);
+                    doc.setFont("helvetica", "bold");
+                    doc.setTextColor(255, 255, 255);
+                    doc.text("Nome", 16, yPos);
+                    doc.text("CPF", 62, yPos);
+                    doc.text("Nº Proposta", 100, yPos);
+                    doc.text("% Paga", 140, yPos);
+                    doc.text("Comissão", 170, yPos);
+                    yPos += 8;
+                    doc.setFont("helvetica", "normal");
+                    doc.setTextColor(60, 60, 60);
                   }
                   
-                  // Alternate row background
+                  // Alternate row background (tom laranja claro)
                   if (index % 2 === 0) {
-                    doc.setFillColor(250, 250, 250);
+                    doc.setFillColor(255, 245, 235);
                     doc.rect(14, yPos - 4, pageWidth - 28, 7, "F");
                   }
                   
-                  const clientName = commission.client_name.length > 20 
-                    ? commission.client_name.substring(0, 20) + "..." 
+                  const clientName = commission.client_name.length > 18 
+                    ? commission.client_name.substring(0, 18) + "..." 
                     : commission.client_name;
-                  const bankName = commission.bank_name.length > 12
-                    ? commission.bank_name.substring(0, 12) + "..."
-                    : commission.bank_name;
-                  const productType = commission.product_type.length > 15
-                    ? commission.product_type.substring(0, 15) + "..."
-                    : commission.product_type;
+                  const cpf = commission.cpf || 'N/A';
+                  const proposalNumber = commission.proposal_number || 'N/A';
+                  const percentage = `${Number(commission.commission_percentage || 0).toFixed(2)}%`;
+                  const commissionValue = formatCurrency(Number(commission.commission_amount));
                   
+                  doc.setFontSize(8);
                   doc.text(clientName, 16, yPos);
-                  doc.text(bankName, 70, yPos);
-                  doc.text(productType, 105, yPos);
-                  doc.text(`R$ ${Number(commission.credit_value || 0).toFixed(2)}`, 150, yPos);
-                  doc.text(`R$ ${Number(commission.commission_amount).toFixed(2)}`, 175, yPos);
+                  doc.text(cpf, 62, yPos);
+                  doc.text(proposalNumber, 100, yPos);
+                  doc.text(percentage, 140, yPos);
+                  doc.setFont("helvetica", "bold");
+                  doc.setTextColor(darkOrange[0], darkOrange[1], darkOrange[2]);
+                  doc.text(commissionValue, 170, yPos);
+                  doc.setFont("helvetica", "normal");
+                  doc.setTextColor(60, 60, 60);
                   
                   yPos += 7;
                 });
                 
-                // Footer
-                yPos += 10;
-                doc.setDrawColor(200, 200, 200);
+                // Total row
+                yPos += 5;
+                doc.setDrawColor(primaryOrange[0], primaryOrange[1], primaryOrange[2]);
+                doc.setLineWidth(1);
                 doc.line(14, yPos, pageWidth - 14, yPos);
                 yPos += 8;
+                
+                doc.setFillColor(255, 240, 230);
+                doc.rect(14, yPos - 5, pageWidth - 28, 12, "F");
+                
+                doc.setFontSize(11);
                 doc.setFont("helvetica", "bold");
-                doc.text(`TOTAL: ${formatCurrency(totalPaid)}`, pageWidth - 14, yPos, { align: "right" });
+                doc.setTextColor(darkOrange[0], darkOrange[1], darkOrange[2]);
+                doc.text("TOTAL:", 16, yPos + 2);
+                doc.text(formatCurrency(totalPaid), pageWidth - 20, yPos + 2, { align: "right" });
+                
+                // Footer
+                doc.setFillColor(primaryOrange[0], primaryOrange[1], primaryOrange[2]);
+                doc.rect(0, pageHeight - 15, pageWidth, 15, "F");
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(8);
+                doc.text("CREDTZ - Sistema de Gestão de Comissões", pageWidth / 2, pageHeight - 6, { align: "center" });
                 
                 // Save PDF
-                const fileName = `comissoes_${year}_${String(month).padStart(2, '0')}.pdf`;
+                const fileName = `credtz_comissoes_${year}_${String(month).padStart(2, '0')}.pdf`;
                 doc.save(fileName);
                 
                 toast({
