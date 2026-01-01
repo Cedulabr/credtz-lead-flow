@@ -369,9 +369,9 @@ export const TelevendasForm = () => {
                           </FormControl>
                           <SelectContent>
                             {banks.length === 0 && !loadingBanks ? (
-                              <SelectItem value="" disabled>
+                              <div className="px-4 py-3 text-sm text-muted-foreground text-center">
                                 Nenhum banco cadastrado
-                              </SelectItem>
+                              </div>
                             ) : (
                               banks.map((bank) => (
                                 <SelectItem key={bank.id} value={bank.name} className="text-base py-3">
