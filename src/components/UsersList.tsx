@@ -337,10 +337,37 @@ export function UsersList() {
         throw new Error(data.error);
       }
 
-      toast({
-        title: "Senha definida com sucesso!",
-        description: `Nova senha definida para ${passwordDialog.user.name || passwordDialog.user.email}`,
-      });
+      // Testar login (debug) com a nova senha
+      let loginTestOk: boolean | null = null;
+      let loginTestError: string | undefined;
+      try {
+        const { data: debugData, error: debugError } = await supabase.functions.invoke('admin-debug-login', {
+          body: { user_id: passwordDialog.user.id, password: newPassword }
+        });
+        if (debugError) {
+          loginTestOk = null;
+          loginTestError = debugError.message;
+        } else {
+          loginTestOk = debugData?.login_test?.ok === true;
+          loginTestError = debugData?.login_test?.error;
+        }
+      } catch (e: any) {
+        loginTestOk = null;
+        loginTestError = e?.message;
+      }
+
+      if (loginTestOk === false) {
+        toast({
+          title: "Senha atualizada, mas login falhou",
+          description: loginTestError || "O Supabase ainda está retornando credenciais inválidas para este usuário.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Senha definida com sucesso!",
+          description: `Nova senha definida para ${passwordDialog.user.name || passwordDialog.user.email}${loginTestOk === true ? ' (login testado: OK)' : ''}`,
+        });
+      }
 
       setPasswordDialog({ open: false, user: null });
       setNewPassword("");
@@ -381,10 +408,41 @@ export function UsersList() {
         throw new Error(data.error);
       }
 
-      toast({
-        title: "Senha resetada!",
-        description: `Nova senha temporária: ${data.new_password}`,
-      });
+      const newPass = data?.new_password as string | undefined;
+
+      // Testar login (debug) com a senha gerada
+      let loginTestOk: boolean | null = null;
+      let loginTestError: string | undefined;
+      if (newPass) {
+        try {
+          const { data: debugData, error: debugError } = await supabase.functions.invoke('admin-debug-login', {
+            body: { user_id: user.id, password: newPass }
+          });
+          if (debugError) {
+            loginTestOk = null;
+            loginTestError = debugError.message;
+          } else {
+            loginTestOk = debugData?.login_test?.ok === true;
+            loginTestError = debugData?.login_test?.error;
+          }
+        } catch (e: any) {
+          loginTestOk = null;
+          loginTestError = e?.message;
+        }
+      }
+
+      if (loginTestOk === false) {
+        toast({
+          title: "Senha resetada, mas login falhou",
+          description: loginTestError || "O Supabase ainda está retornando credenciais inválidas para este usuário.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Senha resetada!",
+          description: `Email: ${user.email} | Nova senha temporária: ${newPass || '(não retornada)'}${loginTestOk === true ? ' (login testado: OK)' : ''}`,
+        });
+      }
 
     } catch (error: any) {
       console.error('Erro ao resetar senha:', error);
