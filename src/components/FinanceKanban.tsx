@@ -58,10 +58,7 @@ export const FinanceKanban = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
-  const [filterMonth, setFilterMonth] = useState<string>(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const [filterMonth, setFilterMonth] = useState<string>("all");
   const [showForm, setShowForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showReceipts, setShowReceipts] = useState(false);
@@ -158,18 +155,24 @@ export const FinanceKanban = () => {
 
     setLoading(true);
     try {
-      const startDate = startOfMonth(new Date(filterMonth + "-01"));
-      const endDate = endOfMonth(startDate);
-
       console.log("FinanceKanban: Fetching transactions for company:", selectedCompanyId, "month:", filterMonth);
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("financial_transactions")
         .select("*")
         .eq("company_id", selectedCompanyId)
-        .gte("due_date", format(startDate, "yyyy-MM-dd"))
-        .lte("due_date", format(endDate, "yyyy-MM-dd"))
         .order("due_date", { ascending: true });
+
+      // Only filter by month if not "all"
+      if (filterMonth !== "all") {
+        const startDate = startOfMonth(new Date(filterMonth + "-01"));
+        const endDate = endOfMonth(startDate);
+        query = query
+          .gte("due_date", format(startDate, "yyyy-MM-dd"))
+          .lte("due_date", format(endDate, "yyyy-MM-dd"));
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error("FinanceKanban: Error fetching transactions:", error);
@@ -336,6 +339,26 @@ export const FinanceKanban = () => {
         </div>
         
         <div className="flex flex-wrap gap-2">
+          {/* Comprovantes Button */}
+          <Button 
+            variant="outline"
+            onClick={() => {
+              if (transactions.length > 0) {
+                setSelectedTransactionForReceipts(transactions[0]);
+                setShowReceipts(true);
+              } else {
+                toast({
+                  title: "Nenhuma transação",
+                  description: "Cadastre uma transação para anexar comprovantes.",
+                  variant: "default",
+                });
+              }
+            }}
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Comprovantes
+          </Button>
+          
           {isGestor && (
             <Button onClick={() => setShowForm(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -378,6 +401,7 @@ export const FinanceKanban = () => {
                 <SelectValue placeholder="Mês" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">Todos os meses</SelectItem>
                 {getMonthOptions().map((month) => (
                   <SelectItem key={month.value} value={month.value}>
                     {month.label}
