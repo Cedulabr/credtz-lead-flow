@@ -19,19 +19,30 @@ interface FinanceAlertsProps {
 }
 
 export const FinanceAlerts = ({ transactions, companyId }: FinanceAlertsProps) => {
+  const parseDateSafe = (dateStr: string) => {
+    // date column comes as YYYY-MM-DD; parse as local date to avoid timezone shifts
+    if (dateStr && dateStr.length === 10) {
+      const [year, month, day] = dateStr.split("-").map(Number);
+      return new Date(year, month - 1, day);
+    }
+    return new Date(dateStr);
+  };
+
   const alerts = useMemo(() => {
+
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const threeDaysFromNow = addDays(today, 3);
-    
+
     const overdue = transactions.filter(t => 
       t.status !== "pago" && 
-      isBefore(new Date(t.due_date), today)
+      isBefore(parseDateSafe(t.due_date), today)
     );
     
     const dueSoon = transactions.filter(t => 
       t.status !== "pago" && 
-      isAfter(new Date(t.due_date), today) && 
-      isBefore(new Date(t.due_date), threeDaysFromNow)
+      isAfter(parseDateSafe(t.due_date), today) && 
+      isBefore(parseDateSafe(t.due_date), threeDaysFromNow)
     );
     
     const totalExpenses = transactions
@@ -115,7 +126,7 @@ export const FinanceAlerts = ({ transactions, companyId }: FinanceAlertsProps) =
                 <div className="mt-2 space-y-1">
                   {alerts.dueSoon.slice(0, 3).map(t => (
                     <p key={t.id} className="text-xs text-yellow-600 truncate">
-                      • {t.description} ({format(new Date(t.due_date), "dd/MM")})
+                      • {t.description} ({format(parseDateSafe(t.due_date), "dd/MM")})
                     </p>
                   ))}
                 </div>
