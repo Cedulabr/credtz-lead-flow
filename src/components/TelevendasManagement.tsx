@@ -423,8 +423,8 @@ export const TelevendasManagement = () => {
                 />
               </div>
               
-              {/* User filter (admin only) */}
-              {isAdmin && (
+              {/* User filter (admin e gestor) */}
+              {(isAdmin || isGestor) && (
                 <Select value={selectedUserId} onValueChange={setSelectedUserId}>
                   <SelectTrigger className="w-full sm:w-[200px]">
                     <SelectValue placeholder="Filtrar por usuário" />
@@ -477,7 +477,7 @@ export const TelevendasManagement = () => {
               <TableBody>
                 {filteredTelevendas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 10 : 9} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={(isAdmin || isGestor) ? 10 : 9} className="text-center text-muted-foreground py-8">
                       {searchTerm ? 'Nenhuma venda encontrada' : 'Nenhuma venda registrada'}
                     </TableCell>
                   </TableRow>
