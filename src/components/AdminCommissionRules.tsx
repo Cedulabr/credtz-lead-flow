@@ -118,10 +118,11 @@ export function AdminCommissionRules() {
       
       setCompanies(companiesData || []);
 
-      // Fetch banks from banks_products or banks table
+      // Fetch banks from televendas_banks table
       const { data: banksData } = await supabase
-        .from('banks')
+        .from('televendas_banks')
         .select('name')
+        .eq('is_active', true)
         .order('name');
       
       const bankNames = banksData?.map(b => b.name) || [];
