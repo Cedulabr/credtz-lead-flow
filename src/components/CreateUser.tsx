@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { UserPlus, KeyRound } from "lucide-react";
+import { UserPlus, KeyRound, Crown, User } from "lucide-react";
 
 interface CreateUserForm {
   name: string;
@@ -18,12 +18,20 @@ interface CreateUserForm {
   cpf: string;
   phone: string;
   role: string;
+  company_id: string;
+  company_role: 'gestor' | 'colaborador';
+}
+
+interface Company {
+  id: string;
+  name: string;
 }
 
 export function CreateUser() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [formData, setFormData] = useState<CreateUserForm>({
     name: "",
     email: "",
@@ -32,8 +40,26 @@ export function CreateUser() {
     level: "",
     cpf: "",
     phone: "",
-    role: "partner"
+    role: "partner",
+    company_id: "",
+    company_role: "colaborador"
   });
+
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
+
+  const fetchCompanies = async () => {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name');
+    
+    if (!error && data) {
+      setCompanies(data);
+    }
+  };
 
   const handleCreateUser = async () => {
     if (!formData.name || !formData.email || !formData.password) {
@@ -57,7 +83,9 @@ export function CreateUser() {
           level: formData.level,
           cpf: formData.cpf,
           phone: formData.phone,
-          role: formData.role
+          role: formData.role,
+          company_id: formData.company_id || null,
+          company_role: formData.company_role
         }
       });
 
@@ -77,7 +105,9 @@ export function CreateUser() {
         level: "",
         cpf: "",
         phone: "",
-        role: "partner"
+        role: "partner",
+        company_id: "",
+        company_role: "colaborador"
       });
     } catch (error: any) {
       console.error('Erro ao criar usuário:', error);
@@ -194,6 +224,52 @@ export function CreateUser() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label htmlFor="company_id">Empresa</Label>
+              <Select
+                value={formData.company_id}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, company_id: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a empresa" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem empresa</SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {formData.company_id && formData.company_id !== "none" && (
+              <div>
+                <Label htmlFor="company_role">Cargo na Empresa</Label>
+                <Select
+                  value={formData.company_role}
+                  onValueChange={(value: 'gestor' | 'colaborador') => setFormData(prev => ({ ...prev, company_role: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gestor">
+                      <div className="flex items-center gap-2">
+                        <Crown className="h-3 w-3 text-yellow-500" />
+                        Gestor
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="colaborador">
+                      <div className="flex items-center gap-2">
+                        <User className="h-3 w-3" />
+                        Colaborador
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label htmlFor="cpf">CPF</Label>
               <Input
