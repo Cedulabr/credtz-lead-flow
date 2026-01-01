@@ -140,6 +140,18 @@ export const TelevendasForm = () => {
         return;
       }
 
+      // Fetch user's company_id
+      const { data: userCompanyData } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      const companyId = userCompanyData?.company_id || null;
+
       // Converter valores de centavos para reais (dividir por 100)
       // Os valores são armazenados como centavos pela máscara de moeda
       const parcelaValue = values.parcela ? parseInt(values.parcela) / 100 : 0;
@@ -148,6 +160,7 @@ export const TelevendasForm = () => {
 
       const { error } = await (supabase as any).from("televendas").insert({
         user_id: user.id,
+        company_id: companyId,
         nome: values.nome,
         cpf: values.cpf.replace(/\D/g, ""),
         data_venda: values.data_venda,
