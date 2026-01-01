@@ -31,6 +31,7 @@ import AdminIndicationsManagement from "./AdminIndicationsManagement";
 import { AdminCommissionTable } from "./AdminCommissionTable";
 import { AdminWhitelabel } from "./AdminWhitelabel";
 import { AdminCompanies } from "./AdminCompanies";
+import { AdminTelevendasBanks } from "./AdminTelevendasBanks";
 
 interface Announcement {
   id: number;
@@ -342,10 +343,11 @@ export function AdminPanel() {
       </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-8' : 'grid-cols-2'}`}>
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-9' : 'grid-cols-2'}`}>
             <TabsTrigger value="announcements">Avisos</TabsTrigger>
             <TabsTrigger value="commissions">Comissões</TabsTrigger>
             {isAdmin && <TabsTrigger value="companies">Empresas</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="televendas-banks">Banco Televendas</TabsTrigger>}
             {isAdmin && <TabsTrigger value="indications">Indicações</TabsTrigger>}
             {isAdmin && <TabsTrigger value="conta-corrente">Conta Corrente</TabsTrigger>}
             {isAdmin && <TabsTrigger value="payments">Pagamentos</TabsTrigger>}
@@ -704,6 +706,10 @@ export function AdminPanel() {
 
         {isAdmin && (
           <>
+            <TabsContent value="televendas-banks">
+              <AdminTelevendasBanks />
+            </TabsContent>
+
             <TabsContent value="users">
               <UsersList />
             </TabsContent>
