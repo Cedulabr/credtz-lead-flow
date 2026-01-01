@@ -58,6 +58,7 @@ interface Proposta {
   status: string | null;
   created_by_id: string | null;
   assigned_to: string | null;
+  company_id: string | null;
   created_at: string | null;
   updated_at: string | null;
   notes: string | null;
@@ -76,6 +77,16 @@ interface Profile {
   id: string;
   name: string | null;
   email: string | null;
+}
+
+interface UserCompany {
+  id: string;
+  company_id: string;
+  company_role: 'gestor' | 'colaborador';
+  companies?: {
+    id: string;
+    name: string;
+  };
 }
 
 const pipelineStages = [
@@ -114,6 +125,11 @@ export function MyClientsKanban() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [draggedItem, setDraggedItem] = useState<Proposta | null>(null);
   
+  // Gestor state
+  const [isGestor, setIsGestor] = useState(false);
+  const [gestorCompanyIds, setGestorCompanyIds] = useState<string[]>([]);
+  const [userCompanies, setUserCompanies] = useState<UserCompany[]>([]);
+  
   // New client form
   const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false);
   const [savingNewClient, setSavingNewClient] = useState(false);
@@ -124,11 +140,12 @@ export function MyClientsKanban() {
     observacao: "",
   });
 
-  // Admin filters
+  // Admin/Gestor filters
   const [users, setUsers] = useState<Profile[]>([]);
   const [filterUser, setFilterUser] = useState<string>("all");
   const [filterMonth, setFilterMonth] = useState<string>("all");
   const [filterConvenio, setFilterConvenio] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   
   // Search filter (for all users)
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -147,22 +164,69 @@ export function MyClientsKanban() {
     origem_lead: "",
   });
 
+  // Check if user is Gestor
+  useEffect(() => {
+    const checkGestorStatus = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from("user_companies")
+          .select("id, company_id, company_role, companies(id, name)")
+          .eq("user_id", user.id)
+          .eq("is_active", true);
+        
+        if (error) throw error;
+        
+        const gestorCompanies = (data || []).filter(uc => uc.company_role === 'gestor');
+        setIsGestor(gestorCompanies.length > 0);
+        setGestorCompanyIds(gestorCompanies.map(uc => uc.company_id));
+        setUserCompanies(data || []);
+      } catch (error) {
+        console.error("Error checking gestor status:", error);
+      }
+    };
+    
+    checkGestorStatus();
+  }, [user?.id]);
+
   useEffect(() => {
     fetchPropostas();
-    if (isAdmin) {
+    if (isAdmin || isGestor) {
       fetchUsers();
     }
-  }, [isAdmin]);
+  }, [isAdmin, isGestor, gestorCompanyIds]);
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, name, email")
-        .order("name");
-      
-      if (error) throw error;
-      setUsers(data || []);
+      if (isAdmin) {
+        // Admin sees all users
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, name, email")
+          .order("name");
+        
+        if (error) throw error;
+        setUsers(data || []);
+      } else if (isGestor && gestorCompanyIds.length > 0) {
+        // Gestor sees only users from their company
+        const { data: companyUsers, error } = await supabase
+          .from("user_companies")
+          .select("user_id, profiles(id, name, email)")
+          .in("company_id", gestorCompanyIds)
+          .eq("is_active", true);
+        
+        if (error) throw error;
+        
+        const uniqueUsers = new Map<string, Profile>();
+        (companyUsers || []).forEach(cu => {
+          const profile = cu.profiles as unknown as Profile;
+          if (profile && !uniqueUsers.has(profile.id)) {
+            uniqueUsers.set(profile.id, profile);
+          }
+        });
+        setUsers(Array.from(uniqueUsers.values()));
+      }
     } catch (error) {
       console.error("Error fetching users:", error);
     }
@@ -175,8 +239,13 @@ export function MyClientsKanban() {
         .select("*")
         .order("created_at", { ascending: false });
 
-      // If not admin, only show user's proposals
-      if (!isAdmin) {
+      if (isAdmin) {
+        // Admin sees all proposals
+      } else if (isGestor && gestorCompanyIds.length > 0) {
+        // Gestor sees only proposals from their company
+        query = query.in("company_id", gestorCompanyIds);
+      } else {
+        // Regular user sees only their own proposals
         query = query.or(`created_by_id.eq.${user?.id},assigned_to.eq.${user?.id}`);
       }
 
@@ -339,7 +408,7 @@ export function MyClientsKanban() {
     return Array.from(convenios).sort();
   }, [propostas]);
 
-  // Filter propostas based on search and admin filters
+  // Filter propostas based on search and admin/gestor filters
   const filteredPropostas = useMemo(() => {
     let filtered = propostas;
     
@@ -357,9 +426,9 @@ export function MyClientsKanban() {
       });
     }
     
-    // Admin-only filters
-    if (isAdmin) {
-      // Filter by user
+    // Admin and Gestor filters
+    if (isAdmin || isGestor) {
+      // Filter by user/collaborator
       if (filterUser !== "all") {
         filtered = filtered.filter(p => 
           p.created_by_id === filterUser || p.assigned_to === filterUser
@@ -381,10 +450,15 @@ export function MyClientsKanban() {
       if (filterConvenio !== "all") {
         filtered = filtered.filter(p => p.convenio === filterConvenio);
       }
+      
+      // Filter by pipeline status
+      if (filterStatus !== "all") {
+        filtered = filtered.filter(p => p.pipeline_stage === filterStatus);
+      }
     }
     
     return filtered;
-  }, [propostas, searchQuery, isAdmin, filterUser, filterMonth, filterConvenio]);
+  }, [propostas, searchQuery, isAdmin, isGestor, filterUser, filterMonth, filterConvenio, filterStatus]);
 
   const getPropostasByStage = (stageId: string) => {
     return filteredPropostas.filter((p) => p.pipeline_stage === stageId);
@@ -415,6 +489,9 @@ export function MyClientsKanban() {
 
     setSavingNewClient(true);
     try {
+      // Get company_id if user is Gestor
+      const companyId = gestorCompanyIds.length > 0 ? gestorCompanyIds[0] : null;
+      
       const { error } = await supabase.from("propostas").insert({
         "Nome do cliente": newClientForm.nome,
         telefone: newClientForm.telefone,
@@ -423,6 +500,7 @@ export function MyClientsKanban() {
         pipeline_stage: "contato_iniciado",
         origem_lead: "ativo",
         created_by_id: user?.id,
+        company_id: companyId,
       });
 
       if (error) throw error;
@@ -523,25 +601,27 @@ export function MyClientsKanban() {
         )}
       </Card>
 
-      {/* Admin Filters */}
-      {isAdmin && (
+      {/* Admin/Gestor Filters */}
+      {(isAdmin || isGestor) && (
         <Card className="p-4">
           <div className="flex items-center gap-2 mb-4">
             <Filter className="h-5 w-5 text-muted-foreground" />
-            <h3 className="font-semibold">Filtros Avançados</h3>
+            <h3 className="font-semibold">
+              Filtros Avançados {isGestor && !isAdmin && "(Gestor)"}
+            </h3>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <Label className="flex items-center gap-2 mb-2">
                 <User className="h-4 w-4" />
-                Usuário
+                {isGestor && !isAdmin ? "Colaborador" : "Usuário"}
               </Label>
               <Select value={filterUser} onValueChange={setFilterUser}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Todos os usuários" />
+                  <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os usuários</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {users.map((u) => (
                     <SelectItem key={u.id} value={u.id}>
                       {u.name || u.email || u.id}
@@ -553,7 +633,7 @@ export function MyClientsKanban() {
             <div>
               <Label className="flex items-center gap-2 mb-2">
                 <Calendar className="h-4 w-4" />
-                Mês/Ano
+                Período
               </Label>
               <Select value={filterMonth} onValueChange={setFilterMonth}>
                 <SelectTrigger>
@@ -580,6 +660,25 @@ export function MyClientsKanban() {
                   {uniqueConvenios.map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="flex items-center gap-2 mb-2">
+                <Target className="h-4 w-4" />
+                Status
+              </Label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os status</SelectItem>
+                  {pipelineStages.map((stage) => (
+                    <SelectItem key={stage.id} value={stage.id}>
+                      {stage.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -673,7 +772,7 @@ export function MyClientsKanban() {
             <DialogTitle className="flex items-center justify-between">
               <span>Detalhes da Proposta</span>
               <div className="flex gap-2">
-                {isAdmin && (
+                {(isAdmin || isGestor) && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
