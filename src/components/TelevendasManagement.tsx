@@ -545,76 +545,123 @@ export const TelevendasManagement = () => {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalhes da Venda</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <span>Detalhes da Venda</span>
+              {selectedTv && getStatusBadge(selectedTv.status)}
+            </DialogTitle>
+            <DialogDescription>
+              Informações completas da proposta de venda
+            </DialogDescription>
           </DialogHeader>
           {selectedTv && (
-            <div className="grid gap-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground">Nome</Label>
-                  <p className="font-medium">{selectedTv.nome}</p>
+            <div className="space-y-6">
+              {/* Dados do Cliente */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-primary border-b pb-2">Dados do Cliente</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Nome do Cliente</Label>
+                    <p className="font-medium text-foreground">{selectedTv.nome}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">CPF</Label>
+                    <p className="font-medium text-foreground font-mono">{selectedTv.cpf}</p>
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-muted-foreground">CPF</Label>
-                  <p className="font-medium">{selectedTv.cpf}</p>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground">Telefone</Label>
-                  <p className="font-medium">{selectedTv.telefone}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Data da Venda</Label>
-                  <p className="font-medium">
-                    {new Date(selectedTv.data_venda).toLocaleDateString("pt-BR")}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground">Banco</Label>
-                  <p className="font-medium">{selectedTv.banco}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Tipo de Operação</Label>
-                  <p className="font-medium">{selectedTv.tipo_operacao}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Telefone</Label>
+                    <p className="font-medium text-foreground">{selectedTv.telefone}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Data da Venda</Label>
+                    <p className="font-medium text-foreground">
+                      {new Date(selectedTv.data_venda + 'T12:00:00').toLocaleDateString("pt-BR", {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground">Parcela</Label>
-                  <p className="font-medium">R$ {selectedTv.parcela.toFixed(2)}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Troco</Label>
-                  <p className="font-medium">
-                    {selectedTv.troco ? `R$ ${selectedTv.troco.toFixed(2)}` : "-"}
-                  </p>
+              {/* Dados da Operação */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-primary border-b pb-2">Dados da Operação</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Banco</Label>
+                    <p className="font-medium text-foreground">{selectedTv.banco}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Tipo de Operação</Label>
+                    <Badge variant="outline" className="mt-1">
+                      {selectedTv.tipo_operacao}
+                    </Badge>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <Label className="text-muted-foreground">Status</Label>
-                <div className="mt-1">{getStatusBadge(selectedTv.status)}</div>
+              {/* Valores */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-primary border-b pb-2">Valores</h4>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-3 rounded-lg bg-muted/50 space-y-1">
+                    <Label className="text-xs text-muted-foreground">Parcela</Label>
+                    <p className="font-bold text-lg text-foreground">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedTv.parcela)}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50 space-y-1">
+                    <Label className="text-xs text-muted-foreground">Troco</Label>
+                    <p className="font-bold text-lg text-foreground">
+                      {selectedTv.troco 
+                        ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedTv.troco)
+                        : "R$ 0,00"}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50 space-y-1">
+                    <Label className="text-xs text-muted-foreground">Saldo Devedor</Label>
+                    <p className="font-bold text-lg text-foreground">
+                      {selectedTv.saldo_devedor 
+                        ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedTv.saldo_devedor)
+                        : "R$ 0,00"}
+                    </p>
+                  </div>
+                </div>
+                {selectedTv.tipo_operacao?.toLowerCase() === 'portabilidade' && (
+                  <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 space-y-1">
+                    <Label className="text-xs text-muted-foreground">Valor Bruto (Saldo Devedor + Troco)</Label>
+                    <p className="font-bold text-lg text-primary">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                        (selectedTv.saldo_devedor || 0) + (selectedTv.troco || 0)
+                      )}
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {selectedTv.observacao && (
-                <div>
-                  <Label className="text-muted-foreground">Observações</Label>
-                  <p className="mt-1 p-3 bg-muted rounded-md">
-                    {selectedTv.observacao}
-                  </p>
+              {/* Observações */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-primary border-b pb-2">Observações</h4>
+                <div className="p-4 bg-muted/50 rounded-lg min-h-[60px]">
+                  {selectedTv.observacao ? (
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{selectedTv.observacao}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">Nenhuma observação registrada</p>
+                  )}
                 </div>
-              )}
+              </div>
 
-              <div className="text-sm text-muted-foreground">
-                Cadastrado em: {new Date(selectedTv.created_at).toLocaleString("pt-BR")}
+              {/* Metadados */}
+              <div className="flex items-center justify-between text-xs text-muted-foreground pt-4 border-t">
+                <span>Cadastrado em: {new Date(selectedTv.created_at).toLocaleString("pt-BR")}</span>
+                {selectedTv.user?.name && (
+                  <span>Vendedor: {selectedTv.user.name}</span>
+                )}
               </div>
             </div>
           )}

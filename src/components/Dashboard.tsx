@@ -240,10 +240,56 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     }
   };
 
+  // Função para calcular valor baseado na regra de comissão flexível
+  const calculateSaleValue = (sale: any, commissionRules: any[]) => {
+    const tipoOperacao = sale.tipo_operacao?.toLowerCase() || '';
+    
+    // Buscar regra aplicável para este banco/produto/empresa
+    const applicableRule = commissionRules.find(rule => 
+      rule.bank_name?.toLowerCase() === sale.banco?.toLowerCase() &&
+      rule.product_name?.toLowerCase().includes(tipoOperacao)
+    );
+    
+    // Se houver regra flexível, usar o modelo de cálculo configurado
+    if (applicableRule) {
+      const calculationModel = applicableRule.calculation_model?.toLowerCase();
+      
+      if (calculationModel === 'saldo_devedor') {
+        return sale.saldo_devedor || 0;
+      } else if (calculationModel === 'valor_bruto' || calculationModel === 'bruto') {
+        return (sale.saldo_devedor || 0) + (sale.troco || 0);
+      } else if (calculationModel === 'troco') {
+        return sale.troco || 0;
+      }
+    }
+    
+    // Regra padrão por tipo de operação
+    if (tipoOperacao === 'portabilidade') {
+      // Portabilidade: considera saldo devedor por padrão
+      return sale.saldo_devedor || 0;
+    }
+    
+    // Para outros tipos, usar a parcela
+    return sale.parcela || 0;
+  };
+
   const fetchSalesData = async () => {
     try {
       const { startDate, endDate, previousStart, previousEnd } = getDateRange();
       const companyFilter = getCompanyFilter();
+      
+      // Buscar regras de comissão flexíveis
+      let rulesQuery = supabase
+        .from('commission_rules')
+        .select('*')
+        .eq('is_active', true);
+      
+      if (companyFilter) {
+        rulesQuery = rulesQuery.or(`company_id.is.null,company_id.in.(${companyFilter.join(',')})`);
+      }
+      
+      const { data: commissionRules } = await rulesQuery;
+      const rules = commissionRules || [];
       
       // Current period sales
       let salesQuery = supabase
@@ -260,8 +306,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       
       const { data: salesData } = await salesQuery;
       
+      // Apenas propostas PAGAS vão para o dashboard
       const paidSales = salesData?.filter(s => s.status === 'pago') || [];
-      const totalValue = paidSales.reduce((sum, s) => sum + (s.parcela || 0), 0);
+      
+      // Calcular valor total respeitando as regras de comissão flexíveis
+      const totalValue = paidSales.reduce((sum, sale) => {
+        return sum + calculateSaleValue(sale, rules);
+      }, 0);
       
       setTotalSales(paidSales.length);
       setTotalRevenue(totalValue);
@@ -270,7 +321,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       // Previous period sales
       let prevQuery = supabase
         .from('televendas')
-        .select('parcela, status')
+        .select('*')
         .gte('created_at', previousStart.toISOString())
         .lte('created_at', previousEnd.toISOString());
       
@@ -282,9 +333,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       
       const { data: prevData } = await prevQuery;
       const prevPaidSales = prevData?.filter(s => s.status === 'pago') || [];
-      setPreviousRevenue(prevPaidSales.reduce((sum, s) => sum + (s.parcela || 0), 0));
+      const prevTotalValue = prevPaidSales.reduce((sum, sale) => {
+        return sum + calculateSaleValue(sale, rules);
+      }, 0);
+      setPreviousRevenue(prevTotalValue);
       
-      // Daily sales for chart
+      // Daily sales for chart - usando valores calculados
       const daysInMonth = eachDayOfInterval({ start: startDate, end: endDate });
       const dailyData = daysInMonth.map(day => {
         const dayStr = format(day, 'yyyy-MM-dd');
@@ -295,18 +349,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           date: dayStr,
           day: format(day, 'dd', { locale: ptBR }),
           sales: daySales.length,
-          value: daySales.reduce((sum, s) => sum + (s.parcela || 0), 0)
+          value: daySales.reduce((sum, sale) => sum + calculateSaleValue(sale, rules), 0)
         };
       });
       setDailySalesData(dailyData);
       
-      // Product stats
+      // Product stats - usando valores calculados
       const productMap = new Map<string, { value: number; count: number }>();
       paidSales.forEach(sale => {
         const product = sale.tipo_operacao || 'Outros';
         const existing = productMap.get(product) || { value: 0, count: 0 };
         productMap.set(product, {
-          value: existing.value + (sale.parcela || 0),
+          value: existing.value + calculateSaleValue(sale, rules),
           count: existing.count + 1
         });
       });
