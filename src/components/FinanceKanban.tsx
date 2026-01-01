@@ -344,7 +344,9 @@ export const FinanceKanban = () => {
     return transactions.filter(t => {
       const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = filterType === "all" || t.type === filterType;
-      return matchesSearch && matchesType;
+      // Kanban mostra apenas despesas (receitas vão para o dashboard)
+      const isDespesa = t.type === "despesa";
+      return matchesSearch && matchesType && isDespesa;
     });
   }, [transactions, searchTerm, filterType]);
 
@@ -425,7 +427,7 @@ export const FinanceKanban = () => {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Finanças</h1>
-          <p className="text-muted-foreground">Gerencie as despesas e comissões da empresa</p>
+          <p className="text-muted-foreground">Organize as despesas mensais da empresa</p>
         </div>
         
         <div className="flex flex-wrap gap-2">
@@ -500,21 +502,8 @@ export const FinanceKanban = () => {
               </SelectContent>
             </Select>
 
-            {/* Type Filter */}
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger>
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="despesa">Despesas</SelectItem>
-                <SelectItem value="comissao">Comissões</SelectItem>
-              </SelectContent>
-            </Select>
-
             {/* Search */}
-            <div className="relative lg:col-span-2">
+            <div className="relative lg:col-span-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por descrição..."
