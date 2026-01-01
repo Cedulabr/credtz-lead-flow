@@ -39,12 +39,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { Pencil, Trash2, Search } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Pencil, Trash2, Search, UserPlus } from "lucide-react";
 
 interface User {
   id: string;
   name: string;
 }
+
 interface Televenda {
   id: string;
   nome: string;
@@ -69,11 +71,48 @@ interface TelevendaWithUser extends Televenda {
   } | null;
 }
 
+// Utility functions for currency formatting
+const formatCurrencyDisplay = (value: number | null | undefined): string => {
+  if (value === null || value === undefined) return "";
+  return value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+const formatCurrencyInput = (value: string): string => {
+  const numbers = value.replace(/\D/g, "");
+  if (!numbers) return "";
+  const amount = parseInt(numbers) / 100;
+  return amount.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+const parseCurrencyToNumber = (value: string): number => {
+  if (!value) return 0;
+  // Remove pontos de milhar e substitui vírgula por ponto
+  const normalized = value.replace(/\./g, "").replace(",", ".");
+  const parsed = parseFloat(normalized);
+  return isNaN(parsed) ? 0 : parsed;
+};
+
+const formatCPF = (value: string): string => {
+  const numbers = value.replace(/\D/g, "");
+  if (numbers.length <= 3) return numbers;
+  if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+  if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
+  return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
+};
+
+const formatPhone = (value: string): string => {
+  const numbers = value.replace(/\D/g, "");
+  if (numbers.length <= 2) return numbers ? `(${numbers}` : "";
+  if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+  return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+};
+
 export const TelevendasManagement = () => {
   const { toast } = useToast();
   const { isAdmin, user } = useAuth();
   const [televendas, setTelevendas] = useState<TelevendaWithUser[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [companyUsers, setCompanyUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
@@ -87,6 +126,21 @@ export const TelevendasManagement = () => {
   const [deletingTvId, setDeletingTvId] = useState<string | null>(null);
   const [isGestor, setIsGestor] = useState(false);
   const [userCompanyIds, setUserCompanyIds] = useState<string[]>([]);
+
+  // Form states for edit dialog with proper formatting
+  const [editFormData, setEditFormData] = useState({
+    nome: "",
+    cpf: "",
+    telefone: "",
+    data_venda: "",
+    banco: "",
+    tipo_operacao: "",
+    parcela: "",
+    troco: "",
+    saldo_devedor: "",
+    observacao: "",
+    user_id: "",
+  });
 
   // Verificar se o usuário é gestor da empresa
   useEffect(() => {
@@ -112,6 +166,52 @@ export const TelevendasManagement = () => {
 
     checkGestorRole();
   }, [user?.id]);
+
+  // Fetch users from the same company for gestor assignment
+  useEffect(() => {
+    const fetchCompanyUsers = async () => {
+      if (!user?.id || (!isGestor && !isAdmin)) return;
+
+      try {
+        if (isAdmin) {
+          // Admin can see all users
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, name')
+            .order('name');
+          
+          if (error) throw error;
+          setCompanyUsers(data || []);
+        } else if (isGestor && userCompanyIds.length > 0) {
+          // Gestor can only see users from their companies
+          const { data, error } = await supabase
+            .from('user_companies')
+            .select('user_id')
+            .in('company_id', userCompanyIds)
+            .eq('is_active', true);
+
+          if (error) throw error;
+
+          const userIds = [...new Set(data?.map(uc => uc.user_id) || [])];
+          
+          if (userIds.length > 0) {
+            const { data: profilesData, error: profilesError } = await supabase
+              .from('profiles')
+              .select('id, name')
+              .in('id', userIds)
+              .order('name');
+
+            if (profilesError) throw profilesError;
+            setCompanyUsers(profilesData || []);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching company users:', error);
+      }
+    };
+
+    fetchCompanyUsers();
+  }, [user?.id, isGestor, isAdmin, userCompanyIds]);
 
   // Verificar se pode editar a proposta (admin ou gestor da empresa)
   const canEditTv = (tv: TelevendaWithUser) => {
@@ -235,6 +335,22 @@ export const TelevendasManagement = () => {
       });
       return;
     }
+    
+    // Initialize form data with proper formatting
+    setEditFormData({
+      nome: tv.nome,
+      cpf: formatCPF(tv.cpf),
+      telefone: formatPhone(tv.telefone),
+      data_venda: tv.data_venda,
+      banco: tv.banco,
+      tipo_operacao: tv.tipo_operacao,
+      parcela: formatCurrencyDisplay(tv.parcela),
+      troco: formatCurrencyDisplay(tv.troco),
+      saldo_devedor: formatCurrencyDisplay(tv.saldo_devedor),
+      observacao: tv.observacao || "",
+      user_id: tv.user_id,
+    });
+    
     setEditingTv(tv);
     setIsEditDialogOpen(true);
   };
@@ -257,19 +373,28 @@ export const TelevendasManagement = () => {
     if (!editingTv) return;
     
     try {
+      // Parse currency values correctly
+      const parcelaValue = parseCurrencyToNumber(editFormData.parcela);
+      const trocoValue = editFormData.troco ? parseCurrencyToNumber(editFormData.troco) : null;
+      const saldoDevedorValue = editFormData.saldo_devedor ? parseCurrencyToNumber(editFormData.saldo_devedor) : null;
+
+      const updateData: any = {
+        nome: editFormData.nome,
+        cpf: editFormData.cpf.replace(/\D/g, ""),
+        telefone: editFormData.telefone.replace(/\D/g, ""),
+        banco: editFormData.banco,
+        parcela: parcelaValue,
+        troco: trocoValue,
+        saldo_devedor: saldoDevedorValue,
+        tipo_operacao: editFormData.tipo_operacao,
+        observacao: editFormData.observacao || null,
+        data_venda: editFormData.data_venda,
+        user_id: editFormData.user_id,
+      };
+
       const { error } = await (supabase as any)
         .from("televendas")
-        .update({
-          nome: editingTv.nome,
-          cpf: editingTv.cpf,
-          telefone: editingTv.telefone,
-          banco: editingTv.banco,
-          parcela: editingTv.parcela,
-          troco: editingTv.troco,
-          tipo_operacao: editingTv.tipo_operacao,
-          observacao: editingTv.observacao,
-          data_venda: editingTv.data_venda,
-        })
+        .update(updateData)
         .eq("id", editingTv.id);
 
       if (error) throw error;
@@ -369,6 +494,13 @@ export const TelevendasManagement = () => {
     pendente: televendas.filter(tv => tv.status === "pendente").length,
     cancelado: televendas.filter(tv => tv.status === "cancelado").length,
   };
+
+  const tipoOperacaoOptions = [
+    { value: "Portabilidade", label: "Portabilidade" },
+    { value: "Novo empréstimo", label: "Novo Empréstimo" },
+    { value: "Refinanciamento", label: "Refinanciamento" },
+    { value: "Cartão", label: "Cartão" },
+  ];
 
   return (
     <>
@@ -490,11 +622,11 @@ export const TelevendasManagement = () => {
                   >
                     <TableCell className="text-sm text-muted-foreground">{tv.user?.name || 'N/A'}</TableCell>
                     <TableCell>{tv.nome}</TableCell>
-                    <TableCell>{tv.cpf}</TableCell>
+                    <TableCell>{formatCPF(tv.cpf)}</TableCell>
                     <TableCell>{new Date(tv.data_venda).toLocaleDateString()}</TableCell>
                     <TableCell>{tv.banco}</TableCell>
                     <TableCell>{tv.tipo_operacao}</TableCell>
-                    <TableCell>R$ {tv.parcela.toFixed(2)}</TableCell>
+                    <TableCell>R$ {formatCurrencyDisplay(tv.parcela)}</TableCell>
                     <TableCell>{getStatusBadge(tv.status)}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Select
@@ -567,13 +699,13 @@ export const TelevendasManagement = () => {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">CPF</Label>
-                    <p className="font-medium text-foreground font-mono">{selectedTv.cpf}</p>
+                    <p className="font-medium text-foreground font-mono">{formatCPF(selectedTv.cpf)}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Telefone</Label>
-                    <p className="font-medium text-foreground">{selectedTv.telefone}</p>
+                    <p className="font-medium text-foreground">{formatPhone(selectedTv.telefone)}</p>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Data da Venda</Label>
@@ -670,7 +802,7 @@ export const TelevendasManagement = () => {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Proposta</DialogTitle>
             <DialogDescription>
@@ -679,19 +811,52 @@ export const TelevendasManagement = () => {
           </DialogHeader>
           {editingTv && (
             <div className="grid gap-4">
+              {/* Responsável pela proposta - Only for gestor/admin */}
+              {(isAdmin || isGestor) && (
+                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <UserPlus className="h-4 w-4 text-primary" />
+                    <Label className="font-semibold text-primary">Usuário Responsável</Label>
+                  </div>
+                  <Select 
+                    value={editFormData.user_id} 
+                    onValueChange={(value) => setEditFormData({ ...editFormData, user_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o responsável" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companyUsers.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name || 'Sem nome'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Altere o usuário responsável por esta proposta
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Nome</Label>
                   <Input
-                    value={editingTv.nome}
-                    onChange={(e) => setEditingTv({ ...editingTv, nome: e.target.value })}
+                    value={editFormData.nome}
+                    onChange={(e) => setEditFormData({ ...editFormData, nome: e.target.value })}
                   />
                 </div>
                 <div>
                   <Label>CPF</Label>
                   <Input
-                    value={editingTv.cpf}
-                    onChange={(e) => setEditingTv({ ...editingTv, cpf: e.target.value })}
+                    value={editFormData.cpf}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, "").slice(0, 11);
+                      setEditFormData({ ...editFormData, cpf: formatCPF(raw) });
+                    }}
+                    placeholder="000.000.000-00"
+                    maxLength={14}
                   />
                 </div>
               </div>
@@ -700,16 +865,21 @@ export const TelevendasManagement = () => {
                 <div>
                   <Label>Telefone</Label>
                   <Input
-                    value={editingTv.telefone}
-                    onChange={(e) => setEditingTv({ ...editingTv, telefone: e.target.value })}
+                    value={editFormData.telefone}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, "").slice(0, 11);
+                      setEditFormData({ ...editFormData, telefone: formatPhone(raw) });
+                    }}
+                    placeholder="(00) 00000-0000"
+                    maxLength={15}
                   />
                 </div>
                 <div>
                   <Label>Data da Venda</Label>
                   <Input
                     type="date"
-                    value={editingTv.data_venda}
-                    onChange={(e) => setEditingTv({ ...editingTv, data_venda: e.target.value })}
+                    value={editFormData.data_venda}
+                    onChange={(e) => setEditFormData({ ...editFormData, data_venda: e.target.value })}
                   />
                 </div>
               </div>
@@ -718,45 +888,72 @@ export const TelevendasManagement = () => {
                 <div>
                   <Label>Banco</Label>
                   <Input
-                    value={editingTv.banco}
-                    onChange={(e) => setEditingTv({ ...editingTv, banco: e.target.value })}
+                    value={editFormData.banco}
+                    onChange={(e) => setEditFormData({ ...editFormData, banco: e.target.value })}
                   />
                 </div>
                 <div>
                   <Label>Tipo de Operação</Label>
-                  <Input
-                    value={editingTv.tipo_operacao}
-                    onChange={(e) => setEditingTv({ ...editingTv, tipo_operacao: e.target.value })}
-                  />
+                  <Select 
+                    value={editFormData.tipo_operacao} 
+                    onValueChange={(value) => setEditFormData({ ...editFormData, tipo_operacao: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tipoOperacaoOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <Label>Parcela</Label>
+                  <Label>Parcela (R$)</Label>
                   <Input
-                    type="number"
-                    step="0.01"
-                    value={editingTv.parcela}
-                    onChange={(e) => setEditingTv({ ...editingTv, parcela: parseFloat(e.target.value) })}
+                    value={editFormData.parcela}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, "");
+                      setEditFormData({ ...editFormData, parcela: formatCurrencyInput(raw) });
+                    }}
+                    placeholder="0,00"
                   />
                 </div>
                 <div>
-                  <Label>Troco</Label>
+                  <Label>Troco (R$)</Label>
                   <Input
-                    type="number"
-                    step="0.01"
-                    value={editingTv.troco || ''}
-                    onChange={(e) => setEditingTv({ ...editingTv, troco: parseFloat(e.target.value) || null })}
+                    value={editFormData.troco}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, "");
+                      setEditFormData({ ...editFormData, troco: formatCurrencyInput(raw) });
+                    }}
+                    placeholder="0,00"
+                  />
+                </div>
+                <div>
+                  <Label>Saldo Devedor (R$)</Label>
+                  <Input
+                    value={editFormData.saldo_devedor}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, "");
+                      setEditFormData({ ...editFormData, saldo_devedor: formatCurrencyInput(raw) });
+                    }}
+                    placeholder="0,00"
                   />
                 </div>
               </div>
 
               <div>
                 <Label>Observações</Label>
-                <Input
-                  value={editingTv.observacao || ''}
-                  onChange={(e) => setEditingTv({ ...editingTv, observacao: e.target.value })}
+                <Textarea
+                  value={editFormData.observacao}
+                  onChange={(e) => setEditFormData({ ...editFormData, observacao: e.target.value })}
+                  rows={3}
                 />
               </div>
 
