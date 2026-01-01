@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Plus, 
   FileText, 
@@ -16,11 +17,15 @@ import {
   Check,
   Trash2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Copy,
+  Download,
+  RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { jsPDF } from "jspdf";
 
 interface Contract {
   id: string;
@@ -38,10 +43,10 @@ interface ProposalData {
 }
 
 const PRODUCTS = [
-  { id: "novo", label: "Novo", color: "bg-emerald-500" },
-  { id: "portabilidade", label: "Portabilidade", color: "bg-blue-500" },
-  { id: "refinanciamento", label: "Refinanciamento", color: "bg-amber-500" },
-  { id: "cartao", label: "Cartão", color: "bg-purple-500" },
+  { id: "novo", label: "Novo", emoji: "🆕", color: "bg-emerald-500" },
+  { id: "portabilidade", label: "Portabilidade", emoji: "🔄", color: "bg-blue-500" },
+  { id: "refinanciamento", label: "Refinanciamento", emoji: "💰", color: "bg-amber-500" },
+  { id: "cartao", label: "Cartão", emoji: "💳", color: "bg-purple-500" },
 ];
 
 const formatCurrency = (value: string): string => {
@@ -59,7 +64,7 @@ const parseCurrency = (value: string): number => {
 };
 
 export function ProposalGenerator() {
-  const [step, setStep] = useState<"client-name" | "client-phone" | "contracts">("client-name");
+  const [step, setStep] = useState<"client-name" | "client-phone" | "contracts" | "summary">("client-name");
   const [proposalData, setProposalData] = useState<ProposalData>({
     clientName: "",
     clientPhone: "",
@@ -77,7 +82,6 @@ export function ProposalGenerator() {
   useEffect(() => {
     const fetchBanks = async () => {
       try {
-        // Use raw SQL approach to avoid type instantiation issues
         const query = supabase.from("televendas_banks").select("name");
         const result = await (query as any).eq("active", true);
         if (result.data && Array.isArray(result.data)) {
@@ -243,6 +247,55 @@ export function ProposalGenerator() {
     );
   };
 
+  const getCompletedContracts = () => {
+    return proposalData.contracts.filter((c) => c.isComplete);
+  };
+
+  const calculateTotalTroco = () => {
+    return getCompletedContracts().reduce((sum, c) => sum + parseCurrency(c.troco), 0);
+  };
+
+  const calculateTotalParcela = () => {
+    return getCompletedContracts().reduce((sum, c) => sum + parseCurrency(c.parcela), 0);
+  };
+
+  const generateProposalText = () => {
+    const completedContracts = getCompletedContracts();
+    const totalTroco = calculateTotalTroco();
+    const totalParcela = calculateTotalParcela();
+    
+    let text = `✨ *PROPOSTA COMERCIAL* ✨\n\n`;
+    text += `👤 *Cliente:* ${proposalData.clientName}\n`;
+    text += `📱 *Telefone:* ${proposalData.clientPhone}\n\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `📝 *CONTRATOS (${completedContracts.length})*\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    completedContracts.forEach((c, i) => {
+      const productInfo = getProductInfo(c.product);
+      text += `${productInfo?.emoji || "📄"} *${i + 1}. ${productInfo?.label || c.product}*\n`;
+      text += `   🏦 Banco: ${c.bank}\n`;
+      text += `   💵 Parcela: ${c.parcela}\n`;
+      if (c.troco && parseCurrency(c.troco) > 0) {
+        text += `   💰 Troco: ${c.troco}\n`;
+      }
+      text += `\n`;
+    });
+
+    text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `📊 *RESUMO*\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    text += `📋 Total de Contratos: ${completedContracts.length}\n`;
+    text += `💵 Parcela Total: ${formatCurrency(String(totalParcela * 100))}\n`;
+    if (totalTroco > 0) {
+      text += `💰 Troco Total Estimado: ${formatCurrency(String(totalTroco * 100))}\n`;
+    }
+    text += `\n📅 Data: ${new Date().toLocaleDateString("pt-BR")}\n`;
+    text += `\n✅ *Proposta sujeita à análise de crédito*`;
+
+    return text;
+  };
+
   const generateProposal = async () => {
     if (!canGenerateProposal()) {
       toast.error("Complete pelo menos um contrato para gerar a proposta");
@@ -250,48 +303,121 @@ export function ProposalGenerator() {
     }
 
     setIsGenerating(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    setIsGenerating(false);
+    setStep("summary");
+  };
 
-    const completedContracts = proposalData.contracts.filter((c) => c.isComplete);
-    
-    const proposalText = `
-📋 PROPOSTA COMERCIAL
-
-👤 Cliente: ${proposalData.clientName}
-📱 Telefone: ${proposalData.clientPhone}
-
-📝 CONTRATOS (${completedContracts.length}):
-
-${completedContracts
-  .map(
-    (c, i) => `
-${i + 1}. ${getProductInfo(c.product)?.label || c.product}
-   🏦 Banco: ${c.bank}
-   💵 Parcela: ${c.parcela}
-   💰 Troco Estimado: ${c.troco || "Não informado"}
-`
-  )
-  .join("")}
-
-📅 Data: ${new Date().toLocaleDateString("pt-BR")}
-    `.trim();
-
+  const copyToClipboard = async () => {
+    const text = generateProposalText();
     try {
-      await navigator.clipboard.writeText(proposalText);
+      await navigator.clipboard.writeText(text);
       toast.success("Proposta copiada para a área de transferência!");
     } catch {
-      console.log("Clipboard not available");
+      toast.error("Não foi possível copiar. Selecione o texto manualmente.");
+    }
+  };
+
+  const generatePDF = () => {
+    const completedContracts = getCompletedContracts();
+    const totalTroco = calculateTotalTroco();
+    const totalParcela = calculateTotalParcela();
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 20;
+
+    // Header
+    doc.setFillColor(59, 130, 246);
+    doc.rect(0, 0, pageWidth, 40, "F");
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont("helvetica", "bold");
+    doc.text("PROPOSTA COMERCIAL", pageWidth / 2, 25, { align: "center" });
+    
+    y = 55;
+    doc.setTextColor(0, 0, 0);
+
+    // Client info
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("DADOS DO CLIENTE", 20, y);
+    y += 10;
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Nome: ${proposalData.clientName}`, 20, y);
+    y += 7;
+    doc.text(`Telefone: ${proposalData.clientPhone}`, 20, y);
+    y += 15;
+
+    // Contracts
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text(`CONTRATOS (${completedContracts.length})`, 20, y);
+    y += 10;
+
+    completedContracts.forEach((c, i) => {
+      const productInfo = getProductInfo(c.product);
+      
+      // Contract card background
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(15, y - 5, pageWidth - 30, 35, 3, 3, "F");
+
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(59, 130, 246);
+      doc.text(`${i + 1}. ${productInfo?.label || c.product}`, 20, y + 5);
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Banco: ${c.bank}`, 25, y + 13);
+      doc.text(`Parcela: ${c.parcela}`, 25, y + 20);
+      if (c.troco && parseCurrency(c.troco) > 0) {
+        doc.text(`Troco Estimado: ${c.troco}`, 25, y + 27);
+      }
+
+      y += 40;
+
+      // Add new page if needed
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
+    });
+
+    y += 10;
+
+    // Summary
+    doc.setFillColor(34, 197, 94);
+    doc.roundedRect(15, y - 5, pageWidth - 30, 45, 3, 3, "F");
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("RESUMO DA PROPOSTA", 20, y + 5);
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Total de Contratos: ${completedContracts.length}`, 20, y + 15);
+    doc.text(`Parcela Total: ${formatCurrency(String(totalParcela * 100))}`, 20, y + 23);
+    if (totalTroco > 0) {
+      doc.text(`Troco Total Estimado: ${formatCurrency(String(totalTroco * 100))}`, 20, y + 31);
     }
 
-    setIsGenerating(false);
-    toast.success(
-      <div className="space-y-2">
-        <p className="font-semibold">Proposta Gerada!</p>
-        <p className="text-sm text-muted-foreground">
-          {completedContracts.length} contrato(s) para {proposalData.clientName}
-        </p>
-      </div>
-    );
+    y += 55;
+
+    // Footer
+    doc.setTextColor(128, 128, 128);
+    doc.setFontSize(9);
+    doc.text(`Data: ${new Date().toLocaleDateString("pt-BR")}`, 20, y);
+    doc.text("Proposta sujeita à análise de crédito", 20, y + 7);
+
+    // Save
+    doc.save(`proposta_${proposalData.clientName.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`);
+    toast.success("PDF gerado com sucesso!");
   };
 
   const resetGenerator = () => {
@@ -312,6 +438,7 @@ ${i + 1}. ${getProductInfo(c.product)?.label || c.product}
       { id: "client-name", label: "Nome", completed: proposalData.clientName.length >= 3 },
       { id: "client-phone", label: "Telefone", completed: proposalData.clientPhone.replace(/\D/g, "").length >= 10 },
       { id: "contracts", label: "Contratos", completed: proposalData.contracts.some((c) => c.isComplete) },
+      { id: "summary", label: "Resumo", completed: step === "summary" },
     ];
 
     return (
@@ -333,7 +460,7 @@ ${i + 1}. ${getProductInfo(c.product)?.label || c.product}
             {i < steps.length - 1 && (
               <div
                 className={cn(
-                  "w-12 h-0.5 mx-2 transition-colors",
+                  "w-8 h-0.5 mx-1 transition-colors",
                   s.completed ? "bg-primary" : "bg-muted"
                 )}
               />
@@ -424,6 +551,112 @@ ${i + 1}. ${getProductInfo(c.product)?.label || c.product}
       </div>
     </div>
   );
+
+  const renderSummaryStep = () => {
+    const completedContracts = getCompletedContracts();
+    const totalTroco = calculateTotalTroco();
+    const totalParcela = calculateTotalParcela();
+    const proposalText = generateProposalText();
+
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="text-center space-y-2">
+          <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Check className="w-8 h-8 text-emerald-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-foreground">Proposta Gerada!</h2>
+          <p className="text-muted-foreground">
+            {completedContracts.length} contrato(s) para {proposalData.clientName}
+          </p>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="max-w-2xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card>
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-bold text-primary">{completedContracts.length}</p>
+              <p className="text-xs text-muted-foreground">Contratos</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <p className="text-lg font-bold text-foreground">{formatCurrency(String(totalParcela * 100))}</p>
+              <p className="text-xs text-muted-foreground">Parcela Total</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <p className="text-lg font-bold text-emerald-500">{formatCurrency(String(totalTroco * 100))}</p>
+              <p className="text-xs text-muted-foreground">Troco Total</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <p className="text-sm font-bold text-foreground">{new Date().toLocaleDateString("pt-BR")}</p>
+              <p className="text-xs text-muted-foreground">Data</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Contracts List */}
+        <div className="max-w-2xl mx-auto space-y-2">
+          {completedContracts.map((contract, i) => {
+            const productInfo = getProductInfo(contract.product);
+            return (
+              <Card key={contract.id} className="border-l-4" style={{ borderLeftColor: productInfo?.color.replace("bg-", "#").replace("emerald-500", "10b981").replace("blue-500", "3b82f6").replace("amber-500", "f59e0b").replace("purple-500", "a855f7") }}>
+                <CardContent className="p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">{productInfo?.emoji}</span>
+                    <div>
+                      <p className="font-medium text-sm">{productInfo?.label} - {contract.bank}</p>
+                      <p className="text-xs text-muted-foreground">Parcela: {contract.parcela}</p>
+                    </div>
+                  </div>
+                  {contract.troco && parseCurrency(contract.troco) > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      Troco: {contract.troco}
+                    </Badge>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Copy Text Area */}
+        <div className="max-w-2xl mx-auto space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-foreground">📋 Texto para enviar ao cliente:</p>
+            <Button variant="outline" size="sm" onClick={copyToClipboard}>
+              <Copy className="w-4 h-4 mr-2" />
+              Copiar
+            </Button>
+          </div>
+          <Textarea
+            value={proposalText}
+            readOnly
+            className="min-h-[200px] font-mono text-sm bg-muted/50"
+          />
+        </div>
+
+        {/* Action Buttons */}
+        <div className="max-w-2xl mx-auto flex flex-col sm:flex-row gap-3">
+          <Button onClick={copyToClipboard} className="flex-1 h-12">
+            <Copy className="w-4 h-4 mr-2" />
+            Copiar Proposta
+          </Button>
+          <Button onClick={generatePDF} variant="secondary" className="flex-1 h-12">
+            <Download className="w-4 h-4 mr-2" />
+            Baixar PDF
+          </Button>
+          <Button onClick={resetGenerator} variant="outline" className="flex-1 h-12">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Nova Proposta
+          </Button>
+        </div>
+      </div>
+    );
+  };
 
   const renderContractStep = () => {
     if (currentContractIndex === null) {
@@ -545,7 +778,7 @@ ${i + 1}. ${getProductInfo(c.product)?.label || c.product}
                 )}
                 onClick={() => handleProductSelect(product.id)}
               >
-                <div className={cn("w-3 h-3 rounded-full", product.color)} />
+                <span className="text-2xl">{product.emoji}</span>
                 {product.label}
               </Button>
             ))}
@@ -591,7 +824,6 @@ ${i + 1}. ${getProductInfo(c.product)?.label || c.product}
                 autoFocus
               />
               
-              {/* Bank suggestions dropdown */}
               {showBankSuggestions && filteredBanks.length > 0 && (
                 <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                   {filteredBanks.map((bank) => (
@@ -743,7 +975,7 @@ ${i + 1}. ${getProductInfo(c.product)?.label || c.product}
                 <p className="text-sm text-muted-foreground">Crie propostas de forma rápida</p>
               </div>
             </div>
-            {step === "contracts" && proposalData.contracts.some((c) => c.isComplete) && (
+            {(step === "contracts" || step === "summary") && proposalData.contracts.some((c) => c.isComplete) && (
               <Button variant="ghost" size="sm" onClick={resetGenerator}>
                 Nova Proposta
               </Button>
@@ -762,6 +994,7 @@ ${i + 1}. ${getProductInfo(c.product)?.label || c.product}
         {step === "client-name" && renderClientNameStep()}
         {step === "client-phone" && renderClientPhoneStep()}
         {step === "contracts" && renderContractStep()}
+        {step === "summary" && renderSummaryStep()}
       </div>
 
       {/* Fixed Bottom Actions */}
