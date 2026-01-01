@@ -41,8 +41,11 @@ export function Commissions() {
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [pixKey, setPixKey] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(() => {
+    // Use current date - ensure it uses the correct month
     const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1; // getMonth() is 0-indexed
+    return `${year}-${String(month).padStart(2, '0')}`;
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [commissions, setCommissions] = useState<any[]>([]);
@@ -501,8 +504,11 @@ export function Commissions() {
                     const [year, month] = selectedMonth.split('-').map(Number);
                     const paidThisMonth = commissions.filter(c => {
                       if (c.status !== 'paid' || !c.payment_date) return false;
-                      const paymentDate = new Date(c.payment_date);
-                      return paymentDate.getMonth() === (month - 1) && paymentDate.getFullYear() === year && c.commission_amount > 0;
+                      // Parse date directly to avoid timezone issues
+                      const dateParts = c.payment_date.split('-');
+                      const paymentYear = parseInt(dateParts[0]);
+                      const paymentMonth = parseInt(dateParts[1]);
+                      return paymentMonth === month && paymentYear === year && c.commission_amount > 0;
                     });
                     
                     const total = paidThisMonth.reduce((sum, c) => sum + Number(c.commission_amount), 0);
@@ -674,12 +680,15 @@ export function Commissions() {
                filteredCommissions = filteredCommissions.filter(c => {
                  // Para comissões pagas, usar data de pagamento
                  if (c.status === 'paid' && c.payment_date) {
-                   const paymentDate = new Date(c.payment_date);
-                   return paymentDate.getMonth() === (month - 1) && paymentDate.getFullYear() === year;
+                   // Parse date as UTC to avoid timezone issues
+                   const dateParts = c.payment_date.split('-');
+                   const paymentYear = parseInt(dateParts[0]);
+                   const paymentMonth = parseInt(dateParts[1]);
+                   return paymentMonth === month && paymentYear === year;
                  }
                  // Para outras comissões, usar data de criação
                  const createdDate = new Date(c.created_at);
-                 return createdDate.getMonth() === (month - 1) && createdDate.getFullYear() === year;
+                 return createdDate.getUTCMonth() === (month - 1) && createdDate.getUTCFullYear() === year;
                });
 
               // Aplicar filtro de busca
