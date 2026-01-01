@@ -1088,6 +1088,7 @@ export type Database = {
       profiles: {
         Row: {
           can_access_documentos: boolean | null
+          can_access_financas: boolean | null
           can_access_gestao_televendas: boolean | null
           can_access_indicar: boolean | null
           can_access_meus_clientes: boolean | null
@@ -1117,6 +1118,7 @@ export type Database = {
         }
         Insert: {
           can_access_documentos?: boolean | null
+          can_access_financas?: boolean | null
           can_access_gestao_televendas?: boolean | null
           can_access_indicar?: boolean | null
           can_access_meus_clientes?: boolean | null
@@ -1146,6 +1148,7 @@ export type Database = {
         }
         Update: {
           can_access_documentos?: boolean | null
+          can_access_financas?: boolean | null
           can_access_gestao_televendas?: boolean | null
           can_access_indicar?: boolean | null
           can_access_meus_clientes?: boolean | null
