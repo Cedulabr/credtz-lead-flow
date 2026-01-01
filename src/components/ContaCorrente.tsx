@@ -547,14 +547,48 @@ export function ContaCorrente() {
                       <SelectValue placeholder="Selecione o usuário" />
                     </SelectTrigger>
                     <SelectContent>
-                      {users.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.name} ({user.email})
-                        </SelectItem>
-                      ))}
+                      {users.map((user) => {
+                        const levelConfig: Record<string, { label: string; color: string }> = {
+                          bronze: { label: "Bronze", color: "bg-amber-700" },
+                          prata: { label: "Prata", color: "bg-gray-400" },
+                          ouro: { label: "Ouro", color: "bg-yellow-500" },
+                          diamante: { label: "Diamante", color: "bg-cyan-400" },
+                        };
+                        const userLevel = levelConfig[user.level] || { label: user.level, color: "bg-gray-500" };
+                        return (
+                          <SelectItem key={user.id} value={user.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{user.name}</span>
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${userLevel.color} text-white`}>
+                                {userLevel.label}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Show selected user level */}
+                {formData.user_id && (() => {
+                  const selectedUser = users.find(u => u.id === formData.user_id);
+                  if (!selectedUser) return null;
+                  const levelConfig: Record<string, { label: string; color: string }> = {
+                    bronze: { label: "Bronze", color: "bg-amber-700 text-white" },
+                    prata: { label: "Prata", color: "bg-gray-400 text-gray-900" },
+                    ouro: { label: "Ouro", color: "bg-yellow-500 text-yellow-900" },
+                    diamante: { label: "Diamante", color: "bg-cyan-400 text-cyan-900" },
+                  };
+                  const userLevel = levelConfig[selectedUser.level] || { label: selectedUser.level, color: "bg-gray-500 text-white" };
+                  return (
+                    <div className="space-y-2 flex items-end">
+                      <Badge className={`${userLevel.color} text-sm py-1.5 px-3`}>
+                        Nível: {userLevel.label}
+                      </Badge>
+                    </div>
+                  );
+                })()}
 
                 <div className="space-y-2">
                   <Label htmlFor="bank_name">Banco *</Label>
