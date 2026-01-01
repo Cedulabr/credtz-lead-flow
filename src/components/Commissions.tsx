@@ -520,17 +520,35 @@ export function Commissions() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => {
-                      const date = new Date();
-                      date.setMonth(date.getMonth() - i);
-                      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                      const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-                      return (
+                    {(() => {
+                      const now = new Date();
+                      const currentYear = now.getFullYear();
+                      const currentMonth = now.getMonth();
+                      const months = [];
+                      
+                      // Start from January 2026, go up to current month only
+                      const startYear = 2026;
+                      const startMonth = 0; // January
+                      
+                      for (let y = startYear; y <= currentYear; y++) {
+                        const monthStart = (y === startYear) ? startMonth : 0;
+                        const monthEnd = (y === currentYear) ? currentMonth : 11;
+                        
+                        for (let m = monthStart; m <= monthEnd; m++) {
+                          const date = new Date(y, m, 1);
+                          const value = `${y}-${String(m + 1).padStart(2, '0')}`;
+                          const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                          months.push({ value, label });
+                        }
+                      }
+                      
+                      // Reverse to show most recent first
+                      return months.reverse().map(({ value, label }) => (
                         <SelectItem key={value} value={value}>
                           {label}
                         </SelectItem>
-                      );
-                    })}
+                      ));
+                    })()}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
