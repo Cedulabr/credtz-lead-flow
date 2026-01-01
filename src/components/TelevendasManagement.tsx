@@ -54,10 +54,12 @@ interface Televenda {
   banco: string;
   parcela: number;
   troco: number | null;
+  saldo_devedor: number | null;
   tipo_operacao: string;
   observacao: string | null;
   status: string;
   created_at: string;
+  company_id: string | null;
 }
 
 interface TelevendaWithUser extends Televenda {
@@ -69,7 +71,7 @@ interface TelevendaWithUser extends Televenda {
 
 export const TelevendasManagement = () => {
   const { toast } = useToast();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [televendas, setTelevendas] = useState<TelevendaWithUser[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,6 +85,40 @@ export const TelevendasManagement = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingTv, setEditingTv] = useState<TelevendaWithUser | null>(null);
   const [deletingTvId, setDeletingTvId] = useState<string | null>(null);
+  const [isGestor, setIsGestor] = useState(false);
+  const [userCompanyIds, setUserCompanyIds] = useState<string[]>([]);
+
+  // Verificar se o usuário é gestor da empresa
+  useEffect(() => {
+    const checkGestorRole = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('user_companies')
+          .select('company_id, company_role')
+          .eq('user_id', user.id)
+          .eq('is_active', true);
+        
+        if (error) throw error;
+        
+        const gestorCompanies = data?.filter(uc => uc.company_role === 'gestor') || [];
+        setIsGestor(gestorCompanies.length > 0);
+        setUserCompanyIds(data?.map(uc => uc.company_id) || []);
+      } catch (error) {
+        console.error('Error checking gestor role:', error);
+      }
+    };
+
+    checkGestorRole();
+  }, [user?.id]);
+
+  // Verificar se pode editar a proposta (admin ou gestor da empresa)
+  const canEditTv = (tv: TelevendaWithUser) => {
+    if (isAdmin) return true;
+    if (isGestor && tv.company_id && userCompanyIds.includes(tv.company_id)) return true;
+    return false;
+  };
 
   const fetchUsers = async () => {
     try {
@@ -191,10 +227,10 @@ export const TelevendasManagement = () => {
 
   const handleEdit = (tv: TelevendaWithUser, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isAdmin) {
+    if (!canEditTv(tv)) {
       toast({
         title: "Acesso negado",
-        description: "Apenas administradores podem editar propostas",
+        description: "Você não tem permissão para editar esta proposta",
         variant: "destructive",
       });
       return;
@@ -203,12 +239,12 @@ export const TelevendasManagement = () => {
     setIsEditDialogOpen(true);
   };
 
-  const handleDelete = (tvId: string, e: React.MouseEvent) => {
+  const handleDelete = (tvId: string, tv: TelevendaWithUser, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isAdmin) {
+    if (!canEditTv(tv)) {
       toast({
         title: "Acesso negado",
-        description: "Apenas administradores podem excluir propostas",
+        description: "Você não tem permissão para excluir esta proposta",
         variant: "destructive",
       });
       return;
@@ -435,7 +471,7 @@ export const TelevendasManagement = () => {
                   <TableHead>Parcela</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Ações</TableHead>
-                  {isAdmin && <TableHead>Gerenciar</TableHead>}
+                  {(isAdmin || isGestor) && <TableHead>Gerenciar</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -475,24 +511,28 @@ export const TelevendasManagement = () => {
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    {isAdmin && (
+                    {(isAdmin || isGestor) && (
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => handleEdit(tv, e)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={(e) => handleDelete(tv.id, e)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        {canEditTv(tv) ? (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => handleEdit(tv, e)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={(e) => handleDelete(tv.id, tv, e)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                     )}
                   </TableRow>

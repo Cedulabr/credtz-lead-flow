@@ -1457,6 +1457,7 @@ export type Database = {
           nome: string
           observacao: string | null
           parcela: number
+          saldo_devedor: number | null
           status: string
           telefone: string
           tipo_operacao: string
@@ -1474,6 +1475,7 @@ export type Database = {
           nome: string
           observacao?: string | null
           parcela: number
+          saldo_devedor?: number | null
           status?: string
           telefone: string
           tipo_operacao: string
@@ -1491,6 +1493,7 @@ export type Database = {
           nome?: string
           observacao?: string | null
           parcela?: number
+          saldo_devedor?: number | null
           status?: string
           telefone?: string
           tipo_operacao?: string
