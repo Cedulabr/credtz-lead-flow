@@ -566,6 +566,81 @@ export type Database = {
         }
         Relationships: []
       }
+      financial_transactions: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string
+          description: string
+          due_date: string
+          id: string
+          is_recurring: boolean | null
+          is_recurring_active: boolean | null
+          notes: string | null
+          parent_transaction_id: string | null
+          payment_date: string | null
+          recurring_day: number | null
+          responsible_id: string | null
+          status: string
+          type: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by: string
+          description: string
+          due_date: string
+          id?: string
+          is_recurring?: boolean | null
+          is_recurring_active?: boolean | null
+          notes?: string | null
+          parent_transaction_id?: string | null
+          payment_date?: string | null
+          recurring_day?: number | null
+          responsible_id?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          description?: string
+          due_date?: string
+          id?: string
+          is_recurring?: boolean | null
+          is_recurring_active?: boolean | null
+          notes?: string | null
+          parent_transaction_id?: string | null
+          payment_date?: string | null
+          recurring_day?: number | null
+          responsible_id?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_parent_transaction_id_fkey"
+            columns: ["parent_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "financial_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form_submissions: {
         Row: {
           client_id: number | null
@@ -890,6 +965,57 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_receipts: {
+        Row: {
+          company_id: string
+          created_at: string
+          file_name: string
+          file_url: string
+          id: string
+          name: string
+          payment_date: string
+          transaction_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          file_name: string
+          file_url: string
+          id?: string
+          name: string
+          payment_date: string
+          transaction_id: string
+          uploaded_by: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          file_name?: string
+          file_url?: string
+          id?: string
+          name?: string
+          payment_date?: string
+          transaction_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_receipts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_receipts_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "financial_transactions"
             referencedColumns: ["id"]
           },
         ]
