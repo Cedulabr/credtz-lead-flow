@@ -2052,6 +2052,8 @@ export type Database = {
           parcela: number
           saldo_devedor: number | null
           status: string
+          status_updated_at: string | null
+          status_updated_by: string | null
           telefone: string
           tipo_operacao: string
           troco: number | null
@@ -2070,6 +2072,8 @@ export type Database = {
           parcela: number
           saldo_devedor?: number | null
           status?: string
+          status_updated_at?: string | null
+          status_updated_by?: string | null
           telefone: string
           tipo_operacao: string
           troco?: number | null
@@ -2088,6 +2092,8 @@ export type Database = {
           parcela?: number
           saldo_devedor?: number | null
           status?: string
+          status_updated_at?: string | null
+          status_updated_by?: string | null
           telefone?: string
           tipo_operacao?: string
           troco?: number | null
@@ -2133,6 +2139,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      televendas_status_history: {
+        Row: {
+          changed_at: string
+          changed_by: string
+          from_status: string | null
+          id: string
+          notes: string | null
+          televendas_id: string
+          to_status: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by: string
+          from_status?: string | null
+          id?: string
+          notes?: string | null
+          televendas_id: string
+          to_status: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string
+          from_status?: string | null
+          id?: string
+          notes?: string | null
+          televendas_id?: string
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "televendas_status_history_televendas_id_fkey"
+            columns: ["televendas_id"]
+            isOneToOne: false
+            referencedRelation: "televendas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_companies: {
         Row: {

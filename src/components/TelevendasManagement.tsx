@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Pencil, Trash2, Search, UserPlus } from "lucide-react";
+import { Pencil, Trash2, Search, UserPlus, History } from "lucide-react";
 
 interface User {
   id: string;
@@ -69,6 +69,15 @@ interface TelevendaWithUser extends Televenda {
   user?: {
     name: string;
   } | null;
+}
+
+interface StatusHistoryItem {
+  id: string;
+  from_status: string | null;
+  to_status: string;
+  changed_at: string;
+  changed_by: string;
+  changed_by_name?: string;
 }
 
 // Utility functions for currency formatting
@@ -126,6 +135,8 @@ export const TelevendasManagement = () => {
   const [deletingTvId, setDeletingTvId] = useState<string | null>(null);
   const [isGestor, setIsGestor] = useState(false);
   const [userCompanyIds, setUserCompanyIds] = useState<string[]>([]);
+  const [statusHistory, setStatusHistory] = useState<StatusHistoryItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Form states for edit dialog with proper formatting
   const [editFormData, setEditFormData] = useState({
@@ -313,6 +324,16 @@ export const TelevendasManagement = () => {
     return isAdmin || isGestor;
   };
 
+  // Verificar se pode mudar para um status específico
+  const canChangeToStatus = (newStatus: string) => {
+    // Apenas admin ou gestor podem mudar para "pago"
+    if (newStatus === "pago") {
+      return isAdmin || isGestor;
+    }
+    // Para outros status, admin e gestor podem alterar
+    return isAdmin || isGestor;
+  };
+
   const updateStatus = async (id: string, newStatus: string) => {
     // Apenas admin ou gestor pode alterar status
     if (!canChangeStatus()) {
@@ -324,13 +345,46 @@ export const TelevendasManagement = () => {
       return;
     }
 
+    // Verificação adicional para status "pago"
+    if (!canChangeToStatus(newStatus)) {
+      toast({
+        title: "Sem permissão",
+        description: "Você não tem permissão para alterar para este status.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      const { error } = await (supabase as any)
+      // Buscar o status atual para registrar no histórico
+      const currentTv = televendas.find(tv => tv.id === id);
+      const fromStatus = currentTv?.status || null;
+
+      // Atualizar o status com informações de auditoria
+      const { error } = await supabase
         .from("televendas")
-        .update({ status: newStatus })
+        .update({ 
+          status: newStatus,
+          status_updated_at: new Date().toISOString(),
+          status_updated_by: user?.id
+        })
         .eq("id", id);
 
       if (error) throw error;
+
+      // Registrar no histórico de mudanças de status
+      const { error: historyError } = await supabase
+        .from("televendas_status_history")
+        .insert({
+          televendas_id: id,
+          from_status: fromStatus,
+          to_status: newStatus,
+          changed_by: user?.id,
+        });
+
+      if (historyError) {
+        console.error("Error inserting status history:", historyError);
+      }
 
       // Se marcou como PAGO, criar alerta de reaproveitamento
       if (newStatus === "pago") {
@@ -582,9 +636,51 @@ export const TelevendasManagement = () => {
     return <div>Carregando...</div>;
   }
 
+  const fetchStatusHistory = async (televendaId: string) => {
+    setLoadingHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from("televendas_status_history")
+        .select("*")
+        .eq("televendas_id", televendaId)
+        .order("changed_at", { ascending: false });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        // Buscar nomes dos usuários que fizeram as alterações
+        const userIds = [...new Set(data.map(h => h.changed_by))];
+        const { data: profilesData } = await supabase
+          .from("profiles")
+          .select("id, name")
+          .in("id", userIds);
+
+        const profilesMap = new Map(
+          (profilesData || []).map(p => [p.id, p.name])
+        );
+
+        const historyWithNames = data.map(h => ({
+          ...h,
+          changed_by_name: profilesMap.get(h.changed_by) || "Desconhecido"
+        }));
+
+        setStatusHistory(historyWithNames);
+      } else {
+        setStatusHistory([]);
+      }
+    } catch (error) {
+      console.error("Error fetching status history:", error);
+      setStatusHistory([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   const handleRowClick = (tv: TelevendaWithUser) => {
     setSelectedTv(tv);
     setIsDialogOpen(true);
+    // Buscar histórico de status quando abrir o dialog
+    fetchStatusHistory(tv.id);
   };
 
   const getMonthOptions = () => {
@@ -914,6 +1010,44 @@ export const TelevendasManagement = () => {
                   )}
                 </div>
               </div>
+
+              {/* Histórico de Alterações de Status */}
+              {(isAdmin || isGestor) && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-primary border-b pb-2 flex items-center gap-2">
+                    <History className="h-4 w-4" />
+                    Histórico de Alterações de Status
+                  </h4>
+                  <div className="p-4 bg-muted/50 rounded-lg max-h-[200px] overflow-y-auto">
+                    {loadingHistory ? (
+                      <p className="text-sm text-muted-foreground">Carregando histórico...</p>
+                    ) : statusHistory.length > 0 ? (
+                      <div className="space-y-3">
+                        {statusHistory.map((history) => (
+                          <div key={history.id} className="flex items-start gap-3 text-sm border-b border-border/50 pb-2 last:border-0">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {history.from_status || "Novo"}
+                                </Badge>
+                                <span className="text-muted-foreground">→</span>
+                                <Badge variant={history.to_status === "pago" ? "secondary" : history.to_status === "cancelado" ? "destructive" : "default"} className="text-xs">
+                                  {history.to_status}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Por: <span className="font-medium">{history.changed_by_name}</span> em {new Date(history.changed_at).toLocaleString("pt-BR")}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">Nenhuma alteração de status registrada</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Metadados */}
               <div className="flex items-center justify-between text-xs text-muted-foreground pt-4 border-t">
