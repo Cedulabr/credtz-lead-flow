@@ -14,6 +14,188 @@ export type Database = {
   }
   public: {
     Tables: {
+      activate_leads: {
+        Row: {
+          assigned_to: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          data_proxima_operacao: string | null
+          id: string
+          motivo_recusa: string | null
+          nome: string
+          origem: string
+          produto: string | null
+          proxima_acao: string | null
+          status: string
+          telefone: string
+          ultima_interacao: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_proxima_operacao?: string | null
+          id?: string
+          motivo_recusa?: string | null
+          nome: string
+          origem?: string
+          produto?: string | null
+          proxima_acao?: string | null
+          status?: string
+          telefone: string
+          ultima_interacao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_proxima_operacao?: string | null
+          id?: string
+          motivo_recusa?: string | null
+          nome?: string
+          origem?: string
+          produto?: string | null
+          proxima_acao?: string | null
+          status?: string
+          telefone?: string
+          ultima_interacao?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activate_leads_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activate_leads_distribution: {
+        Row: {
+          created_at: string
+          distributed_at: string
+          id: string
+          lead_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          distributed_at?: string
+          id?: string
+          lead_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          distributed_at?: string
+          id?: string
+          lead_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activate_leads_distribution_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "activate_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activate_leads_history: {
+        Row: {
+          action_type: string
+          created_at: string
+          from_status: string | null
+          id: string
+          lead_id: string
+          metadata: Json | null
+          notes: string | null
+          to_status: string | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          lead_id: string
+          metadata?: Json | null
+          notes?: string | null
+          to_status?: string | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          lead_id?: string
+          metadata?: Json | null
+          notes?: string | null
+          to_status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activate_leads_history_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "activate_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activate_leads_notifications: {
+        Row: {
+          created_at: string
+          gestor_id: string | null
+          id: string
+          is_notified: boolean | null
+          lead_id: string
+          notification_type: string
+          notified_at: string | null
+          scheduled_date: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          gestor_id?: string | null
+          id?: string
+          is_notified?: boolean | null
+          lead_id: string
+          notification_type: string
+          notified_at?: string | null
+          scheduled_date: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          gestor_id?: string | null
+          id?: string
+          is_notified?: boolean | null
+          lead_id?: string
+          notification_type?: string
+          notified_at?: string | null
+          scheduled_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activate_leads_notifications_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "activate_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       announcements: {
         Row: {
           content: string
