@@ -1,1 +1,22 @@
 project_id = "qwgsplcqyongfsqdjrme"
+
+[functions.admin-create-user]
+verify_jwt = false
+
+[functions.admin-debug-login]
+verify_jwt = false
+
+[functions.admin-delete-user]
+verify_jwt = false
+
+[functions.admin-reset-password]
+verify_jwt = false
+
+[functions.send-invitation-request]
+verify_jwt = false
+
+[functions.upload-to-minio]
+verify_jwt = false
+
+[functions.send-reuse-alerts]
+verify_jwt = false
