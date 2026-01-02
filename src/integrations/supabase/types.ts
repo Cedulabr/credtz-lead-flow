@@ -209,6 +209,86 @@ export type Database = {
         }
         Relationships: []
       }
+      baseoff_lead_tracking: {
+        Row: {
+          cpf: string
+          created_at: string
+          future_contact_date: string | null
+          id: string
+          offered_value: number | null
+          rejection_notes: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cpf: string
+          created_at?: string
+          future_contact_date?: string | null
+          id?: string
+          offered_value?: number | null
+          rejection_notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cpf?: string
+          created_at?: string
+          future_contact_date?: string | null
+          id?: string
+          offered_value?: number | null
+          rejection_notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      baseoff_notifications: {
+        Row: {
+          cpf: string
+          created_at: string
+          gestor_id: string | null
+          id: string
+          is_notified: boolean | null
+          notified_at: string | null
+          scheduled_date: string
+          tracking_id: string | null
+          user_id: string
+        }
+        Insert: {
+          cpf: string
+          created_at?: string
+          gestor_id?: string | null
+          id?: string
+          is_notified?: boolean | null
+          notified_at?: string | null
+          scheduled_date: string
+          tracking_id?: string | null
+          user_id: string
+        }
+        Update: {
+          cpf?: string
+          created_at?: string
+          gestor_id?: string | null
+          id?: string
+          is_notified?: boolean | null
+          notified_at?: string | null
+          scheduled_date?: string
+          tracking_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "baseoff_notifications_tracking_id_fkey"
+            columns: ["tracking_id"]
+            isOneToOne: false
+            referencedRelation: "baseoff_lead_tracking"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       baseoff_requests: {
         Row: {
           codigo_banco: string | null

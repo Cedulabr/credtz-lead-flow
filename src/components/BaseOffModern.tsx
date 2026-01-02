@@ -86,6 +86,8 @@ export function BaseOffModern() {
   const [futureContactDate, setFutureContactDate] = useState("");
   const [offeredValue, setOfferedValue] = useState("");
   const [savingStatus, setSavingStatus] = useState(false);
+  const [gestorId, setGestorId] = useState<string | null>(null);
+  const [leadTracking, setLeadTracking] = useState<Record<string, any>>({});
 
   useEffect(() => {
     if (user) {
@@ -100,12 +102,52 @@ export function BaseOffModern() {
         fetchLeads(),
         fetchAvailableBancos(),
         fetchAvailableUFs(),
-        checkDailyLimit()
+        checkDailyLimit(),
+        fetchLeadTracking(),
+        fetchGestorId()
       ]);
     } catch (error) {
       console.error('Error initializing data:', error);
     } finally {
       setIsLoadingData(false);
+    }
+  };
+
+  const fetchGestorId = async () => {
+    if (!user?.id) return;
+    try {
+      const { data } = await supabase
+        .from("user_companies")
+        .select("user_id, company_role")
+        .eq("company_role", "gestor")
+        .eq("is_active", true)
+        .limit(1);
+      
+      if (data && data.length > 0) {
+        setGestorId(data[0].user_id);
+      }
+    } catch (error) {
+      console.error("Error fetching gestor:", error);
+    }
+  };
+
+  const fetchLeadTracking = async () => {
+    if (!user?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from("baseoff_lead_tracking")
+        .select("*")
+        .eq("user_id", user.id);
+      
+      if (error) throw error;
+      
+      const trackingMap: Record<string, any> = {};
+      (data || []).forEach(item => {
+        trackingMap[item.cpf] = item;
+      });
+      setLeadTracking(trackingMap);
+    } catch (error) {
+      console.error("Error fetching lead tracking:", error);
     }
   };
 
@@ -128,20 +170,25 @@ export function BaseOffModern() {
       
       console.log('BaseOff: Fetched leads:', data?.length || 0);
       
-      // Mapear os dados para a interface esperada
-      const mappedLeads = data?.map((item: any) => ({
-        CPF: item.cpf,
-        Nome: item.nome,
-        Telefone1: item.telefone1,
-        Telefone2: item.telefone2,
-        Telefone3: item.telefone3,
-        Banco: item.banco,
-        Valor_Beneficio: item.valor_beneficio,
-        UF: item.uf,
-        Municipio: item.municipio,
-        Margem_Disponivel: item.margem_disponivel,
-        status: 'Novo lead'
-      })) || [];
+      // Mapear os dados para a interface esperada e aplicar tracking salvo
+      const mappedLeads = data?.map((item: any) => {
+        const tracking = leadTracking[item.cpf];
+        return {
+          CPF: item.cpf,
+          Nome: item.nome,
+          Telefone1: item.telefone1,
+          Telefone2: item.telefone2,
+          Telefone3: item.telefone3,
+          Banco: item.banco,
+          Valor_Beneficio: item.valor_beneficio,
+          UF: item.uf,
+          Municipio: item.municipio,
+          Margem_Disponivel: item.margem_disponivel,
+          status: tracking?.status || 'Novo lead',
+          future_contact_date: tracking?.future_contact_date,
+          offered_value: tracking?.offered_value
+        };
+      }) || [];
       
       setLeads(mappedLeads);
     } catch (error) {
@@ -258,6 +305,47 @@ export function BaseOffModern() {
 
   const updateLeadStatus = async (leadIndex: number, newStatus: string, metadata?: any) => {
     try {
+      const lead = leads[leadIndex];
+      const cpf = lead.CPF;
+
+      // Atualiza no banco de dados
+      const { data: existingTracking } = await supabase
+        .from("baseoff_lead_tracking")
+        .select("id")
+        .eq("cpf", cpf)
+        .eq("user_id", user?.id)
+        .maybeSingle();
+
+      const trackingData = {
+        cpf,
+        user_id: user?.id,
+        status: newStatus,
+        future_contact_date: metadata?.future_contact_date || null,
+        offered_value: metadata?.offered_value || null,
+        rejection_notes: metadata?.notes || null,
+        updated_at: new Date().toISOString()
+      };
+
+      let trackingId: string | undefined;
+
+      if (existingTracking?.id) {
+        // Atualiza registro existente
+        await supabase
+          .from("baseoff_lead_tracking")
+          .update(trackingData)
+          .eq("id", existingTracking.id);
+        trackingId = existingTracking.id;
+      } else {
+        // Cria novo registro
+        const { data: newTracking } = await supabase
+          .from("baseoff_lead_tracking")
+          .insert(trackingData)
+          .select("id")
+          .single();
+        trackingId = newTracking?.id;
+      }
+
+      // Atualiza estado local
       const updatedLeads = [...leads];
       updatedLeads[leadIndex] = { 
         ...updatedLeads[leadIndex], 
@@ -271,6 +359,8 @@ export function BaseOffModern() {
         title: "Status atualizado",
         description: `Lead marcado como: ${newStatus}`,
       });
+
+      return trackingId;
     } catch (error) {
       console.error('Error updating lead status:', error);
       toast({
@@ -278,10 +368,11 @@ export function BaseOffModern() {
         description: "Erro ao atualizar status do lead",
         variant: "destructive",
       });
+      return null;
     }
   };
 
-  const handleFutureContactSubmit = () => {
+  const handleFutureContactSubmit = async () => {
     if (selectedLeadIndex === null) return;
     
     if (!futureContactDate) {
@@ -290,22 +381,46 @@ export function BaseOffModern() {
     }
 
     setSavingStatus(true);
-    updateLeadStatus(selectedLeadIndex, "Contato Futuro", {
-      future_contact_date: futureContactDate,
-    });
     
-    toast({
-      title: "Contato agendado",
-      description: `Retorno agendado para ${new Date(futureContactDate).toLocaleDateString('pt-BR')}`,
-    });
-    
-    setIsFutureContactModalOpen(false);
-    setSelectedLeadIndex(null);
-    setFutureContactDate("");
-    setSavingStatus(false);
+    try {
+      const lead = leads[selectedLeadIndex];
+      
+      // Atualiza status e obtém o ID do tracking
+      const trackingId = await updateLeadStatus(selectedLeadIndex, "Contato Futuro", {
+        future_contact_date: futureContactDate,
+      });
+
+      // Cria notificações para usuário e gestor
+      if (trackingId) {
+        await supabase.from("baseoff_notifications").insert({
+          tracking_id: trackingId,
+          cpf: lead.CPF,
+          user_id: user?.id,
+          gestor_id: gestorId,
+          scheduled_date: futureContactDate,
+        });
+      }
+      
+      toast({
+        title: "Contato agendado",
+        description: `Retorno agendado para ${new Date(futureContactDate).toLocaleDateString('pt-BR')}. Você e o gestor serão notificados.`,
+      });
+    } catch (error) {
+      console.error("Error scheduling contact:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao agendar contato",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFutureContactModalOpen(false);
+      setSelectedLeadIndex(null);
+      setFutureContactDate("");
+      setSavingStatus(false);
+    }
   };
 
-  const handleRejectionSubmit = () => {
+  const handleRejectionSubmit = async () => {
     if (selectedLeadIndex === null) return;
     
     if (!offeredValue) {
@@ -314,21 +429,31 @@ export function BaseOffModern() {
     }
 
     setSavingStatus(true);
-    const valueNum = parseFloat(offeredValue.replace(/\D/g, '')) / 100;
     
-    updateLeadStatus(selectedLeadIndex, "Oferta negada", {
-      offered_value: valueNum,
-    });
-    
-    toast({
-      title: "Status atualizado",
-      description: `Oferta de ${formatCurrency(valueNum)} foi recusada`,
-    });
-    
-    setIsRejectionModalOpen(false);
-    setSelectedLeadIndex(null);
-    setOfferedValue("");
-    setSavingStatus(false);
+    try {
+      const valueNum = parseFloat(offeredValue.replace(/\D/g, '')) / 100;
+      
+      await updateLeadStatus(selectedLeadIndex, "Oferta negada", {
+        offered_value: valueNum,
+      });
+      
+      toast({
+        title: "Status atualizado",
+        description: `Oferta de ${formatCurrency(valueNum)} foi registrada como recusada`,
+      });
+    } catch (error) {
+      console.error("Error saving rejection:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar recusa",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRejectionModalOpen(false);
+      setSelectedLeadIndex(null);
+      setOfferedValue("");
+      setSavingStatus(false);
+    }
   };
 
   const formatCurrency = (value: number) => {
