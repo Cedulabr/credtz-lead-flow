@@ -227,8 +227,8 @@ export const ActivateLeads = () => {
   const canEditLead = (lead: ActivateLead) => {
     if (isAdmin) return true;
     if (isGestor) return true;
-    // Colaborador pode editar leads atribuídos a ele, criados por ele, ou não atribuídos (para pegar novos leads)
-    return lead.assigned_to === user?.id || lead.created_by === user?.id || lead.assigned_to === null;
+    // Colaborador só pode editar leads exclusivamente atribuídos a ele
+    return lead.assigned_to === user?.id;
   };
 
   const handleStatusChange = async (lead: ActivateLead, status: string) => {
@@ -322,6 +322,11 @@ export const ActivateLeads = () => {
         ultima_interacao: new Date().toISOString(),
         ...extraData,
       };
+
+      // Auto-atribuir lead ao usuário se ainda não estiver atribuído (trava de exclusividade)
+      if (!lead.assigned_to) {
+        updateData.assigned_to = user.id;
+      }
 
       const { error: updateError } = await supabase
         .from('activate_leads')
@@ -555,7 +560,7 @@ export const ActivateLeads = () => {
     link.click();
   };
 
-  // Filters
+  // Filters - Exclusividade de leads por usuário
   const filteredLeads = useMemo(() => {
     return leads.filter(lead => {
       const matchesSearch = 
@@ -563,11 +568,16 @@ export const ActivateLeads = () => {
         lead.telefone.includes(searchTerm);
       const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
       const matchesOrigem = origemFilter === 'all' || lead.origem === origemFilter;
-      const matchesUser = isAdmin || lead.assigned_to === user?.id || lead.assigned_to === null;
+      
+      // Regra de exclusividade:
+      // - Admin e Gestor veem todos os leads
+      // - Colaborador vê apenas leads atribuídos a ele (exclusivos)
+      // - Leads não atribuídos (assigned_to = null) só aparecem quando colaborador solicita via "Gerar Leads"
+      const matchesUser = isAdmin || isGestor || lead.assigned_to === user?.id;
       
       return matchesSearch && matchesStatus && matchesOrigem && matchesUser;
     });
-  }, [leads, searchTerm, statusFilter, origemFilter, isAdmin, user?.id]);
+  }, [leads, searchTerm, statusFilter, origemFilter, isAdmin, isGestor, user?.id]);
 
   const totalPages = Math.ceil(filteredLeads.length / ITEMS_PER_PAGE);
   const paginatedLeads = filteredLeads.slice(
