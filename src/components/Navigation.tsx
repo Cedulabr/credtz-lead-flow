@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import credtzLogo from "@/assets/credtz-logo.png";
+import credtzLogo from "@/assets/credtz-logo-new.jpeg";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { useWhitelabel } from "@/hooks/useWhitelabel";
 
