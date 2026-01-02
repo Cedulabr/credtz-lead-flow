@@ -227,8 +227,8 @@ export const ActivateLeads = () => {
   const canEditLead = (lead: ActivateLead) => {
     if (isAdmin) return true;
     if (isGestor) return true;
-    // Colaborador pode editar leads atribuídos a ele ou criados por ele
-    return lead.assigned_to === user?.id || lead.created_by === user?.id;
+    // Colaborador pode editar leads atribuídos a ele, criados por ele, ou não atribuídos (para pegar novos leads)
+    return lead.assigned_to === user?.id || lead.created_by === user?.id || lead.assigned_to === null;
   };
 
   const handleStatusChange = async (lead: ActivateLead, status: string) => {
