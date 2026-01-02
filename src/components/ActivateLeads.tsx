@@ -199,10 +199,18 @@ export const ActivateLeads = () => {
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('activate_leads')
         .select('*')
         .order('created_at', { ascending: false });
+
+      // Regra de visibilidade: usuário comum só vê leads atribuídos a ele
+      // Admin e Gestor veem todos os leads
+      if (!isAdmin && !isGestor) {
+        query = query.eq('assigned_to', user.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setLeads((data as ActivateLead[]) || []);
@@ -216,7 +224,7 @@ export const ActivateLeads = () => {
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, isAdmin, isGestor]);
 
   const fetchAvailableUsers = useCallback(async () => {
     if (!user?.id) return;
@@ -266,11 +274,17 @@ export const ActivateLeads = () => {
     }
   }, [user?.id]);
 
+  // Primeiro busca o papel de gestor
   useEffect(() => {
     fetchGestorId();
-    fetchLeads();
-  }, [fetchGestorId, fetchLeads]);
+  }, [fetchGestorId]);
 
+  // Depois que isAdmin e isGestor estão definidos, busca os leads
+  useEffect(() => {
+    fetchLeads();
+  }, [fetchLeads]);
+
+  // Busca usuários disponíveis para atribuição se for admin ou gestor
   useEffect(() => {
     if (isAdmin || isGestor) {
       fetchAvailableUsers();
@@ -313,12 +327,20 @@ export const ActivateLeads = () => {
       // Tratar 'none' como null para remover atribuição
       const assignedTo = (selectedUserId && selectedUserId !== 'none') ? selectedUserId : null;
       
+      // Atualiza assigned_to e muda status para em_andamento (trava exclusividade)
+      const updateData: any = {
+        assigned_to: assignedTo,
+        ultima_interacao: new Date().toISOString()
+      };
+      
+      // Se estiver atribuindo (não removendo), muda status para em_andamento
+      if (assignedTo) {
+        updateData.status = 'em_andamento';
+      }
+      
       const { error } = await supabase
         .from('activate_leads')
-        .update({ 
-          assigned_to: assignedTo,
-          ultima_interacao: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', leadToAssign.id);
 
       if (error) throw error;
@@ -328,6 +350,8 @@ export const ActivateLeads = () => {
         lead_id: leadToAssign.id,
         user_id: user.id,
         action_type: 'assignment',
+        from_status: leadToAssign.status,
+        to_status: assignedTo ? 'em_andamento' : leadToAssign.status,
         notes: assignedTo 
           ? `Lead atribuído ao usuário ${availableUsers.find(u => u.id === assignedTo)?.name || assignedTo}`
           : 'Atribuição do lead removida',
@@ -337,7 +361,7 @@ export const ActivateLeads = () => {
       toast({
         title: assignedTo ? 'Lead atribuído!' : 'Atribuição removida',
         description: assignedTo 
-          ? `Lead atribuído para ${availableUsers.find(u => u.id === assignedTo)?.name || 'usuário'}`
+          ? `Lead atribuído para ${availableUsers.find(u => u.id === assignedTo)?.name || 'usuário'} - Status: Em Andamento`
           : 'O lead agora está disponível para distribuição',
       });
 
