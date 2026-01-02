@@ -1611,8 +1611,11 @@ export type Database = {
       }
       profiles: {
         Row: {
+          can_access_activate_leads: boolean | null
+          can_access_alertas: boolean | null
           can_access_documentos: boolean | null
           can_access_financas: boolean | null
+          can_access_gerador_propostas: boolean | null
           can_access_gestao_televendas: boolean | null
           can_access_indicar: boolean | null
           can_access_meus_clientes: boolean | null
@@ -1641,8 +1644,11 @@ export type Database = {
           whatsapp_enabled: boolean | null
         }
         Insert: {
+          can_access_activate_leads?: boolean | null
+          can_access_alertas?: boolean | null
           can_access_documentos?: boolean | null
           can_access_financas?: boolean | null
+          can_access_gerador_propostas?: boolean | null
           can_access_gestao_televendas?: boolean | null
           can_access_indicar?: boolean | null
           can_access_meus_clientes?: boolean | null
@@ -1671,8 +1677,11 @@ export type Database = {
           whatsapp_enabled?: boolean | null
         }
         Update: {
+          can_access_activate_leads?: boolean | null
+          can_access_alertas?: boolean | null
           can_access_documentos?: boolean | null
           can_access_financas?: boolean | null
+          can_access_gerador_propostas?: boolean | null
           can_access_gestao_televendas?: boolean | null
           can_access_indicar?: boolean | null
           can_access_meus_clientes?: boolean | null

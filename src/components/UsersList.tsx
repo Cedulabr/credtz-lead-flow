@@ -63,10 +63,14 @@ export function UsersList() {
   const [permissions, setPermissions] = useState({
     can_access_premium_leads: false,
     can_access_indicar: true,
+    can_access_gerador_propostas: true,
+    can_access_activate_leads: true,
     can_access_meus_clientes: true,
     can_access_televendas: true,
     can_access_gestao_televendas: true,
+    can_access_financas: true,
     can_access_documentos: true,
+    can_access_alertas: true,
     can_access_tabela_comissoes: true,
     can_access_minhas_comissoes: true,
   });
@@ -459,10 +463,14 @@ export function UsersList() {
     setPermissions({
       can_access_premium_leads: user.can_access_premium_leads !== false,
       can_access_indicar: user.can_access_indicar !== false,
+      can_access_gerador_propostas: (user as any).can_access_gerador_propostas !== false,
+      can_access_activate_leads: (user as any).can_access_activate_leads !== false,
       can_access_meus_clientes: user.can_access_meus_clientes !== false,
       can_access_televendas: user.can_access_televendas !== false,
       can_access_gestao_televendas: user.can_access_gestao_televendas !== false,
+      can_access_financas: (user as any).can_access_financas !== false,
       can_access_documentos: user.can_access_documentos !== false,
+      can_access_alertas: (user as any).can_access_alertas !== false,
       can_access_tabela_comissoes: user.can_access_tabela_comissoes !== false,
       can_access_minhas_comissoes: user.can_access_minhas_comissoes !== false,
     });
@@ -852,6 +860,42 @@ export function UsersList() {
                     id="documentos"
                     checked={permissions.can_access_documentos}
                     onCheckedChange={(checked) => setPermissions({ ...permissions, can_access_documentos: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <Label htmlFor="gerador-propostas" className="font-medium">Gerador de Propostas</Label>
+                  <Switch
+                    id="gerador-propostas"
+                    checked={permissions.can_access_gerador_propostas}
+                    onCheckedChange={(checked) => setPermissions({ ...permissions, can_access_gerador_propostas: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <Label htmlFor="activate-leads" className="font-medium">Activate Leads</Label>
+                  <Switch
+                    id="activate-leads"
+                    checked={permissions.can_access_activate_leads}
+                    onCheckedChange={(checked) => setPermissions({ ...permissions, can_access_activate_leads: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <Label htmlFor="financas" className="font-medium">Finanças</Label>
+                  <Switch
+                    id="financas"
+                    checked={permissions.can_access_financas}
+                    onCheckedChange={(checked) => setPermissions({ ...permissions, can_access_financas: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <Label htmlFor="alertas" className="font-medium">Alertas de Reaproveitamento</Label>
+                  <Switch
+                    id="alertas"
+                    checked={permissions.can_access_alertas}
+                    onCheckedChange={(checked) => setPermissions({ ...permissions, can_access_alertas: checked })}
                   />
                 </div>
 
