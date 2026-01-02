@@ -10,6 +10,7 @@ export const Commissions = lazy(() => import('./Commissions').then(module => ({ 
 export const LeadsManagement = lazy(() => import('./LeadsManagement').then(module => ({ default: module.LeadsManagement })));
 export const LeadsIndicados = lazy(() => import('./LeadsIndicados'));
 export const TestFunctionalities = lazy(() => import('./TestFunctionalities').then(module => ({ default: module.TestFunctionalities })));
+export const ActivateLeads = lazy(() => import('./ActivateLeads').then(module => ({ default: module.ActivateLeads })));
 
 // Loading skeleton components for better UX
 const TableSkeleton = () => (
@@ -79,3 +80,4 @@ export const LazyCommissions = withLazyLoading(Commissions, TableSkeleton);
 export const LazyLeadsManagement = withLazyLoading(LeadsManagement, TableSkeleton);
 export const LazyLeadsIndicados = withLazyLoading(LeadsIndicados, FormSkeleton);
 export const LazyTestFunctionalities = withLazyLoading(TestFunctionalities, FormSkeleton);
+export const LazyActivateLeads = withLazyLoading(ActivateLeads, TableSkeleton);

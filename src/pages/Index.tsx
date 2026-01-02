@@ -25,7 +25,8 @@ import { useWhitelabel } from "@/hooks/useWhitelabel";
 import { 
   LazyLeadsManagement, 
   LazyCommissions, 
-  LazyTestFunctionalities 
+  LazyTestFunctionalities,
+  LazyActivateLeads
 } from "@/components/LazyComponents";
 
 const Index = () => {
@@ -106,6 +107,16 @@ const Index = () => {
         }
         return <ProposalGenerator />;
       
+      case "activate-leads":
+        if (!hasPermission('can_access_activate_leads')) {
+          return <BlockedAccess message="Acesso ao Activate Leads bloqueado pelo administrador" />;
+        }
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <LazyActivateLeads />
+          </Suspense>
+        );
+
       case "leads":
         if (!hasPermission('can_access_premium_leads')) {
           return <BlockedAccess message="Acesso aos Leads Premium bloqueado pelo administrador" />;
