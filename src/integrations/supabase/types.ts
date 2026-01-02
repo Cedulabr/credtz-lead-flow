@@ -256,6 +256,36 @@ export type Database = {
         }
         Relationships: []
       }
+      bank_reuse_settings: {
+        Row: {
+          bank_name: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          reuse_months: number
+          updated_at: string
+        }
+        Insert: {
+          bank_name: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          reuse_months?: number
+          updated_at?: string
+        }
+        Update: {
+          bank_name?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          reuse_months?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       banks: {
         Row: {
           created_at: string | null
@@ -582,6 +612,91 @@ export type Database = {
             columns: ["proposta_id"]
             isOneToOne: false
             referencedRelation: "propostas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_reuse_alerts: {
+        Row: {
+          alert_date: string
+          bank_name: string
+          client_cpf: string | null
+          client_name: string
+          client_phone: string | null
+          company_id: string | null
+          created_at: string
+          gestor_id: string | null
+          id: string
+          notes: string | null
+          notified_at: string | null
+          payment_date: string
+          proposta_id: number
+          reuse_months: number
+          status: string
+          televendas_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alert_date: string
+          bank_name: string
+          client_cpf?: string | null
+          client_name: string
+          client_phone?: string | null
+          company_id?: string | null
+          created_at?: string
+          gestor_id?: string | null
+          id?: string
+          notes?: string | null
+          notified_at?: string | null
+          payment_date: string
+          proposta_id: number
+          reuse_months: number
+          status?: string
+          televendas_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alert_date?: string
+          bank_name?: string
+          client_cpf?: string | null
+          client_name?: string
+          client_phone?: string | null
+          company_id?: string | null
+          created_at?: string
+          gestor_id?: string | null
+          id?: string
+          notes?: string | null
+          notified_at?: string | null
+          payment_date?: string
+          proposta_id?: number
+          reuse_months?: number
+          status?: string
+          televendas_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_reuse_alerts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_reuse_alerts_proposta_id_fkey"
+            columns: ["proposta_id"]
+            isOneToOne: false
+            referencedRelation: "propostas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_reuse_alerts_televendas_id_fkey"
+            columns: ["televendas_id"]
+            isOneToOne: false
+            referencedRelation: "televendas"
             referencedColumns: ["id"]
           },
         ]

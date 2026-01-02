@@ -26,7 +26,8 @@ import {
   LazyLeadsManagement, 
   LazyCommissions, 
   LazyTestFunctionalities,
-  LazyActivateLeads
+  LazyActivateLeads,
+  LazyClientReuseAlerts
 } from "@/components/LazyComponents";
 
 const Index = () => {
@@ -182,6 +183,16 @@ const Index = () => {
         return (
           <Suspense fallback={<LoadingFallback />}>
             <LazyCommissions />
+          </Suspense>
+        );
+      
+      case "reuse-alerts":
+        if (!hasPermission('can_access_alertas')) {
+          return <BlockedAccess message="Acesso aos Alertas de Reaproveitamento bloqueado pelo administrador" />;
+        }
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <LazyClientReuseAlerts />
           </Suspense>
         );
       

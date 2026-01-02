@@ -11,6 +11,7 @@ export const LeadsManagement = lazy(() => import('./LeadsManagement').then(modul
 export const LeadsIndicados = lazy(() => import('./LeadsIndicados'));
 export const TestFunctionalities = lazy(() => import('./TestFunctionalities').then(module => ({ default: module.TestFunctionalities })));
 export const ActivateLeads = lazy(() => import('./ActivateLeads').then(module => ({ default: module.ActivateLeads })));
+export const ClientReuseAlerts = lazy(() => import('./ClientReuseAlerts').then(module => ({ default: module.ClientReuseAlerts })));
 
 // Loading skeleton components for better UX
 const TableSkeleton = () => (
@@ -81,3 +82,4 @@ export const LazyLeadsManagement = withLazyLoading(LeadsManagement, TableSkeleto
 export const LazyLeadsIndicados = withLazyLoading(LeadsIndicados, FormSkeleton);
 export const LazyTestFunctionalities = withLazyLoading(TestFunctionalities, FormSkeleton);
 export const LazyActivateLeads = withLazyLoading(ActivateLeads, TableSkeleton);
+export const LazyClientReuseAlerts = withLazyLoading(ClientReuseAlerts, TableSkeleton);
