@@ -241,6 +241,14 @@ export const TelevendasManagement = () => {
         .select("*")
         .order("created_at", { ascending: false });
 
+      // Colaborador só pode ver suas próprias propostas
+      if (!isAdmin && !isGestor) {
+        query = query.eq("user_id", user?.id);
+      } else if (isGestor && !isAdmin && userCompanyIds.length > 0) {
+        // Gestor pode ver propostas de sua empresa
+        query = query.in("company_id", userCompanyIds);
+      }
+
       if (selectedMonth && selectedMonth !== "all") {
         const [year, month] = selectedMonth.split("-");
         const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
@@ -300,7 +308,22 @@ export const TelevendasManagement = () => {
     fetchTelevendas();
   }, [selectedMonth, selectedUserId]);
 
+  // Verificar se pode alterar status (apenas admin ou gestor)
+  const canChangeStatus = () => {
+    return isAdmin || isGestor;
+  };
+
   const updateStatus = async (id: string, newStatus: string) => {
+    // Apenas admin ou gestor pode alterar status
+    if (!canChangeStatus()) {
+      toast({
+        title: "Sem permissão",
+        description: "Apenas gestores ou administradores podem alterar o status.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { error } = await (supabase as any)
         .from("televendas")
@@ -729,19 +752,23 @@ export const TelevendasManagement = () => {
                     <TableCell>R$ {formatCurrencyDisplay(tv.parcela)}</TableCell>
                     <TableCell>{getStatusBadge(tv.status)}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Select
-                        value={tv.status}
-                        onValueChange={(value) => updateStatus(tv.id, value)}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pendente">Pendente</SelectItem>
-                          <SelectItem value="pago">Pago</SelectItem>
-                          <SelectItem value="cancelado">Cancelado</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      {canChangeStatus() ? (
+                        <Select
+                          value={tv.status}
+                          onValueChange={(value) => updateStatus(tv.id, value)}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pendente">Pendente</SelectItem>
+                            <SelectItem value="pago">Pago</SelectItem>
+                            <SelectItem value="cancelado">Cancelado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        getStatusBadge(tv.status)
+                      )}
                     </TableCell>
                     {(isAdmin || isGestor) && (
                       <TableCell onClick={(e) => e.stopPropagation()}>

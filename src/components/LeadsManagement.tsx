@@ -352,16 +352,17 @@ export function LeadsManagement() {
 
   const handleClienteFechado = async (lead: Lead) => {
     try {
-      // Update lead status
-      await updateLeadStatus(lead.id, 'cliente_fechado');
-
-      // Get user's company
-      const { data: userCompanies } = await supabase
+      // Get user's company first
+      const { data: userCompanies, error: companyError } = await supabase
         .from('user_companies')
         .select('company_id')
         .eq('user_id', user?.id)
         .eq('is_active', true)
         .limit(1);
+
+      if (companyError) {
+        console.error('Error fetching user company:', companyError);
+      }
 
       const companyId = userCompanies?.[0]?.company_id || null;
 
@@ -377,11 +378,18 @@ export function LeadsManagement() {
           client_status: "cliente_intencionado",
           origem_lead: "Leads Premium",
           created_by_id: user?.id,
+          assigned_to: user?.id,
           company_id: companyId,
           notes: `Convertido de Leads Premium em ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`
         });
 
-      if (propostaError) throw propostaError;
+      if (propostaError) {
+        console.error('Error creating proposta:', propostaError);
+        throw propostaError;
+      }
+
+      // Update lead status only after successful proposta creation
+      await updateLeadStatus(lead.id, 'cliente_fechado');
 
       toast({
         title: "Cliente Fechado!",
@@ -389,11 +397,11 @@ export function LeadsManagement() {
       });
 
       fetchLeads();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error handling cliente fechado:', error);
       toast({
         title: "Erro",
-        description: "Erro ao converter lead em cliente",
+        description: error?.message || "Erro ao converter lead em cliente",
         variant: "destructive",
       });
     }
