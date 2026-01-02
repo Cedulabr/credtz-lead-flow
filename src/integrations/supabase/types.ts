@@ -1237,6 +1237,50 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string
+          executed: boolean | null
+          executed_at: string | null
+          id: string
+          lead_id: string | null
+          notes: string | null
+          scheduled_date: string
+          user_id: string | null
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string
+          executed?: boolean | null
+          executed_at?: string | null
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          scheduled_date: string
+          user_id?: string | null
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string
+          executed?: boolean | null
+          executed_at?: string | null
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          scheduled_date?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_alerts_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_requests: {
         Row: {
           banco: string | null
@@ -1279,11 +1323,21 @@ export type Database = {
           cpf: string
           created_at: string | null
           created_by: string | null
+          future_contact_date: string | null
+          history: Json | null
           id: string
+          is_rework: boolean | null
           name: string
+          notes: string | null
           origem_lead: string | null
+          original_status: string | null
           phone: string
           priority: string | null
+          rejection_bank: string | null
+          rejection_description: string | null
+          rejection_offered_value: number | null
+          rejection_reason: string | null
+          rework_date: string | null
           stage: string | null
           status: string | null
           updated_at: string | null
@@ -1297,11 +1351,21 @@ export type Database = {
           cpf: string
           created_at?: string | null
           created_by?: string | null
+          future_contact_date?: string | null
+          history?: Json | null
           id?: string
+          is_rework?: boolean | null
           name: string
+          notes?: string | null
           origem_lead?: string | null
+          original_status?: string | null
           phone: string
           priority?: string | null
+          rejection_bank?: string | null
+          rejection_description?: string | null
+          rejection_offered_value?: number | null
+          rejection_reason?: string | null
+          rework_date?: string | null
           stage?: string | null
           status?: string | null
           updated_at?: string | null
@@ -1315,11 +1379,21 @@ export type Database = {
           cpf?: string
           created_at?: string | null
           created_by?: string | null
+          future_contact_date?: string | null
+          history?: Json | null
           id?: string
+          is_rework?: boolean | null
           name?: string
+          notes?: string | null
           origem_lead?: string | null
+          original_status?: string | null
           phone?: string
           priority?: string | null
+          rejection_bank?: string | null
+          rejection_description?: string | null
+          rejection_offered_value?: number | null
+          rejection_reason?: string | null
+          rework_date?: string | null
           stage?: string | null
           status?: string | null
           updated_at?: string | null
@@ -2328,6 +2402,7 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      process_expired_future_contacts: { Args: never; Returns: number }
       request_leads: {
         Args: {
           banco_filter?: string
