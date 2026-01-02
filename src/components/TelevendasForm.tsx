@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,7 +36,9 @@ import {
   FileText,
   Send,
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  Loader2,
+  Lock
 } from "lucide-react";
 
 interface TelevendasBank {
@@ -59,10 +62,40 @@ const formSchema = z.object({
 
 export const TelevendasForm = () => {
   const { toast } = useToast();
+  const { profile } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [banks, setBanks] = useState<TelevendasBank[]>([]);
   const [loadingBanks, setLoadingBanks] = useState(true);
   const [successMessage, setSuccessMessage] = useState(false);
+  
+  // Estados para busca de cliente por CPF
+  const [searchingClient, setSearchingClient] = useState(false);
+  const [clientFound, setClientFound] = useState(false);
+  const [canEditClientData, setCanEditClientData] = useState(true);
+  const [isGestor, setIsGestor] = useState(false);
+
+  // Verificar se usuário é admin ou gestor
+  const isAdminOrGestor = profile?.role === 'admin' || isGestor;
+  
+  // Verificar se é gestor pela user_companies
+  useEffect(() => {
+    const checkGestor = async () => {
+      if (!profile?.id) return;
+      
+      const { data } = await supabase
+        .from('user_companies')
+        .select('company_role')
+        .eq('user_id', profile.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (data?.company_role === 'gestor') {
+        setIsGestor(true);
+      }
+    };
+    
+    checkGestor();
+  }, [profile?.id]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -82,6 +115,59 @@ export const TelevendasForm = () => {
 
   // Watch tipo_operacao para mostrar/esconder campo saldo_devedor
   const tipoOperacao = form.watch("tipo_operacao");
+
+  // Buscar cliente por CPF
+  const searchClientByCPF = useCallback(async (cpf: string) => {
+    const cleanCPF = cpf.replace(/\D/g, "");
+    
+    if (cleanCPF.length !== 11) {
+      setClientFound(false);
+      setCanEditClientData(true);
+      return;
+    }
+
+    setSearchingClient(true);
+    try {
+      // Buscar na tabela televendas o último registro com esse CPF
+      const { data, error } = await supabase
+        .from('televendas')
+        .select('nome, telefone')
+        .eq('cpf', cleanCPF)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Erro ao buscar cliente:', error);
+        return;
+      }
+
+      if (data) {
+        // Cliente encontrado - preencher dados
+        form.setValue('nome', data.nome);
+        form.setValue('telefone', data.telefone);
+        setClientFound(true);
+        
+        // Apenas admin/gestor pode editar dados de cliente existente
+        setCanEditClientData(isAdminOrGestor);
+        
+        toast({
+          title: "Cliente encontrado!",
+          description: isAdminOrGestor 
+            ? "Dados preenchidos automaticamente. Você pode editá-los." 
+            : "Dados preenchidos automaticamente.",
+        });
+      } else {
+        // Cliente não encontrado - permitir edição
+        setClientFound(false);
+        setCanEditClientData(true);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar cliente:', error);
+    } finally {
+      setSearchingClient(false);
+    }
+  }, [form, isAdminOrGestor, toast]);
 
   useEffect(() => {
     fetchBanks();
@@ -195,6 +281,10 @@ export const TelevendasForm = () => {
         tipo_operacao: "Novo empréstimo",
         observacao: "",
       });
+      
+      // Resetar estados de busca de cliente
+      setClientFound(false);
+      setCanEditClientData(true);
     } catch (error) {
       console.error("Error creating televendas:", error);
       toast({
@@ -267,33 +357,14 @@ export const TelevendasForm = () => {
                   <h3 className="text-lg font-semibold">Dados do Cliente</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="nome"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-base font-medium">
-                          Nome Completo *
-                        </FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            placeholder="Digite o nome do cliente"
-                            className="h-12 text-base"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
+                  {/* CPF - Primeiro campo para buscar cliente */}
                   <FormField
                     control={form.control}
                     name="cpf"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-medium">
-                          CPF *
+                          CPF * {searchingClient && <Loader2 className="inline h-4 w-4 animate-spin ml-2" />}
                         </FormLabel>
                         <FormControl>
                           <div className="relative">
@@ -301,13 +372,58 @@ export const TelevendasForm = () => {
                             <Input 
                               {...field}
                               value={formatCPF(field.value)}
-                              onChange={(e) => field.onChange(e.target.value.replace(/\D/g, "").slice(0, 11))}
+                              onChange={(e) => {
+                                const newValue = e.target.value.replace(/\D/g, "").slice(0, 11);
+                                field.onChange(newValue);
+                                // Buscar cliente quando CPF tiver 11 dígitos
+                                if (newValue.length === 11) {
+                                  searchClientByCPF(newValue);
+                                } else {
+                                  setClientFound(false);
+                                  setCanEditClientData(true);
+                                }
+                              }}
                               placeholder="000.000.000-00"
                               className="h-12 text-base pl-10"
                               maxLength={14}
                             />
                           </div>
                         </FormControl>
+                        {clientFound && (
+                          <p className="text-sm text-green-600 flex items-center gap-1 mt-1">
+                            <CheckCircle2 className="h-4 w-4" />
+                            Cliente encontrado no sistema
+                          </p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="nome"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base font-medium flex items-center gap-2">
+                          Nome Completo *
+                          {clientFound && !canEditClientData && (
+                            <Lock className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            placeholder="Digite o nome do cliente"
+                            className="h-12 text-base"
+                            disabled={clientFound && !canEditClientData}
+                          />
+                        </FormControl>
+                        {clientFound && !canEditClientData && (
+                          <p className="text-xs text-muted-foreground">
+                            Apenas admin/gestor pode editar
+                          </p>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -318,8 +434,11 @@ export const TelevendasForm = () => {
                     name="telefone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">
+                        <FormLabel className="text-base font-medium flex items-center gap-2">
                           Telefone *
+                          {clientFound && !canEditClientData && (
+                            <Lock className="h-4 w-4 text-muted-foreground" />
+                          )}
                         </FormLabel>
                         <FormControl>
                           <div className="relative">
@@ -331,9 +450,15 @@ export const TelevendasForm = () => {
                               placeholder="(00) 00000-0000"
                               className="h-12 text-base pl-10"
                               maxLength={15}
+                              disabled={clientFound && !canEditClientData}
                             />
                           </div>
                         </FormControl>
+                        {clientFound && !canEditClientData && (
+                          <p className="text-xs text-muted-foreground">
+                            Apenas admin/gestor pode editar
+                          </p>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
