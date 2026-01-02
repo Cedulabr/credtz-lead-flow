@@ -744,15 +744,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--destructive))', 'hsl(var(--secondary))'];
 
-  // Generate month options
+  // Generate month options - incluindo dezembro de 2025
   const monthOptions = useMemo(() => {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
     const months = [];
     
-    const startYear = 2026;
-    const startMonth = 0;
+    // Começar em dezembro de 2025
+    const startYear = 2025;
+    const startMonth = 11; // Dezembro (0-indexed)
     
     for (let y = startYear; y <= currentYear; y++) {
       const mStart = (y === startYear) ? startMonth : 0;
