@@ -127,7 +127,7 @@ const STATUS_CONFIG: Record<string, {
 };
 
 const ORIGEM_OPTIONS = ['site', 'aplicativo', 'importacao', 'indicacao'];
-const ITEMS_PER_PAGE = 20;
+const ITEMS_PER_PAGE = 10;
 
 export const ActivateLeads = () => {
   const { user, profile } = useAuth();
@@ -158,7 +158,7 @@ export const ActivateLeads = () => {
   
   // Pull leads states
   const [pullSource, setPullSource] = useState<string>('');
-  const [pullCount, setPullCount] = useState(20);
+  const [pullCount, setPullCount] = useState(10);
   const [pulling, setPulling] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
@@ -231,7 +231,7 @@ export const ActivateLeads = () => {
     return lead.assigned_to === user?.id || lead.created_by === user?.id;
   };
 
-  const handleStatusChange = (lead: ActivateLead, status: string) => {
+  const handleStatusChange = async (lead: ActivateLead, status: string) => {
     if (!canEditLead(lead)) {
       toast({
         title: 'Sem permissão',
@@ -251,8 +251,65 @@ export const ActivateLeads = () => {
       setIsStatusModalOpen(true);
     } else if (status === 'operacoes_recentes') {
       setIsDateModalOpen(true);
+    } else if (status === 'fechado') {
+      await handleFechado(lead);
     } else {
       updateLeadStatus(lead, status);
+    }
+  };
+
+  const handleFechado = async (lead: ActivateLead) => {
+    try {
+      // Get user's company first
+      const { data: userCompanies, error: companyError } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user?.id)
+        .eq('is_active', true)
+        .limit(1);
+
+      if (companyError) {
+        console.error('Error fetching user company:', companyError);
+      }
+
+      const companyId = userCompanies?.[0]?.company_id || null;
+
+      // Create client in "Meus Clientes" (propostas table)
+      const { error: propostaError } = await supabase
+        .from('propostas')
+        .insert({
+          "Nome do cliente": lead.nome,
+          telefone: lead.telefone,
+          pipeline_stage: "contato_iniciado",
+          client_status: "cliente_intencionado",
+          origem_lead: "activate_leads",
+          created_by_id: user?.id,
+          assigned_to: user?.id,
+          company_id: companyId,
+          notes: `Convertido de Activate Leads em ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`
+        });
+
+      if (propostaError) {
+        console.error('Error creating proposta:', propostaError);
+        throw propostaError;
+      }
+
+      // Update lead status only after successful proposta creation
+      await updateLeadStatus(lead, 'fechado');
+
+      toast({
+        title: 'Cliente Fechado!',
+        description: "Lead convertido e adicionado em Meus Clientes como 'Cliente Intencionado'.",
+      });
+
+      fetchLeads();
+    } catch (error: any) {
+      console.error('Error handling fechado:', error);
+      toast({
+        title: 'Erro',
+        description: error?.message || 'Erro ao converter lead em cliente',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -363,7 +420,7 @@ export const ActivateLeads = () => {
         .select('*')
         .is('assigned_to', null)
         .eq('status', 'novo')
-        .limit(20);
+        .limit(10);
 
       if (error) throw error;
 
