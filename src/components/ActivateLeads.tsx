@@ -131,7 +131,7 @@ const ORIGEM_OPTIONS = ['site', 'aplicativo', 'importacao', 'indicacao'];
 const ITEMS_PER_PAGE = 10;
 
 export const ActivateLeads = () => {
-  const { user, profile } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
   const [leads, setLeads] = useState<ActivateLead[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -169,23 +169,28 @@ export const ActivateLeads = () => {
   const [availableUsers, setAvailableUsers] = useState<{ id: string; name: string; email: string }[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
-  const isAdmin = profile?.role === 'admin';
   const isGestor = gestorId !== null;
   const canImport = isAdmin || isGestor;
 
   const fetchGestorId = useCallback(async () => {
     if (!user?.id) return;
-    
-    const { data } = await supabase
-      .from('user_companies')
-      .select('id, company_role')
-      .eq('user_id', user.id)
-      .eq('company_role', 'gestor')
-      .eq('is_active', true)
-      .maybeSingle();
-    
-    if (data) {
-      setGestorId(data.id);
+
+    try {
+      // Evita maybeSingle() (pode falhar se houver múltiplos vínculos como gestor)
+      const { data, error } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .eq('company_role', 'gestor')
+        .eq('is_active', true);
+
+      if (error) throw error;
+
+      // Se for gestor em qualquer empresa, habilita permissões de gestor
+      setGestorId(data && data.length > 0 ? user.id : null);
+    } catch (error) {
+      console.error('Error checking gestor role:', error);
+      setGestorId(null);
     }
   }, [user?.id]);
 
