@@ -5,6 +5,7 @@ import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -42,9 +43,14 @@ import {
   Filter,
   RefreshCw,
   AlertTriangle,
+  TrendingUp,
+  BarChart3,
+  Target,
+  Timer,
 } from "lucide-react";
-import { format, isToday, isPast, isFuture, addDays, differenceInDays } from "date-fns";
+import { format, isToday, isPast, isFuture, addDays, differenceInDays, differenceInHours } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 
 interface ClientReuseAlert {
   id: string;
@@ -85,6 +91,18 @@ export function ClientReuseAlerts() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [actionNotes, setActionNotes] = useState("");
   const [isGestor, setIsGestor] = useState(false);
+  const [activeView, setActiveView] = useState<"dashboard" | "list">("dashboard");
+
+  // Colors for charts
+  const CHART_COLORS = [
+    "hsl(var(--primary))",
+    "hsl(142, 76%, 36%)", // green
+    "hsl(38, 92%, 50%)", // amber
+    "hsl(0, 84%, 60%)", // red
+    "hsl(221, 83%, 53%)", // blue
+    "hsl(280, 87%, 65%)", // purple
+    "hsl(173, 58%, 39%)", // teal
+  ];
 
   useEffect(() => {
     checkGestorRole();
@@ -240,8 +258,120 @@ export function ClientReuseAlerts() {
         return isFuture(alertDate) && differenceInDays(alertDate, today) <= 7 && a.status === "pending";
       }).length,
       converted: alerts.filter((a) => a.status === "converted").length,
+      dismissed: alerts.filter((a) => a.status === "dismissed").length,
+      notified: alerts.filter((a) => a.status === "notified").length,
     };
   }, [alerts]);
+
+  // Dashboard metrics
+  const dashboardMetrics = useMemo(() => {
+    // Conversion rate by bank
+    const bankStats: Record<string, { total: number; converted: number; dismissed: number; avgResponseDays: number; responseTimes: number[] }> = {};
+    
+    alerts.forEach((alert) => {
+      if (!bankStats[alert.bank_name]) {
+        bankStats[alert.bank_name] = { total: 0, converted: 0, dismissed: 0, avgResponseDays: 0, responseTimes: [] };
+      }
+      bankStats[alert.bank_name].total++;
+      
+      if (alert.status === "converted") {
+        bankStats[alert.bank_name].converted++;
+        // Calculate response time (from alert_date to notified_at or updated)
+        if (alert.notified_at) {
+          const alertDate = new Date(alert.alert_date);
+          const responseDate = new Date(alert.notified_at);
+          const daysDiff = differenceInDays(responseDate, alertDate);
+          bankStats[alert.bank_name].responseTimes.push(Math.max(0, daysDiff));
+        }
+      }
+      if (alert.status === "dismissed") {
+        bankStats[alert.bank_name].dismissed++;
+      }
+    });
+
+    // Calculate averages
+    Object.keys(bankStats).forEach((bank) => {
+      const times = bankStats[bank].responseTimes;
+      bankStats[bank].avgResponseDays = times.length > 0 
+        ? Math.round(times.reduce((a, b) => a + b, 0) / times.length)
+        : 0;
+    });
+
+    // Chart data for conversion by bank
+    const conversionByBankData = Object.entries(bankStats)
+      .map(([bank, data]) => ({
+        name: bank,
+        total: data.total,
+        converted: data.converted,
+        dismissed: data.dismissed,
+        pending: data.total - data.converted - data.dismissed,
+        conversionRate: data.total > 0 ? Math.round((data.converted / data.total) * 100) : 0,
+        avgResponse: data.avgResponseDays,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 8); // Top 8 banks
+
+    // Status distribution for pie chart
+    const statusDistribution = [
+      { name: "Pendentes", value: stats.pending, color: "hsl(38, 92%, 50%)" },
+      { name: "Notificados", value: stats.notified, color: "hsl(221, 83%, 53%)" },
+      { name: "Convertidos", value: stats.converted, color: "hsl(142, 76%, 36%)" },
+      { name: "Dispensados", value: stats.dismissed, color: "hsl(0, 0%, 60%)" },
+    ].filter(item => item.value > 0);
+
+    // Global metrics
+    const totalProcessed = stats.converted + stats.dismissed;
+    const globalConversionRate = totalProcessed > 0 
+      ? Math.round((stats.converted / totalProcessed) * 100) 
+      : 0;
+
+    // Average response time (global)
+    const allResponseTimes: number[] = [];
+    alerts.forEach((alert) => {
+      if (alert.status === "converted" && alert.notified_at) {
+        const alertDate = new Date(alert.alert_date);
+        const responseDate = new Date(alert.notified_at);
+        allResponseTimes.push(Math.max(0, differenceInDays(responseDate, alertDate)));
+      }
+    });
+    const avgGlobalResponseDays = allResponseTimes.length > 0
+      ? Math.round(allResponseTimes.reduce((a, b) => a + b, 0) / allResponseTimes.length)
+      : 0;
+
+    // Monthly trend (last 6 months)
+    const monthlyData: Record<string, { month: string; created: number; converted: number }> = {};
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = format(date, "yyyy-MM");
+      const label = format(date, "MMM", { locale: ptBR });
+      monthlyData[key] = { month: label, created: 0, converted: 0 };
+    }
+    
+    alerts.forEach((alert) => {
+      const createdKey = format(new Date(alert.created_at), "yyyy-MM");
+      if (monthlyData[createdKey]) {
+        monthlyData[createdKey].created++;
+      }
+      if (alert.status === "converted" && alert.notified_at) {
+        const convertedKey = format(new Date(alert.notified_at), "yyyy-MM");
+        if (monthlyData[convertedKey]) {
+          monthlyData[convertedKey].converted++;
+        }
+      }
+    });
+
+    const monthlyTrendData = Object.values(monthlyData);
+
+    return {
+      conversionByBankData,
+      statusDistribution,
+      globalConversionRate,
+      avgGlobalResponseDays,
+      monthlyTrendData,
+      bankStats,
+    };
+  }, [alerts, stats]);
 
   const getAlertPriority = (alert: ClientReuseAlert) => {
     if (alert.status !== "pending") return "normal";
@@ -308,51 +438,300 @@ export function ClientReuseAlerts() {
             Clientes aptos para nova operação
           </p>
         </div>
-        <Button variant="outline" onClick={fetchAlerts}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Tabs value={activeView} onValueChange={(v) => setActiveView(v as "dashboard" | "list")}>
+            <TabsList>
+              <TabsTrigger value="dashboard" className="gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="list" className="gap-2">
+                <Bell className="h-4 w-4" />
+                Alertas
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Button variant="outline" onClick={fetchAlerts}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold">{stats.total}</p>
-            <p className="text-xs text-muted-foreground">Total</p>
-          </CardContent>
-        </Card>
-        <Card className="border-red-200 dark:border-red-800">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
-            <p className="text-xs text-muted-foreground">Atrasados</p>
-          </CardContent>
-        </Card>
-        <Card className="border-green-200 dark:border-green-800">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-green-600">{stats.today}</p>
-            <p className="text-xs text-muted-foreground">Hoje</p>
-          </CardContent>
-        </Card>
-        <Card className="border-amber-200 dark:border-amber-800">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-amber-600">{stats.upcoming}</p>
-            <p className="text-xs text-muted-foreground">Próx. 7 dias</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold">{stats.pending}</p>
-            <p className="text-xs text-muted-foreground">Pendentes</p>
-          </CardContent>
-        </Card>
-        <Card className="border-primary/50">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-primary">{stats.converted}</p>
-            <p className="text-xs text-muted-foreground">Convertidos</p>
-          </CardContent>
-        </Card>
-      </div>
+      {activeView === "dashboard" ? (
+        <>
+          {/* Dashboard Metrics Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-full bg-primary/20">
+                    <Target className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-3xl font-bold">{dashboardMetrics.globalConversionRate}%</p>
+                    <p className="text-sm text-muted-foreground">Taxa de Conversão</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-full bg-green-500/20">
+                    <CheckCircle className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-3xl font-bold text-green-600">{stats.converted}</p>
+                    <p className="text-sm text-muted-foreground">Convertidos</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-full bg-amber-500/20">
+                    <Timer className="h-6 w-6 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-3xl font-bold text-amber-600">{dashboardMetrics.avgGlobalResponseDays}</p>
+                    <p className="text-sm text-muted-foreground">Dias Resposta Média</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-full bg-blue-500/20">
+                    <TrendingUp className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-3xl font-bold text-blue-600">{stats.pending}</p>
+                    <p className="text-sm text-muted-foreground">Oportunidades</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Charts Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Conversion by Bank Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  Taxa de Conversão por Banco
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {dashboardMetrics.conversionByBankData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={dashboardMetrics.conversionByBankData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+                      <YAxis dataKey="name" type="category" width={80} fontSize={12} />
+                      <Tooltip
+                        formatter={(value: number, name: string) => {
+                          if (name === "conversionRate") return [`${value}%`, "Taxa de Conversão"];
+                          return [value, name];
+                        }}
+                        contentStyle={{ 
+                          backgroundColor: "hsl(var(--card))", 
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px"
+                        }}
+                      />
+                      <Bar 
+                        dataKey="conversionRate" 
+                        fill="hsl(var(--primary))" 
+                        radius={[0, 4, 4, 0]}
+                        name="Taxa de Conversão"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    Sem dados suficientes para exibir
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Status Distribution Pie Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Target className="h-5 w-5 text-primary" />
+                  Distribuição por Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {dashboardMetrics.statusDistribution.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={dashboardMetrics.statusDistribution}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={5}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {dashboardMetrics.statusDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ 
+                          backgroundColor: "hsl(var(--card))", 
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px"
+                        }}
+                      />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    Sem dados para exibir
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Monthly Trend Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                Tendência Mensal (Últimos 6 meses)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={dashboardMetrics.monthlyTrendData}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip
+                    contentStyle={{ 
+                      backgroundColor: "hsl(var(--card))", 
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px"
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="created" name="Alertas Criados" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="converted" name="Convertidos" fill="hsl(142, 76%, 36%)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Bank Performance Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Building2 className="h-5 w-5 text-primary" />
+                Performance por Banco
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Banco</TableHead>
+                      <TableHead className="text-center">Total Alertas</TableHead>
+                      <TableHead className="text-center">Convertidos</TableHead>
+                      <TableHead className="text-center">Dispensados</TableHead>
+                      <TableHead className="text-center">Taxa Conversão</TableHead>
+                      <TableHead className="text-center">Tempo Médio (dias)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {dashboardMetrics.conversionByBankData.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          Sem dados de performance ainda
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      dashboardMetrics.conversionByBankData.map((bank) => (
+                        <TableRow key={bank.name}>
+                          <TableCell className="font-medium">{bank.name}</TableCell>
+                          <TableCell className="text-center">{bank.total}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="default" className="bg-green-500">{bank.converted}</Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="secondary">{bank.dismissed}</Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className={`font-bold ${bank.conversionRate >= 50 ? "text-green-600" : bank.conversionRate >= 25 ? "text-amber-600" : "text-red-600"}`}>
+                              {bank.conversionRate}%
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {bank.avgResponse > 0 ? `${bank.avgResponse} dias` : "—"}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        <>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <Card>
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-bold">{stats.total}</p>
+                <p className="text-xs text-muted-foreground">Total</p>
+              </CardContent>
+            </Card>
+            <Card className="border-red-200 dark:border-red-800">
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
+                <p className="text-xs text-muted-foreground">Atrasados</p>
+              </CardContent>
+            </Card>
+            <Card className="border-green-200 dark:border-green-800">
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-bold text-green-600">{stats.today}</p>
+                <p className="text-xs text-muted-foreground">Hoje</p>
+              </CardContent>
+            </Card>
+            <Card className="border-amber-200 dark:border-amber-800">
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-bold text-amber-600">{stats.upcoming}</p>
+                <p className="text-xs text-muted-foreground">Próx. 7 dias</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-bold">{stats.pending}</p>
+                <p className="text-xs text-muted-foreground">Pendentes</p>
+              </CardContent>
+            </Card>
+            <Card className="border-primary/50">
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-bold text-primary">{stats.converted}</p>
+                <p className="text-xs text-muted-foreground">Convertidos</p>
+              </CardContent>
+            </Card>
+          </div>
 
       {/* Filters */}
       <Card>
@@ -503,6 +882,8 @@ export function ClientReuseAlerts() {
           </div>
         </CardContent>
       </Card>
+        </>
+      )}
 
       {/* Alert Detail Dialog */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
