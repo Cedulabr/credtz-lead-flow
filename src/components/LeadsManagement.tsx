@@ -376,7 +376,7 @@ export function LeadsManagement() {
           convenio: lead.convenio,
           pipeline_stage: "contato_iniciado",
           client_status: "cliente_intencionado",
-          origem_lead: "Leads Premium",
+          origem_lead: "leads_premium",
           created_by_id: user?.id,
           assigned_to: user?.id,
           company_id: companyId,
