@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -34,7 +34,10 @@ import {
   Eye,
   FileEdit,
   AlertTriangle,
-  TrendingUp
+  TrendingUp,
+  Target,
+  Sparkles,
+  RefreshCw
 } from "lucide-react";
 import {
   AlertDialog,
@@ -62,6 +65,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 interface Client {
   id: number;
@@ -106,22 +110,59 @@ interface Profile {
   email: string | null;
 }
 
-interface UserCompany {
-  id: string;
-  company_id: string;
-  company_role: 'gestor' | 'colaborador';
-  companies?: {
-    id: string;
-    name: string;
-  };
-}
-
+// Modern status configuration
 const clientStatuses = [
-  { id: "cliente_intencionado", label: "Cliente Intencionado", icon: UserCheck, color: "bg-blue-500", textColor: "text-blue-700", bgLight: "bg-blue-100" },
-  { id: "proposta_enviada", label: "Proposta Enviada", icon: Send, color: "bg-yellow-500", textColor: "text-yellow-700", bgLight: "bg-yellow-100", hasAlert: true },
-  { id: "proposta_digitada", label: "Proposta Digitada", icon: FileEdit, color: "bg-green-500", textColor: "text-green-700", bgLight: "bg-green-100" },
-  { id: "proposta_recusada", label: "Proposta Recusada", icon: XCircle, color: "bg-red-500", textColor: "text-red-700", bgLight: "bg-red-100" },
-  { id: "contato_futuro", label: "Contato Futuro", icon: CalendarClock, color: "bg-purple-500", textColor: "text-purple-700", bgLight: "bg-purple-100" },
+  { 
+    id: "cliente_intencionado", 
+    label: "Cliente Intencionado", 
+    icon: UserCheck, 
+    color: "from-blue-500 to-blue-600", 
+    textColor: "text-blue-700", 
+    bgColor: "bg-gradient-to-r from-blue-50 to-blue-100",
+    borderColor: "border-blue-200",
+    dotColor: "bg-blue-500"
+  },
+  { 
+    id: "proposta_enviada", 
+    label: "Proposta Enviada", 
+    icon: Send, 
+    color: "from-amber-500 to-yellow-500", 
+    textColor: "text-amber-700", 
+    bgColor: "bg-gradient-to-r from-amber-50 to-yellow-100",
+    borderColor: "border-amber-200",
+    dotColor: "bg-amber-500",
+    hasAlert: true 
+  },
+  { 
+    id: "proposta_digitada", 
+    label: "Proposta Digitada", 
+    icon: FileEdit, 
+    color: "from-emerald-500 to-green-500", 
+    textColor: "text-emerald-700", 
+    bgColor: "bg-gradient-to-r from-emerald-50 to-green-100",
+    borderColor: "border-emerald-200",
+    dotColor: "bg-emerald-500"
+  },
+  { 
+    id: "proposta_recusada", 
+    label: "Proposta Recusada", 
+    icon: XCircle, 
+    color: "from-rose-500 to-red-500", 
+    textColor: "text-rose-700", 
+    bgColor: "bg-gradient-to-r from-rose-50 to-red-100",
+    borderColor: "border-rose-200",
+    dotColor: "bg-rose-500"
+  },
+  { 
+    id: "contato_futuro", 
+    label: "Contato Futuro", 
+    icon: CalendarClock, 
+    color: "from-purple-500 to-indigo-500", 
+    textColor: "text-purple-700", 
+    bgColor: "bg-gradient-to-r from-purple-50 to-indigo-100",
+    borderColor: "border-purple-200",
+    dotColor: "bg-purple-500"
+  },
 ];
 
 const rejectionReasons = [
@@ -226,7 +267,6 @@ export function MyClientsList() {
         setIsGestor(gestorCompanies.length > 0);
         setGestorCompanyIds(gestorCompanies.map(uc => uc.company_id));
         
-        // Find gestor for the company
         if (gestorCompanies.length > 0) {
           const { data: gestorData } = await supabase
             .from("user_companies")
@@ -363,9 +403,13 @@ export function MyClientsList() {
     return clientStatuses.find(s => s.id === statusId) || clientStatuses[0];
   };
 
-  // Check if client has pending proposal alert
   const hasPendingProposalAlert = (client: Client) => {
     return client.client_status === "proposta_enviada";
+  };
+
+  const canEditClient = (client: Client) => {
+    if (isAdmin) return true;
+    return client.created_by_id === user?.id || client.assigned_to === user?.id;
   };
 
   const handleClientClick = (client: Client) => {
@@ -385,6 +429,15 @@ export function MyClientsList() {
   };
 
   const handleStatusChange = async (client: Client, newStatus: string) => {
+    if (!canEditClient(client)) {
+      toast({
+        title: "Sem permissão",
+        description: "Você só pode alterar clientes que você trabalha.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (newStatus === "proposta_recusada") {
       setStatusChangeClient(client);
       setRejectionForm({ reason: "", offeredValue: "", description: "" });
@@ -440,16 +493,12 @@ export function MyClientsList() {
 
       // Create notification for future contact
       if (newStatus === "contato_futuro" && metadata?.future_contact_date) {
-        const { error: notificationError } = await supabase
-          .from("contact_notifications")
-          .insert({
-            proposta_id: client.id,
-            user_id: user?.id,
-            gestor_id: gestorId,
-            scheduled_date: metadata.future_contact_date,
-          });
-
-        if (notificationError) console.error("Error creating notification:", notificationError);
+        await supabase.from("contact_notifications").insert({
+          proposta_id: client.id,
+          user_id: user?.id,
+          gestor_id: gestorId,
+          scheduled_date: metadata.future_contact_date,
+        });
       }
 
       toast({
@@ -492,7 +541,6 @@ export function MyClientsList() {
       return;
     }
 
-    // Calculate follow-up date for "pegar_depois" reason (30 days)
     let futureFollowUpDate: string | null = null;
     if (selectedReason.autoFollowUp) {
       const followUpDate = new Date();
@@ -508,7 +556,6 @@ export function MyClientsList() {
       future_contact_date: futureFollowUpDate,
     });
 
-    // Create automatic follow-up notification for "pegar_depois"
     if (selectedReason.autoFollowUp && futureFollowUpDate) {
       try {
         await supabase.from("contact_notifications").insert({
@@ -518,12 +565,11 @@ export function MyClientsList() {
           scheduled_date: futureFollowUpDate,
         });
 
-        // Create interaction record for the scheduled follow-up
         await supabase.from("client_interactions").insert({
           proposta_id: statusChangeClient.id,
           user_id: user?.id,
           interaction_type: "auto_follow_up_scheduled",
-          notes: `Follow-up automático agendado para ${new Date(futureFollowUpDate).toLocaleDateString('pt-BR')} - Cliente pensa em pegar mais pra frente`,
+          notes: `Follow-up automático agendado para ${new Date(futureFollowUpDate).toLocaleDateString('pt-BR')}`,
           metadata: { scheduled_date: futureFollowUpDate, reason: "pegar_depois" },
         });
 
@@ -569,7 +615,6 @@ export function MyClientsList() {
 
       if (error) throw error;
 
-      // Create interaction
       await supabase.from("client_interactions").insert({
         proposta_id: selectedClient.id,
         user_id: user?.id,
@@ -611,7 +656,6 @@ export function MyClientsList() {
 
       if (error) throw error;
 
-      // Create initial interaction
       if (data) {
         await supabase.from("client_interactions").insert({
           proposta_id: data.id,
@@ -668,7 +712,6 @@ export function MyClientsList() {
   const filteredClients = useMemo(() => {
     let filtered = clients;
 
-    // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(c => {
@@ -683,24 +726,20 @@ export function MyClientsList() {
       });
     }
 
-    // Status filter
     if (filterStatus !== "all") {
       filtered = filtered.filter(c => c.client_status === filterStatus);
     }
 
-    // User filter (for admin/gestor)
     if ((isAdmin || isGestor) && filterUser !== "all") {
       filtered = filtered.filter(c => 
         c.created_by_id === filterUser || c.assigned_to === filterUser
       );
     }
 
-    // Convenio filter
     if (filterConvenio !== "all") {
       filtered = filtered.filter(c => c.convenio === filterConvenio);
     }
 
-    // Date range filter
     if (filterDateFrom) {
       filtered = filtered.filter(c => {
         if (!c.created_at) return false;
@@ -715,7 +754,6 @@ export function MyClientsList() {
       });
     }
 
-    // Future contact filter
     if (filterFutureContact === "today") {
       const today = new Date().toISOString().split('T')[0];
       filtered = filtered.filter(c => c.future_contact_date === today);
@@ -738,7 +776,6 @@ export function MyClientsList() {
     return filtered;
   }, [clients, searchQuery, filterStatus, filterUser, filterConvenio, filterDateFrom, filterDateTo, filterFutureContact, isAdmin, isGestor]);
 
-  // Get unique convenios
   const uniqueConvenios = useMemo(() => {
     const convenios = new Set<string>();
     clients.forEach(c => {
@@ -747,7 +784,6 @@ export function MyClientsList() {
     return Array.from(convenios).sort();
   }, [clients]);
 
-  // Stats
   const stats = useMemo(() => {
     const total = filteredClients.length;
     const byStatus = clientStatuses.reduce((acc, status) => {
@@ -758,7 +794,6 @@ export function MyClientsList() {
     const today = new Date().toISOString().split('T')[0];
     const contactsToday = filteredClients.filter(c => c.future_contact_date === today).length;
     
-    // Clients registered today
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const registeredToday = clients.filter(c => {
@@ -766,7 +801,6 @@ export function MyClientsList() {
       return new Date(c.created_at) >= todayStart;
     }).length;
 
-    // Pending proposal alerts count
     const pendingProposals = filteredClients.filter(c => c.client_status === "proposta_enviada").length;
     
     return { total, byStatus, contactsToday, registeredToday, pendingProposals };
@@ -781,113 +815,156 @@ export function MyClientsList() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Meus Clientes</h1>
-          <p className="text-muted-foreground text-sm md:text-base">Gestão da carteira de clientes</p>
+    <div className="p-4 md:p-6 space-y-6 pb-20 md:pb-6 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen">
+      {/* Modern Header */}
+      <div className="flex flex-col space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
+              Meus Clientes
+            </h1>
+            <p className="text-muted-foreground text-sm md:text-base">
+              Gestão da carteira de clientes e funil de vendas
+            </p>
+          </div>
+          
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={fetchClients}
+              className="hover:bg-primary/10"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            
+            <Button 
+              onClick={() => setIsNewClientDialogOpen(true)} 
+              className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/25"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Cliente
+            </Button>
+          </div>
         </div>
-        <Button onClick={() => setIsNewClientDialogOpen(true)} className="gap-2 w-full md:w-auto">
-          <Plus className="h-4 w-4" />
-          Novo Cliente
-        </Button>
+
+        {/* Modern Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 md:gap-4">
+          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-slate-200 dark:border-slate-700 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+            <CardContent className="p-4 text-center">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-slate-500 to-slate-600 flex items-center justify-center mx-auto mb-2">
+                <Target className="h-5 w-5 text-white" />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{stats.total}</p>
+              <p className="text-xs text-muted-foreground">Total</p>
+            </CardContent>
+          </Card>
+
+          {(isAdmin || isGestor) && (
+            <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+              <CardContent className="p-4 text-center">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-primary to-primary/80 flex items-center justify-center mx-auto mb-2">
+                  <TrendingUp className="h-5 w-5 text-white" />
+                </div>
+                <p className="text-2xl font-bold text-primary">{stats.registeredToday}</p>
+                <p className="text-xs text-primary/70">Hoje</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {stats.pendingProposals > 0 && (
+            <Card className="bg-gradient-to-br from-amber-50 to-yellow-100 dark:from-amber-950 dark:to-yellow-900 border-amber-200 dark:border-amber-800 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 animate-pulse">
+              <CardContent className="p-4 text-center">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 flex items-center justify-center mx-auto mb-2">
+                  <AlertTriangle className="h-5 w-5 text-white" />
+                </div>
+                <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{stats.pendingProposals}</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400">Pendentes</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {clientStatuses.slice(0, 4).map(status => (
+            <Card 
+              key={status.id} 
+              className={cn(
+                "hover:shadow-lg transition-all duration-300 hover:-translate-y-1",
+                status.bgColor,
+                status.borderColor,
+                "border"
+              )}
+            >
+              <CardContent className="p-4 text-center">
+                <div className={cn("w-10 h-10 rounded-xl bg-gradient-to-r flex items-center justify-center mx-auto mb-2", status.color)}>
+                  <status.icon className="h-5 w-5 text-white" />
+                </div>
+                <p className={cn("text-2xl font-bold", status.textColor)}>{stats.byStatus[status.id] || 0}</p>
+                <p className={cn("text-xs truncate", status.textColor.replace("700", "600"))}>{status.label}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        <Card className="p-3">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Total</span>
-          </div>
-          <p className="text-2xl font-bold">{stats.total}</p>
-        </Card>
-
-        {/* Indicador de cadastros do dia - visível para gestores */}
-        {(isAdmin || isGestor) && (
-          <Card className="p-3 border-primary/50 bg-primary/5">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              <span className="text-sm text-primary font-medium">Hoje</span>
+      {/* Modern Filters */}
+      <Card className="border-2 border-muted/50 shadow-sm">
+        <CardContent className="p-4 space-y-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nome, CPF ou telefone..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 border-2 focus:border-primary transition-colors"
+                />
+              </div>
             </div>
-            <p className="text-2xl font-bold text-primary">{stats.registeredToday}</p>
-            <p className="text-xs text-muted-foreground">cadastros</p>
-          </Card>
-        )}
-
-        {/* Alerta de propostas pendentes */}
-        {stats.pendingProposals > 0 && (
-          <Card className="p-3 border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20 animate-pulse">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-yellow-600" />
-              <span className="text-sm text-yellow-700 dark:text-yellow-400 font-medium">Pendentes</span>
-            </div>
-            <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">{stats.pendingProposals}</p>
-            <p className="text-xs text-yellow-600 dark:text-yellow-500">aguardando retorno</p>
-          </Card>
-        )}
-
-        {clientStatuses.map(status => (
-          <Card key={status.id} className={`p-3 ${status.id === "proposta_enviada" && stats.byStatus[status.id] > 0 ? "ring-2 ring-yellow-400 ring-offset-1" : ""}`}>
-            <div className="flex items-center gap-2">
-              <status.icon className={`h-4 w-4 ${status.textColor}`} />
-              <span className="text-xs text-muted-foreground truncate">{status.label}</span>
-            </div>
-            <p className="text-2xl font-bold">{stats.byStatus[status.id] || 0}</p>
-          </Card>
-        ))}
-      </div>
-
-      {/* Search and Filters */}
-      <Card className="p-4">
-        <div className="space-y-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome, CPF ou telefone..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+            
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
+              className="hover:bg-primary/10"
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Filtros
+              {showFilters ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
+            </Button>
           </div>
 
-          {/* Toggle filters */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            className="gap-2"
-          >
-            <Filter className="h-4 w-4" />
-            Filtros
-            {showFilters ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </Button>
-
-          {/* Filters */}
           {showFilters && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t">
-              <div>
-                <Label className="text-xs">Status</Label>
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">Status</Label>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger>
+                  <SelectTrigger className="border-2 focus:border-primary">
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos os status</SelectItem>
+                    <SelectItem value="all">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                        Todos os status
+                      </span>
+                    </SelectItem>
                     {clientStatuses.map(status => (
-                      <SelectItem key={status.id} value={status.id}>{status.label}</SelectItem>
+                      <SelectItem key={status.id} value={status.id}>
+                        <span className="flex items-center gap-2">
+                          <span className={cn("w-2 h-2 rounded-full", status.dotColor)}></span>
+                          {status.label}
+                        </span>
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               {(isAdmin || isGestor) && (
-                <div>
-                  <Label className="text-xs">Vendedor</Label>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Vendedor</Label>
                   <Select value={filterUser} onValueChange={setFilterUser}>
-                    <SelectTrigger>
+                    <SelectTrigger className="border-2 focus:border-primary">
                       <SelectValue placeholder="Todos" />
                     </SelectTrigger>
                     <SelectContent>
@@ -900,10 +977,10 @@ export function MyClientsList() {
                 </div>
               )}
 
-              <div>
-                <Label className="text-xs">Convênio</Label>
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">Convênio</Label>
                 <Select value={filterConvenio} onValueChange={setFilterConvenio}>
-                  <SelectTrigger>
+                  <SelectTrigger className="border-2 focus:border-primary">
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
@@ -915,10 +992,10 @@ export function MyClientsList() {
                 </Select>
               </div>
 
-              <div>
-                <Label className="text-xs">Contatos Agendados</Label>
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">Contatos Agendados</Label>
                 <Select value={filterFutureContact} onValueChange={setFilterFutureContact}>
-                  <SelectTrigger>
+                  <SelectTrigger className="border-2 focus:border-primary">
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
@@ -929,161 +1006,180 @@ export function MyClientsList() {
                   </SelectContent>
                 </Select>
               </div>
-
-              <div>
-                <Label className="text-xs">Data de cadastro (de)</Label>
-                <Input
-                  type="date"
-                  value={filterDateFrom}
-                  onChange={(e) => setFilterDateFrom(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label className="text-xs">Data de cadastro (até)</Label>
-                <Input
-                  type="date"
-                  value={filterDateTo}
-                  onChange={(e) => setFilterDateTo(e.target.value)}
-                />
-              </div>
             </div>
           )}
-        </div>
+        </CardContent>
       </Card>
 
-      {/* Clients List - Desktop */}
+      {/* Modern Table - Desktop */}
       <div className="hidden md:block">
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Contato</TableHead>
-                <TableHead>Convênio</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Contato Futuro</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredClients.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    Nenhum cliente encontrado
-                  </TableCell>
+        <Card className="border-2 border-muted/50 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gradient-to-r from-muted/50 to-muted/30 hover:from-muted/60 hover:to-muted/40">
+                  <TableHead className="font-semibold">Cliente</TableHead>
+                  <TableHead className="font-semibold">Contato</TableHead>
+                  <TableHead className="font-semibold">Convênio</TableHead>
+                  <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="font-semibold">Próximo Contato</TableHead>
+                  <TableHead className="font-semibold text-right">Ações</TableHead>
                 </TableRow>
-              ) : (
-                filteredClients.map(client => {
-                  const statusInfo = getStatusInfo(client.client_status);
-                  const isOverdue = client.future_contact_date && client.future_contact_date < new Date().toISOString().split('T')[0] && client.client_status === "contato_futuro";
-                  const hasPendingAlert = hasPendingProposalAlert(client);
-                  
-                  return (
-                    <TableRow key={client.id} className={`hover:bg-muted/50 ${hasPendingAlert ? "bg-yellow-50/50 dark:bg-yellow-950/10" : ""}`}>
-                      <TableCell>
-                        <div className="flex items-start gap-2">
-                          {hasPendingAlert && (
-                            <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-                          )}
-                          <div>
-                            <p className="font-medium">{client["Nome do cliente"] || "Sem nome"}</p>
-                            <p className="text-xs text-muted-foreground">{client.cpf ? formatCPF(client.cpf) : "—"}</p>
-                          </div>
+              </TableHeader>
+              <TableBody>
+                {filteredClients.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-32">
+                      <div className="flex flex-col items-center justify-center text-center">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-muted to-muted/50 flex items-center justify-center mb-4">
+                          <Users className="h-8 w-8 text-muted-foreground" />
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm">{client.telefone ? formatPhone(client.telefone) : "—"}</span>
-                          {client.telefone && (
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openWhatsApp(client.telefone!)}>
-                              <MessageCircle className="h-4 w-4 text-green-600" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {client.convenio ? (
-                          <Badge variant="outline">{client.convenio}</Badge>
-                        ) : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={client.client_status || "cliente_intencionado"}
-                          onValueChange={(value) => handleStatusChange(client, value)}
-                        >
-                          <SelectTrigger className={`w-[180px] ${statusInfo.bgLight} ${statusInfo.textColor} border-0`}>
-                            <div className="flex items-center gap-2">
-                              <statusInfo.icon className="h-4 w-4" />
-                              <span className="text-xs font-medium">{statusInfo.label}</span>
+                        <h3 className="font-semibold text-foreground">Nenhum cliente encontrado</h3>
+                        <p className="text-sm text-muted-foreground mt-1">Cadastre seu primeiro cliente</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredClients.map(client => {
+                    const statusInfo = getStatusInfo(client.client_status);
+                    const isOverdue = client.future_contact_date && client.future_contact_date < new Date().toISOString().split('T')[0] && client.client_status === "contato_futuro";
+                    const hasPendingAlert = hasPendingProposalAlert(client);
+                    const StatusIcon = statusInfo.icon;
+
+                    return (
+                      <TableRow 
+                        key={client.id} 
+                        className={cn(
+                          "group hover:bg-muted/30 transition-colors cursor-pointer",
+                          hasPendingAlert && "bg-amber-50/50 dark:bg-amber-950/20"
+                        )}
+                        onClick={() => handleClientClick(client)}
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-lg bg-gradient-to-r from-primary/20 to-primary/10 flex items-center justify-center">
+                              <User className="h-4 w-4 text-primary" />
                             </div>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {clientStatuses.map(status => (
-                              <SelectItem key={status.id} value={status.id}>
-                                <div className="flex items-center gap-2">
-                                  <status.icon className={`h-4 w-4 ${status.textColor}`} />
-                                  {status.label}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        {client.future_contact_date ? (
-                          <div className={`flex items-center gap-1 text-sm ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
-                            <CalendarClock className={`h-4 w-4 ${isOverdue ? 'text-red-600' : 'text-muted-foreground'}`} />
-                            {new Date(client.future_contact_date).toLocaleDateString('pt-BR')}
-                            {isOverdue && <span className="text-xs">(Atrasado)</span>}
+                            <div>
+                              <span className="font-medium">{client["Nome do cliente"] || "Sem nome"}</span>
+                              {hasPendingAlert && (
+                                <p className="text-xs text-amber-600 font-medium">⚠️ Cobrar retorno</p>
+                              )}
+                            </div>
                           </div>
-                        ) : "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleClientClick(client)}>
-                              <Eye className="h-4 w-4 mr-2" /> Ver detalhes
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => {
-                              handleClientClick(client);
-                              setTimeout(() => setIsEditMode(true), 100);
-                            }}>
-                              <Pencil className="h-4 w-4 mr-2" /> Editar
-                            </DropdownMenuItem>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <span className="font-mono text-sm">{client.telefone ? formatPhone(client.telefone) : "—"}</span>
                             {client.telefone && (
                               <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => window.open(`tel:${client.telefone}`, "_self")}>
-                                  <Phone className="h-4 w-4 mr-2" /> Ligar
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => openWhatsApp(client.telefone!)}>
-                                  <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp
-                                </DropdownMenuItem>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 hover:bg-blue-100 hover:text-blue-700"
+                                  onClick={() => window.open(`tel:${client.telefone}`, '_self')}
+                                >
+                                  <Phone className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 hover:bg-green-100 hover:text-green-700"
+                                  onClick={() => openWhatsApp(client.telefone!)}
+                                >
+                                  <MessageCircle className="h-3.5 w-3.5" />
+                                </Button>
                               </>
                             )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {client.convenio ? (
+                            <Badge variant="outline" className="font-medium">{client.convenio}</Badge>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Select
+                            value={client.client_status || "cliente_intencionado"}
+                            onValueChange={(value) => handleStatusChange(client, value)}
+                            disabled={!canEditClient(client)}
+                          >
+                            <SelectTrigger className={cn(
+                              "w-44 h-8 text-xs font-medium border",
+                              statusInfo.bgColor,
+                              statusInfo.textColor,
+                              statusInfo.borderColor
+                            )}>
+                              <div className="flex items-center gap-1.5">
+                                <StatusIcon className="h-3.5 w-3.5" />
+                                <span>{statusInfo.label}</span>
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {clientStatuses.map(status => (
+                                <SelectItem key={status.id} value={status.id}>
+                                  <span className="flex items-center gap-2">
+                                    <span className={cn("w-2 h-2 rounded-full", status.dotColor)}></span>
+                                    {status.label}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          {client.future_contact_date ? (
+                            <div className={cn(
+                              "flex items-center gap-1 text-sm",
+                              isOverdue && "text-rose-600 font-medium"
+                            )}>
+                              <CalendarClock className={cn("h-4 w-4", isOverdue ? "text-rose-600" : "text-muted-foreground")} />
+                              {new Date(client.future_contact_date).toLocaleDateString('pt-BR')}
+                              {isOverdue && <span className="text-xs">(Atrasado)</span>}
+                            </div>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleClientClick(client)}>
+                                <Eye className="h-4 w-4 mr-2" /> Ver detalhes
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                handleClientClick(client);
+                                setTimeout(() => setIsEditMode(true), 100);
+                              }}>
+                                <Pencil className="h-4 w-4 mr-2" /> Editar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
       </div>
 
-      {/* Clients List - Mobile */}
+      {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
         {filteredClients.length === 0 ? (
-          <Card className="p-8 text-center text-muted-foreground">
-            Nenhum cliente encontrado
+          <Card className="p-8">
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-muted to-muted/50 flex items-center justify-center mb-4">
+                <Users className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="font-semibold text-foreground">Nenhum cliente</h3>
+              <p className="text-sm text-muted-foreground mt-1">Cadastre seu primeiro cliente</p>
+            </div>
           </Card>
         ) : (
           filteredClients.map(client => {
@@ -1091,30 +1187,42 @@ export function MyClientsList() {
             const isExpanded = expandedRowId === client.id;
             const isOverdue = client.future_contact_date && client.future_contact_date < new Date().toISOString().split('T')[0] && client.client_status === "contato_futuro";
             const hasPendingAlert = hasPendingProposalAlert(client);
+            const StatusIcon = statusInfo.icon;
 
             return (
-              <Card key={client.id} className={`overflow-hidden ${hasPendingAlert ? "ring-2 ring-yellow-400 ring-offset-1" : ""}`}>
+              <Card 
+                key={client.id} 
+                className={cn(
+                  "overflow-hidden border-2",
+                  hasPendingAlert && "border-amber-300 bg-amber-50/30 dark:bg-amber-950/10"
+                )}
+              >
                 <div 
-                  className={`p-4 cursor-pointer ${hasPendingAlert ? "bg-yellow-50/50 dark:bg-yellow-950/10" : ""}`}
+                  className="p-4 cursor-pointer"
                   onClick={() => setExpandedRowId(isExpanded ? null : client.id)}
                 >
                   <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-2 flex-1">
-                      {hasPendingAlert && (
-                        <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0 animate-pulse" />
-                      )}
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0">
+                        <User className="h-5 w-5 text-primary" />
+                      </div>
                       <div>
                         <p className="font-medium">{client["Nome do cliente"] || "Sem nome"}</p>
                         <p className="text-xs text-muted-foreground">{client.cpf ? formatCPF(client.cpf) : "—"}</p>
                         {hasPendingAlert && (
-                          <p className="text-xs text-yellow-600 font-medium mt-1">⚠️ Cobrar retorno do cliente</p>
+                          <p className="text-xs text-amber-600 font-medium mt-1">⚠️ Cobrar retorno</p>
                         )}
                       </div>
                     </div>
-                    <Badge className={`${statusInfo.bgLight} ${statusInfo.textColor} border-0`}>
-                      <statusInfo.icon className="h-3 w-3 mr-1" />
-                      {statusInfo.label}
-                    </Badge>
+                    <div className={cn(
+                      "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border",
+                      statusInfo.bgColor,
+                      statusInfo.textColor,
+                      statusInfo.borderColor
+                    )}>
+                      <StatusIcon className="h-3 w-3" />
+                      <span className="hidden sm:inline">{statusInfo.label}</span>
+                    </div>
                   </div>
                   
                   <div className="flex items-center justify-between mt-3">
@@ -1126,15 +1234,15 @@ export function MyClientsList() {
                   </div>
 
                   {isOverdue && (
-                    <div className="flex items-center gap-1 mt-2 text-red-600 text-xs font-medium">
+                    <div className="flex items-center gap-1 mt-2 text-rose-600 text-xs font-medium">
                       <CalendarClock className="h-3 w-3" />
-                      Contato atrasado: {new Date(client.future_contact_date!).toLocaleDateString('pt-BR')}
+                      Atrasado: {new Date(client.future_contact_date!).toLocaleDateString('pt-BR')}
                     </div>
                   )}
                 </div>
 
                 {isExpanded && (
-                  <div className="border-t p-4 bg-muted/30 space-y-4">
+                  <div className="border-t p-4 bg-muted/20 space-y-4">
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>
                         <span className="text-muted-foreground block text-xs">Convênio</span>
@@ -1144,43 +1252,39 @@ export function MyClientsList() {
                         <span className="text-muted-foreground block text-xs">Valor</span>
                         <span className="font-medium">{formatCurrency(client.valor_proposta || client.valor)}</span>
                       </div>
-                      {client.future_contact_date && (
-                        <div className="col-span-2">
-                          <span className="text-muted-foreground block text-xs">Contato Agendado</span>
-                          <span className={`font-medium ${isOverdue ? 'text-red-600' : ''}`}>
-                            {new Date(client.future_contact_date).toLocaleDateString('pt-BR')}
-                          </span>
-                        </div>
-                      )}
                     </div>
 
-                    {/* Status selector */}
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Alterar Status</Label>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium">Alterar Status</Label>
                       <Select
                         value={client.client_status || "cliente_intencionado"}
                         onValueChange={(value) => handleStatusChange(client, value)}
+                        disabled={!canEditClient(client)}
                       >
-                        <SelectTrigger className={`${statusInfo.bgLight} ${statusInfo.textColor} border-0`}>
+                        <SelectTrigger className={cn(
+                          "border",
+                          statusInfo.bgColor,
+                          statusInfo.textColor,
+                          statusInfo.borderColor
+                        )}>
                           <div className="flex items-center gap-2">
-                            <statusInfo.icon className="h-4 w-4" />
+                            <StatusIcon className="h-4 w-4" />
                             <span>{statusInfo.label}</span>
                           </div>
                         </SelectTrigger>
                         <SelectContent>
                           {clientStatuses.map(status => (
                             <SelectItem key={status.id} value={status.id}>
-                              <div className="flex items-center gap-2">
-                                <status.icon className={`h-4 w-4 ${status.textColor}`} />
+                              <span className="flex items-center gap-2">
+                                <span className={cn("w-2 h-2 rounded-full", status.dotColor)}></span>
                                 {status.label}
-                              </div>
+                              </span>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
 
-                    {/* Action buttons */}
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" className="flex-1" onClick={() => handleClientClick(client)}>
                         <Eye className="h-4 w-4 mr-1" /> Detalhes
@@ -1190,7 +1294,7 @@ export function MyClientsList() {
                           <Button variant="outline" size="sm" onClick={() => window.open(`tel:${client.telefone}`, "_self")}>
                             <Phone className="h-4 w-4" />
                           </Button>
-                          <Button variant="outline" size="sm" className="bg-green-50 text-green-700 hover:bg-green-100" onClick={() => openWhatsApp(client.telefone!)}>
+                          <Button variant="outline" size="sm" className="hover:bg-green-100 hover:text-green-700" onClick={() => openWhatsApp(client.telefone!)}>
                             <MessageCircle className="h-4 w-4" />
                           </Button>
                         </>
@@ -1204,12 +1308,87 @@ export function MyClientsList() {
         )}
       </div>
 
+      {/* New Client Dialog */}
+      <Dialog open={isNewClientDialogOpen} onOpenChange={setIsNewClientDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary" />
+              Novo Cliente
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 space-y-2">
+                <Label>Nome *</Label>
+                <Input
+                  value={newClientForm.nome}
+                  onChange={(e) => setNewClientForm({ ...newClientForm, nome: e.target.value })}
+                  placeholder="Nome completo"
+                  className="border-2 focus:border-primary"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>CPF</Label>
+                <Input
+                  value={newClientForm.cpf}
+                  onChange={(e) => setNewClientForm({ ...newClientForm, cpf: e.target.value })}
+                  placeholder="000.000.000-00"
+                  className="border-2 focus:border-primary"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefone *</Label>
+                <Input
+                  value={newClientForm.telefone}
+                  onChange={(e) => setNewClientForm({ ...newClientForm, telefone: e.target.value })}
+                  placeholder="(00) 00000-0000"
+                  className="border-2 focus:border-primary"
+                />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label>Convênio</Label>
+                <Select value={newClientForm.convenio} onValueChange={(v) => setNewClientForm({ ...newClientForm, convenio: v })}>
+                  <SelectTrigger className="border-2 focus:border-primary">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {convenioOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label>Observações</Label>
+                <Textarea
+                  value={newClientForm.observacao}
+                  onChange={(e) => setNewClientForm({ ...newClientForm, observacao: e.target.value })}
+                  placeholder="Notas sobre o cliente..."
+                  className="border-2 focus:border-primary"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsNewClientDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleNewClientSubmit} 
+              disabled={savingNewClient}
+              className="bg-gradient-to-r from-primary to-primary/80"
+            >
+              {savingNewClient ? "Salvando..." : "Cadastrar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Detail Dialog */}
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
-              <span>Detalhes do Cliente</span>
+              <span className="text-xl font-bold">Detalhes do Cliente</span>
               <div className="flex gap-2">
                 {(isAdmin || isGestor) && (
                   <AlertDialog>
@@ -1246,75 +1425,77 @@ export function MyClientsList() {
             <div className="space-y-6">
               {isEditMode ? (
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-2">
                     <Label>Nome</Label>
-                    <Input value={editForm.nome} onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })} />
+                    <Input value={editForm.nome} onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })} className="border-2" />
                   </div>
-                  <div>
+                  <div className="space-y-2">
                     <Label>CPF</Label>
-                    <Input value={editForm.cpf} onChange={(e) => setEditForm({ ...editForm, cpf: e.target.value })} />
+                    <Input value={editForm.cpf} onChange={(e) => setEditForm({ ...editForm, cpf: e.target.value })} className="border-2" />
                   </div>
-                  <div>
+                  <div className="space-y-2">
                     <Label>Telefone</Label>
-                    <Input value={editForm.telefone} onChange={(e) => setEditForm({ ...editForm, telefone: e.target.value })} />
+                    <Input value={editForm.telefone} onChange={(e) => setEditForm({ ...editForm, telefone: e.target.value })} className="border-2" />
                   </div>
-                  <div>
+                  <div className="space-y-2">
                     <Label>WhatsApp</Label>
-                    <Input value={editForm.whatsapp} onChange={(e) => setEditForm({ ...editForm, whatsapp: e.target.value })} />
+                    <Input value={editForm.whatsapp} onChange={(e) => setEditForm({ ...editForm, whatsapp: e.target.value })} className="border-2" />
                   </div>
-                  <div>
+                  <div className="space-y-2">
                     <Label>Convênio</Label>
                     <Select value={editForm.convenio} onValueChange={(v) => setEditForm({ ...editForm, convenio: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="border-2"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {convenioOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
+                  <div className="space-y-2">
                     <Label>Valor Proposta</Label>
-                    <Input value={editForm.valor_proposta} onChange={(e) => setEditForm({ ...editForm, valor_proposta: e.target.value })} />
+                    <Input value={editForm.valor_proposta} onChange={(e) => setEditForm({ ...editForm, valor_proposta: e.target.value })} className="border-2" />
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-2 space-y-2">
                     <Label>Observações</Label>
-                    <Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
+                    <Textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} className="border-2" />
                   </div>
                   <div className="col-span-2">
-                    <Button onClick={handleSaveEdit} className="w-full">Salvar Alterações</Button>
+                    <Button onClick={handleSaveEdit} className="w-full bg-gradient-to-r from-primary to-primary/80">
+                      Salvar Alterações
+                    </Button>
                   </div>
                 </div>
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-muted-foreground">Nome</Label>
+                      <Label className="text-muted-foreground text-xs">Nome</Label>
                       <p className="font-medium">{selectedClient?.["Nome do cliente"] || "N/A"}</p>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">CPF</Label>
+                      <Label className="text-muted-foreground text-xs">CPF</Label>
                       <p className="font-medium">{selectedClient?.cpf ? formatCPF(selectedClient.cpf) : "N/A"}</p>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">Telefone</Label>
+                      <Label className="text-muted-foreground text-xs">Telefone</Label>
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{selectedClient?.telefone ? formatPhone(selectedClient.telefone) : "N/A"}</p>
                         {selectedClient?.telefone && (
-                          <Button size="sm" variant="ghost" onClick={() => openWhatsApp(selectedClient.telefone!)}>
+                          <Button size="sm" variant="ghost" onClick={() => openWhatsApp(selectedClient.telefone!)} className="h-7 w-7 p-0">
                             <MessageCircle className="h-4 w-4 text-green-600" />
                           </Button>
                         )}
                       </div>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">Convênio</Label>
+                      <Label className="text-muted-foreground text-xs">Convênio</Label>
                       <p className="font-medium">{selectedClient?.convenio || "N/A"}</p>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">Valor Proposta</Label>
+                      <Label className="text-muted-foreground text-xs">Valor Proposta</Label>
                       <p className="font-medium">{formatCurrency(selectedClient?.valor_proposta || selectedClient?.valor)}</p>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">Contato Futuro</Label>
+                      <Label className="text-muted-foreground text-xs">Contato Futuro</Label>
                       <p className="font-medium">
                         {selectedClient?.future_contact_date 
                           ? new Date(selectedClient.future_contact_date).toLocaleDateString('pt-BR')
@@ -1325,24 +1506,26 @@ export function MyClientsList() {
 
                   {selectedClient?.notes && (
                     <div>
-                      <Label className="text-muted-foreground">Observações</Label>
+                      <Label className="text-muted-foreground text-xs">Observações</Label>
                       <p className="text-sm">{selectedClient.notes}</p>
                     </div>
                   )}
 
                   {selectedClient?.rejection_reason && (
-                    <Card className="p-4 bg-red-50 border-red-200">
-                      <h4 className="font-medium text-red-700 flex items-center gap-2">
+                    <Card className="p-4 bg-rose-50 border-rose-200">
+                      <h4 className="font-medium text-rose-700 flex items-center gap-2">
                         <XCircle className="h-4 w-4" /> Motivo da Recusa
                       </h4>
-                      <p className="text-sm mt-1">
+                      <p className="text-sm mt-2">
                         {rejectionReasons.find(r => r.id === selectedClient.rejection_reason)?.label || selectedClient.rejection_reason}
                       </p>
                       {selectedClient.rejection_offered_value && (
-                        <p className="text-sm">Valor ofertado: {formatCurrency(selectedClient.rejection_offered_value)}</p>
+                        <p className="text-sm text-rose-600 mt-1">
+                          Valor ofertado: {formatCurrency(selectedClient.rejection_offered_value)}
+                        </p>
                       )}
                       {selectedClient.rejection_description && (
-                        <p className="text-sm mt-1">{selectedClient.rejection_description}</p>
+                        <p className="text-sm text-rose-600 mt-1">{selectedClient.rejection_description}</p>
                       )}
                     </Card>
                   )}
@@ -1357,17 +1540,16 @@ export function MyClientsList() {
                     ) : interactions.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Nenhuma interação registrada</p>
                     ) : (
-                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {interactions.map(interaction => (
-                          <div key={interaction.id} className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg text-sm">
-                            <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
-                            <div className="flex-1">
-                              <p className="font-medium capitalize">{interaction.interaction_type.replace('_', ' ')}</p>
-                              {interaction.notes && <p className="text-muted-foreground">{interaction.notes}</p>}
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(interaction.created_at).toLocaleString('pt-BR')}
-                              </p>
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {interactions.map(int => (
+                          <div key={int.id} className="p-3 bg-muted/30 rounded-lg text-sm">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium capitalize">{int.interaction_type.replace(/_/g, ' ')}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(int.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                              </span>
                             </div>
+                            {int.notes && <p className="text-muted-foreground mt-1">{int.notes}</p>}
                           </div>
                         ))}
                       </div>
@@ -1380,110 +1562,69 @@ export function MyClientsList() {
         </DialogContent>
       </Dialog>
 
-      {/* New Client Dialog */}
-      <Dialog open={isNewClientDialogOpen} onOpenChange={setIsNewClientDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Novo Cliente</DialogTitle>
-            <DialogDescription>Cadastre um novo cliente na sua carteira</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Nome *</Label>
-              <Input
-                value={newClientForm.nome}
-                onChange={(e) => setNewClientForm({ ...newClientForm, nome: e.target.value })}
-                placeholder="Nome completo"
-              />
-            </div>
-            <div>
-              <Label>CPF</Label>
-              <Input
-                value={newClientForm.cpf}
-                onChange={(e) => setNewClientForm({ ...newClientForm, cpf: e.target.value })}
-                placeholder="000.000.000-00"
-              />
-            </div>
-            <div>
-              <Label>Telefone *</Label>
-              <Input
-                value={newClientForm.telefone}
-                onChange={(e) => setNewClientForm({ ...newClientForm, telefone: e.target.value })}
-                placeholder="(00) 00000-0000"
-              />
-            </div>
-            <div>
-              <Label>Convênio</Label>
-              <Select value={newClientForm.convenio} onValueChange={(v) => setNewClientForm({ ...newClientForm, convenio: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  {convenioOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Observação</Label>
-              <Textarea
-                value={newClientForm.observacao}
-                onChange={(e) => setNewClientForm({ ...newClientForm, observacao: e.target.value })}
-                placeholder="Anotações sobre o cliente..."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsNewClientDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleNewClientSubmit} disabled={savingNewClient}>
-              {savingNewClient ? "Salvando..." : "Cadastrar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Rejection Modal */}
       <Dialog open={isRejectionModalOpen} onOpenChange={setIsRejectionModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-700">
-              <XCircle className="h-5 w-5" /> Registrar Recusa
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-rose-500" />
+              Proposta Recusada
             </DialogTitle>
-            <DialogDescription>Informe o motivo da recusa da proposta</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
+          <div className="space-y-4 py-4">
+            <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800">
+              <p className="text-sm text-rose-700 dark:text-rose-300">
+                <strong>Cliente:</strong> {statusChangeClient?.["Nome do cliente"]}
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Label>Motivo da Recusa *</Label>
               <Select value={rejectionForm.reason} onValueChange={(v) => setRejectionForm({ ...rejectionForm, reason: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione o motivo" /></SelectTrigger>
+                <SelectTrigger className="border-2 focus:border-rose-500">
+                  <SelectValue placeholder="Selecione o motivo" />
+                </SelectTrigger>
                 <SelectContent>
-                  {rejectionReasons.map(r => <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>)}
+                  {rejectionReasons.map(r => (
+                    <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {rejectionForm.reason === "desinteresse_valor" && (
-              <div>
+            {rejectionReasons.find(r => r.id === rejectionForm.reason)?.requiresValue && (
+              <div className="space-y-2">
                 <Label>Valor Ofertado *</Label>
                 <Input
+                  placeholder="R$ 0,00"
                   value={rejectionForm.offeredValue}
                   onChange={(e) => setRejectionForm({ ...rejectionForm, offeredValue: e.target.value })}
-                  placeholder="R$ 0,00"
+                  className="border-2 focus:border-rose-500"
                 />
               </div>
             )}
 
-            {rejectionForm.reason === "outros" && (
-              <div>
-                <Label>Descreva o motivo *</Label>
+            {rejectionReasons.find(r => r.id === rejectionForm.reason)?.requiresDescription && (
+              <div className="space-y-2">
+                <Label>Descrição *</Label>
                 <Textarea
+                  placeholder="Descreva o motivo..."
                   value={rejectionForm.description}
                   onChange={(e) => setRejectionForm({ ...rejectionForm, description: e.target.value })}
-                  placeholder="Descreva o motivo da recusa..."
+                  className="border-2 focus:border-rose-500"
                 />
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRejectionModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleRejectionSubmit} disabled={savingStatus} variant="destructive">
+            <Button variant="outline" onClick={() => setIsRejectionModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleRejectionSubmit}
+              disabled={savingStatus}
+              className="bg-gradient-to-r from-rose-500 to-red-500"
+            >
               {savingStatus ? "Salvando..." : "Confirmar Recusa"}
             </Button>
           </DialogFooter>
@@ -1494,25 +1635,38 @@ export function MyClientsList() {
       <Dialog open={isFutureContactModalOpen} onOpenChange={setIsFutureContactModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-purple-700">
-              <CalendarClock className="h-5 w-5" /> Agendar Contato Futuro
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <CalendarClock className="h-5 w-5 text-purple-500" />
+              Agendar Contato Futuro
             </DialogTitle>
-            <DialogDescription>O vendedor e o gestor serão notificados na data agendada</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Data do Contato *</Label>
+          <div className="space-y-4 py-4">
+            <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800">
+              <p className="text-sm text-purple-700 dark:text-purple-300">
+                <strong>Cliente:</strong> {statusChangeClient?.["Nome do cliente"]}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Data do Próximo Contato *</Label>
               <Input
                 type="date"
                 value={futureContactDate}
                 onChange={(e) => setFutureContactDate(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
+                className="border-2 focus:border-purple-500"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsFutureContactModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleFutureContactSubmit} disabled={savingStatus}>
+            <Button variant="outline" onClick={() => setIsFutureContactModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleFutureContactSubmit}
+              disabled={savingStatus || !futureContactDate}
+              className="bg-gradient-to-r from-purple-500 to-indigo-500"
+            >
               {savingStatus ? "Salvando..." : "Agendar Contato"}
             </Button>
           </DialogFooter>
