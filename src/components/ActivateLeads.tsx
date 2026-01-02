@@ -36,7 +36,8 @@ import {
   TrendingUp,
   Target,
   Users,
-  Zap
+  Zap,
+  UserPlus
 } from 'lucide-react';
 import { format, addDays, parseISO, isToday, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -161,6 +162,13 @@ export const ActivateLeads = () => {
   const [pullCount, setPullCount] = useState(10);
   const [pulling, setPulling] = useState(false);
 
+  // Assign lead states
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [leadToAssign, setLeadToAssign] = useState<ActivateLead | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [availableUsers, setAvailableUsers] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
   const isAdmin = profile?.role === 'admin';
   const isGestor = gestorId !== null;
   const canImport = isAdmin || isGestor;
@@ -205,10 +213,64 @@ export const ActivateLeads = () => {
     }
   }, [user?.id]);
 
+  const fetchAvailableUsers = useCallback(async () => {
+    if (!user?.id) return;
+    
+    setLoadingUsers(true);
+    try {
+      // Buscar usuários colaboradores da mesma empresa
+      const { data: userCompanies } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+
+      if (userCompanies && userCompanies.length > 0) {
+        const companyIds = userCompanies.map(uc => uc.company_id);
+        
+        // Buscar todos os usuários das mesmas empresas
+        const { data: companyUsers } = await supabase
+          .from('user_companies')
+          .select('user_id')
+          .in('company_id', companyIds)
+          .eq('is_active', true);
+
+        if (companyUsers) {
+          const userIds = [...new Set(companyUsers.map(cu => cu.user_id))];
+          
+          // Buscar perfis dos usuários
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, name, email')
+            .in('id', userIds)
+            .eq('is_active', true);
+
+          if (profiles) {
+            setAvailableUsers(profiles.map(p => ({
+              id: p.id,
+              name: p.name || 'Sem nome',
+              email: p.email || ''
+            })));
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     fetchGestorId();
     fetchLeads();
   }, [fetchGestorId, fetchLeads]);
+
+  useEffect(() => {
+    if (isAdmin || isGestor) {
+      fetchAvailableUsers();
+    }
+  }, [isAdmin, isGestor, fetchAvailableUsers]);
 
   const formatPhone = (phone: string): string => {
     const digits = phone.replace(/\D/g, '');
@@ -229,6 +291,62 @@ export const ActivateLeads = () => {
     if (isGestor) return true;
     // Colaborador só pode editar leads exclusivamente atribuídos a ele
     return lead.assigned_to === user?.id;
+  };
+
+  const canAssignLead = isAdmin || isGestor;
+
+  const openAssignModal = (lead: ActivateLead) => {
+    setLeadToAssign(lead);
+    setSelectedUserId(lead.assigned_to || '');
+    setIsAssignModalOpen(true);
+  };
+
+  const handleAssignLead = async () => {
+    if (!leadToAssign || !user?.id) return;
+
+    try {
+      const assignedTo = selectedUserId || null;
+      
+      const { error } = await supabase
+        .from('activate_leads')
+        .update({ 
+          assigned_to: assignedTo,
+          ultima_interacao: new Date().toISOString()
+        })
+        .eq('id', leadToAssign.id);
+
+      if (error) throw error;
+
+      // Registrar no histórico
+      await supabase.from('activate_leads_history').insert({
+        lead_id: leadToAssign.id,
+        user_id: user.id,
+        action_type: 'assignment',
+        notes: assignedTo 
+          ? `Lead atribuído ao usuário ${availableUsers.find(u => u.id === assignedTo)?.name || assignedTo}`
+          : 'Atribuição do lead removida',
+        metadata: { assigned_to: assignedTo, assigned_by: user.id }
+      });
+
+      toast({
+        title: assignedTo ? 'Lead atribuído!' : 'Atribuição removida',
+        description: assignedTo 
+          ? `Lead atribuído para ${availableUsers.find(u => u.id === assignedTo)?.name || 'usuário'}`
+          : 'O lead agora está disponível para distribuição',
+      });
+
+      setIsAssignModalOpen(false);
+      setLeadToAssign(null);
+      setSelectedUserId('');
+      fetchLeads();
+    } catch (error: any) {
+      console.error('Error assigning lead:', error);
+      toast({
+        title: 'Erro ao atribuir lead',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleStatusChange = async (lead: ActivateLead, status: string) => {
@@ -870,6 +988,19 @@ export const ActivateLeads = () => {
                             <MessageCircle className="h-4 w-4" />
                           </Button>
 
+                          {/* Botão de atribuir - só para Gestor/Admin */}
+                          {canAssignLead && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => openAssignModal(lead)}
+                              className="h-8 w-8 p-0 hover:bg-purple-100 hover:text-purple-700"
+                              title={lead.assigned_to ? 'Reatribuir lead' : 'Atribuir lead'}
+                            >
+                              <UserPlus className="h-4 w-4" />
+                            </Button>
+                          )}
+
                           <Select 
                             value={lead.status}
                             onValueChange={(value) => handleStatusChange(lead, value)}
@@ -1176,6 +1307,75 @@ export const ActivateLeads = () => {
             >
               {pulling && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Puxar Leads
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Lead Modal */}
+      <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" />
+              Atribuir Lead
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {leadToAssign && (
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="font-medium">{leadToAssign.nome}</p>
+                <p className="text-sm text-muted-foreground">{formatPhone(leadToAssign.telefone)}</p>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label>Atribuir para</Label>
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger className="border-2 focus:border-primary">
+                  <SelectValue placeholder="Selecione um usuário" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <span className="flex items-center gap-2 text-muted-foreground">
+                      <UserX className="h-4 w-4" />
+                      Remover atribuição
+                    </span>
+                  </SelectItem>
+                  {availableUsers.map(u => (
+                    <SelectItem key={u.id} value={u.id}>
+                      <span className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        {u.name}
+                        {u.email && <span className="text-xs text-muted-foreground">({u.email})</span>}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {loadingUsers && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Carregando usuários...
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAssignModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={() => {
+                if (selectedUserId === 'none') {
+                  setSelectedUserId('');
+                }
+                handleAssignLead();
+              }}
+              className="bg-gradient-to-r from-primary to-primary/80"
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Confirmar Atribuição
             </Button>
           </DialogFooter>
         </DialogContent>
