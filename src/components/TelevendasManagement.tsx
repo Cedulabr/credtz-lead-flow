@@ -320,8 +320,11 @@ export const TelevendasManagement = () => {
   }, [selectedMonth, selectedUserId]);
 
   // Verificar se pode alterar status (apenas admin ou gestor)
-  const canChangeStatus = () => {
-    return isAdmin || isGestor;
+  const canChangeStatus = (tv?: TelevendaWithUser) => {
+    if (isAdmin) return true;
+    // Gestor só pode alterar status de propostas da sua empresa
+    if (isGestor && tv?.company_id && userCompanyIds.includes(tv.company_id)) return true;
+    return false;
   };
 
   // Verificar se pode mudar para um status específico
@@ -334,9 +337,9 @@ export const TelevendasManagement = () => {
     return isAdmin || isGestor;
   };
 
-  const updateStatus = async (id: string, newStatus: string) => {
+  const updateStatus = async (id: string, newStatus: string, tv?: TelevendaWithUser) => {
     // Apenas admin ou gestor pode alterar status
-    if (!canChangeStatus()) {
+    if (!canChangeStatus(tv)) {
       toast({
         title: "Sem permissão",
         description: "Apenas gestores ou administradores podem alterar o status.",
@@ -848,10 +851,10 @@ export const TelevendasManagement = () => {
                     <TableCell>R$ {formatCurrencyDisplay(tv.parcela)}</TableCell>
                     <TableCell>{getStatusBadge(tv.status)}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      {canChangeStatus() ? (
+                      {canChangeStatus(tv) ? (
                         <Select
                           value={tv.status}
-                          onValueChange={(value) => updateStatus(tv.id, value)}
+                          onValueChange={(value) => updateStatus(tv.id, value, tv)}
                         >
                           <SelectTrigger className="w-32">
                             <SelectValue />
