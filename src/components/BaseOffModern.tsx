@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -25,7 +25,9 @@ import {
   RefreshCw,
   User,
   Target,
-  Sparkles
+  Sparkles,
+  CalendarClock,
+  XCircle
 } from "lucide-react";
 
 interface BaseOffLead {
@@ -40,6 +42,8 @@ interface BaseOffLead {
   Municipio: string;
   Margem_Disponivel?: string;
   status?: string;
+  future_contact_date?: string;
+  offered_value?: number;
 }
 
 export function BaseOffModern() {
@@ -74,6 +78,14 @@ export function BaseOffModern() {
   const [dailyLimit, setDailyLimit] = useState<number>(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // Status modals states
+  const [isFutureContactModalOpen, setIsFutureContactModalOpen] = useState(false);
+  const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);
+  const [selectedLeadIndex, setSelectedLeadIndex] = useState<number | null>(null);
+  const [futureContactDate, setFutureContactDate] = useState("");
+  const [offeredValue, setOfferedValue] = useState("");
+  const [savingStatus, setSavingStatus] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -223,10 +235,36 @@ export function BaseOffModern() {
     return `https://wa.me/${phoneWithCountry}`;
   };
 
-  const updateLeadStatus = async (leadIndex: number, newStatus: string) => {
+  // Calculate max date for future contact (60 days from now)
+  const getMaxFutureContactDate = () => {
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 60);
+    return maxDate.toISOString().split('T')[0];
+  };
+
+  const handleStatusChange = (leadIndex: number, newStatus: string) => {
+    if (newStatus === "Contato Futuro") {
+      setSelectedLeadIndex(leadIndex);
+      setFutureContactDate("");
+      setIsFutureContactModalOpen(true);
+    } else if (newStatus === "Oferta negada") {
+      setSelectedLeadIndex(leadIndex);
+      setOfferedValue("");
+      setIsRejectionModalOpen(true);
+    } else {
+      updateLeadStatus(leadIndex, newStatus);
+    }
+  };
+
+  const updateLeadStatus = async (leadIndex: number, newStatus: string, metadata?: any) => {
     try {
       const updatedLeads = [...leads];
-      updatedLeads[leadIndex] = { ...updatedLeads[leadIndex], status: newStatus };
+      updatedLeads[leadIndex] = { 
+        ...updatedLeads[leadIndex], 
+        status: newStatus,
+        ...(metadata?.future_contact_date && { future_contact_date: metadata.future_contact_date }),
+        ...(metadata?.offered_value && { offered_value: metadata.offered_value }),
+      };
       setLeads(updatedLeads);
       
       toast({
@@ -241,6 +279,63 @@ export function BaseOffModern() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleFutureContactSubmit = () => {
+    if (selectedLeadIndex === null) return;
+    
+    if (!futureContactDate) {
+      toast({ title: "Erro", description: "Selecione a data do contato", variant: "destructive" });
+      return;
+    }
+
+    setSavingStatus(true);
+    updateLeadStatus(selectedLeadIndex, "Contato Futuro", {
+      future_contact_date: futureContactDate,
+    });
+    
+    toast({
+      title: "Contato agendado",
+      description: `Retorno agendado para ${new Date(futureContactDate).toLocaleDateString('pt-BR')}`,
+    });
+    
+    setIsFutureContactModalOpen(false);
+    setSelectedLeadIndex(null);
+    setFutureContactDate("");
+    setSavingStatus(false);
+  };
+
+  const handleRejectionSubmit = () => {
+    if (selectedLeadIndex === null) return;
+    
+    if (!offeredValue) {
+      toast({ title: "Erro", description: "Informe o valor ofertado", variant: "destructive" });
+      return;
+    }
+
+    setSavingStatus(true);
+    const valueNum = parseFloat(offeredValue.replace(/\D/g, '')) / 100;
+    
+    updateLeadStatus(selectedLeadIndex, "Oferta negada", {
+      offered_value: valueNum,
+    });
+    
+    toast({
+      title: "Status atualizado",
+      description: `Oferta de ${formatCurrency(valueNum)} foi recusada`,
+    });
+    
+    setIsRejectionModalOpen(false);
+    setSelectedLeadIndex(null);
+    setOfferedValue("");
+    setSavingStatus(false);
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value);
   };
 
   const generateLeads = async () => {
@@ -603,7 +698,7 @@ export function BaseOffModern() {
                       <TableCell className="hidden lg:table-cell">
                         <Select 
                           value={lead.status || "Novo lead"} 
-                          onValueChange={(value) => updateLeadStatus(index, value)}
+                          onValueChange={(value) => handleStatusChange(index, value)}
                         >
                           <SelectTrigger className="w-[140px] h-8">
                             <SelectValue />
@@ -616,6 +711,11 @@ export function BaseOffModern() {
                             ))}
                           </SelectContent>
                         </Select>
+                        {lead.future_contact_date && lead.status === "Contato Futuro" && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Retorno: {new Date(lead.future_contact_date).toLocaleDateString('pt-BR')}
+                          </p>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -629,7 +729,7 @@ export function BaseOffModern() {
                           <div className="lg:hidden">
                             <Select 
                               value={lead.status || "Novo lead"} 
-                              onValueChange={(value) => updateLeadStatus(index, value)}
+                              onValueChange={(value) => handleStatusChange(index, value)}
                             >
                               <SelectTrigger className="w-8 h-8 p-0">
                                 <div className="w-3 h-3 rounded-full bg-primary"></div>
@@ -748,6 +848,83 @@ export function BaseOffModern() {
                 )}
               </Button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Future Contact Modal */}
+        <Dialog open={isFutureContactModalOpen} onOpenChange={setIsFutureContactModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-purple-700">
+                <CalendarClock className="h-5 w-5" /> Agendar Contato Futuro
+              </DialogTitle>
+              <DialogDescription>
+                Selecione a data para retorno (máximo 60 dias)
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Data do Retorno *</Label>
+                <Input
+                  type="date"
+                  value={futureContactDate}
+                  onChange={(e) => setFutureContactDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  max={getMaxFutureContactDate()}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Limite máximo: {new Date(getMaxFutureContactDate()).toLocaleDateString('pt-BR')}
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsFutureContactModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleFutureContactSubmit} disabled={savingStatus}>
+                {savingStatus ? "Salvando..." : "Agendar Contato"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Rejection Modal - Valor Ofertado */}
+        <Dialog open={isRejectionModalOpen} onOpenChange={setIsRejectionModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-700">
+                <XCircle className="h-5 w-5" /> Oferta Recusada
+              </DialogTitle>
+              <DialogDescription>
+                Informe o valor que foi ofertado ao cliente
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Valor Ofertado *</Label>
+                <Input
+                  type="text"
+                  placeholder="R$ 0,00"
+                  value={offeredValue}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '');
+                    const formatted = (parseInt(value || '0') / 100).toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL'
+                    });
+                    setOfferedValue(formatted);
+                  }}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsRejectionModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleRejectionSubmit} disabled={savingStatus} variant="destructive">
+                {savingStatus ? "Salvando..." : "Confirmar Recusa"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
