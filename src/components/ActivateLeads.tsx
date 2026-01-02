@@ -305,7 +305,8 @@ export const ActivateLeads = () => {
     if (!leadToAssign || !user?.id) return;
 
     try {
-      const assignedTo = selectedUserId || null;
+      // Tratar 'none' como null para remover atribuição
+      const assignedTo = (selectedUserId && selectedUserId !== 'none') ? selectedUserId : null;
       
       const { error } = await supabase
         .from('activate_leads')
@@ -1366,12 +1367,7 @@ export const ActivateLeads = () => {
               Cancelar
             </Button>
             <Button 
-              onClick={() => {
-                if (selectedUserId === 'none') {
-                  setSelectedUserId('');
-                }
-                handleAssignLead();
-              }}
+              onClick={handleAssignLead}
               className="bg-gradient-to-r from-primary to-primary/80"
             >
               <UserPlus className="h-4 w-4 mr-2" />
