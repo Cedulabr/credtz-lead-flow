@@ -309,6 +309,11 @@ export const TelevendasManagement = () => {
 
       if (error) throw error;
 
+      // Se marcou como PAGO, criar alerta de reaproveitamento
+      if (newStatus === "pago") {
+        await createReuseAlert(id);
+      }
+
       toast({
         title: "Sucesso",
         description: "Status atualizado com sucesso!",
@@ -322,6 +327,101 @@ export const TelevendasManagement = () => {
         description: "Erro ao atualizar status",
         variant: "destructive",
       });
+    }
+  };
+
+  // Criar alerta de reaproveitamento quando uma proposta for marcada como PAGA
+  const createReuseAlert = async (televendaId: string) => {
+    try {
+      // Buscar dados da televenda
+      const televenda = televendas.find(tv => tv.id === televendaId);
+      if (!televenda) return;
+
+      // Buscar configuração do banco
+      const { data: bankSettings, error: bankError } = await supabase
+        .from("bank_reuse_settings")
+        .select("*")
+        .eq("bank_name", televenda.banco)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (bankError) {
+        console.error("Erro ao buscar configuração do banco:", bankError);
+        return;
+      }
+
+      // Se não houver configuração para o banco, não criar alerta
+      if (!bankSettings) {
+        console.log(`Banco ${televenda.banco} não tem configuração de reaproveitamento`);
+        return;
+      }
+
+      // Calcular data do alerta (data_venda + prazo em meses)
+      const paymentDate = new Date(televenda.data_venda);
+      const alertDate = new Date(paymentDate);
+      alertDate.setMonth(alertDate.getMonth() + bankSettings.reuse_months);
+
+      // Buscar gestor da empresa (se houver)
+      let gestorId = null;
+      if (televenda.company_id) {
+        const { data: gestorData } = await supabase
+          .from("user_companies")
+          .select("user_id")
+          .eq("company_id", televenda.company_id)
+          .eq("company_role", "gestor")
+          .eq("is_active", true)
+          .limit(1)
+          .maybeSingle();
+        
+        if (gestorData) {
+          gestorId = gestorData.user_id;
+        }
+      }
+
+      // Verificar se já existe um alerta para esta televenda
+      const { data: existingAlert } = await supabase
+        .from("client_reuse_alerts")
+        .select("id")
+        .eq("televendas_id", televendaId)
+        .maybeSingle();
+
+      if (existingAlert) {
+        console.log("Alerta já existe para esta televenda");
+        return;
+      }
+
+      // Criar o alerta de reaproveitamento
+      const { error: alertError } = await supabase
+        .from("client_reuse_alerts")
+        .insert({
+          proposta_id: 0, // Usamos televendas_id ao invés
+          televendas_id: televendaId,
+          client_name: televenda.nome,
+          client_cpf: televenda.cpf.replace(/\D/g, ""),
+          client_phone: televenda.telefone.replace(/\D/g, ""),
+          bank_name: televenda.banco,
+          payment_date: televenda.data_venda,
+          reuse_months: bankSettings.reuse_months,
+          alert_date: alertDate.toISOString().split("T")[0],
+          user_id: televenda.user_id,
+          gestor_id: gestorId,
+          company_id: televenda.company_id,
+          status: "pending"
+        });
+
+      if (alertError) {
+        console.error("Erro ao criar alerta de reaproveitamento:", alertError);
+        return;
+      }
+
+      console.log(`Alerta de reaproveitamento criado para ${televenda.nome} - ${televenda.banco} em ${alertDate.toISOString().split("T")[0]}`);
+      
+      toast({
+        title: "Alerta programado!",
+        description: `Cliente ${televenda.nome} será notificado para nova operação em ${alertDate.toLocaleDateString("pt-BR")}`,
+      });
+    } catch (error) {
+      console.error("Erro ao criar alerta de reaproveitamento:", error);
     }
   };
 
