@@ -31,7 +31,10 @@ import {
   ChevronDown,
   ChevronUp,
   MoreHorizontal,
-  Eye
+  Eye,
+  FileEdit,
+  AlertTriangle,
+  TrendingUp
 } from "lucide-react";
 import {
   AlertDialog,
@@ -115,14 +118,15 @@ interface UserCompany {
 
 const clientStatuses = [
   { id: "cliente_intencionado", label: "Cliente Intencionado", icon: UserCheck, color: "bg-blue-500", textColor: "text-blue-700", bgLight: "bg-blue-100" },
-  { id: "proposta_enviada", label: "Proposta Enviada", icon: Send, color: "bg-yellow-500", textColor: "text-yellow-700", bgLight: "bg-yellow-100" },
+  { id: "proposta_enviada", label: "Proposta Enviada", icon: Send, color: "bg-yellow-500", textColor: "text-yellow-700", bgLight: "bg-yellow-100", hasAlert: true },
+  { id: "proposta_digitada", label: "Proposta Digitada", icon: FileEdit, color: "bg-green-500", textColor: "text-green-700", bgLight: "bg-green-100" },
   { id: "proposta_recusada", label: "Proposta Recusada", icon: XCircle, color: "bg-red-500", textColor: "text-red-700", bgLight: "bg-red-100" },
   { id: "contato_futuro", label: "Contato Futuro", icon: CalendarClock, color: "bg-purple-500", textColor: "text-purple-700", bgLight: "bg-purple-100" },
 ];
 
 const rejectionReasons = [
   { id: "desinteresse_valor", label: "Desinteresse no valor", requiresValue: true },
-  { id: "pegar_depois", label: "Pensa em pegar mais pra frente", requiresValue: false },
+  { id: "pegar_depois", label: "Pensa em pegar mais pra frente", requiresValue: false, autoFollowUp: true },
   { id: "outros", label: "Outros", requiresDescription: true },
 ];
 
@@ -359,6 +363,11 @@ export function MyClientsList() {
     return clientStatuses.find(s => s.id === statusId) || clientStatuses[0];
   };
 
+  // Check if client has pending proposal alert
+  const hasPendingProposalAlert = (client: Client) => {
+    return client.client_status === "proposta_enviada";
+  };
+
   const handleClientClick = (client: Client) => {
     setSelectedClient(client);
     setEditForm({
@@ -464,7 +473,7 @@ export function MyClientsList() {
     }
   };
 
-  const handleRejectionSubmit = () => {
+  const handleRejectionSubmit = async () => {
     if (!statusChangeClient) return;
 
     const selectedReason = rejectionReasons.find(r => r.id === rejectionForm.reason);
@@ -483,12 +492,49 @@ export function MyClientsList() {
       return;
     }
 
-    updateClientStatus(statusChangeClient, "proposta_recusada", {
+    // Calculate follow-up date for "pegar_depois" reason (30 days)
+    let futureFollowUpDate: string | null = null;
+    if (selectedReason.autoFollowUp) {
+      const followUpDate = new Date();
+      followUpDate.setDate(followUpDate.getDate() + 30);
+      futureFollowUpDate = followUpDate.toISOString().split('T')[0];
+    }
+
+    await updateClientStatus(statusChangeClient, "proposta_recusada", {
       rejection_reason: rejectionForm.reason,
       rejection_offered_value: rejectionForm.offeredValue ? parseFloat(rejectionForm.offeredValue.replace(/\D/g, '')) / 100 : null,
       rejection_description: rejectionForm.description,
       notes: `Recusado: ${selectedReason.label}${rejectionForm.offeredValue ? ` - Valor: ${rejectionForm.offeredValue}` : ""}${rejectionForm.description ? ` - ${rejectionForm.description}` : ""}`,
+      future_contact_date: futureFollowUpDate,
     });
+
+    // Create automatic follow-up notification for "pegar_depois"
+    if (selectedReason.autoFollowUp && futureFollowUpDate) {
+      try {
+        await supabase.from("contact_notifications").insert({
+          proposta_id: statusChangeClient.id,
+          user_id: user?.id,
+          gestor_id: gestorId,
+          scheduled_date: futureFollowUpDate,
+        });
+
+        // Create interaction record for the scheduled follow-up
+        await supabase.from("client_interactions").insert({
+          proposta_id: statusChangeClient.id,
+          user_id: user?.id,
+          interaction_type: "auto_follow_up_scheduled",
+          notes: `Follow-up automático agendado para ${new Date(futureFollowUpDate).toLocaleDateString('pt-BR')} - Cliente pensa em pegar mais pra frente`,
+          metadata: { scheduled_date: futureFollowUpDate, reason: "pegar_depois" },
+        });
+
+        toast({
+          title: "Follow-up Agendado",
+          description: `Contato automático agendado para ${new Date(futureFollowUpDate).toLocaleDateString('pt-BR')}`,
+        });
+      } catch (error) {
+        console.error("Error creating auto follow-up:", error);
+      }
+    }
   };
 
   const handleFutureContactSubmit = () => {
@@ -712,8 +758,19 @@ export function MyClientsList() {
     const today = new Date().toISOString().split('T')[0];
     const contactsToday = filteredClients.filter(c => c.future_contact_date === today).length;
     
-    return { total, byStatus, contactsToday };
-  }, [filteredClients]);
+    // Clients registered today
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const registeredToday = clients.filter(c => {
+      if (!c.created_at) return false;
+      return new Date(c.created_at) >= todayStart;
+    }).length;
+
+    // Pending proposal alerts count
+    const pendingProposals = filteredClients.filter(c => c.client_status === "proposta_enviada").length;
+    
+    return { total, byStatus, contactsToday, registeredToday, pendingProposals };
+  }, [filteredClients, clients]);
 
   if (loading) {
     return (
@@ -738,7 +795,7 @@ export function MyClientsList() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         <Card className="p-3">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-muted-foreground" />
@@ -746,8 +803,33 @@ export function MyClientsList() {
           </div>
           <p className="text-2xl font-bold">{stats.total}</p>
         </Card>
+
+        {/* Indicador de cadastros do dia - visível para gestores */}
+        {(isAdmin || isGestor) && (
+          <Card className="p-3 border-primary/50 bg-primary/5">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <span className="text-sm text-primary font-medium">Hoje</span>
+            </div>
+            <p className="text-2xl font-bold text-primary">{stats.registeredToday}</p>
+            <p className="text-xs text-muted-foreground">cadastros</p>
+          </Card>
+        )}
+
+        {/* Alerta de propostas pendentes */}
+        {stats.pendingProposals > 0 && (
+          <Card className="p-3 border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20 animate-pulse">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              <span className="text-sm text-yellow-700 dark:text-yellow-400 font-medium">Pendentes</span>
+            </div>
+            <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">{stats.pendingProposals}</p>
+            <p className="text-xs text-yellow-600 dark:text-yellow-500">aguardando retorno</p>
+          </Card>
+        )}
+
         {clientStatuses.map(status => (
-          <Card key={status.id} className="p-3">
+          <Card key={status.id} className={`p-3 ${status.id === "proposta_enviada" && stats.byStatus[status.id] > 0 ? "ring-2 ring-yellow-400 ring-offset-1" : ""}`}>
             <div className="flex items-center gap-2">
               <status.icon className={`h-4 w-4 ${status.textColor}`} />
               <span className="text-xs text-muted-foreground truncate">{status.label}</span>
@@ -895,13 +977,19 @@ export function MyClientsList() {
                 filteredClients.map(client => {
                   const statusInfo = getStatusInfo(client.client_status);
                   const isOverdue = client.future_contact_date && client.future_contact_date < new Date().toISOString().split('T')[0] && client.client_status === "contato_futuro";
+                  const hasPendingAlert = hasPendingProposalAlert(client);
                   
                   return (
-                    <TableRow key={client.id} className="hover:bg-muted/50">
+                    <TableRow key={client.id} className={`hover:bg-muted/50 ${hasPendingAlert ? "bg-yellow-50/50 dark:bg-yellow-950/10" : ""}`}>
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{client["Nome do cliente"] || "Sem nome"}</p>
-                          <p className="text-xs text-muted-foreground">{client.cpf ? formatCPF(client.cpf) : "—"}</p>
+                        <div className="flex items-start gap-2">
+                          {hasPendingAlert && (
+                            <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                          )}
+                          <div>
+                            <p className="font-medium">{client["Nome do cliente"] || "Sem nome"}</p>
+                            <p className="text-xs text-muted-foreground">{client.cpf ? formatCPF(client.cpf) : "—"}</p>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -1002,17 +1090,26 @@ export function MyClientsList() {
             const statusInfo = getStatusInfo(client.client_status);
             const isExpanded = expandedRowId === client.id;
             const isOverdue = client.future_contact_date && client.future_contact_date < new Date().toISOString().split('T')[0] && client.client_status === "contato_futuro";
+            const hasPendingAlert = hasPendingProposalAlert(client);
 
             return (
-              <Card key={client.id} className="overflow-hidden">
+              <Card key={client.id} className={`overflow-hidden ${hasPendingAlert ? "ring-2 ring-yellow-400 ring-offset-1" : ""}`}>
                 <div 
-                  className="p-4 cursor-pointer"
+                  className={`p-4 cursor-pointer ${hasPendingAlert ? "bg-yellow-50/50 dark:bg-yellow-950/10" : ""}`}
                   onClick={() => setExpandedRowId(isExpanded ? null : client.id)}
                 >
                   <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <p className="font-medium">{client["Nome do cliente"] || "Sem nome"}</p>
-                      <p className="text-xs text-muted-foreground">{client.cpf ? formatCPF(client.cpf) : "—"}</p>
+                    <div className="flex items-start gap-2 flex-1">
+                      {hasPendingAlert && (
+                        <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0 animate-pulse" />
+                      )}
+                      <div>
+                        <p className="font-medium">{client["Nome do cliente"] || "Sem nome"}</p>
+                        <p className="text-xs text-muted-foreground">{client.cpf ? formatCPF(client.cpf) : "—"}</p>
+                        {hasPendingAlert && (
+                          <p className="text-xs text-yellow-600 font-medium mt-1">⚠️ Cobrar retorno do cliente</p>
+                        )}
+                      </div>
                     </div>
                     <Badge className={`${statusInfo.bgLight} ${statusInfo.textColor} border-0`}>
                       <statusInfo.icon className="h-3 w-3 mr-1" />
