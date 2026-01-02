@@ -280,6 +280,50 @@ export type Database = {
           },
         ]
       }
+      client_interactions: {
+        Row: {
+          created_at: string
+          from_status: string | null
+          id: string
+          interaction_type: string
+          metadata: Json | null
+          notes: string | null
+          proposta_id: number
+          to_status: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          interaction_type: string
+          metadata?: Json | null
+          notes?: string | null
+          proposta_id: number
+          to_status?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          interaction_type?: string
+          metadata?: Json | null
+          notes?: string | null
+          proposta_id?: number
+          to_status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_interactions_proposta_id_fkey"
+            columns: ["proposta_id"]
+            isOneToOne: false
+            referencedRelation: "propostas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           beneficio: string | null
@@ -526,6 +570,47 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      contact_notifications: {
+        Row: {
+          created_at: string
+          gestor_id: string | null
+          id: string
+          is_notified: boolean | null
+          notified_at: string | null
+          proposta_id: number
+          scheduled_date: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          gestor_id?: string | null
+          id?: string
+          is_notified?: boolean | null
+          notified_at?: string | null
+          proposta_id: number
+          scheduled_date: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          gestor_id?: string | null
+          id?: string
+          is_notified?: boolean | null
+          notified_at?: string | null
+          proposta_id?: number
+          scheduled_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_notifications_proposta_id_fkey"
+            columns: ["proposta_id"]
+            isOneToOne: false
+            referencedRelation: "propostas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contratos: {
         Row: {
@@ -1246,6 +1331,7 @@ export type Database = {
           banco: string | null
           bank_id: number | null
           client_id: number | null
+          client_status: string | null
           company_id: string | null
           convenio: string | null
           convenio_id: number | null
@@ -1253,8 +1339,10 @@ export type Database = {
           created_at: string | null
           created_by_id: string | null
           data_criacao: string | null
+          future_contact_date: string | null
           id: number
           installments: number | null
+          last_contact_date: string | null
           "Nome do cliente": string | null
           notes: string | null
           organization_id: number | null
@@ -1262,6 +1350,9 @@ export type Database = {
           pipeline_stage: string | null
           product_id: number | null
           produto: string | null
+          rejection_description: string | null
+          rejection_offered_value: number | null
+          rejection_reason: string | null
           status: string | null
           telefone: string | null
           updated_at: string | null
@@ -1276,6 +1367,7 @@ export type Database = {
           banco?: string | null
           bank_id?: number | null
           client_id?: number | null
+          client_status?: string | null
           company_id?: string | null
           convenio?: string | null
           convenio_id?: number | null
@@ -1283,8 +1375,10 @@ export type Database = {
           created_at?: string | null
           created_by_id?: string | null
           data_criacao?: string | null
+          future_contact_date?: string | null
           id?: number
           installments?: number | null
+          last_contact_date?: string | null
           "Nome do cliente"?: string | null
           notes?: string | null
           organization_id?: number | null
@@ -1292,6 +1386,9 @@ export type Database = {
           pipeline_stage?: string | null
           product_id?: number | null
           produto?: string | null
+          rejection_description?: string | null
+          rejection_offered_value?: number | null
+          rejection_reason?: string | null
           status?: string | null
           telefone?: string | null
           updated_at?: string | null
@@ -1306,6 +1403,7 @@ export type Database = {
           banco?: string | null
           bank_id?: number | null
           client_id?: number | null
+          client_status?: string | null
           company_id?: string | null
           convenio?: string | null
           convenio_id?: number | null
@@ -1313,8 +1411,10 @@ export type Database = {
           created_at?: string | null
           created_by_id?: string | null
           data_criacao?: string | null
+          future_contact_date?: string | null
           id?: number
           installments?: number | null
+          last_contact_date?: string | null
           "Nome do cliente"?: string | null
           notes?: string | null
           organization_id?: number | null
@@ -1322,6 +1422,9 @@ export type Database = {
           pipeline_stage?: string | null
           product_id?: number | null
           produto?: string | null
+          rejection_description?: string | null
+          rejection_offered_value?: number | null
+          rejection_reason?: string | null
           status?: string | null
           telefone?: string | null
           updated_at?: string | null
