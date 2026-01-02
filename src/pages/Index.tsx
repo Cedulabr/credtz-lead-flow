@@ -11,7 +11,7 @@ import { TelevendasForm } from "@/components/TelevendasForm";
 import { TelevendasManagement } from "@/components/TelevendasManagement";
 import { CommissionTable } from "@/components/CommissionTable";
 import { ClientDocuments } from "@/components/ClientDocuments";
-import { MyClientsKanban } from "@/components/MyClientsKanban";
+import { MyClientsList } from "@/components/MyClientsList";
 import { FinanceKanban } from "@/components/FinanceKanban";
 import { ProposalGenerator } from "@/components/ProposalGenerator";
 import { Button } from "@/components/ui/button";
@@ -120,7 +120,7 @@ const Index = () => {
         if (!hasPermission('can_access_meus_clientes')) {
           return <BlockedAccess message="Acesso à seção Meus Clientes bloqueado pelo administrador" />;
         }
-        return <MyClientsKanban />;
+        return <MyClientsList />;
       
       case "documents":
         if (!hasPermission('can_access_documentos')) {
