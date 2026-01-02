@@ -231,40 +231,84 @@ export const ActivateLeads = () => {
     
     setLoadingUsers(true);
     try {
-      // Buscar usuários colaboradores da mesma empresa
-      const { data: userCompanies } = await supabase
+      // Para Admin: buscar todos os usuários ativos
+      if (isAdmin) {
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('id, name, email')
+          .eq('is_active', true)
+          .order('name');
+
+        if (error) {
+          console.error('Error fetching all users:', error);
+        } else if (profiles) {
+          console.log('Usuários encontrados (admin):', profiles.length);
+          setAvailableUsers(profiles.map(p => ({
+            id: p.id,
+            name: p.name || p.email || 'Sem nome',
+            email: p.email || ''
+          })));
+        }
+        return;
+      }
+
+      // Para Gestor: buscar usuários da mesma empresa
+      const { data: userCompanies, error: ucError } = await supabase
         .from('user_companies')
         .select('company_id')
         .eq('user_id', user.id)
         .eq('is_active', true);
 
+      console.log('Empresas do usuário:', userCompanies, ucError);
+
       if (userCompanies && userCompanies.length > 0) {
         const companyIds = userCompanies.map(uc => uc.company_id);
         
         // Buscar todos os usuários das mesmas empresas
-        const { data: companyUsers } = await supabase
+        const { data: companyUsers, error: cuError } = await supabase
           .from('user_companies')
           .select('user_id')
           .in('company_id', companyIds)
           .eq('is_active', true);
 
-        if (companyUsers) {
+        console.log('Usuários das empresas:', companyUsers, cuError);
+
+        if (companyUsers && companyUsers.length > 0) {
           const userIds = [...new Set(companyUsers.map(cu => cu.user_id))];
           
           // Buscar perfis dos usuários
-          const { data: profiles } = await supabase
+          const { data: profiles, error: profError } = await supabase
             .from('profiles')
             .select('id, name, email')
             .in('id', userIds)
-            .eq('is_active', true);
+            .eq('is_active', true)
+            .order('name');
+
+          console.log('Perfis encontrados:', profiles, profError);
 
           if (profiles) {
             setAvailableUsers(profiles.map(p => ({
               id: p.id,
-              name: p.name || 'Sem nome',
+              name: p.name || p.email || 'Sem nome',
               email: p.email || ''
             })));
           }
+        }
+      } else {
+        // Fallback: se não tem empresa, buscar todos os usuários ativos
+        console.log('Nenhuma empresa encontrada, buscando todos os usuários...');
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name, email')
+          .eq('is_active', true)
+          .order('name');
+
+        if (profiles) {
+          setAvailableUsers(profiles.map(p => ({
+            id: p.id,
+            name: p.name || p.email || 'Sem nome',
+            email: p.email || ''
+          })));
         }
       }
     } catch (error) {
@@ -272,7 +316,7 @@ export const ActivateLeads = () => {
     } finally {
       setLoadingUsers(false);
     }
-  }, [user?.id]);
+  }, [user?.id, isAdmin]);
 
   // Primeiro busca o papel de gestor
   useEffect(() => {
