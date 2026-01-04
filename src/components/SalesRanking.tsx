@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Trophy, Medal, Crown, TrendingUp, Users } from "lucide-react";
-import { format, startOfDay, endOfDay } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface RankingUser {
@@ -68,9 +68,6 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
     setIsLoading(true);
     try {
       const today = new Date();
-      const dayStart = startOfDay(today);
-      const dayEnd = endOfDay(today);
-
       const [year, month] = selectedMonth.split('-').map(Number);
       const monthStart = new Date(year, month - 1, 1);
       const monthEnd = new Date(year, month, 0, 23, 59, 59);
@@ -80,83 +77,84 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
       const monthStartStr = format(monthStart, 'yyyy-MM-dd');
       const monthEndStr = format(monthEnd, 'yyyy-MM-dd');
 
-      // Buscar vendas do dia - usando data_venda (data de competência)
+      // Se não temos filtro de empresa, não podemos mostrar ranking
+      if (!effectiveCompanyFilter || effectiveCompanyFilter.length === 0) {
+        setDailyRanking([]);
+        setMonthlyRanking([]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Buscar TODOS os usuários das empresas do filtro (para mostrar ranking completo)
+      const { data: companyUsers } = await supabase
+        .from('user_companies')
+        .select('user_id')
+        .in('company_id', effectiveCompanyFilter)
+        .eq('is_active', true);
+
+      const allCompanyUserIds = [...new Set((companyUsers || []).map(cu => cu.user_id))];
+
+      // Buscar perfis de TODOS os usuários da empresa
+      let profilesData: { id: string; name: string | null; email: string | null }[] = [];
+      if (allCompanyUserIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name, email')
+          .in('id', allCompanyUserIds);
+        profilesData = profiles || [];
+      }
+
+      // Criar mapa de nomes para lookup rápido
+      const profileMap = new Map<string, string>();
+      profilesData.forEach(p => {
+        const displayName = p.name || p.email?.split('@')[0] || 'Usuário';
+        profileMap.set(p.id, displayName);
+      });
+
+      // Buscar vendas do dia - TODAS da empresa, não apenas do usuário logado
       let dailyQuery = supabase
         .from('televendas')
         .select('user_id, company_id, status, data_venda')
         .eq('data_venda', todayStr)
-        .eq('status', 'pago');
-
-      if (effectiveCompanyFilter && effectiveCompanyFilter.length > 0) {
-        dailyQuery = dailyQuery.in('company_id', effectiveCompanyFilter);
-      }
+        .eq('status', 'pago')
+        .in('company_id', effectiveCompanyFilter);
 
       const { data: dailySales } = await dailyQuery;
 
-      // Buscar vendas do mês - usando data_venda (data de competência)
+      // Buscar vendas do mês - TODAS da empresa, não apenas do usuário logado
       let monthlyQuery = supabase
         .from('televendas')
         .select('user_id, company_id, status, data_venda')
         .gte('data_venda', monthStartStr)
         .lte('data_venda', monthEndStr)
-        .eq('status', 'pago');
-
-      if (effectiveCompanyFilter && effectiveCompanyFilter.length > 0) {
-        monthlyQuery = monthlyQuery.in('company_id', effectiveCompanyFilter);
-      }
+        .eq('status', 'pago')
+        .in('company_id', effectiveCompanyFilter);
 
       const { data: monthlySales } = await monthlyQuery;
 
-      // Coletar todos os user_ids únicos das vendas
-      const allUserIds = new Set<string>();
-      (dailySales || []).forEach(sale => sale.user_id && allUserIds.add(sale.user_id));
-      (monthlySales || []).forEach(sale => sale.user_id && allUserIds.add(sale.user_id));
-
-      // Buscar perfis baseado nos user_ids das vendas (não depende de RLS restritiva)
-      let profilesData: { id: string; name: string | null; email: string | null }[] = [];
-      
-      if (allUserIds.size > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, name, email')
-          .in('id', Array.from(allUserIds));
-        profilesData = profiles || [];
-      }
-
-      // Criar ranking baseado em quantidade de vendas
+      // Criar ranking baseado em quantidade de vendas (todos os vendedores da empresa)
       const createRanking = (sales: any[] | null): RankingUser[] => {
-        const userMap = new Map<string, RankingUser>();
+        const salesMap = new Map<string, number>();
         
-        // Inicializar todos os usuários da empresa com 0 vendas
-        profilesData.forEach(p => {
-          userMap.set(p.id, {
-            id: p.id,
-            name: p.name || p.email?.split('@')[0] || 'Usuário',
-            salesCount: 0
-          });
-        });
-
         // Contar vendas por usuário
         (sales || []).forEach(sale => {
           if (sale.user_id) {
-            const existingUser = userMap.get(sale.user_id);
-            if (existingUser) {
-              existingUser.salesCount++;
-            } else {
-              // Usuário não encontrado nos perfis, adicionar mesmo assim
-              userMap.set(sale.user_id, {
-                id: sale.user_id,
-                name: 'Usuário',
-                salesCount: 1
-              });
-            }
+            salesMap.set(sale.user_id, (salesMap.get(sale.user_id) || 0) + 1);
           }
         });
 
+        // Criar array de ranking com todos que têm vendas
+        const ranking: RankingUser[] = [];
+        salesMap.forEach((count, id) => {
+          ranking.push({
+            id,
+            name: profileMap.get(id) || 'Colaborador',
+            salesCount: count
+          });
+        });
+
         // Ordenar por quantidade de vendas (maior para menor)
-        return Array.from(userMap.values())
-          .filter(u => u.salesCount > 0)
-          .sort((a, b) => b.salesCount - a.salesCount);
+        return ranking.sort((a, b) => b.salesCount - a.salesCount);
       };
 
       setDailyRanking(createRanking(dailySales));
