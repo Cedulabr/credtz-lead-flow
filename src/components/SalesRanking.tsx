@@ -72,7 +72,7 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
       const monthStart = new Date(year, month - 1, 1);
       const monthEnd = new Date(year, month, 0, 23, 59, 59);
 
-      // Formatar datas para comparação (data_venda é string no formato YYYY-MM-DD)
+      // Formatar datas para comparação
       const todayStr = format(today, 'yyyy-MM-dd');
       const monthStartStr = format(monthStart, 'yyyy-MM-dd');
       const monthEndStr = format(monthEnd, 'yyyy-MM-dd');
@@ -85,80 +85,70 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
         return;
       }
 
-      // Buscar TODOS os usuários das empresas do filtro (para mostrar ranking completo)
-      const { data: companyUsers } = await supabase
-        .from('user_companies')
-        .select('user_id')
-        .in('company_id', effectiveCompanyFilter)
-        .eq('is_active', true);
+      // Usar a função RPC segura para buscar o ranking (bypassa RLS e retorna nomes corretamente)
+      // A função já retorna user_id, user_name e sales_count ordenados
+      const dailyRankingResults: RankingUser[] = [];
+      const monthlyRankingResults: RankingUser[] = [];
 
-      const allCompanyUserIds = [...new Set((companyUsers || []).map(cu => cu.user_id))];
+      // Buscar ranking para cada empresa e combinar
+      for (const companyId of effectiveCompanyFilter) {
+        // Ranking do dia
+        const { data: dailyData, error: dailyError } = await supabase.rpc(
+          'get_televendas_sales_ranking',
+          {
+            p_company_id: companyId,
+            p_start_date: todayStr,
+            p_end_date: todayStr
+          }
+        );
+        
+        if (!dailyError && dailyData) {
+          dailyData.forEach((row: { user_id: string; user_name: string; sales_count: number }) => {
+            const existing = dailyRankingResults.find(r => r.id === row.user_id);
+            if (existing) {
+              existing.salesCount += row.sales_count;
+            } else {
+              dailyRankingResults.push({
+                id: row.user_id,
+                name: row.user_name || 'Colaborador',
+                salesCount: row.sales_count
+              });
+            }
+          });
+        }
 
-      // Buscar perfis de TODOS os usuários da empresa
-      let profilesData: { id: string; name: string | null; email: string | null }[] = [];
-      if (allCompanyUserIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, name, email')
-          .in('id', allCompanyUserIds);
-        profilesData = profiles || [];
+        // Ranking do mês
+        const { data: monthlyData, error: monthlyError } = await supabase.rpc(
+          'get_televendas_sales_ranking',
+          {
+            p_company_id: companyId,
+            p_start_date: monthStartStr,
+            p_end_date: monthEndStr
+          }
+        );
+        
+        if (!monthlyError && monthlyData) {
+          monthlyData.forEach((row: { user_id: string; user_name: string; sales_count: number }) => {
+            const existing = monthlyRankingResults.find(r => r.id === row.user_id);
+            if (existing) {
+              existing.salesCount += row.sales_count;
+            } else {
+              monthlyRankingResults.push({
+                id: row.user_id,
+                name: row.user_name || 'Colaborador',
+                salesCount: row.sales_count
+              });
+            }
+          });
+        }
       }
 
-      // Criar mapa de nomes para lookup rápido
-      const profileMap = new Map<string, string>();
-      profilesData.forEach(p => {
-        const displayName = p.name || p.email?.split('@')[0] || 'Usuário';
-        profileMap.set(p.id, displayName);
-      });
+      // Ordenar rankings por quantidade de vendas
+      dailyRankingResults.sort((a, b) => b.salesCount - a.salesCount);
+      monthlyRankingResults.sort((a, b) => b.salesCount - a.salesCount);
 
-      // Buscar vendas do dia - TODAS da empresa, não apenas do usuário logado
-      let dailyQuery = supabase
-        .from('televendas')
-        .select('user_id, company_id, status, data_venda')
-        .eq('data_venda', todayStr)
-        .eq('status', 'pago')
-        .in('company_id', effectiveCompanyFilter);
-
-      const { data: dailySales } = await dailyQuery;
-
-      // Buscar vendas do mês - TODAS da empresa, não apenas do usuário logado
-      let monthlyQuery = supabase
-        .from('televendas')
-        .select('user_id, company_id, status, data_venda')
-        .gte('data_venda', monthStartStr)
-        .lte('data_venda', monthEndStr)
-        .eq('status', 'pago')
-        .in('company_id', effectiveCompanyFilter);
-
-      const { data: monthlySales } = await monthlyQuery;
-
-      // Criar ranking baseado em quantidade de vendas (todos os vendedores da empresa)
-      const createRanking = (sales: any[] | null): RankingUser[] => {
-        const salesMap = new Map<string, number>();
-        
-        // Contar vendas por usuário
-        (sales || []).forEach(sale => {
-          if (sale.user_id) {
-            salesMap.set(sale.user_id, (salesMap.get(sale.user_id) || 0) + 1);
-          }
-        });
-
-        // Criar array de ranking com todos que têm vendas
-        const ranking: RankingUser[] = [];
-        salesMap.forEach((count, id) => {
-          ranking.push({
-            id,
-            name: profileMap.get(id) || 'Colaborador',
-            salesCount: count
-          });
-        });
-
-        // Ordenar por quantidade de vendas (maior para menor)
-        return ranking.sort((a, b) => b.salesCount - a.salesCount);
-      };
-
-      setDailyRanking(createRanking(dailySales));
-      setMonthlyRanking(createRanking(monthlySales));
+      setDailyRanking(dailyRankingResults);
+      setMonthlyRanking(monthlyRankingResults);
     } catch (error) {
       console.error('Error fetching ranking data:', error);
     } finally {
