@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { checkConnection } from '@/integrations/supabase/client';
-import credtzLogo from '@/assets/credtz-logo.png';
+import credtzLogo from '@/assets/logo-credtz-auth.jpeg';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
