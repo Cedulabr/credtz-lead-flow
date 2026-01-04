@@ -2426,6 +2426,13 @@ export type Database = {
         }[]
       }
       get_complete_schema: { Args: never; Returns: Json }
+      get_televendas_sales_ranking: {
+        Args: { p_company_id: string; p_end_date: string; p_start_date: string }
+        Returns: {
+          sales_count: number
+          user_id: string
+        }[]
+      }
       get_user_company_ids: { Args: { _user_id: string }; Returns: string[] }
       has_role: {
         Args: {
