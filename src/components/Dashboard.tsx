@@ -7,6 +7,7 @@ import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useWhitelabel } from "@/hooks/useWhitelabel";
+import { SalesRanking } from "./SalesRanking";
 import { 
   Users, 
   TrendingUp, 
@@ -1029,6 +1030,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </div>
           </CardContent>
         </Card>
+
+        {/* Sales Ranking - Gamificação */}
+        <SalesRanking 
+          companyFilter={getCompanyFilter()} 
+          selectedMonth={selectedMonth}
+        />
 
         {/* Funnel + Finance Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
