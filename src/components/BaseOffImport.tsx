@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -17,6 +18,7 @@ import {
   ArrowLeft,
   Download,
   RefreshCw,
+  FileSpreadsheet,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,8 +34,8 @@ interface BaseOffImportProps {
   onBack: () => void;
 }
 
-// Mapeamento das colunas do CSV para os campos do banco
-const CSV_COLUMN_MAP: Record<string, string> = {
+// Mapeamento das colunas do arquivo para os campos do banco
+const COLUMN_MAP: Record<string, string> = {
   NB: "nb",
   CPF: "cpf",
   NOME: "nome",
@@ -83,15 +85,31 @@ const CSV_COLUMN_MAP: Record<string, string> = {
   CIDADE_1: "cidade_1",
   UF_1: "uf_1",
   CEP_1: "cep_1",
-  TelFixo_1: "tel_fixo_1",
-  TelFixo_2: "tel_fixo_2",
-  TelFixo_3: "tel_fixo_3",
-  TelCel_1: "tel_cel_1",
-  TelCel_2: "tel_cel_2",
-  TelCel_3: "tel_cel_3",
-  Email_1: "email_1",
-  Email_2: "email_2",
-  Email_3: "email_3",
+  TELFIXO_1: "tel_fixo_1",
+  TELFIXO_2: "tel_fixo_2",
+  TELFIXO_3: "tel_fixo_3",
+  TELCEL_1: "tel_cel_1",
+  TELCEL_2: "tel_cel_2",
+  TELCEL_3: "tel_cel_3",
+  EMAIL_1: "email_1",
+  EMAIL_2: "email_2",
+  EMAIL_3: "email_3",
+  // Aliases para variações comuns
+  "TELCEL 1": "tel_cel_1",
+  "TELCEL 2": "tel_cel_2",
+  "TELCEL 3": "tel_cel_3",
+  "TELFIXO 1": "tel_fixo_1",
+  "TELFIXO 2": "tel_fixo_2",
+  "TELFIXO 3": "tel_fixo_3",
+  "TEL_CEL_1": "tel_cel_1",
+  "TEL_CEL_2": "tel_cel_2",
+  "TEL_CEL_3": "tel_cel_3",
+  "TEL_FIXO_1": "tel_fixo_1",
+  "TEL_FIXO_2": "tel_fixo_2",
+  "TEL_FIXO_3": "tel_fixo_3",
+  "EMAIL 1": "email_1",
+  "EMAIL 2": "email_2",
+  "EMAIL 3": "email_3",
 };
 
 export function BaseOffImport({ onBack }: BaseOffImportProps) {
@@ -102,6 +120,110 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
   const [progressText, setProgressText] = useState("");
   const [result, setResult] = useState<ImportResult | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const parseDate = (dateValue: any): string | null => {
+    if (!dateValue) return null;
+    
+    // Se for número (Excel date serial)
+    if (typeof dateValue === "number") {
+      const date = XLSX.SSF.parse_date_code(dateValue);
+      if (date) {
+        const year = date.y;
+        const month = String(date.m).padStart(2, "0");
+        const day = String(date.d).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      }
+      return null;
+    }
+    
+    const dateStr = String(dateValue).trim();
+    if (dateStr === "") return null;
+
+    // Formato DD/MM/YYYY
+    const brMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (brMatch) {
+      return `${brMatch[3]}-${brMatch[2].padStart(2, "0")}-${brMatch[1].padStart(2, "0")}`;
+    }
+
+    // Formato YYYY-MM-DD
+    const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+      return dateStr;
+    }
+
+    // Formato YYYYMMDD
+    const numMatch = dateStr.match(/^(\d{4})(\d{2})(\d{2})$/);
+    if (numMatch) {
+      return `${numMatch[1]}-${numMatch[2]}-${numMatch[3]}`;
+    }
+
+    return null;
+  };
+
+  const parseNumber = (numValue: any): number | null => {
+    if (numValue === null || numValue === undefined) return null;
+    
+    if (typeof numValue === "number") {
+      return isNaN(numValue) ? null : numValue;
+    }
+    
+    const numStr = String(numValue).trim();
+    if (numStr === "") return null;
+    
+    const clean = numStr.replace(/[^\d,.-]/g, "").replace(",", ".");
+    const num = parseFloat(clean);
+    return isNaN(num) ? null : num;
+  };
+
+  // Função melhorada para CPF - preserva zeros à esquerda
+  const cleanCPF = (cpfValue: any): string | null => {
+    if (cpfValue === null || cpfValue === undefined) return null;
+    
+    // Converter para string, tratando números
+    let cpfStr = String(cpfValue);
+    
+    // Remover caracteres não numéricos
+    const clean = cpfStr.replace(/\D/g, "");
+    
+    if (clean.length === 0) return null;
+    
+    // Garantir que tem 11 dígitos, preenchendo com zeros à esquerda
+    return clean.padStart(11, "0").slice(0, 11);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const validExtensions = [".csv", ".xlsx", ".xls"];
+      const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
+      
+      if (!validExtensions.includes(fileExtension)) {
+        toast.error("Formato inválido. Use arquivos CSV ou XLSX.");
+        return;
+      }
+      
+      setSelectedFile(file);
+      setResult(null);
+    }
+  };
+
+  const readFileData = async (file: File): Promise<any[][]> => {
+    const extension = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
+    
+    if (extension === ".csv") {
+      const text = await file.text();
+      return parseCSV(text);
+    } else {
+      // XLSX ou XLS
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array", cellDates: true, raw: false });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      
+      // Converter para array com header
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, raw: false, defval: "" });
+      return jsonData as any[][];
+    }
+  };
 
   const parseCSV = (text: string): string[][] => {
     const lines = text.split(/\r?\n/).filter((line) => line.trim());
@@ -128,53 +250,6 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
     }
 
     return result;
-  };
-
-  const parseDate = (dateStr: string | null | undefined): string | null => {
-    if (!dateStr || dateStr.trim() === "") return null;
-    const clean = dateStr.trim();
-
-    // Formato DD/MM/YYYY
-    const brMatch = clean.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if (brMatch) {
-      return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
-    }
-
-    // Formato YYYY-MM-DD
-    const isoMatch = clean.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (isoMatch) {
-      return clean;
-    }
-
-    // Formato YYYYMMDD
-    const numMatch = clean.match(/^(\d{4})(\d{2})(\d{2})$/);
-    if (numMatch) {
-      return `${numMatch[1]}-${numMatch[2]}-${numMatch[3]}`;
-    }
-
-    return null;
-  };
-
-  const parseNumber = (numStr: string | null | undefined): number | null => {
-    if (!numStr || numStr.trim() === "") return null;
-    const clean = numStr.replace(/[^\d,.-]/g, "").replace(",", ".");
-    const num = parseFloat(clean);
-    return isNaN(num) ? null : num;
-  };
-
-  const cleanCPF = (cpf: string | null | undefined): string | null => {
-    if (!cpf) return null;
-    const clean = cpf.replace(/\D/g, "");
-    if (clean.length < 11) return clean.padStart(11, "0");
-    return clean.slice(0, 11);
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setResult(null);
-    }
   };
 
   const processImport = async () => {
@@ -209,14 +284,40 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
 
       // Ler arquivo
       setProgressText("Lendo arquivo...");
-      const text = await selectedFile.text();
-      const rows = parseCSV(text);
+      const rows = await readFileData(selectedFile);
 
       if (rows.length < 2) {
         throw new Error("Arquivo vazio ou sem dados");
       }
 
-      const headers = rows[0].map((h) => h.toUpperCase().trim());
+      // Normalizar headers
+      const headers = rows[0].map((h) => 
+        String(h || "").toUpperCase().trim().replace(/[_\s]+/g, "").replace(/[^A-Z0-9]/g, "")
+      );
+      
+      // Criar mapa de índice para campo
+      const headerToDbField: Record<number, string> = {};
+      headers.forEach((header, idx) => {
+        // Tentar encontrar correspondência exata
+        let dbField = COLUMN_MAP[header];
+        
+        // Se não encontrou, tentar com variações
+        if (!dbField) {
+          const variations = Object.keys(COLUMN_MAP);
+          for (const variation of variations) {
+            const normalizedVariation = variation.toUpperCase().replace(/[_\s]+/g, "").replace(/[^A-Z0-9]/g, "");
+            if (normalizedVariation === header) {
+              dbField = COLUMN_MAP[variation];
+              break;
+            }
+          }
+        }
+        
+        if (dbField) {
+          headerToDbField[idx] = dbField;
+        }
+      });
+
       const dataRows = rows.slice(1);
       importResult.total = dataRows.length;
 
@@ -225,15 +326,16 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
       // Agrupar por CPF para processar clientes e contratos
       const clientsMap = new Map<string, any>();
       const contractsMap = new Map<string, any[]>();
+      const processedContracts = new Set<string>(); // Para evitar duplicados
 
       for (let i = 0; i < dataRows.length; i++) {
         const row = dataRows[i];
         const rowData: Record<string, any> = {};
 
-        // Mapear colunas
-        headers.forEach((header, idx) => {
-          const dbField = CSV_COLUMN_MAP[header];
-          if (dbField && row[idx]) {
+        // Mapear colunas usando o mapa de índices
+        Object.entries(headerToDbField).forEach(([idxStr, dbField]) => {
+          const idx = parseInt(idxStr);
+          if (row[idx] !== undefined && row[idx] !== null && String(row[idx]).trim() !== "") {
             rowData[dbField] = row[idx];
           }
         });
@@ -249,7 +351,7 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
           continue;
         }
 
-        const nb = rowData.nb?.trim();
+        const nb = String(rowData.nb || "").trim();
         if (!nb) {
           importResult.errors++;
           importResult.errorDetails.push({
@@ -260,85 +362,92 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
           continue;
         }
 
-        // Dados do cliente
+        // Dados do cliente - só adiciona se ainda não existe
         if (!clientsMap.has(cpf)) {
           clientsMap.set(cpf, {
             nb: nb,
             cpf: cpf,
             nome: rowData.nome || "Não informado",
             data_nascimento: parseDate(rowData.data_nascimento),
-            sexo: rowData.sexo,
-            esp: rowData.esp,
+            sexo: rowData.sexo ? String(rowData.sexo) : null,
+            esp: rowData.esp ? String(rowData.esp) : null,
             dib: parseDate(rowData.dib),
             mr: parseNumber(rowData.mr),
-            banco_pagto: rowData.banco_pagto,
-            agencia_pagto: rowData.agencia_pagto,
-            orgao_pagador: rowData.orgao_pagador,
-            conta_corrente: rowData.conta_corrente,
-            meio_pagto: rowData.meio_pagto,
-            status_beneficio: rowData.status_beneficio,
-            bloqueio: rowData.bloqueio,
-            pensao_alimenticia: rowData.pensao_alimenticia,
-            representante: rowData.representante,
+            banco_pagto: rowData.banco_pagto ? String(rowData.banco_pagto) : null,
+            agencia_pagto: rowData.agencia_pagto ? String(rowData.agencia_pagto) : null,
+            orgao_pagador: rowData.orgao_pagador ? String(rowData.orgao_pagador) : null,
+            conta_corrente: rowData.conta_corrente ? String(rowData.conta_corrente) : null,
+            meio_pagto: rowData.meio_pagto ? String(rowData.meio_pagto) : null,
+            status_beneficio: rowData.status_beneficio ? String(rowData.status_beneficio) : null,
+            bloqueio: rowData.bloqueio ? String(rowData.bloqueio) : null,
+            pensao_alimenticia: rowData.pensao_alimenticia ? String(rowData.pensao_alimenticia) : null,
+            representante: rowData.representante ? String(rowData.representante) : null,
             ddb: parseDate(rowData.ddb),
-            banco_rmc: rowData.banco_rmc,
+            banco_rmc: rowData.banco_rmc ? String(rowData.banco_rmc) : null,
             valor_rmc: parseNumber(rowData.valor_rmc),
-            banco_rcc: rowData.banco_rcc,
+            banco_rcc: rowData.banco_rcc ? String(rowData.banco_rcc) : null,
             valor_rcc: parseNumber(rowData.valor_rcc),
-            bairro: rowData.bairro,
-            municipio: rowData.municipio,
-            uf: rowData.uf,
-            cep: rowData.cep,
-            endereco: rowData.endereco,
-            logr_tipo_1: rowData.logr_tipo_1,
-            logr_titulo_1: rowData.logr_titulo_1,
-            logr_nome_1: rowData.logr_nome_1,
-            logr_numero_1: rowData.logr_numero_1,
-            logr_complemento_1: rowData.logr_complemento_1,
-            bairro_1: rowData.bairro_1,
-            cidade_1: rowData.cidade_1,
-            uf_1: rowData.uf_1,
-            cep_1: rowData.cep_1,
-            tel_fixo_1: rowData.tel_fixo_1,
-            tel_fixo_2: rowData.tel_fixo_2,
-            tel_fixo_3: rowData.tel_fixo_3,
-            tel_cel_1: rowData.tel_cel_1,
-            tel_cel_2: rowData.tel_cel_2,
-            tel_cel_3: rowData.tel_cel_3,
-            email_1: rowData.email_1,
-            email_2: rowData.email_2,
-            email_3: rowData.email_3,
+            bairro: rowData.bairro ? String(rowData.bairro) : null,
+            municipio: rowData.municipio ? String(rowData.municipio) : null,
+            uf: rowData.uf ? String(rowData.uf) : null,
+            cep: rowData.cep ? String(rowData.cep) : null,
+            endereco: rowData.endereco ? String(rowData.endereco) : null,
+            logr_tipo_1: rowData.logr_tipo_1 ? String(rowData.logr_tipo_1) : null,
+            logr_titulo_1: rowData.logr_titulo_1 ? String(rowData.logr_titulo_1) : null,
+            logr_nome_1: rowData.logr_nome_1 ? String(rowData.logr_nome_1) : null,
+            logr_numero_1: rowData.logr_numero_1 ? String(rowData.logr_numero_1) : null,
+            logr_complemento_1: rowData.logr_complemento_1 ? String(rowData.logr_complemento_1) : null,
+            bairro_1: rowData.bairro_1 ? String(rowData.bairro_1) : null,
+            cidade_1: rowData.cidade_1 ? String(rowData.cidade_1) : null,
+            uf_1: rowData.uf_1 ? String(rowData.uf_1) : null,
+            cep_1: rowData.cep_1 ? String(rowData.cep_1) : null,
+            tel_fixo_1: rowData.tel_fixo_1 ? String(rowData.tel_fixo_1) : null,
+            tel_fixo_2: rowData.tel_fixo_2 ? String(rowData.tel_fixo_2) : null,
+            tel_fixo_3: rowData.tel_fixo_3 ? String(rowData.tel_fixo_3) : null,
+            tel_cel_1: rowData.tel_cel_1 ? String(rowData.tel_cel_1) : null,
+            tel_cel_2: rowData.tel_cel_2 ? String(rowData.tel_cel_2) : null,
+            tel_cel_3: rowData.tel_cel_3 ? String(rowData.tel_cel_3) : null,
+            email_1: rowData.email_1 ? String(rowData.email_1) : null,
+            email_2: rowData.email_2 ? String(rowData.email_2) : null,
+            email_3: rowData.email_3 ? String(rowData.email_3) : null,
             imported_by: user.id,
             import_batch_id: batchId,
           });
         }
 
         // Dados do contrato (se houver)
-        if (rowData.contrato && rowData.banco_emprestimo) {
-          const contractKey = `${cpf}-${rowData.contrato}`;
-          if (!contractsMap.has(cpf)) {
-            contractsMap.set(cpf, []);
-          }
+        const contrato = rowData.contrato ? String(rowData.contrato).trim() : null;
+        const bancoEmprestimo = rowData.banco_emprestimo ? String(rowData.banco_emprestimo).trim() : null;
+        
+        if (contrato && bancoEmprestimo) {
+          const contractKey = `${cpf}-${contrato}`;
+          
+          // Verificar se já processamos este contrato (evitar duplicados)
+          if (!processedContracts.has(contractKey)) {
+            processedContracts.add(contractKey);
+            
+            if (!contractsMap.has(cpf)) {
+              contractsMap.set(cpf, []);
+            }
 
-          // Evitar duplicidade de contrato
-          const existingContracts = contractsMap.get(cpf)!;
-          if (!existingContracts.find((c) => c.contrato === rowData.contrato)) {
-            existingContracts.push({
+            contractsMap.get(cpf)!.push({
               cpf: cpf,
-              banco_emprestimo: rowData.banco_emprestimo,
-              contrato: rowData.contrato,
+              banco_emprestimo: bancoEmprestimo,
+              contrato: contrato,
               vl_emprestimo: parseNumber(rowData.vl_emprestimo),
               inicio_desconto: parseDate(rowData.inicio_desconto),
-              prazo: rowData.prazo ? parseInt(rowData.prazo) : null,
+              prazo: rowData.prazo ? parseInt(String(rowData.prazo)) : null,
               vl_parcela: parseNumber(rowData.vl_parcela),
-              tipo_emprestimo: rowData.tipo_emprestimo,
+              tipo_emprestimo: rowData.tipo_emprestimo ? String(rowData.tipo_emprestimo) : null,
               data_averbacao: parseDate(rowData.data_averbacao),
-              situacao_emprestimo: rowData.situacao_emprestimo,
+              situacao_emprestimo: rowData.situacao_emprestimo ? String(rowData.situacao_emprestimo) : null,
               competencia: parseDate(rowData.competencia),
               competencia_final: parseDate(rowData.competencia_final),
               taxa: parseNumber(rowData.taxa),
               saldo: parseNumber(rowData.saldo),
             });
+          } else {
+            importResult.duplicates++;
           }
         }
 
@@ -401,6 +510,8 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
       });
 
       if (allContracts.length > 0) {
+        setProgressText(`Salvando ${allContracts.length} contratos...`);
+        
         for (let i = 0; i < allContracts.length; i += batchSize) {
           const batch = allContracts.slice(i, i + batchSize);
 
@@ -433,7 +544,7 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
       setProgressText("Importação concluída!");
       setResult(importResult);
       toast.success(
-        `Importação concluída! ${importResult.success} clientes processados.`
+        `Importação concluída! ${importResult.success} clientes e ${allContracts.length} contratos processados.`
       );
     } catch (error: any) {
       console.error("Erro na importação:", error);
@@ -462,7 +573,7 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
             Importação de Base OFF
           </h1>
           <p className="text-sm text-muted-foreground">
-            Importe dados de clientes e contratos via arquivo CSV
+            Importe dados de clientes e contratos via arquivo CSV ou XLSX
           </p>
         </div>
       </div>
@@ -474,7 +585,7 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
               selectedFile
                 ? "border-primary/50 bg-primary/5"
                 : "border-muted-foreground/25 hover:border-primary/50"
@@ -484,11 +595,11 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv"
+              accept=".csv,.xlsx,.xls"
               onChange={handleFileSelect}
               className="hidden"
             />
-            <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+            <FileSpreadsheet className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
             {selectedFile ? (
               <div>
                 <p className="font-medium text-foreground">{selectedFile.name}</p>
@@ -501,9 +612,9 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
               </div>
             ) : (
               <div>
-                <p className="font-medium">Clique para selecionar um arquivo CSV</p>
+                <p className="font-medium">Clique para selecionar um arquivo</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  ou arraste e solte aqui
+                  Formatos aceitos: CSV, XLSX, XLS
                 </p>
               </div>
             )}
@@ -545,11 +656,11 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center p-4 bg-muted/50 rounded-lg">
                 <p className="text-2xl font-bold">{result.total}</p>
-                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="text-sm text-muted-foreground">Total de Linhas</p>
               </div>
               <div className="text-center p-4 bg-success/10 rounded-lg">
                 <p className="text-2xl font-bold text-success">{result.success}</p>
-                <p className="text-sm text-muted-foreground">Sucesso</p>
+                <p className="text-sm text-muted-foreground">Clientes Importados</p>
               </div>
               <div className="text-center p-4 bg-destructive/10 rounded-lg">
                 <p className="text-2xl font-bold text-destructive">{result.errors}</p>
@@ -557,7 +668,7 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
               </div>
               <div className="text-center p-4 bg-warning/10 rounded-lg">
                 <p className="text-2xl font-bold text-warning">{result.duplicates}</p>
-                <p className="text-sm text-muted-foreground">Duplicados</p>
+                <p className="text-sm text-muted-foreground">Contratos Duplicados</p>
               </div>
             </div>
 
@@ -612,11 +723,11 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <Alert>
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Formato do Arquivo</AlertTitle>
+            <FileSpreadsheet className="h-4 w-4" />
+            <AlertTitle>Formatos Aceitos</AlertTitle>
             <AlertDescription>
-              O arquivo deve estar no formato CSV com as colunas separadas por vírgula ou
-              ponto-e-vírgula.
+              O arquivo pode estar no formato CSV, XLSX ou XLS. CPFs com zeros à esquerda
+              serão preservados corretamente.
             </AlertDescription>
           </Alert>
 
@@ -634,9 +745,11 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
             <ul className="list-disc list-inside text-muted-foreground space-y-1">
               <li>CPFs duplicados serão atualizados com os novos dados</li>
               <li>Contratos com mesmo CPF e número serão atualizados</li>
+              <li>Contratos duplicados no mesmo arquivo são ignorados</li>
               <li>Um cliente pode ter múltiplos contratos</li>
               <li>Datas devem estar no formato DD/MM/YYYY ou YYYY-MM-DD</li>
               <li>Valores numéricos podem usar vírgula ou ponto como separador decimal</li>
+              <li>CPFs com zeros à esquerda são tratados corretamente</li>
             </ul>
           </div>
         </CardContent>
