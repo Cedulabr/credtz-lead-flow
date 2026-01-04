@@ -14,6 +14,7 @@ import { ClientDocuments } from "@/components/ClientDocuments";
 import { MyClientsList } from "@/components/MyClientsList";
 import { FinanceKanban } from "@/components/FinanceKanban";
 import { ProposalGenerator } from "@/components/ProposalGenerator";
+import { BaseOffConsulta } from "@/components/BaseOffConsulta";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
@@ -127,6 +128,9 @@ const Index = () => {
             <LazyLeadsManagement />
           </Suspense>
         );
+      
+      case "baseoff-consulta":
+        return <BaseOffConsulta />;
       
       case "my-clients":
         if (!hasPermission('can_access_meus_clientes')) {
