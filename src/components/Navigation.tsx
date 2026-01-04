@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X } from "lucide-react";
+import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,6 +21,7 @@ const navItems = [
   { id: "proposal-generator", label: "Gerador de Propostas", icon: FileText, permissionKey: "can_access_gerador_propostas" },
   { id: "activate-leads", label: "Activate Leads", icon: Zap, permissionKey: "can_access_activate_leads" },
   { id: "leads", label: "Leads Premium", icon: TrendingUp, permissionKey: "can_access_premium_leads" },
+  { id: "baseoff-consulta", label: "Consulta Base OFF", icon: Database, permissionKey: null },
   { id: "my-clients", label: "Meus Clientes", icon: Users, permissionKey: "can_access_meus_clientes" },
   { id: "televendas", label: "Televendas", icon: Phone, permissionKey: "can_access_televendas" },
   { id: "televendas-manage", label: "Gestão Televendas", icon: Settings, permissionKey: "can_access_gestao_televendas" },

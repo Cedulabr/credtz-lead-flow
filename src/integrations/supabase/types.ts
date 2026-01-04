@@ -421,6 +421,284 @@ export type Database = {
         }
         Relationships: []
       }
+      baseoff_clients: {
+        Row: {
+          agencia_pagto: string | null
+          bairro: string | null
+          bairro_1: string | null
+          banco_pagto: string | null
+          banco_rcc: string | null
+          banco_rmc: string | null
+          bloqueio: string | null
+          cep: string | null
+          cep_1: string | null
+          cidade_1: string | null
+          conta_corrente: string | null
+          cpf: string
+          created_at: string
+          data_nascimento: string | null
+          ddb: string | null
+          dib: string | null
+          email_1: string | null
+          email_2: string | null
+          email_3: string | null
+          endereco: string | null
+          esp: string | null
+          id: string
+          import_batch_id: string | null
+          imported_by: string | null
+          logr_complemento_1: string | null
+          logr_nome_1: string | null
+          logr_numero_1: string | null
+          logr_tipo_1: string | null
+          logr_titulo_1: string | null
+          meio_pagto: string | null
+          mr: number | null
+          municipio: string | null
+          naturalidade: string | null
+          nb: string
+          nome: string
+          nome_mae: string | null
+          nome_pai: string | null
+          orgao_pagador: string | null
+          pensao_alimenticia: string | null
+          representante: string | null
+          sexo: string | null
+          status_beneficio: string | null
+          tel_cel_1: string | null
+          tel_cel_2: string | null
+          tel_cel_3: string | null
+          tel_fixo_1: string | null
+          tel_fixo_2: string | null
+          tel_fixo_3: string | null
+          uf: string | null
+          uf_1: string | null
+          updated_at: string
+          valor_rcc: number | null
+          valor_rmc: number | null
+        }
+        Insert: {
+          agencia_pagto?: string | null
+          bairro?: string | null
+          bairro_1?: string | null
+          banco_pagto?: string | null
+          banco_rcc?: string | null
+          banco_rmc?: string | null
+          bloqueio?: string | null
+          cep?: string | null
+          cep_1?: string | null
+          cidade_1?: string | null
+          conta_corrente?: string | null
+          cpf: string
+          created_at?: string
+          data_nascimento?: string | null
+          ddb?: string | null
+          dib?: string | null
+          email_1?: string | null
+          email_2?: string | null
+          email_3?: string | null
+          endereco?: string | null
+          esp?: string | null
+          id?: string
+          import_batch_id?: string | null
+          imported_by?: string | null
+          logr_complemento_1?: string | null
+          logr_nome_1?: string | null
+          logr_numero_1?: string | null
+          logr_tipo_1?: string | null
+          logr_titulo_1?: string | null
+          meio_pagto?: string | null
+          mr?: number | null
+          municipio?: string | null
+          naturalidade?: string | null
+          nb: string
+          nome: string
+          nome_mae?: string | null
+          nome_pai?: string | null
+          orgao_pagador?: string | null
+          pensao_alimenticia?: string | null
+          representante?: string | null
+          sexo?: string | null
+          status_beneficio?: string | null
+          tel_cel_1?: string | null
+          tel_cel_2?: string | null
+          tel_cel_3?: string | null
+          tel_fixo_1?: string | null
+          tel_fixo_2?: string | null
+          tel_fixo_3?: string | null
+          uf?: string | null
+          uf_1?: string | null
+          updated_at?: string
+          valor_rcc?: number | null
+          valor_rmc?: number | null
+        }
+        Update: {
+          agencia_pagto?: string | null
+          bairro?: string | null
+          bairro_1?: string | null
+          banco_pagto?: string | null
+          banco_rcc?: string | null
+          banco_rmc?: string | null
+          bloqueio?: string | null
+          cep?: string | null
+          cep_1?: string | null
+          cidade_1?: string | null
+          conta_corrente?: string | null
+          cpf?: string
+          created_at?: string
+          data_nascimento?: string | null
+          ddb?: string | null
+          dib?: string | null
+          email_1?: string | null
+          email_2?: string | null
+          email_3?: string | null
+          endereco?: string | null
+          esp?: string | null
+          id?: string
+          import_batch_id?: string | null
+          imported_by?: string | null
+          logr_complemento_1?: string | null
+          logr_nome_1?: string | null
+          logr_numero_1?: string | null
+          logr_tipo_1?: string | null
+          logr_titulo_1?: string | null
+          meio_pagto?: string | null
+          mr?: number | null
+          municipio?: string | null
+          naturalidade?: string | null
+          nb?: string
+          nome?: string
+          nome_mae?: string | null
+          nome_pai?: string | null
+          orgao_pagador?: string | null
+          pensao_alimenticia?: string | null
+          representante?: string | null
+          sexo?: string | null
+          status_beneficio?: string | null
+          tel_cel_1?: string | null
+          tel_cel_2?: string | null
+          tel_cel_3?: string | null
+          tel_fixo_1?: string | null
+          tel_fixo_2?: string | null
+          tel_fixo_3?: string | null
+          uf?: string | null
+          uf_1?: string | null
+          updated_at?: string
+          valor_rcc?: number | null
+          valor_rmc?: number | null
+        }
+        Relationships: []
+      }
+      baseoff_contracts: {
+        Row: {
+          banco_emprestimo: string
+          client_id: string
+          competencia: string | null
+          competencia_final: string | null
+          contrato: string
+          cpf: string
+          created_at: string
+          data_averbacao: string | null
+          id: string
+          inicio_desconto: string | null
+          prazo: number | null
+          saldo: number | null
+          situacao_emprestimo: string | null
+          taxa: number | null
+          tipo_emprestimo: string | null
+          updated_at: string
+          vl_emprestimo: number | null
+          vl_parcela: number | null
+        }
+        Insert: {
+          banco_emprestimo: string
+          client_id: string
+          competencia?: string | null
+          competencia_final?: string | null
+          contrato: string
+          cpf: string
+          created_at?: string
+          data_averbacao?: string | null
+          id?: string
+          inicio_desconto?: string | null
+          prazo?: number | null
+          saldo?: number | null
+          situacao_emprestimo?: string | null
+          taxa?: number | null
+          tipo_emprestimo?: string | null
+          updated_at?: string
+          vl_emprestimo?: number | null
+          vl_parcela?: number | null
+        }
+        Update: {
+          banco_emprestimo?: string
+          client_id?: string
+          competencia?: string | null
+          competencia_final?: string | null
+          contrato?: string
+          cpf?: string
+          created_at?: string
+          data_averbacao?: string | null
+          id?: string
+          inicio_desconto?: string | null
+          prazo?: number | null
+          saldo?: number | null
+          situacao_emprestimo?: string | null
+          taxa?: number | null
+          tipo_emprestimo?: string | null
+          updated_at?: string
+          vl_emprestimo?: number | null
+          vl_parcela?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "baseoff_contracts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "baseoff_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      baseoff_import_batches: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_count: number
+          error_details: Json | null
+          file_name: string
+          id: string
+          imported_by: string
+          status: string
+          success_count: number
+          total_records: number
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_count?: number
+          error_details?: Json | null
+          file_name: string
+          id?: string
+          imported_by: string
+          status?: string
+          success_count?: number
+          total_records?: number
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_count?: number
+          error_details?: Json | null
+          file_name?: string
+          id?: string
+          imported_by?: string
+          status?: string
+          success_count?: number
+          total_records?: number
+        }
+        Relationships: []
+      }
       baseoff_lead_tracking: {
         Row: {
           cpf: string
