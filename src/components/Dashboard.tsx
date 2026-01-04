@@ -857,52 +857,49 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
         
         {/* Quick Stats Bar */}
-        <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-t overflow-x-auto gap-4">
-          <div className="flex items-center gap-2 min-w-fit">
-            <TrendingUp className="h-4 w-4 text-primary" />
-            <span className="text-xs text-muted-foreground">Vendas:</span>
-            <span className="text-sm font-bold">{totalSales}</span>
+        <div className="grid grid-cols-2 md:grid-cols-4 px-4 py-2 bg-muted/30 border-t gap-2">
+          <div className="flex items-center gap-1.5">
+            <TrendingUp className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+            <span className="text-xs text-muted-foreground hidden sm:inline">Vendas:</span>
+            <span className="text-xs font-bold">{totalSales}</span>
           </div>
-          <div className="flex items-center gap-2 min-w-fit">
-            <DollarSign className="h-4 w-4 text-success" />
-            <span className="text-xs text-muted-foreground">Faturamento:</span>
-            <span className="text-sm font-bold text-success">{formatCurrency(totalRevenue)}</span>
+          <div className="flex items-center gap-1.5">
+            <DollarSign className="h-3.5 w-3.5 text-success flex-shrink-0" />
+            <span className="text-xs font-bold text-success truncate">{formatCurrency(totalRevenue)}</span>
           </div>
-          <div className="flex items-center gap-2 min-w-fit">
-            <CreditCard className="h-4 w-4 text-warning" />
-            <span className="text-xs text-muted-foreground">Comissão:</span>
-            <span className="text-sm font-bold">{formatCurrency(totalCommissions)}</span>
+          <div className="flex items-center gap-1.5">
+            <CreditCard className="h-3.5 w-3.5 text-warning flex-shrink-0" />
+            <span className="text-xs font-bold truncate">{formatCurrency(totalCommissions)}</span>
           </div>
-          <div className="flex items-center gap-2 min-w-fit">
+          <div className="flex items-center gap-1.5">
             {revenueChange >= 0 ? (
-              <TrendingUp className="h-4 w-4 text-success" />
+              <TrendingUp className="h-3.5 w-3.5 text-success flex-shrink-0" />
             ) : (
-              <TrendingDown className="h-4 w-4 text-destructive" />
+              <TrendingDown className="h-3.5 w-3.5 text-destructive flex-shrink-0" />
             )}
-            <span className="text-xs text-muted-foreground">Crescimento:</span>
-            <span className={`text-sm font-bold ${revenueChange >= 0 ? 'text-success' : 'text-destructive'}`}>
+            <span className={`text-xs font-bold ${revenueChange >= 0 ? 'text-success' : 'text-destructive'}`}>
               {revenueChange >= 0 ? '+' : ''}{revenueChange.toFixed(1)}%
             </span>
           </div>
         </div>
       </div>
 
-      <div className="p-4 space-y-6 pb-24">
+      <div className="p-3 md:p-4 space-y-4 pb-24">
         {/* Main KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
           {/* Vendas do Mês */}
           <Card className="border-2 shadow-card hover:shadow-elevation transition-shadow cursor-pointer" onClick={() => onNavigate('televendas')}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                  <ShoppingCart className="h-5 w-5 text-primary" />
+            <CardContent className="p-3 md:p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="h-8 w-8 md:h-10 md:w-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                  <ShoppingCart className="h-4 w-4 md:h-5 md:w-5 text-primary" />
                 </div>
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="text-[10px] hidden md:inline-flex">
                   vs. mês anterior
                 </Badge>
               </div>
-              <p className="text-xs text-muted-foreground">Vendas do Mês</p>
-              <p className="text-2xl font-bold text-foreground">{totalSales}</p>
+              <p className="text-[10px] md:text-xs text-muted-foreground">Vendas do Mês</p>
+              <p className="text-xl md:text-2xl font-bold text-foreground">{totalSales}</p>
               <div className="flex items-center gap-1 mt-1">
                 {revenueChange >= 0 ? (
                   <TrendingUp className="h-3 w-3 text-success" />
@@ -918,61 +915,59 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
           {/* Valor Produzido */}
           <Card className="border-2 shadow-card hover:shadow-elevation transition-shadow cursor-pointer" onClick={() => onNavigate('televendas')}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="h-10 w-10 bg-success/10 rounded-xl flex items-center justify-center">
-                  <DollarSign className="h-5 w-5 text-success" />
+            <CardContent className="p-3 md:p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="h-8 w-8 md:h-10 md:w-10 bg-success/10 rounded-xl flex items-center justify-center">
+                  <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-success" />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">Valor Produzido</p>
-              <p className="text-2xl font-bold text-success">{formatCurrency(totalRevenue)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Ticket médio: {formatCurrency(averageTicket)}</p>
+              <p className="text-[10px] md:text-xs text-muted-foreground">Valor Produzido</p>
+              <p className="text-lg md:text-2xl font-bold text-success truncate">{formatCurrency(totalRevenue)}</p>
+              <p className="text-[10px] md:text-xs text-muted-foreground mt-1 truncate">Ticket: {formatCurrency(averageTicket)}</p>
             </CardContent>
           </Card>
 
           {/* Comissões */}
           <Card className="border-2 shadow-card hover:shadow-elevation transition-shadow cursor-pointer" onClick={() => onNavigate('minhas-comissoes')}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="h-10 w-10 bg-warning/10 rounded-xl flex items-center justify-center">
-                  <CreditCard className="h-5 w-5 text-warning" />
+            <CardContent className="p-3 md:p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="h-8 w-8 md:h-10 md:w-10 bg-warning/10 rounded-xl flex items-center justify-center">
+                  <CreditCard className="h-4 w-4 md:h-5 md:w-5 text-warning" />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">Comissões Geradas</p>
-              <p className="text-2xl font-bold text-foreground">{formatCurrency(totalCommissions)}</p>
-              <div className="flex gap-2 mt-1">
-                <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/30">
-                  Pago: {formatCurrency(commissionsPaid)}
-                </Badge>
-              </div>
+              <p className="text-[10px] md:text-xs text-muted-foreground">Comissões</p>
+              <p className="text-lg md:text-2xl font-bold text-foreground truncate">{formatCurrency(totalCommissions)}</p>
+              <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/30 mt-1">
+                Pago: {formatCurrency(commissionsPaid)}
+              </Badge>
             </CardContent>
           </Card>
 
           {/* Performance Equipe */}
           {(isAdmin || isGestor) && vendorStats.length > 0 ? (
             <Card className="border-2 shadow-card hover:shadow-elevation transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                    <Trophy className="h-5 w-5 text-primary" />
+              <CardContent className="p-3 md:p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="h-8 w-8 md:h-10 md:w-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <Trophy className="h-4 w-4 md:h-5 md:w-5 text-primary" />
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">Top Vendedor</p>
-                <p className="text-lg font-bold text-foreground truncate">{vendorStats[0]?.name}</p>
-                <p className="text-xs text-success">{formatCurrency(vendorStats[0]?.totalValue || 0)}</p>
+                <p className="text-[10px] md:text-xs text-muted-foreground">Top Vendedor</p>
+                <p className="text-sm md:text-lg font-bold text-foreground truncate">{vendorStats[0]?.name}</p>
+                <p className="text-xs text-success truncate">{formatCurrency(vendorStats[0]?.totalValue || 0)}</p>
               </CardContent>
             </Card>
           ) : (
             <Card className="border-2 shadow-card">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                    <Percent className="h-5 w-5 text-primary" />
+              <CardContent className="p-3 md:p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="h-8 w-8 md:h-10 md:w-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <Percent className="h-4 w-4 md:h-5 md:w-5 text-primary" />
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">Taxa Conversão</p>
-                <p className="text-2xl font-bold text-foreground">{leadsStats.conversionRate.toFixed(0)}%</p>
-                <p className="text-xs text-muted-foreground mt-1">{leadsStats.worked} leads trabalhados</p>
+                <p className="text-[10px] md:text-xs text-muted-foreground">Conversão</p>
+                <p className="text-xl md:text-2xl font-bold text-foreground">{leadsStats.conversionRate.toFixed(0)}%</p>
+                <p className="text-[10px] md:text-xs text-muted-foreground mt-1">{leadsStats.worked} leads</p>
               </CardContent>
             </Card>
           )}
