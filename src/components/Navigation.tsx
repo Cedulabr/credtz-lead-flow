@@ -287,21 +287,23 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
               );
             })}
 
-            {/* More menu button */}
+            {/* More menu button - toggles open/close */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => setIsMobileMenuOpen(true)}
+                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                   className={cn(
                     "flex items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200",
-                    "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    isMobileMenuOpen
+                      ? "text-primary bg-primary/15 shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
-                  <Menu size={26} strokeWidth={2} />
+                  {isMobileMenuOpen ? <X size={26} strokeWidth={2.5} /> : <Menu size={26} strokeWidth={2} />}
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top" className="font-medium">
-                Menu
+                {isMobileMenuOpen ? "Fechar" : "Menu"}
               </TooltipContent>
             </Tooltip>
           </div>
