@@ -4,16 +4,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback } from "./ui/avatar";
-import { Trophy, Medal, Crown, TrendingUp, DollarSign, Users } from "lucide-react";
-import { format, startOfDay, endOfDay, startOfMonth, endOfMonth } from "date-fns";
+import { Trophy, Medal, Crown, TrendingUp, Users } from "lucide-react";
+import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface RankingUser {
   id: string;
   name: string;
   salesCount: number;
-  totalValue: number;
-  commissionTotal: number;
 }
 
 interface SalesRankingProps {
@@ -26,10 +24,45 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
   const [dailyRanking, setDailyRanking] = useState<RankingUser[]>([]);
   const [monthlyRanking, setMonthlyRanking] = useState<RankingUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [effectiveCompanyFilter, setEffectiveCompanyFilter] = useState<string[] | null>(null);
+
+  // Buscar empresas do usuário se não tiver filtro
+  useEffect(() => {
+    const fetchUserCompanies = async () => {
+      if (companyFilter && companyFilter.length > 0) {
+        setEffectiveCompanyFilter(companyFilter);
+        return;
+      }
+
+      if (isAdmin) {
+        setEffectiveCompanyFilter(null);
+        return;
+      }
+
+      if (!user?.id) return;
+
+      try {
+        const { data } = await supabase
+          .from('user_companies')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .eq('is_active', true);
+
+        const companyIds = (data || []).map(uc => uc.company_id);
+        setEffectiveCompanyFilter(companyIds.length > 0 ? companyIds : null);
+      } catch (error) {
+        console.error('Error fetching user companies:', error);
+      }
+    };
+
+    fetchUserCompanies();
+  }, [companyFilter, user?.id, isAdmin]);
 
   useEffect(() => {
-    fetchRankingData();
-  }, [companyFilter, selectedMonth]);
+    if (effectiveCompanyFilter !== undefined) {
+      fetchRankingData();
+    }
+  }, [effectiveCompanyFilter, selectedMonth]);
 
   const fetchRankingData = async () => {
     setIsLoading(true);
@@ -42,151 +75,99 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
       const monthStart = new Date(year, month - 1, 1);
       const monthEnd = new Date(year, month, 0, 23, 59, 59);
 
-      // Buscar regras de comissão
-      let rulesQuery = supabase
-        .from('commission_rules')
-        .select('*')
-        .eq('is_active', true);
-      
-      if (companyFilter) {
-        rulesQuery = rulesQuery.or(`company_id.is.null,company_id.in.(${companyFilter.join(',')})`);
-      }
-      
-      const { data: commissionRules } = await rulesQuery;
-      const rules = commissionRules || [];
-
-      // Buscar vendas do dia
+      // Buscar vendas do dia - de TODOS os vendedores da empresa
       let dailyQuery = supabase
         .from('televendas')
-        .select('user_id, parcela, saldo_devedor, troco, tipo_operacao, banco, company_id, status')
+        .select('user_id, company_id, status')
         .gte('created_at', dayStart.toISOString())
         .lte('created_at', dayEnd.toISOString())
         .eq('status', 'pago');
 
-      if (companyFilter) {
-        dailyQuery = dailyQuery.in('company_id', companyFilter);
+      if (effectiveCompanyFilter && effectiveCompanyFilter.length > 0) {
+        dailyQuery = dailyQuery.in('company_id', effectiveCompanyFilter);
       }
 
       const { data: dailySales } = await dailyQuery;
 
-      // Buscar vendas do mês
+      // Buscar vendas do mês - de TODOS os vendedores da empresa
       let monthlyQuery = supabase
         .from('televendas')
-        .select('user_id, parcela, saldo_devedor, troco, tipo_operacao, banco, company_id, status')
+        .select('user_id, company_id, status')
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString())
         .eq('status', 'pago');
 
-      if (companyFilter) {
-        monthlyQuery = monthlyQuery.in('company_id', companyFilter);
+      if (effectiveCompanyFilter && effectiveCompanyFilter.length > 0) {
+        monthlyQuery = monthlyQuery.in('company_id', effectiveCompanyFilter);
       }
 
       const { data: monthlySales } = await monthlyQuery;
 
-      // Buscar todos os usuários ativos com suas empresas
-      let usersQuery = supabase
-        .from('profiles')
-        .select('id, name, email, is_active')
-        .eq('is_active', true);
-
-      const { data: allProfiles } = await usersQuery;
-
-      // Se houver filtro de empresa, buscar apenas usuários dessas empresas
+      // Buscar TODOS os usuários ativos das empresas do filtro
       let userIdsInCompanies: string[] = [];
-      if (companyFilter && companyFilter.length > 0) {
+      if (effectiveCompanyFilter && effectiveCompanyFilter.length > 0) {
         const { data: companyUsers } = await supabase
           .from('user_companies')
           .select('user_id')
-          .in('company_id', companyFilter)
+          .in('company_id', effectiveCompanyFilter)
           .eq('is_active', true);
         
         userIdsInCompanies = (companyUsers || []).map(u => u.user_id);
       }
 
-      const profiles = allProfiles?.filter(p => {
-        if (companyFilter && companyFilter.length > 0) {
-          return userIdsInCompanies.includes(p.id);
-        }
-        return true;
-      }) || [];
+      // Buscar perfis dos usuários das empresas
+      let profilesData: { id: string; name: string | null; email: string | null }[] = [];
+      
+      if (userIdsInCompanies.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name, email')
+          .in('id', userIdsInCompanies)
+          .eq('is_active', true);
+        profilesData = profiles || [];
+      } else if (!effectiveCompanyFilter) {
+        // Admin sem filtro - buscar todos os perfis ativos
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name, email')
+          .eq('is_active', true);
+        profilesData = profiles || [];
+      }
 
-      // Função para calcular valor da venda
-      const calculateSaleValue = (sale: any) => {
-        const tipoOperacao = sale.tipo_operacao?.toLowerCase()?.trim() || '';
-        const bancoNome = sale.banco?.toLowerCase()?.trim() || '';
-        
-        const applicableRule = rules.find(rule => {
-          const ruleBank = rule.bank_name?.toLowerCase()?.trim() || '';
-          const ruleProduct = rule.product_name?.toLowerCase()?.trim() || '';
-          
-          const bankMatch = ruleBank === bancoNome;
-          const productMatch = ruleProduct === tipoOperacao || 
-                              ruleProduct.includes(tipoOperacao) || 
-                              tipoOperacao.includes(ruleProduct);
-          
-          const isCompanyRule = rule.company_id === sale.company_id && sale.company_id;
-          const isGlobalRule = !rule.company_id;
-          
-          return bankMatch && productMatch && (isCompanyRule || isGlobalRule);
-        }) || rules.find(rule => {
-          const ruleBank = rule.bank_name?.toLowerCase()?.trim() || '';
-          return ruleBank === bancoNome;
-        });
-        
-        if (applicableRule) {
-          const calculationModel = applicableRule.calculation_model?.toLowerCase()?.trim();
-          
-          if (calculationModel === 'saldo_devedor') {
-            return sale.saldo_devedor || 0;
-          } else if (calculationModel === 'valor_bruto' || calculationModel === 'bruto') {
-            return (sale.saldo_devedor || 0) + (sale.troco || 0);
-          } else if (calculationModel === 'troco') {
-            return sale.troco || 0;
-          } else if (calculationModel === 'ambos') {
-            return (sale.saldo_devedor || 0) + (sale.troco || 0);
-          }
-        }
-        
-        if (tipoOperacao === 'portabilidade') {
-          return sale.saldo_devedor || 0;
-        }
-        
-        return sale.parcela || 0;
-      };
-
-      // Criar mapa de usuários
+      // Criar ranking baseado em quantidade de vendas
       const createRanking = (sales: any[] | null): RankingUser[] => {
         const userMap = new Map<string, RankingUser>();
         
-        profiles.forEach(p => {
+        // Inicializar todos os usuários da empresa com 0 vendas
+        profilesData.forEach(p => {
           userMap.set(p.id, {
             id: p.id,
             name: p.name || p.email?.split('@')[0] || 'Usuário',
-            salesCount: 0,
-            totalValue: 0,
-            commissionTotal: 0
+            salesCount: 0
           });
         });
 
+        // Contar vendas por usuário
         (sales || []).forEach(sale => {
           if (sale.user_id) {
-            const user = userMap.get(sale.user_id);
-            if (user) {
-              user.salesCount++;
-              user.totalValue += calculateSaleValue(sale);
+            const existingUser = userMap.get(sale.user_id);
+            if (existingUser) {
+              existingUser.salesCount++;
+            } else {
+              // Usuário não encontrado nos perfis, adicionar mesmo assim
+              userMap.set(sale.user_id, {
+                id: sale.user_id,
+                name: 'Usuário',
+                salesCount: 1
+              });
             }
           }
         });
 
+        // Ordenar por quantidade de vendas (maior para menor)
         return Array.from(userMap.values())
           .filter(u => u.salesCount > 0)
-          .sort((a, b) => {
-            // Ordenar por quantidade de vendas, depois por valor
-            if (b.salesCount !== a.salesCount) {
-              return b.salesCount - a.salesCount;
-            }
-            return b.totalValue - a.totalValue;
-          });
+          .sort((a, b) => b.salesCount - a.salesCount);
       };
 
       setDailyRanking(createRanking(dailySales));
@@ -196,10 +177,6 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
   const getInitials = (name: string) => {
@@ -283,15 +260,9 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
                       🥇 1º Lugar
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-4 mt-1">
-                    <div className="flex items-center gap-1">
-                      <TrendingUp className="h-4 w-4 text-success" />
-                      <span className="text-sm font-medium">{topUser.salesCount} vendas</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <DollarSign className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium text-primary">{formatCurrency(topUser.totalValue)}</span>
-                    </div>
+                  <div className="flex items-center gap-1 mt-1">
+                    <TrendingUp className="h-4 w-4 text-success" />
+                    <span className="text-sm font-medium">{topUser.salesCount} {topUser.salesCount === 1 ? 'venda' : 'vendas'}</span>
                   </div>
                 </div>
               </div>
@@ -316,10 +287,7 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{user.name}</p>
                     </div>
-                    <div className="flex items-center gap-3 text-xs">
-                      <span className="text-muted-foreground">{user.salesCount} vendas</span>
-                      <span className="font-medium text-success">{formatCurrency(user.totalValue)}</span>
-                    </div>
+                    <span className="text-sm text-muted-foreground">{user.salesCount} {user.salesCount === 1 ? 'venda' : 'vendas'}</span>
                   </div>
                 ))}
               </div>
