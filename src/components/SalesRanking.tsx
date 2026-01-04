@@ -24,7 +24,7 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
   const [dailyRanking, setDailyRanking] = useState<RankingUser[]>([]);
   const [monthlyRanking, setMonthlyRanking] = useState<RankingUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [effectiveCompanyFilter, setEffectiveCompanyFilter] = useState<string[] | null>(null);
+  const [effectiveCompanyFilter, setEffectiveCompanyFilter] = useState<string[] | null | undefined>(undefined);
 
   // Buscar empresas do usuário se não tiver filtro
   useEffect(() => {
@@ -35,11 +35,26 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
       }
 
       if (isAdmin) {
-        setEffectiveCompanyFilter(null);
+        // Para admin, buscar todas as empresas ativas
+        try {
+          const { data: allCompanies } = await supabase
+            .from('companies')
+            .select('id')
+            .eq('is_active', true);
+          
+          const companyIds = (allCompanies || []).map(c => c.id);
+          setEffectiveCompanyFilter(companyIds.length > 0 ? companyIds : []);
+        } catch (error) {
+          console.error('Error fetching all companies:', error);
+          setEffectiveCompanyFilter([]);
+        }
         return;
       }
 
-      if (!user?.id) return;
+      if (!user?.id) {
+        setEffectiveCompanyFilter([]);
+        return;
+      }
 
       try {
         const { data } = await supabase
@@ -49,9 +64,10 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
           .eq('is_active', true);
 
         const companyIds = (data || []).map(uc => uc.company_id);
-        setEffectiveCompanyFilter(companyIds.length > 0 ? companyIds : null);
+        setEffectiveCompanyFilter(companyIds.length > 0 ? companyIds : []);
       } catch (error) {
         console.error('Error fetching user companies:', error);
+        setEffectiveCompanyFilter([]);
       }
     };
 
@@ -59,12 +75,23 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
   }, [companyFilter, user?.id, isAdmin]);
 
   useEffect(() => {
-    if (effectiveCompanyFilter !== undefined) {
+    if (effectiveCompanyFilter !== undefined && effectiveCompanyFilter.length > 0) {
       fetchRankingData();
+    } else if (effectiveCompanyFilter !== undefined) {
+      setDailyRanking([]);
+      setMonthlyRanking([]);
+      setIsLoading(false);
     }
   }, [effectiveCompanyFilter, selectedMonth]);
 
   const fetchRankingData = async () => {
+    if (!effectiveCompanyFilter || effectiveCompanyFilter.length === 0) {
+      setDailyRanking([]);
+      setMonthlyRanking([]);
+      setIsLoading(false);
+      return;
+    }
+    
     setIsLoading(true);
     try {
       const today = new Date();
@@ -76,14 +103,6 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
       const todayStr = format(today, 'yyyy-MM-dd');
       const monthStartStr = format(monthStart, 'yyyy-MM-dd');
       const monthEndStr = format(monthEnd, 'yyyy-MM-dd');
-
-      // Se não temos filtro de empresa, não podemos mostrar ranking
-      if (!effectiveCompanyFilter || effectiveCompanyFilter.length === 0) {
-        setDailyRanking([]);
-        setMonthlyRanking([]);
-        setIsLoading(false);
-        return;
-      }
 
       // Usar a função RPC segura para buscar o ranking (bypassa RLS e retorna nomes corretamente)
       // A função já retorna user_id, user_name e sales_count ordenados
@@ -316,7 +335,7 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
   const monthName = format(new Date(year, month - 1), "MMMM 'de' yyyy", { locale: ptBR });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 md:gap-4">
       <RankingCard
         title={`🥇 Melhor Vendedor do Dia`}
         icon={<Trophy className="h-5 w-5 text-yellow-500" />}
