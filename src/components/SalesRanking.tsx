@@ -103,34 +103,19 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
 
       const { data: monthlySales } = await monthlyQuery;
 
-      // Buscar TODOS os usuários ativos das empresas do filtro
-      let userIdsInCompanies: string[] = [];
-      if (effectiveCompanyFilter && effectiveCompanyFilter.length > 0) {
-        const { data: companyUsers } = await supabase
-          .from('user_companies')
-          .select('user_id')
-          .in('company_id', effectiveCompanyFilter)
-          .eq('is_active', true);
-        
-        userIdsInCompanies = (companyUsers || []).map(u => u.user_id);
-      }
+      // Coletar todos os user_ids únicos das vendas
+      const allUserIds = new Set<string>();
+      (dailySales || []).forEach(sale => sale.user_id && allUserIds.add(sale.user_id));
+      (monthlySales || []).forEach(sale => sale.user_id && allUserIds.add(sale.user_id));
 
-      // Buscar perfis dos usuários das empresas
+      // Buscar perfis baseado nos user_ids das vendas (não depende de RLS restritiva)
       let profilesData: { id: string; name: string | null; email: string | null }[] = [];
       
-      if (userIdsInCompanies.length > 0) {
+      if (allUserIds.size > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, name, email')
-          .in('id', userIdsInCompanies)
-          .eq('is_active', true);
-        profilesData = profiles || [];
-      } else if (!effectiveCompanyFilter) {
-        // Admin sem filtro - buscar todos os perfis ativos
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, name, email')
-          .eq('is_active', true);
+          .in('id', Array.from(allUserIds));
         profilesData = profiles || [];
       }
 
