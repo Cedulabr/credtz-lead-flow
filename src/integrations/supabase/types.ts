@@ -2431,6 +2431,7 @@ export type Database = {
         Returns: {
           sales_count: number
           user_id: string
+          user_name: string
         }[]
       }
       get_user_company_ids: { Args: { _user_id: string }; Returns: string[] }
