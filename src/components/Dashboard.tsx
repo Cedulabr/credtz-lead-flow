@@ -328,12 +328,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       const { data: commissionRules } = await rulesQuery;
       const rules = commissionRules || [];
       
-      // Current period sales
+      // Formatar datas para comparação com data_venda (data de competência)
+      const startDateStr = format(startDate, 'yyyy-MM-dd');
+      const endDateStr = format(endDate, 'yyyy-MM-dd');
+      const prevStartStr = format(previousStart, 'yyyy-MM-dd');
+      const prevEndStr = format(previousEnd, 'yyyy-MM-dd');
+      
+      // Current period sales - usando data_venda (data de competência)
       let salesQuery = supabase
         .from('televendas')
         .select('*')
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString());
+        .gte('data_venda', startDateStr)
+        .lte('data_venda', endDateStr);
       
       if (!isAdmin && !isGestor) {
         salesQuery = salesQuery.eq('user_id', user?.id);
@@ -355,12 +361,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       setTotalRevenue(totalValue);
       setAverageTicket(paidSales.length > 0 ? totalValue / paidSales.length : 0);
       
-      // Previous period sales
+      // Previous period sales - usando data_venda (data de competência)
       let prevQuery = supabase
         .from('televendas')
         .select('*')
-        .gte('created_at', previousStart.toISOString())
-        .lte('created_at', previousEnd.toISOString());
+        .gte('data_venda', prevStartStr)
+        .lte('data_venda', prevEndStr);
       
       if (!isAdmin && !isGestor) {
         prevQuery = prevQuery.eq('user_id', user?.id);
@@ -375,13 +381,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       }, 0);
       setPreviousRevenue(prevTotalValue);
       
-      // Daily sales for chart - usando valores calculados
+      // Daily sales for chart - usando data_venda (data de competência)
       const daysInMonth = eachDayOfInterval({ start: startDate, end: endDate });
       const dailyData = daysInMonth.map(day => {
         const dayStr = format(day, 'yyyy-MM-dd');
-        const daySales = paidSales.filter(s => 
-          format(new Date(s.created_at), 'yyyy-MM-dd') === dayStr
-        );
+        const daySales = paidSales.filter(s => s.data_venda === dayStr);
         return {
           date: dayStr,
           day: format(day, 'dd', { locale: ptBR }),
@@ -417,11 +421,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       const { startDate, endDate } = getDateRange();
       const companyFilter = getCompanyFilter();
       
+      // Formatar datas para comparação com proposal_date (data de competência)
+      const startDateStr = format(startDate, 'yyyy-MM-dd');
+      const endDateStr = format(endDate, 'yyyy-MM-dd');
+      
+      // Usar proposal_date (data de competência) ao invés de created_at
       let query = supabase
         .from('commissions')
         .select('*')
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString());
+        .gte('proposal_date', startDateStr)
+        .lte('proposal_date', endDateStr);
       
       if (!isAdmin && !isGestor) {
         query = query.eq('user_id', user?.id);

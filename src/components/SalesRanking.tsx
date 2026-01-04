@@ -75,12 +75,16 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
       const monthStart = new Date(year, month - 1, 1);
       const monthEnd = new Date(year, month, 0, 23, 59, 59);
 
-      // Buscar vendas do dia - de TODOS os vendedores da empresa
+      // Formatar datas para comparação (data_venda é string no formato YYYY-MM-DD)
+      const todayStr = format(today, 'yyyy-MM-dd');
+      const monthStartStr = format(monthStart, 'yyyy-MM-dd');
+      const monthEndStr = format(monthEnd, 'yyyy-MM-dd');
+
+      // Buscar vendas do dia - usando data_venda (data de competência)
       let dailyQuery = supabase
         .from('televendas')
-        .select('user_id, company_id, status')
-        .gte('created_at', dayStart.toISOString())
-        .lte('created_at', dayEnd.toISOString())
+        .select('user_id, company_id, status, data_venda')
+        .eq('data_venda', todayStr)
         .eq('status', 'pago');
 
       if (effectiveCompanyFilter && effectiveCompanyFilter.length > 0) {
@@ -89,12 +93,12 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
 
       const { data: dailySales } = await dailyQuery;
 
-      // Buscar vendas do mês - de TODOS os vendedores da empresa
+      // Buscar vendas do mês - usando data_venda (data de competência)
       let monthlyQuery = supabase
         .from('televendas')
-        .select('user_id, company_id, status')
-        .gte('created_at', monthStart.toISOString())
-        .lte('created_at', monthEnd.toISOString())
+        .select('user_id, company_id, status, data_venda')
+        .gte('data_venda', monthStartStr)
+        .lte('data_venda', monthEndStr)
         .eq('status', 'pago');
 
       if (effectiveCompanyFilter && effectiveCompanyFilter.length > 0) {
