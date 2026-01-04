@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell } from "lucide-react";
+import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import credtzLogo from "@/assets/credtz-logo-new.jpeg";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { useWhitelabel } from "@/hooks/useWhitelabel";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
 interface NavigationProps {
   activeTab: string;
@@ -27,6 +28,14 @@ const navItems = [
   { id: "documents", label: "Documentos", icon: FileText, permissionKey: "can_access_documentos" },
   { id: "reuse-alerts", label: "Alertas", icon: Bell, permissionKey: "can_access_alertas" },
   { id: "commission-table", label: "Tabela de Comissões", icon: DollarSign, permissionKey: "can_access_tabela_comissoes" },
+  { id: "commissions", label: "Minhas Comissões", icon: DollarSign, permissionKey: "can_access_minhas_comissoes" },
+];
+
+// Mobile priority items - only icons
+const mobileNavItems = [
+  { id: "indicate", label: "Indicar", icon: UserPlus, permissionKey: "can_access_indicar" },
+  { id: "leads", label: "Leads Premium", icon: TrendingUp, permissionKey: "can_access_premium_leads" },
+  { id: "finances", label: "Finanças", icon: Wallet, permissionKey: "can_access_financas" },
   { id: "commissions", label: "Minhas Comissões", icon: DollarSign, permissionKey: "can_access_minhas_comissoes" },
 ];
 
@@ -60,10 +69,92 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
     return hasAccess(item.permissionKey);
   });
 
+  // Filter mobile items based on permissions
+  const visibleMobileItems = mobileNavItems.filter(item => {
+    if (isAdmin) return true;
+    return hasAccess(item.permissionKey);
+  });
+
   return (
     <>
-      {/* Mobile Header - Hidden to save space */}
-      <div className="md:hidden h-0"></div>
+      {/* Mobile Header - Minimal with menu toggle */}
+      <div className="md:hidden fixed top-0 left-0 right-0 bg-card border-b z-50 h-14 flex items-center justify-between px-4">
+        <div className="flex items-center gap-2">
+          <img 
+            src={logoUrl || credtzLogo} 
+            alt={`${companyName} Logo`} 
+            className="w-8 h-8 rounded-lg object-contain"
+          />
+          <span className="font-semibold text-foreground">{companyName}</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="h-10 w-10"
+        >
+          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </Button>
+      </div>
+
+      {/* Mobile Full Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 bg-background z-40 pt-14 pb-20 overflow-y-auto">
+          <nav className="p-4 space-y-2">
+            {visibleNavItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Button
+                  key={item.id}
+                  variant={activeTab === item.id ? "default" : "ghost"}
+                  onClick={() => {
+                    onTabChange(item.id);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full justify-start gap-3 h-12"
+                >
+                  <Icon size={20} />
+                  <span>{item.label}</span>
+                </Button>
+              );
+            })}
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                onClick={() => window.location.href = '/admin'}
+                className="w-full justify-start gap-3 h-12"
+              >
+                <Settings size={20} />
+                <span>Admin</span>
+              </Button>
+            )}
+          </nav>
+          
+          {user && (
+            <div className="p-4 border-t mt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <User className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium text-sm">{profile?.name || user.email}</p>
+                  {profile?.role && (
+                    <p className="text-xs text-muted-foreground capitalize">{profile.role}</p>
+                  )}
+                </div>
+              </div>
+              <ConnectionStatus />
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleSignOut}
+                className="w-full mt-3"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sair
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Desktop Sidebar - Hidden on Mobile */}
       <div className="hidden md:flex md:flex-col md:w-64 md:bg-card md:border-r md:h-screen md:sticky md:top-0">
@@ -147,40 +238,75 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         </div>
       </div>
 
-      {/* Bottom Navigation for Mobile - Show first 4 visible items */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t z-50 shadow-elevation">
-        <div className="grid grid-cols-4 gap-1 px-2 py-1">
-          {visibleNavItems.slice(0, 4).map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onTabChange(item.id)}
-                className={cn(
-                  "flex flex-col items-center justify-center py-3 px-2 transition-all duration-200 rounded-lg min-h-[72px]",
-                  activeTab === item.id
-                    ? "text-primary bg-primary/10 font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                )}
-              >
-                <Icon size={24} className="mb-1" />
-                <span className="text-xs text-center leading-tight font-medium">{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-        {isAdmin && (
-          <div className="border-t px-2 py-1">
-            <button
-              onClick={() => window.location.href = '/admin'}
-              className="w-full flex items-center justify-center py-2 text-muted-foreground hover:text-foreground text-sm"
-            >
-              <Settings size={16} className="mr-2" />
-              Admin
-            </button>
+      {/* Bottom Navigation for Mobile - Icons only with tooltips */}
+      <TooltipProvider delayDuration={0}>
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t z-50 safe-area-inset-bottom">
+          <div className="flex justify-around items-center px-2 py-2">
+            {/* Home button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onTabChange("dashboard")}
+                  className={cn(
+                    "flex items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200",
+                    activeTab === "dashboard"
+                      ? "text-primary bg-primary/15 shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  <Home size={26} strokeWidth={activeTab === "dashboard" ? 2.5 : 2} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="font-medium">
+                Início
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Dynamic mobile items - icons only */}
+            {visibleMobileItems.slice(0, 3).map((item) => {
+              const Icon = item.icon;
+              return (
+                <Tooltip key={item.id}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => onTabChange(item.id)}
+                      className={cn(
+                        "flex items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200",
+                        activeTab === item.id
+                          ? "text-primary bg-primary/15 shadow-sm"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      )}
+                    >
+                      <Icon size={26} strokeWidth={activeTab === item.id ? 2.5 : 2} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="font-medium">
+                    {item.label}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+
+            {/* More menu button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setIsMobileMenuOpen(true)}
+                  className={cn(
+                    "flex items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200",
+                    "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  <Menu size={26} strokeWidth={2} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="font-medium">
+                Menu
+              </TooltipContent>
+            </Tooltip>
           </div>
-        )}
-      </div>
+        </div>
+      </TooltipProvider>
     </>
   );
 }
