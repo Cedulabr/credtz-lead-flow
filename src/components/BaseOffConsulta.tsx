@@ -8,7 +8,9 @@ import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { ScrollArea } from "./ui/scroll-area";
-import { Skeleton } from "./ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Textarea } from "./ui/textarea";
 import { 
   Search, 
   User, 
@@ -20,13 +22,14 @@ import {
   Copy,
   Check,
   Building2,
-  Calendar,
   Banknote,
-  Wallet,
   ChevronRight,
   X,
   Upload,
-  AlertCircle
+  Calculator,
+  Play,
+  ChevronLeft,
+  Loader2
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -102,8 +105,37 @@ interface BaseOffContract {
   saldo: number | null;
 }
 
+interface SimulationResult {
+  contrato: string;
+  banco: string;
+  parcela: number;
+  saldo: number;
+  valorSimulado185: number;
+  valorSimulado22: number;
+  troco185: number;
+  troco22: number;
+}
+
+interface ActiveClient {
+  id: string;
+  client_id: string;
+  cpf: string;
+  status: string;
+  notes: string | null;
+  client: BaseOffClient;
+  contracts: BaseOffContract[];
+}
+
+const STATUS_OPTIONS = [
+  "Contato iniciado",
+  "Sem WhatsApp",
+  "Sem contrato disponível",
+  "Agendado",
+  "Desinteresse momentâneo"
+];
+
 export function BaseOffConsulta() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [searchType, setSearchType] = useState<"cpf" | "nome" | "nb">("cpf");
   const [isSearching, setIsSearching] = useState(false);
@@ -113,6 +145,20 @@ export function BaseOffConsulta() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [activeTab, setActiveTab] = useState("dados");
+  
+  // Simulação
+  const [showSimulation, setShowSimulation] = useState(false);
+  const [simulations, setSimulations] = useState<SimulationResult[]>([]);
+  
+  // Ativo
+  const [showAtivo, setShowAtivo] = useState(false);
+  const [activeClients, setActiveClients] = useState<ActiveClient[]>([]);
+  const [currentActiveIndex, setCurrentActiveIndex] = useState(0);
+  const [isLoadingAtivo, setIsLoadingAtivo] = useState(false);
+  const [statusModal, setStatusModal] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState("");
+  const [statusNotes, setStatusNotes] = useState("");
+  const [isSavingStatus, setIsSavingStatus] = useState(false);
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
@@ -129,7 +175,7 @@ export function BaseOffConsulta() {
       let query = supabase.from("baseoff_clients").select("*");
 
       if (searchType === "cpf") {
-        const cleanCpf = searchTerm.replace(/\D/g, "");
+        const cleanCpf = searchTerm.replace(/\D/g, "").padStart(11, "0");
         query = query.eq("cpf", cleanCpf);
       } else if (searchType === "nb") {
         query = query.ilike("nb", `%${searchTerm}%`);
@@ -150,7 +196,6 @@ export function BaseOffConsulta() {
 
       setSearchResults(data as BaseOffClient[]);
 
-      // Se encontrou apenas um, seleciona automaticamente
       if (data.length === 1) {
         await selectClient(data[0] as BaseOffClient);
       }
@@ -166,8 +211,8 @@ export function BaseOffConsulta() {
     setSelectedClient(client);
     setSearchResults([]);
     setActiveTab("dados");
+    setShowSimulation(false);
 
-    // Buscar contratos do cliente
     try {
       const { data: contractsData, error } = await supabase
         .from("baseoff_contracts")
@@ -179,6 +224,191 @@ export function BaseOffConsulta() {
       setContracts((contractsData || []) as BaseOffContract[]);
     } catch (error) {
       console.error("Erro ao buscar contratos:", error);
+    }
+  };
+
+  // Calcular simulações
+  const calculateSimulations = () => {
+    const FATOR_185 = 0.0234;
+    const FATOR_22 = 0.022605;
+
+    const results: SimulationResult[] = contracts
+      .filter(c => c.vl_parcela && c.vl_parcela > 0)
+      .map(contract => {
+        const parcela = contract.vl_parcela || 0;
+        const saldo = contract.saldo || 0;
+        
+        const valorSimulado185 = parcela / FATOR_185;
+        const valorSimulado22 = parcela / FATOR_22;
+        
+        const troco185 = valorSimulado185 - saldo;
+        const troco22 = valorSimulado22 - saldo;
+
+        return {
+          contrato: contract.contrato,
+          banco: contract.banco_emprestimo,
+          parcela,
+          saldo,
+          valorSimulado185,
+          valorSimulado22,
+          troco185,
+          troco22
+        };
+      });
+
+    setSimulations(results);
+    setShowSimulation(true);
+    setActiveTab("simulados");
+  };
+
+  // Função Ativo - Puxar 50 clientes
+  const handleAtivoClick = async () => {
+    if (!user?.id) {
+      toast.error("Usuário não autenticado");
+      return;
+    }
+
+    setIsLoadingAtivo(true);
+
+    try {
+      // Buscar IDs de clientes já atribuídos a qualquer usuário
+      const { data: assignedClients } = await supabase
+        .from("baseoff_active_clients")
+        .select("client_id");
+
+      const assignedIds = (assignedClients || []).map(c => c.client_id);
+
+      // Buscar 50 clientes não atribuídos
+      let query = supabase
+        .from("baseoff_clients")
+        .select("*")
+        .limit(50);
+
+      if (assignedIds.length > 0) {
+        query = query.not("id", "in", `(${assignedIds.join(",")})`);
+      }
+
+      const { data: availableClients, error } = await query;
+
+      if (error) throw error;
+
+      if (!availableClients || availableClients.length === 0) {
+        toast.info("Não há clientes disponíveis no momento");
+        setIsLoadingAtivo(false);
+        return;
+      }
+
+      // Inserir clientes como atribuídos ao usuário
+      const insertData = availableClients.map(client => ({
+        client_id: client.id,
+        cpf: client.cpf,
+        user_id: user.id,
+        status: "Pendente"
+      }));
+
+      const { error: insertError } = await supabase
+        .from("baseoff_active_clients")
+        .insert(insertData);
+
+      if (insertError) throw insertError;
+
+      // Buscar contratos para cada cliente
+      const clientsWithContracts: ActiveClient[] = [];
+      
+      for (const client of availableClients) {
+        const { data: contractsData } = await supabase
+          .from("baseoff_contracts")
+          .select("*")
+          .eq("client_id", client.id);
+
+        clientsWithContracts.push({
+          id: "", // Será preenchido depois
+          client_id: client.id,
+          cpf: client.cpf,
+          status: "Pendente",
+          notes: null,
+          client: client as BaseOffClient,
+          contracts: (contractsData || []) as BaseOffContract[]
+        });
+      }
+
+      setActiveClients(clientsWithContracts);
+      setCurrentActiveIndex(0);
+      setShowAtivo(true);
+      
+      toast.success(`${availableClients.length} clientes carregados para atendimento`);
+    } catch (error) {
+      console.error("Erro ao carregar clientes ativos:", error);
+      toast.error("Erro ao carregar clientes");
+    } finally {
+      setIsLoadingAtivo(false);
+    }
+  };
+
+  // Avançar para próximo cliente (requer status)
+  const handleNextClient = () => {
+    const currentClient = activeClients[currentActiveIndex];
+    if (currentClient.status === "Pendente") {
+      setStatusModal(true);
+      return;
+    }
+
+    if (currentActiveIndex < activeClients.length - 1) {
+      setCurrentActiveIndex(prev => prev + 1);
+    } else {
+      toast.info("Você atendeu todos os clientes da lista!");
+      setShowAtivo(false);
+    }
+  };
+
+  // Salvar status do cliente ativo
+  const saveClientStatus = async () => {
+    if (!selectedStatus) {
+      toast.error("Selecione um status");
+      return;
+    }
+
+    setIsSavingStatus(true);
+
+    try {
+      const currentClient = activeClients[currentActiveIndex];
+
+      await supabase
+        .from("baseoff_active_clients")
+        .update({
+          status: selectedStatus,
+          notes: statusNotes || null,
+          status_updated_at: new Date().toISOString()
+        })
+        .eq("client_id", currentClient.client_id)
+        .eq("user_id", user?.id);
+
+      // Atualizar estado local
+      const updatedClients = [...activeClients];
+      updatedClients[currentActiveIndex] = {
+        ...currentClient,
+        status: selectedStatus,
+        notes: statusNotes
+      };
+      setActiveClients(updatedClients);
+
+      toast.success("Status atualizado");
+      setStatusModal(false);
+      setSelectedStatus("");
+      setStatusNotes("");
+
+      // Avançar para próximo
+      if (currentActiveIndex < activeClients.length - 1) {
+        setCurrentActiveIndex(prev => prev + 1);
+      } else {
+        toast.info("Você atendeu todos os clientes da lista!");
+        setShowAtivo(false);
+      }
+    } catch (error) {
+      console.error("Erro ao salvar status:", error);
+      toast.error("Erro ao salvar status");
+    } finally {
+      setIsSavingStatus(false);
     }
   };
 
@@ -234,37 +464,190 @@ export function BaseOffConsulta() {
     return "outline";
   };
 
-  const getPhones = () => {
-    if (!selectedClient) return [];
-    const phones = [
-      selectedClient.tel_cel_1,
-      selectedClient.tel_cel_2,
-      selectedClient.tel_cel_3,
-      selectedClient.tel_fixo_1,
-      selectedClient.tel_fixo_2,
-      selectedClient.tel_fixo_3,
+  const getPhones = (client?: BaseOffClient) => {
+    const c = client || selectedClient;
+    if (!c) return [];
+    return [
+      c.tel_cel_1,
+      c.tel_cel_2,
+      c.tel_cel_3,
+      c.tel_fixo_1,
+      c.tel_fixo_2,
+      c.tel_fixo_3,
     ].filter(Boolean);
-    return phones;
   };
 
-  const getEmails = () => {
-    if (!selectedClient) return [];
-    const emails = [
-      selectedClient.email_1,
-      selectedClient.email_2,
-      selectedClient.email_3,
-    ].filter(Boolean);
-    return emails;
+  const getEmails = (client?: BaseOffClient) => {
+    const c = client || selectedClient;
+    if (!c) return [];
+    return [c.email_1, c.email_2, c.email_3].filter(Boolean);
   };
 
   if (showImport && isAdmin) {
     return <BaseOffImport onBack={() => setShowImport(false)} />;
   }
 
+  // Tela de Ativo
+  if (showAtivo && activeClients.length > 0) {
+    const currentClient = activeClients[currentActiveIndex];
+    const clientData = currentClient.client;
+    const clientContracts = currentClient.contracts;
+
+    return (
+      <div className="p-4 space-y-4">
+        {/* Header Ativo */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={() => setShowAtivo(false)}>
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Voltar
+            </Button>
+            <div>
+              <h1 className="text-xl font-bold flex items-center gap-2">
+                <Play className="h-5 w-5 text-primary" />
+                Atendimento Ativo
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Cliente {currentActiveIndex + 1} de {activeClients.length}
+              </p>
+            </div>
+          </div>
+          <Badge variant={currentClient.status === "Pendente" ? "destructive" : "default"}>
+            {currentClient.status}
+          </Badge>
+        </div>
+
+        {/* Progress */}
+        <div className="w-full bg-muted rounded-full h-2">
+          <div 
+            className="bg-primary h-2 rounded-full transition-all"
+            style={{ width: `${((currentActiveIndex + 1) / activeClients.length) * 100}%` }}
+          />
+        </div>
+
+        {/* Client Card */}
+        <Card>
+          <CardHeader className="border-b bg-muted/30">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <User className="h-5 w-5 text-primary" />
+                <CardTitle className="text-xl">{clientData.nome}</CardTitle>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                <span>CPF: <span className="font-mono font-medium text-foreground">{formatCpf(clientData.cpf)}</span></span>
+                <span>NB: <span className="font-mono font-medium text-foreground">{clientData.nb}</span></span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {getPhones(clientData).slice(0, 3).map((phone, idx) => (
+                  <Badge key={idx} variant="outline" className="font-mono">
+                    <Phone className="h-3 w-3 mr-1" />
+                    {formatPhone(phone)}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4">
+            {/* Contratos do cliente ativo */}
+            <h4 className="font-medium mb-3 flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-primary" />
+              Contratos ({clientContracts.length})
+            </h4>
+            {clientContracts.length > 0 ? (
+              <ScrollArea className="max-h-64">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Banco</TableHead>
+                      <TableHead>Contrato</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead className="text-right">Parcela</TableHead>
+                      <TableHead className="text-right">Saldo</TableHead>
+                      <TableHead>Situação</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clientContracts.map((contract) => (
+                      <TableRow key={contract.id}>
+                        <TableCell className="font-medium">{contract.banco_emprestimo}</TableCell>
+                        <TableCell className="font-mono text-xs">{contract.contrato}</TableCell>
+                        <TableCell>{contract.tipo_emprestimo || "-"}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(contract.vl_parcela)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(contract.saldo)}</TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusColor(contract.situacao_emprestimo) as any}>
+                            {contract.situacao_emprestimo || "-"}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            ) : (
+              <p className="text-muted-foreground text-sm">Nenhum contrato encontrado</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Ações */}
+        <div className="flex justify-end gap-3">
+          <Button 
+            variant="outline"
+            onClick={() => setStatusModal(true)}
+          >
+            Marcar Status
+          </Button>
+          <Button onClick={handleNextClient}>
+            Próximo Cliente
+            <ChevronRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
+
+        {/* Modal de Status */}
+        <Dialog open={statusModal} onOpenChange={setStatusModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Selecione o Status do Atendimento</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um status..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Textarea
+                placeholder="Observações (opcional)"
+                value={statusNotes}
+                onChange={(e) => setStatusNotes(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setStatusModal(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={saveClientStatus} disabled={isSavingStatus || !selectedStatus}>
+                {isSavingStatus && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Salvar e Avançar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <FileText className="h-6 w-6 text-primary" />
@@ -274,12 +657,14 @@ export function BaseOffConsulta() {
             Consulte dados cadastrais e contratos de clientes
           </p>
         </div>
-        {isAdmin && (
-          <Button onClick={() => setShowImport(true)} variant="outline">
-            <Upload className="h-4 w-4 mr-2" />
-            Importar Base
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {isAdmin && (
+            <Button onClick={() => setShowImport(true)} variant="outline">
+              <Upload className="h-4 w-4 mr-2" />
+              Importar Base
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Search */}
@@ -314,6 +699,18 @@ export function BaseOffConsulta() {
               <Button onClick={handleSearch} disabled={isSearching}>
                 <Search className="h-4 w-4 mr-2" />
                 {isSearching ? "Buscando..." : "Buscar"}
+              </Button>
+              <Button 
+                onClick={handleAtivoClick} 
+                variant="secondary"
+                disabled={isLoadingAtivo}
+              >
+                {isLoadingAtivo ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4 mr-2" />
+                )}
+                Ativo
               </Button>
             </div>
           </div>
@@ -372,7 +769,7 @@ export function BaseOffConsulta() {
                       onClick={() => copyToClipboard(selectedClient.cpf, "cpf")}
                     >
                       {copiedField === "cpf" ? (
-                        <Check className="h-3 w-3 text-success" />
+                        <Check className="h-3 w-3 text-green-500" />
                       ) : (
                         <Copy className="h-3 w-3" />
                       )}
@@ -390,7 +787,7 @@ export function BaseOffConsulta() {
                       onClick={() => copyToClipboard(selectedClient.nb, "nb")}
                     >
                       {copiedField === "nb" ? (
-                        <Check className="h-3 w-3 text-success" />
+                        <Check className="h-3 w-3 text-green-500" />
                       ) : (
                         <Copy className="h-3 w-3" />
                       )}
@@ -409,7 +806,7 @@ export function BaseOffConsulta() {
                         onClick={() => copyToClipboard(phone!, `phone-${idx}`)}
                       >
                         {copiedField === `phone-${idx}` ? (
-                          <Check className="h-2.5 w-2.5 text-success" />
+                          <Check className="h-2.5 w-2.5 text-green-500" />
                         ) : (
                           <Copy className="h-2.5 w-2.5" />
                         )}
@@ -424,6 +821,7 @@ export function BaseOffConsulta() {
                 onClick={() => {
                   setSelectedClient(null);
                   setContracts([]);
+                  setShowSimulation(false);
                 }}
               >
                 <X className="h-4 w-4" />
@@ -454,6 +852,18 @@ export function BaseOffConsulta() {
                 >
                   <CreditCard className="h-4 w-4 mr-2" />
                   Contratos ({contracts.length})
+                </TabsTrigger>
+                <TabsTrigger
+                  value="simulados"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary"
+                  onClick={() => {
+                    if (!showSimulation && contracts.length > 0) {
+                      calculateSimulations();
+                    }
+                  }}
+                >
+                  <Calculator className="h-4 w-4 mr-2" />
+                  Simulados
                 </TabsTrigger>
               </TabsList>
 
@@ -577,7 +987,7 @@ export function BaseOffConsulta() {
                             onClick={() => copyToClipboard(phone!, `phone-info-${idx}`)}
                           >
                             {copiedField === `phone-info-${idx}` ? (
-                              <Check className="h-3 w-3 text-success" />
+                              <Check className="h-3 w-3 text-green-500" />
                             ) : (
                               <Copy className="h-3 w-3" />
                             )}
@@ -614,7 +1024,7 @@ export function BaseOffConsulta() {
                             onClick={() => copyToClipboard(email!, `email-${idx}`)}
                           >
                             {copiedField === `email-${idx}` ? (
-                              <Check className="h-3 w-3 text-success" />
+                              <Check className="h-3 w-3 text-green-500" />
                             ) : (
                               <Copy className="h-3 w-3" />
                             )}
@@ -637,47 +1047,43 @@ export function BaseOffConsulta() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Banco</TableHead>
+                          <TableHead>Banco RMC</TableHead>
+                          <TableHead className="text-right">Valor RMC</TableHead>
+                          <TableHead>Banco RCC</TableHead>
+                          <TableHead className="text-right">Valor RCC</TableHead>
+                          <TableHead>Banco Empréstimo</TableHead>
                           <TableHead>Contrato</TableHead>
-                          <TableHead>Tipo</TableHead>
-                          <TableHead className="text-right">Valor</TableHead>
-                          <TableHead className="text-right">Parcela</TableHead>
+                          <TableHead className="text-right">Valor Empréstimo</TableHead>
+                          <TableHead>Início Desconto</TableHead>
                           <TableHead>Prazo</TableHead>
+                          <TableHead className="text-right">Parcela</TableHead>
+                          <TableHead>Tipo</TableHead>
                           <TableHead>Averbação</TableHead>
-                          <TableHead className="text-right">Taxa</TableHead>
-                          <TableHead className="text-right">Saldo</TableHead>
-                          <TableHead>Situação</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {contracts.map((contract) => (
                           <TableRow key={contract.id}>
+                            <TableCell>{selectedClient.banco_rmc || "-"}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(selectedClient.valor_rmc)}</TableCell>
+                            <TableCell>{selectedClient.banco_rcc || "-"}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(selectedClient.valor_rcc)}</TableCell>
                             <TableCell className="font-medium">
                               {contract.banco_emprestimo}
                             </TableCell>
                             <TableCell className="font-mono text-xs">
                               {contract.contrato}
                             </TableCell>
-                            <TableCell>{contract.tipo_emprestimo || "-"}</TableCell>
                             <TableCell className="text-right">
                               {formatCurrency(contract.vl_emprestimo)}
                             </TableCell>
+                            <TableCell>{formatDate(contract.inicio_desconto)}</TableCell>
+                            <TableCell>{contract.prazo || "-"}</TableCell>
                             <TableCell className="text-right">
                               {formatCurrency(contract.vl_parcela)}
                             </TableCell>
-                            <TableCell>{contract.prazo || "-"}</TableCell>
+                            <TableCell>{contract.tipo_emprestimo || "-"}</TableCell>
                             <TableCell>{formatDate(contract.data_averbacao)}</TableCell>
-                            <TableCell className="text-right">
-                              {contract.taxa ? `${contract.taxa}%` : "-"}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {formatCurrency(contract.saldo)}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={getStatusColor(contract.situacao_emprestimo) as any}>
-                                {contract.situacao_emprestimo || "-"}
-                              </Badge>
-                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -689,6 +1095,82 @@ export function BaseOffConsulta() {
                     <p className="text-muted-foreground">
                       Nenhum contrato encontrado para este cliente
                     </p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Simulados */}
+              <TabsContent value="simulados" className="p-4">
+                {simulations.length > 0 ? (
+                  <div className="space-y-4">
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Calculator className="h-4 w-4 text-primary" />
+                        Simulação de Portabilidade
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        Valores estimados com base nos fatores de taxa 1,85% (0,0234) e taxa alternativa (0,022605)
+                      </p>
+                    </div>
+                    <ScrollArea className="w-full">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Banco</TableHead>
+                            <TableHead>Contrato</TableHead>
+                            <TableHead className="text-right">Parcela</TableHead>
+                            <TableHead className="text-right">Saldo Devedor</TableHead>
+                            <TableHead className="text-right">Valor (1,85%)</TableHead>
+                            <TableHead className="text-right">Troco (1,85%)</TableHead>
+                            <TableHead className="text-right">Valor (Alt.)</TableHead>
+                            <TableHead className="text-right">Troco (Alt.)</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {simulations.map((sim, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-medium">{sim.banco}</TableCell>
+                              <TableCell className="font-mono text-xs">{sim.contrato}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(sim.parcela)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(sim.saldo)}</TableCell>
+                              <TableCell className="text-right font-medium text-primary">
+                                {formatCurrency(sim.valorSimulado185)}
+                              </TableCell>
+                              <TableCell className={`text-right font-medium ${sim.troco185 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {formatCurrency(sim.troco185)}
+                              </TableCell>
+                              <TableCell className="text-right font-medium text-primary">
+                                {formatCurrency(sim.valorSimulado22)}
+                              </TableCell>
+                              <TableCell className={`text-right font-medium ${sim.troco22 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {formatCurrency(sim.troco22)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                        ⚠️ Os valores acima são apenas simulações informativas e não representam proposta formal.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Calculator className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                    <p className="text-muted-foreground mb-4">
+                      {contracts.length === 0 
+                        ? "Nenhum contrato disponível para simulação"
+                        : "Clique para calcular simulações"
+                      }
+                    </p>
+                    {contracts.length > 0 && (
+                      <Button onClick={calculateSimulations}>
+                        <Calculator className="h-4 w-4 mr-2" />
+                        Calcular Simulações
+                      </Button>
+                    )}
                   </div>
                 )}
               </TabsContent>
@@ -705,7 +1187,7 @@ export function BaseOffConsulta() {
             <h3 className="text-lg font-medium mb-2">Busque um cliente</h3>
             <p className="text-muted-foreground max-w-md">
               Digite o CPF, nome ou número do benefício para consultar os dados cadastrais e
-              contratos do cliente.
+              contratos do cliente. Ou clique em <strong>Ativo</strong> para iniciar atendimento.
             </p>
           </CardContent>
         </Card>
