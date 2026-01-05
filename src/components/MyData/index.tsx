@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, User, FileText, History, Settings } from 'lucide-react';
+import { Loader2, User, FileText, History, Settings, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -11,14 +11,23 @@ import { PersonalDataForm } from './PersonalDataForm';
 import { DocumentsManager } from './DocumentsManager';
 import { HistoryLog } from './HistoryLog';
 import { AdminObservations } from './AdminObservations';
+import { UserDataList } from './UserDataList';
+import { UserDataDetail } from './UserDataDetail';
 
 export function MyData() {
   const { user, profile } = useAuth();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [documents, setDocuments] = useState<UserDocument[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Admin/Partner view states
+  const [viewMode, setViewMode] = useState<'my-data' | 'user-list' | 'user-detail'>('my-data');
+  const [selectedUserData, setSelectedUserData] = useState<UserData | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const isAdmin = profile?.role === 'admin';
+  const isPartner = profile?.role === 'partner';
+  const canManageUsers = isAdmin || isPartner;
 
   useEffect(() => {
     if (user) {
@@ -172,6 +181,18 @@ export function MyData() {
     await fetchData();
   };
 
+  const handleSelectUser = (userData: UserData, userId: string) => {
+    setSelectedUserData(userData);
+    setSelectedUserId(userId);
+    setViewMode('user-detail');
+  };
+
+  const handleBackToList = () => {
+    setSelectedUserData(null);
+    setSelectedUserId(null);
+    setViewMode('user-list');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -180,13 +201,58 @@ export function MyData() {
     );
   }
 
+  // User detail view for admin/partner
+  if (viewMode === 'user-detail' && selectedUserData && selectedUserId) {
+    return (
+      <UserDataDetail
+        userData={selectedUserData}
+        userId={selectedUserId}
+        onBack={handleBackToList}
+      />
+    );
+  }
+
+  // User list view for admin/partner
+  if (viewMode === 'user-list' && canManageUsers) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Gestão de Cadastros</h1>
+            <p className="text-muted-foreground">
+              Gerencie os cadastros de todos os usuários
+            </p>
+          </div>
+          <button
+            onClick={() => setViewMode('my-data')}
+            className="text-sm text-primary hover:underline"
+          >
+            Ver Meus Dados
+          </button>
+        </div>
+        <UserDataList onSelectUser={handleSelectUser} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Meus Dados</h1>
-        <p className="text-muted-foreground">
-          Gerencie suas informações pessoais e documentos
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Meus Dados</h1>
+          <p className="text-muted-foreground">
+            Gerencie suas informações pessoais e documentos
+          </p>
+        </div>
+        {canManageUsers && (
+          <button
+            onClick={() => setViewMode('user-list')}
+            className="flex items-center gap-2 text-sm text-primary hover:underline"
+          >
+            <Users className="h-4 w-4" />
+            Gestão de Cadastros
+          </button>
+        )}
       </div>
 
       <StatusCard

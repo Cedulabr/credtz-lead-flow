@@ -8,6 +8,7 @@ import { Progress } from "./ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useWhitelabel } from "@/hooks/useWhitelabel";
 import { useTelevendasNotifications } from "@/hooks/useTelevendasNotifications";
+import { useUserDataNotifications } from "@/hooks/useUserDataNotifications";
 import { SalesRanking } from "./SalesRanking";
 import { 
   Users, 
@@ -98,7 +99,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const { user, profile, isAdmin } = useAuth();
   const { config } = useWhitelabel();
   const { unreadCount: televendasUnreadCount } = useTelevendasNotifications();
+  const { unreadCount: userDataUnreadCount } = useUserDataNotifications();
   
+  // Total unread count for notifications badge
+  const totalNotificationsCount = televendasUnreadCount + userDataUnreadCount;
   // Period and filters
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
