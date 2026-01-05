@@ -484,34 +484,63 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
         setProgress(50 + Math.round(((i + batchSize) / clientsArray.length) * 25));
       }
 
-      // Buscar IDs dos clientes inseridos
+      // Buscar IDs dos clientes inseridos (em lotes para evitar limite de query/URL)
       setProgressText("Vinculando contratos...");
       const cpfList = Array.from(clientsMap.keys());
-      const { data: insertedClients } = await supabase
-        .from("baseoff_clients")
-        .select("id, cpf")
-        .in("cpf", cpfList);
-
       const cpfToIdMap = new Map<string, string>();
-      insertedClients?.forEach((c) => cpfToIdMap.set(c.cpf, c.id));
+      const cpfBatchSize = 1000;
+
+      for (let i = 0; i < cpfList.length; i += cpfBatchSize) {
+        const cpfBatch = cpfList.slice(i, i + cpfBatchSize);
+
+        const { data: insertedClientsBatch, error: insertedClientsError } = await supabase
+          .from("baseoff_clients")
+          .select("id, cpf")
+          .in("cpf", cpfBatch)
+          .limit(cpfBatchSize);
+
+        if (insertedClientsError) {
+          console.error("Erro ao buscar IDs dos clientes:", insertedClientsError);
+          importResult.errors++;
+          importResult.errorDetails.push({
+            row: 0,
+            error: `Erro ao vincular contratos (buscar IDs de clientes): ${insertedClientsError.message}`,
+          });
+          continue;
+        }
+
+        insertedClientsBatch?.forEach((c) => cpfToIdMap.set(c.cpf, c.id));
+
+        // Progresso: 50 -> 75 durante vínculo
+        setProgress(50 + Math.round(((i + cpfBatch.length) / cpfList.length) * 25));
+      }
 
       // Inserir contratos
       const allContracts: any[] = [];
+      let cpfsSemId = 0;
+
       contractsMap.forEach((contracts, cpf) => {
         const clientId = cpfToIdMap.get(cpf);
-        if (clientId) {
-          contracts.forEach((contract) => {
-            allContracts.push({
-              ...contract,
-              client_id: clientId,
-            });
-          });
+        if (!clientId) {
+          cpfsSemId++;
+          return;
         }
+
+        contracts.forEach((contract) => {
+          allContracts.push({
+            ...contract,
+            client_id: clientId,
+          });
+        });
       });
+
+      if (cpfsSemId > 0) {
+        console.warn(`Não foi possível resolver o ID de ${cpfsSemId} CPFs para vínculo de contratos.`);
+      }
 
       if (allContracts.length > 0) {
         setProgressText(`Salvando ${allContracts.length} contratos...`);
-        
+
         for (let i = 0; i < allContracts.length; i += batchSize) {
           const batch = allContracts.slice(i, i + batchSize);
 
@@ -522,6 +551,11 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
 
           if (error) {
             console.error("Erro ao inserir contratos:", error);
+            importResult.errors++;
+            importResult.errorDetails.push({
+              row: 0,
+              error: `Erro ao salvar contratos: ${error.message}`,
+            });
           }
 
           setProgress(75 + Math.round(((i + batchSize) / allContracts.length) * 25));

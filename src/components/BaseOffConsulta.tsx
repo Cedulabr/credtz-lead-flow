@@ -92,6 +92,8 @@ interface BaseOffClient {
 
 interface BaseOffContract {
   id: string;
+  client_id?: string; // preferencial para vínculo
+  cpf?: string; // redundância
   banco_emprestimo: string;
   contrato: string;
   vl_emprestimo: number | null;
@@ -263,19 +265,41 @@ export function BaseOffConsulta() {
     }
   };
 
-  // Buscar contratos por CPF
-  const fetchContractsByCpf = async (cpf: string): Promise<BaseOffContract[]> => {
+  const normalizeCpf = (cpf: string) => cpf.replace(/\D/g, "").padStart(11, "0").slice(0, 11);
+
+  // Buscar contratos do cliente (prioriza vínculo por client_id; fallback por CPF)
+  const fetchContractsForClient = async (client: Pick<BaseOffClient, "id" | "cpf">): Promise<BaseOffContract[]> => {
+    // 1) client_id (mais confiável)
     try {
       const { data, error } = await supabase
         .from("baseoff_contracts")
         .select("*")
-        .eq("cpf", cpf)
+        .eq("client_id", client.id)
+        .order("data_averbacao", { ascending: false });
+
+      if (error) throw error;
+      if (data && data.length > 0) return data as BaseOffContract[];
+    } catch (error) {
+      console.error("Erro ao buscar contratos por client_id:", error);
+    }
+
+    // 2) fallback por CPF (caso existam contratos legados sem client_id consistente)
+    try {
+      const cpfDigits = normalizeCpf(client.cpf);
+      const cpfSemZeros = cpfDigits.replace(/^0+/, "");
+      const cpfMascara = cpfDigits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+      const variants = Array.from(new Set([cpfDigits, cpfSemZeros, cpfMascara].filter(Boolean)));
+
+      const { data, error } = await supabase
+        .from("baseoff_contracts")
+        .select("*")
+        .in("cpf", variants)
         .order("data_averbacao", { ascending: false });
 
       if (error) throw error;
       return (data || []) as BaseOffContract[];
     } catch (error) {
-      console.error("Erro ao buscar contratos:", error);
+      console.error("Erro ao buscar contratos por CPF:", error);
       return [];
     }
   };
@@ -286,8 +310,7 @@ export function BaseOffConsulta() {
     setActiveTab("dados");
     setShowSimulation(false);
 
-    // Buscar contratos por CPF
-    const clientContracts = await fetchContractsByCpf(client.cpf);
+    const clientContracts = await fetchContractsForClient(client);
     setContracts(clientContracts);
   };
 
@@ -401,11 +424,11 @@ export function BaseOffConsulta() {
 
       if (insertError) throw insertError;
 
-      // Buscar contratos para cada cliente por CPF
+      // Buscar contratos para cada cliente (prioriza vínculo por client_id)
       const clientsWithContracts: ActiveClient[] = [];
-      
+
       for (const client of availableClients) {
-        const contractsData = await fetchContractsByCpf(client.cpf);
+        const contractsData = await fetchContractsForClient(client as BaseOffClient);
 
         clientsWithContracts.push({
           id: "",
@@ -414,7 +437,7 @@ export function BaseOffConsulta() {
           status: "Pendente",
           notes: null,
           client: client as BaseOffClient,
-          contracts: contractsData
+          contracts: contractsData,
         });
       }
 
