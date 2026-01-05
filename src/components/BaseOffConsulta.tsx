@@ -11,6 +11,7 @@ import { ScrollArea } from "./ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Textarea } from "./ui/textarea";
+import { Label } from "./ui/label";
 import { 
   Search, 
   User, 
@@ -29,7 +30,8 @@ import {
   Calculator,
   Play,
   ChevronLeft,
-  Loader2
+  Loader2,
+  Filter
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -108,6 +110,10 @@ interface BaseOffContract {
 interface SimulationResult {
   contrato: string;
   banco: string;
+  tipo: string;
+  vl_emprestimo: number;
+  inicio_desconto: string | null;
+  prazo: number | null;
   parcela: number;
   saldo: number;
   valorSimulado185: number;
@@ -132,6 +138,13 @@ const STATUS_OPTIONS = [
   "Sem contrato disponível",
   "Agendado",
   "Desinteresse momentâneo"
+];
+
+// Estados brasileiros
+const ESTADOS_BR = [
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", 
+  "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", 
+  "SP", "SE", "TO"
 ];
 
 export function BaseOffConsulta() {
@@ -159,6 +172,49 @@ export function BaseOffConsulta() {
   const [selectedStatus, setSelectedStatus] = useState("");
   const [statusNotes, setStatusNotes] = useState("");
   const [isSavingStatus, setIsSavingStatus] = useState(false);
+  
+  // Filtro Regional - Modal Ativo
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [selectedUF, setSelectedUF] = useState("");
+  const [selectedCidade, setSelectedCidade] = useState("");
+  const [cidadesDisponiveis, setCidadesDisponiveis] = useState<string[]>([]);
+  const [isLoadingCidades, setIsLoadingCidades] = useState(false);
+
+  // Buscar cidades quando UF é selecionado
+  useEffect(() => {
+    const fetchCidades = async () => {
+      if (!selectedUF) {
+        setCidadesDisponiveis([]);
+        setSelectedCidade("");
+        return;
+      }
+
+      setIsLoadingCidades(true);
+      try {
+        const { data, error } = await supabase
+          .from("baseoff_clients")
+          .select("municipio")
+          .eq("uf", selectedUF)
+          .not("municipio", "is", null)
+          .limit(500);
+
+        if (error) throw error;
+
+        // Extrair cidades únicas e ordenar
+        const cidadesUnicas = [...new Set((data || []).map(d => d.municipio).filter(Boolean))]
+          .sort() as string[];
+        
+        setCidadesDisponiveis(cidadesUnicas);
+      } catch (error) {
+        console.error("Erro ao buscar cidades:", error);
+        toast.error("Erro ao carregar cidades");
+      } finally {
+        setIsLoadingCidades(false);
+      }
+    };
+
+    fetchCidades();
+  }, [selectedUF]);
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
@@ -207,33 +263,42 @@ export function BaseOffConsulta() {
     }
   };
 
+  // Buscar contratos por CPF
+  const fetchContractsByCpf = async (cpf: string): Promise<BaseOffContract[]> => {
+    try {
+      const { data, error } = await supabase
+        .from("baseoff_contracts")
+        .select("*")
+        .eq("cpf", cpf)
+        .order("data_averbacao", { ascending: false });
+
+      if (error) throw error;
+      return (data || []) as BaseOffContract[];
+    } catch (error) {
+      console.error("Erro ao buscar contratos:", error);
+      return [];
+    }
+  };
+
   const selectClient = async (client: BaseOffClient) => {
     setSelectedClient(client);
     setSearchResults([]);
     setActiveTab("dados");
     setShowSimulation(false);
 
-    try {
-      const { data: contractsData, error } = await supabase
-        .from("baseoff_contracts")
-        .select("*")
-        .eq("client_id", client.id)
-        .order("data_averbacao", { ascending: false });
-
-      if (error) throw error;
-      setContracts((contractsData || []) as BaseOffContract[]);
-    } catch (error) {
-      console.error("Erro ao buscar contratos:", error);
-    }
+    // Buscar contratos por CPF
+    const clientContracts = await fetchContractsByCpf(client.cpf);
+    setContracts(clientContracts);
   };
 
-  // Calcular simulações
+  // Calcular simulações - apenas para contratos de empréstimo
   const calculateSimulations = () => {
     const FATOR_185 = 0.0234;
     const FATOR_22 = 0.022605;
 
+    // Filtrar apenas contratos de empréstimo (que tenham contrato e tipo_emprestimo)
     const results: SimulationResult[] = contracts
-      .filter(c => c.vl_parcela && c.vl_parcela > 0)
+      .filter(c => c.contrato && c.tipo_emprestimo && c.vl_parcela && c.vl_parcela > 0)
       .map(contract => {
         const parcela = contract.vl_parcela || 0;
         const saldo = contract.saldo || 0;
@@ -247,6 +312,10 @@ export function BaseOffConsulta() {
         return {
           contrato: contract.contrato,
           banco: contract.banco_emprestimo,
+          tipo: contract.tipo_emprestimo || "",
+          vl_emprestimo: contract.vl_emprestimo || 0,
+          inicio_desconto: contract.inicio_desconto,
+          prazo: contract.prazo,
           parcela,
           saldo,
           valorSimulado185,
@@ -261,13 +330,31 @@ export function BaseOffConsulta() {
     setActiveTab("simulados");
   };
 
-  // Função Ativo - Puxar 50 clientes
-  const handleAtivoClick = async () => {
+  // Abrir modal de filtro regional antes de puxar clientes
+  const handleAtivoClick = () => {
+    setSelectedUF("");
+    setSelectedCidade("");
+    setShowFilterModal(true);
+  };
+
+  // Confirmar e puxar clientes com filtro
+  const handleConfirmAtivo = async () => {
+    if (!selectedUF) {
+      toast.error("Selecione um estado");
+      return;
+    }
+    
+    if (!selectedCidade) {
+      toast.error("Selecione uma cidade");
+      return;
+    }
+
     if (!user?.id) {
       toast.error("Usuário não autenticado");
       return;
     }
 
+    setShowFilterModal(false);
     setIsLoadingAtivo(true);
 
     try {
@@ -278,10 +365,12 @@ export function BaseOffConsulta() {
 
       const assignedIds = (assignedClients || []).map(c => c.client_id);
 
-      // Buscar 50 clientes não atribuídos
+      // Buscar 50 clientes não atribuídos da região selecionada
       let query = supabase
         .from("baseoff_clients")
         .select("*")
+        .eq("uf", selectedUF)
+        .eq("municipio", selectedCidade)
         .limit(50);
 
       if (assignedIds.length > 0) {
@@ -293,7 +382,7 @@ export function BaseOffConsulta() {
       if (error) throw error;
 
       if (!availableClients || availableClients.length === 0) {
-        toast.info("Não há clientes disponíveis no momento");
+        toast.info(`Não há clientes disponíveis em ${selectedCidade}/${selectedUF}`);
         setIsLoadingAtivo(false);
         return;
       }
@@ -312,23 +401,20 @@ export function BaseOffConsulta() {
 
       if (insertError) throw insertError;
 
-      // Buscar contratos para cada cliente
+      // Buscar contratos para cada cliente por CPF
       const clientsWithContracts: ActiveClient[] = [];
       
       for (const client of availableClients) {
-        const { data: contractsData } = await supabase
-          .from("baseoff_contracts")
-          .select("*")
-          .eq("client_id", client.id);
+        const contractsData = await fetchContractsByCpf(client.cpf);
 
         clientsWithContracts.push({
-          id: "", // Será preenchido depois
+          id: "",
           client_id: client.id,
           cpf: client.cpf,
           status: "Pendente",
           notes: null,
           client: client as BaseOffClient,
-          contracts: (contractsData || []) as BaseOffContract[]
+          contracts: contractsData
         });
       }
 
@@ -336,7 +422,7 @@ export function BaseOffConsulta() {
       setCurrentActiveIndex(0);
       setShowAtivo(true);
       
-      toast.success(`${availableClients.length} clientes carregados para atendimento`);
+      toast.success(`${availableClients.length} clientes de ${selectedCidade}/${selectedUF} carregados`);
     } catch (error) {
       console.error("Erro ao carregar clientes ativos:", error);
       toast.error("Erro ao carregar clientes");
@@ -428,7 +514,7 @@ export function BaseOffConsulta() {
   };
 
   const formatCurrency = (value: number | null) => {
-    if (value === null) return "-";
+    if (value === null || value === undefined) return "-";
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
@@ -458,7 +544,7 @@ export function BaseOffConsulta() {
   const getStatusColor = (status: string | null) => {
     if (!status) return "secondary";
     const lower = status.toLowerCase();
-    if (lower.includes("ativo") || lower.includes("normal")) return "success";
+    if (lower.includes("ativo") || lower.includes("normal")) return "default";
     if (lower.includes("quitado") || lower.includes("encerrado")) return "secondary";
     if (lower.includes("bloqueado") || lower.includes("suspenso")) return "destructive";
     return "outline";
@@ -481,6 +567,96 @@ export function BaseOffConsulta() {
     const c = client || selectedClient;
     if (!c) return [];
     return [c.email_1, c.email_2, c.email_3].filter(Boolean);
+  };
+
+  // Verificar se tem contratos de empréstimo para simulação
+  const hasLoanContracts = (contractsList: BaseOffContract[]) => {
+    return contractsList.some(c => c.contrato && c.tipo_emprestimo && c.vl_parcela && c.vl_parcela > 0);
+  };
+
+  // Componente para exibir bloco de contratos completo
+  const ContractsBlock = ({ client, contractsList }: { client: BaseOffClient; contractsList: BaseOffContract[] }) => {
+    const hasRmcRcc = client.banco_rmc || client.valor_rmc || client.banco_rcc || client.valor_rcc;
+    const hasContracts = contractsList.length > 0;
+
+    if (!hasRmcRcc && !hasContracts) {
+      return (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <CreditCard className="h-10 w-10 text-muted-foreground/30 mb-2" />
+          <p className="text-muted-foreground text-sm">Nenhum contrato encontrado para este cliente</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4 p-4">
+        {/* RMC e RCC do cliente */}
+        {hasRmcRcc && (
+          <div className="bg-muted/30 p-4 rounded-lg">
+            <h4 className="font-medium mb-3 text-sm uppercase tracking-wide text-muted-foreground">
+              Cartões (RMC/RCC)
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Banco RMC</p>
+                <p className="font-medium">{client.banco_rmc || "-"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Valor RMC</p>
+                <p className="font-medium">{formatCurrency(client.valor_rmc)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Banco RCC</p>
+                <p className="font-medium">{client.banco_rcc || "-"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Valor RCC</p>
+                <p className="font-medium">{formatCurrency(client.valor_rcc)}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Contratos de Empréstimo */}
+        {hasContracts && (
+          <div>
+            <h4 className="font-medium mb-3 text-sm uppercase tracking-wide text-muted-foreground">
+              Contratos de Empréstimo ({contractsList.length})
+            </h4>
+            <ScrollArea className="w-full">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Banco</TableHead>
+                    <TableHead>Contrato</TableHead>
+                    <TableHead className="text-right">Valor Empréstimo</TableHead>
+                    <TableHead>Início Desconto</TableHead>
+                    <TableHead className="text-center">Prazo</TableHead>
+                    <TableHead className="text-right">Parcela</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Averbação</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {contractsList.map((contract) => (
+                    <TableRow key={contract.id}>
+                      <TableCell className="font-medium">{contract.banco_emprestimo}</TableCell>
+                      <TableCell className="font-mono text-xs">{contract.contrato}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(contract.vl_emprestimo)}</TableCell>
+                      <TableCell>{formatDate(contract.inicio_desconto)}</TableCell>
+                      <TableCell className="text-center">{contract.prazo || "-"}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(contract.vl_parcela)}</TableCell>
+                      <TableCell>{contract.tipo_emprestimo || "-"}</TableCell>
+                      <TableCell>{formatDate(contract.data_averbacao)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </div>
+        )}
+      </div>
+    );
   };
 
   if (showImport && isAdmin) {
@@ -536,6 +712,12 @@ export function BaseOffConsulta() {
               <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                 <span>CPF: <span className="font-mono font-medium text-foreground">{formatCpf(clientData.cpf)}</span></span>
                 <span>NB: <span className="font-mono font-medium text-foreground">{clientData.nb}</span></span>
+                {clientData.municipio && (
+                  <span>
+                    <MapPin className="h-3 w-3 inline mr-1" />
+                    {clientData.municipio}/{clientData.uf}
+                  </span>
+                )}
               </div>
               <div className="flex flex-wrap gap-2">
                 {getPhones(clientData).slice(0, 3).map((phone, idx) => (
@@ -547,46 +729,34 @@ export function BaseOffConsulta() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-4">
-            {/* Contratos do cliente ativo */}
-            <h4 className="font-medium mb-3 flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-primary" />
-              Contratos ({clientContracts.length})
-            </h4>
-            {clientContracts.length > 0 ? (
-              <ScrollArea className="max-h-64">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Banco</TableHead>
-                      <TableHead>Contrato</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead className="text-right">Parcela</TableHead>
-                      <TableHead className="text-right">Saldo</TableHead>
-                      <TableHead>Situação</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {clientContracts.map((contract) => (
-                      <TableRow key={contract.id}>
-                        <TableCell className="font-medium">{contract.banco_emprestimo}</TableCell>
-                        <TableCell className="font-mono text-xs">{contract.contrato}</TableCell>
-                        <TableCell>{contract.tipo_emprestimo || "-"}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(contract.vl_parcela)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(contract.saldo)}</TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusColor(contract.situacao_emprestimo) as any}>
-                            {contract.situacao_emprestimo || "-"}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-            ) : (
-              <p className="text-muted-foreground text-sm">Nenhum contrato encontrado</p>
-            )}
+          <CardContent className="p-0">
+            <Tabs defaultValue="contratos">
+              <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0">
+                <TabsTrigger
+                  value="contratos"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary"
+                >
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Contratos
+                </TabsTrigger>
+                <TabsTrigger
+                  value="simulados"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary"
+                  disabled={!hasLoanContracts(clientContracts)}
+                >
+                  <Calculator className="h-4 w-4 mr-2" />
+                  Simulados
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="contratos">
+                <ContractsBlock client={clientData} contractsList={clientContracts} />
+              </TabsContent>
+
+              <TabsContent value="simulados" className="p-4">
+                <SimulationBlock contracts={clientContracts} formatCurrency={formatCurrency} formatDate={formatDate} />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
 
@@ -745,6 +915,76 @@ export function BaseOffConsulta() {
         </CardContent>
       </Card>
 
+      {/* Modal de Filtro Regional */}
+      <Dialog open={showFilterModal} onOpenChange={setShowFilterModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5 text-primary" />
+              Selecione a Região
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Estado (UF)</Label>
+              <Select value={selectedUF} onValueChange={setSelectedUF}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o estado..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {ESTADOS_BR.map((uf) => (
+                    <SelectItem key={uf} value={uf}>
+                      {uf}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Cidade (Município)</Label>
+              <Select 
+                value={selectedCidade} 
+                onValueChange={setSelectedCidade}
+                disabled={!selectedUF || isLoadingCidades}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={
+                    isLoadingCidades 
+                      ? "Carregando cidades..." 
+                      : !selectedUF 
+                        ? "Selecione um estado primeiro" 
+                        : "Selecione a cidade..."
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  <ScrollArea className="h-60">
+                    {cidadesDisponiveis.map((cidade) => (
+                      <SelectItem key={cidade} value={cidade}>
+                        {cidade}
+                      </SelectItem>
+                    ))}
+                  </ScrollArea>
+                </SelectContent>
+              </Select>
+              {selectedUF && cidadesDisponiveis.length === 0 && !isLoadingCidades && (
+                <p className="text-xs text-muted-foreground">
+                  Nenhuma cidade encontrada para este estado
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFilterModal(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmAtivo} disabled={!selectedUF || !selectedCidade}>
+              <Play className="h-4 w-4 mr-2" />
+              Iniciar Atendimento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Client Details */}
       {selectedClient && (
         <Card>
@@ -856,8 +1096,9 @@ export function BaseOffConsulta() {
                 <TabsTrigger
                   value="simulados"
                   className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary"
+                  disabled={!hasLoanContracts(contracts)}
                   onClick={() => {
-                    if (!showSimulation && contracts.length > 0) {
+                    if (!showSimulation && hasLoanContracts(contracts)) {
                       calculateSimulations();
                     }
                   }}
@@ -896,10 +1137,7 @@ export function BaseOffConsulta() {
                     <InfoBlock label="Margem" value={formatCurrency(selectedClient.mr)} />
                     <InfoBlock label="Status" value={selectedClient.status_beneficio} />
                     <InfoBlock label="Bloqueio" value={selectedClient.bloqueio} />
-                    <InfoBlock
-                      label="Pensão Alimentícia"
-                      value={selectedClient.pensao_alimenticia}
-                    />
+                    <InfoBlock label="Pensão Alimentícia" value={selectedClient.pensao_alimenticia} />
                   </div>
                 </div>
 
@@ -1042,130 +1280,28 @@ export function BaseOffConsulta() {
 
               {/* Contratos */}
               <TabsContent value="contratos" className="p-0">
-                {contracts.length > 0 ? (
-                  <ScrollArea className="w-full">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Banco RMC</TableHead>
-                          <TableHead className="text-right">Valor RMC</TableHead>
-                          <TableHead>Banco RCC</TableHead>
-                          <TableHead className="text-right">Valor RCC</TableHead>
-                          <TableHead>Banco Empréstimo</TableHead>
-                          <TableHead>Contrato</TableHead>
-                          <TableHead className="text-right">Valor Empréstimo</TableHead>
-                          <TableHead>Início Desconto</TableHead>
-                          <TableHead>Prazo</TableHead>
-                          <TableHead className="text-right">Parcela</TableHead>
-                          <TableHead>Tipo</TableHead>
-                          <TableHead>Averbação</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {contracts.map((contract) => (
-                          <TableRow key={contract.id}>
-                            <TableCell>{selectedClient.banco_rmc || "-"}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(selectedClient.valor_rmc)}</TableCell>
-                            <TableCell>{selectedClient.banco_rcc || "-"}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(selectedClient.valor_rcc)}</TableCell>
-                            <TableCell className="font-medium">
-                              {contract.banco_emprestimo}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {contract.contrato}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {formatCurrency(contract.vl_emprestimo)}
-                            </TableCell>
-                            <TableCell>{formatDate(contract.inicio_desconto)}</TableCell>
-                            <TableCell>{contract.prazo || "-"}</TableCell>
-                            <TableCell className="text-right">
-                              {formatCurrency(contract.vl_parcela)}
-                            </TableCell>
-                            <TableCell>{contract.tipo_emprestimo || "-"}</TableCell>
-                            <TableCell>{formatDate(contract.data_averbacao)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <CreditCard className="h-12 w-12 text-muted-foreground/30 mb-3" />
-                    <p className="text-muted-foreground">
-                      Nenhum contrato encontrado para este cliente
-                    </p>
-                  </div>
-                )}
+                <ContractsBlock client={selectedClient} contractsList={contracts} />
               </TabsContent>
 
               {/* Simulados */}
               <TabsContent value="simulados" className="p-4">
                 {simulations.length > 0 ? (
-                  <div className="space-y-4">
-                    <div className="bg-muted/50 p-4 rounded-lg">
-                      <h4 className="font-medium mb-2 flex items-center gap-2">
-                        <Calculator className="h-4 w-4 text-primary" />
-                        Simulação de Portabilidade
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        Valores estimados com base nos fatores de taxa 1,85% (0,0234) e taxa alternativa (0,022605)
-                      </p>
-                    </div>
-                    <ScrollArea className="w-full">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Banco</TableHead>
-                            <TableHead>Contrato</TableHead>
-                            <TableHead className="text-right">Parcela</TableHead>
-                            <TableHead className="text-right">Saldo Devedor</TableHead>
-                            <TableHead className="text-right">Valor (1,85%)</TableHead>
-                            <TableHead className="text-right">Troco (1,85%)</TableHead>
-                            <TableHead className="text-right">Valor (Alt.)</TableHead>
-                            <TableHead className="text-right">Troco (Alt.)</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {simulations.map((sim, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell className="font-medium">{sim.banco}</TableCell>
-                              <TableCell className="font-mono text-xs">{sim.contrato}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(sim.parcela)}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(sim.saldo)}</TableCell>
-                              <TableCell className="text-right font-medium text-primary">
-                                {formatCurrency(sim.valorSimulado185)}
-                              </TableCell>
-                              <TableCell className={`text-right font-medium ${sim.troco185 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {formatCurrency(sim.troco185)}
-                              </TableCell>
-                              <TableCell className="text-right font-medium text-primary">
-                                {formatCurrency(sim.valorSimulado22)}
-                              </TableCell>
-                              <TableCell className={`text-right font-medium ${sim.troco22 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {formatCurrency(sim.troco22)}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
-                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg">
-                      <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                        ⚠️ Os valores acima são apenas simulações informativas e não representam proposta formal.
-                      </p>
-                    </div>
-                  </div>
+                  <SimulationBlock 
+                    contracts={contracts.filter(c => c.contrato && c.tipo_emprestimo && c.vl_parcela && c.vl_parcela > 0)} 
+                    formatCurrency={formatCurrency} 
+                    formatDate={formatDate}
+                    simulations={simulations}
+                  />
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <Calculator className="h-12 w-12 text-muted-foreground/30 mb-3" />
                     <p className="text-muted-foreground mb-4">
-                      {contracts.length === 0 
-                        ? "Nenhum contrato disponível para simulação"
+                      {!hasLoanContracts(contracts) 
+                        ? "Nenhum contrato de empréstimo disponível para simulação"
                         : "Clique para calcular simulações"
                       }
                     </p>
-                    {contracts.length > 0 && (
+                    {hasLoanContracts(contracts) && (
                       <Button onClick={calculateSimulations}>
                         <Calculator className="h-4 w-4 mr-2" />
                         Calcular Simulações
@@ -1204,4 +1340,139 @@ function InfoBlock({ label, value }: { label: string; value: string | null | und
       <p className="text-sm font-medium">{value || "-"}</p>
     </div>
   );
+}
+
+// Componente de Simulação
+function SimulationBlock({ 
+  contracts, 
+  formatCurrency, 
+  formatDate,
+  simulations: existingSimulations
+}: { 
+  contracts: BaseOffContract[]; 
+  formatCurrency: (value: number | null) => string;
+  formatDate: (date: string | null) => string;
+  simulations?: SimulationResult[];
+}) {
+  const FATOR_185 = 0.0234;
+  const FATOR_22 = 0.022605;
+
+  const simulations = existingSimulations || contracts
+    .filter(c => c.contrato && c.tipo_emprestimo && c.vl_parcela && c.vl_parcela > 0)
+    .map(contract => {
+      const parcela = contract.vl_parcela || 0;
+      const saldo = contract.saldo || 0;
+      
+      const valorSimulado185 = parcela / FATOR_185;
+      const valorSimulado22 = parcela / FATOR_22;
+      
+      const troco185 = valorSimulado185 - saldo;
+      const troco22 = valorSimulado22 - saldo;
+
+      return {
+        contrato: contract.contrato,
+        banco: contract.banco_emprestimo,
+        tipo: contract.tipo_emprestimo || "",
+        vl_emprestimo: contract.vl_emprestimo || 0,
+        inicio_desconto: contract.inicio_desconto,
+        prazo: contract.prazo,
+        parcela,
+        saldo,
+        valorSimulado185,
+        valorSimulado22,
+        troco185,
+        troco22
+      };
+    });
+
+  if (simulations.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center">
+        <Calculator className="h-10 w-10 text-muted-foreground/30 mb-2" />
+        <p className="text-muted-foreground text-sm">
+          Nenhum contrato de empréstimo elegível para simulação
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-muted/50 p-4 rounded-lg">
+        <h4 className="font-medium mb-2 flex items-center gap-2">
+          <Calculator className="h-4 w-4 text-primary" />
+          Simulação de Portabilidade
+        </h4>
+        <p className="text-sm text-muted-foreground">
+          Valores estimados com base nos fatores de taxa 1,85% (0,0234) e taxa alternativa (0,022605)
+        </p>
+      </div>
+      <ScrollArea className="w-full">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Contrato</TableHead>
+              <TableHead className="text-right">Valor Empréstimo</TableHead>
+              <TableHead>Início Desconto</TableHead>
+              <TableHead className="text-center">Prazo</TableHead>
+              <TableHead className="text-right">Parcela</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead className="text-right">Saldo Devedor</TableHead>
+              <TableHead className="text-right">Valor (1,85%)</TableHead>
+              <TableHead className="text-right">Troco (1,85%)</TableHead>
+              <TableHead className="text-right">Valor (Alt.)</TableHead>
+              <TableHead className="text-right">Troco (Alt.)</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {simulations.map((sim, idx) => (
+              <TableRow key={idx}>
+                <TableCell className="font-mono text-xs">{sim.contrato}</TableCell>
+                <TableCell className="text-right">{formatCurrency(sim.vl_emprestimo)}</TableCell>
+                <TableCell>{formatDate(sim.inicio_desconto)}</TableCell>
+                <TableCell className="text-center">{sim.prazo || "-"}</TableCell>
+                <TableCell className="text-right">{formatCurrency(sim.parcela)}</TableCell>
+                <TableCell>{sim.tipo}</TableCell>
+                <TableCell className="text-right">{formatCurrency(sim.saldo)}</TableCell>
+                <TableCell className="text-right font-medium text-primary">
+                  {formatCurrency(sim.valorSimulado185)}
+                </TableCell>
+                <TableCell className={`text-right font-medium ${sim.troco185 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(sim.troco185)}
+                </TableCell>
+                <TableCell className="text-right font-medium text-primary">
+                  {formatCurrency(sim.valorSimulado22)}
+                </TableCell>
+                <TableCell className={`text-right font-medium ${sim.troco22 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(sim.troco22)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </ScrollArea>
+      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg">
+        <p className="text-sm text-yellow-800 dark:text-yellow-200">
+          ⚠️ Os valores acima são apenas simulações informativas e não representam proposta formal.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+interface BaseOffContract {
+  id: string;
+  banco_emprestimo: string;
+  contrato: string;
+  vl_emprestimo: number | null;
+  inicio_desconto: string | null;
+  prazo: number | null;
+  vl_parcela: number | null;
+  tipo_emprestimo: string | null;
+  data_averbacao: string | null;
+  situacao_emprestimo: string | null;
+  competencia: string | null;
+  competencia_final: string | null;
+  taxa: number | null;
+  saldo: number | null;
 }
