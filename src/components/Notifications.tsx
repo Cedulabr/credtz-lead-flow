@@ -5,6 +5,7 @@ import { Badge } from "./ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useTelevendasNotifications } from "@/hooks/useTelevendasNotifications";
 import { 
   Bell, 
   CheckCircle, 
@@ -17,7 +18,9 @@ import {
   Settings,
   Trash2,
   Megaphone,
-  RefreshCw
+  RefreshCw,
+  AlertTriangle,
+  FileText
 } from "lucide-react";
 
 interface Announcement {
@@ -31,6 +34,15 @@ interface Announcement {
 export function Notifications() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { 
+    notifications: televendasNotifications, 
+    unreadCount: televendasUnreadCount, 
+    fetchNotifications: fetchTelevendasNotifications,
+    markAsRead: markTelevendasAsRead,
+    markAllAsRead: markAllTelevendasAsRead,
+    dismissNotification: dismissTelevendasNotification 
+  } = useTelevendasNotifications();
+  
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([
@@ -145,10 +157,12 @@ export function Notifications() {
     );
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     setNotifications(prev => 
       prev.map(notif => ({ ...notif, read: true }))
     );
+    // Também marcar notificações de televendas
+    await markAllTelevendasAsRead();
   };
 
   const deleteNotification = (id: number) => {
@@ -156,15 +170,33 @@ export function Notifications() {
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
+  const totalUnreadCount = unreadCount + televendasUnreadCount;
 
   const typeConfig = {
-    approval: { label: "Aprovação", bgColor: "bg-success/10" },
-    new_lead: { label: "Novo Lead", bgColor: "bg-primary/10" },
-    payment: { label: "Pagamento", bgColor: "bg-success/10" },
-    opportunity: { label: "Oportunidade", bgColor: "bg-warning/10" },
-    reminder: { label: "Lembrete", bgColor: "bg-warning/10" },
-    system: { label: "Sistema", bgColor: "bg-primary/10" },
-    referral: { label: "Indicação", bgColor: "bg-success/10" }
+    approval: { label: "Aprovação", bgColor: "bg-success/10", icon: CheckCircle },
+    new_lead: { label: "Novo Lead", bgColor: "bg-primary/10", icon: TrendingUp },
+    payment: { label: "Pagamento", bgColor: "bg-success/10", icon: DollarSign },
+    opportunity: { label: "Oportunidade", bgColor: "bg-warning/10", icon: Star },
+    reminder: { label: "Lembrete", bgColor: "bg-warning/10", icon: Clock },
+    system: { label: "Sistema", bgColor: "bg-primary/10", icon: Bell },
+    referral: { label: "Indicação", bgColor: "bg-success/10", icon: Users },
+    status_pendente: { label: "Pendência", bgColor: "bg-yellow-500/10", icon: AlertTriangle },
+    portabilidade_reminder: { label: "Lembrete", bgColor: "bg-purple-500/10", icon: FileText },
+    portabilidade_urgent: { label: "Urgente", bgColor: "bg-red-500/10", icon: AlertCircle }
+  };
+
+  const getTimeAgo = (date: string) => {
+    const now = new Date();
+    const past = new Date(date);
+    const diffMs = now.getTime() - past.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 60) return `há ${diffMins} minuto${diffMins !== 1 ? 's' : ''}`;
+    if (diffHours < 24) return `há ${diffHours} hora${diffHours !== 1 ? 's' : ''}`;
+    if (diffDays < 7) return `há ${diffDays} dia${diffDays !== 1 ? 's' : ''}`;
+    return past.toLocaleDateString('pt-BR');
   };
 
   return (
@@ -177,8 +209,8 @@ export function Notifications() {
               Avisos & Notificações
             </h1>
             <p className="text-muted-foreground">
-              {unreadCount > 0 
-                ? `Você tem ${unreadCount} notificação${unreadCount > 1 ? 'ões' : ''} não lida${unreadCount > 1 ? 's' : ''}`
+              {totalUnreadCount > 0 
+                ? `Você tem ${totalUnreadCount} notificação${totalUnreadCount > 1 ? 'ões' : ''} não lida${totalUnreadCount > 1 ? 's' : ''}`
                 : "Todas as notificações foram lidas"
               }
             </p>
@@ -201,7 +233,7 @@ export function Notifications() {
         </div>
 
         {/* Action Buttons */}
-        {unreadCount > 0 && (
+        {totalUnreadCount > 0 && (
           <div className="flex gap-2">
             <Button 
               onClick={markAllAsRead}
@@ -220,7 +252,7 @@ export function Notifications() {
         <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
           <CardContent className="p-4 text-center">
             <Bell className="h-6 w-6 text-primary mx-auto mb-2" />
-            <p className="text-2xl font-bold text-foreground">{notifications.length}</p>
+            <p className="text-2xl font-bold text-foreground">{notifications.length + televendasNotifications.length}</p>
             <p className="text-sm text-muted-foreground">Total</p>
           </CardContent>
         </Card>
@@ -228,7 +260,7 @@ export function Notifications() {
         <Card className="bg-gradient-to-br from-warning/10 to-warning/5">
           <CardContent className="p-4 text-center">
             <AlertCircle className="h-6 w-6 text-warning mx-auto mb-2" />
-            <p className="text-2xl font-bold text-foreground">{unreadCount}</p>
+            <p className="text-2xl font-bold text-foreground">{totalUnreadCount}</p>
             <p className="text-sm text-muted-foreground">Não Lidas</p>
           </CardContent>
         </Card>
@@ -292,7 +324,93 @@ export function Notifications() {
         </Card>
       )}
 
-      {/* Notifications List */}
+      {/* Televendas Notifications */}
+      {televendasNotifications.length > 0 && (
+        <Card className="border-yellow-500/20 bg-gradient-to-r from-yellow-500/5 to-orange-500/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              Notificações de Televendas
+              {televendasUnreadCount > 0 && (
+                <Badge variant="destructive" className="ml-2">
+                  {televendasUnreadCount} nova{televendasUnreadCount > 1 ? 's' : ''}
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {televendasNotifications.map((notification) => {
+                const typeInfo = typeConfig[notification.notification_type as keyof typeof typeConfig] || { label: "Alerta", bgColor: "bg-muted", icon: Bell };
+                const Icon = typeInfo.icon;
+                
+                return (
+                  <div 
+                    key={notification.id} 
+                    className={`p-4 rounded-lg border transition-all ${
+                      !notification.is_read 
+                        ? "bg-yellow-500/10 border-yellow-500/30" 
+                        : "bg-background/50"
+                    }`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className={`p-2 rounded-lg ${typeInfo.bgColor} flex-shrink-0`}>
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h3 className={`font-semibold text-foreground ${!notification.is_read ? "font-bold" : ""}`}>
+                              {notification.title}
+                            </h3>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {notification.message}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Badge variant="outline" className={notification.notification_type === 'portabilidade_urgent' ? 'border-red-500 text-red-600' : ''}>
+                              {typeInfo.label}
+                            </Badge>
+                            {!notification.is_read && (
+                              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between mt-3">
+                          <span className="text-xs text-muted-foreground">
+                            {getTimeAgo(notification.created_at)}
+                          </span>
+                          <div className="flex gap-2">
+                            {!notification.is_read && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => markTelevendasAsRead(notification.id)}
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => dismissTelevendasNotification(notification.id)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Regular Notifications List */}
       <div className="space-y-3">
         {notifications.map((notification) => {
           const Icon = notification.icon;
@@ -380,7 +498,7 @@ export function Notifications() {
         })}
       </div>
 
-      {notifications.length === 0 && (
+      {notifications.length === 0 && televendasNotifications.length === 0 && (
         <Card>
           <CardContent className="p-8 text-center">
             <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

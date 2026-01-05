@@ -2825,6 +2825,94 @@ export type Database = {
         }
         Relationships: []
       }
+      televendas_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_dismissed: boolean | null
+          is_read: boolean | null
+          message: string
+          notification_type: string
+          read_at: string | null
+          reminder_day: number | null
+          scheduled_date: string | null
+          televendas_id: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_dismissed?: boolean | null
+          is_read?: boolean | null
+          message: string
+          notification_type: string
+          read_at?: string | null
+          reminder_day?: number | null
+          scheduled_date?: string | null
+          televendas_id: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_dismissed?: boolean | null
+          is_read?: boolean | null
+          message?: string
+          notification_type?: string
+          read_at?: string | null
+          reminder_day?: number | null
+          scheduled_date?: string | null
+          televendas_id?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "televendas_notifications_televendas_id_fkey"
+            columns: ["televendas_id"]
+            isOneToOne: false
+            referencedRelation: "televendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      televendas_portability_reminders: {
+        Row: {
+          id: string
+          is_urgent: boolean | null
+          reminder_day: number
+          sent_at: string
+          televendas_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          is_urgent?: boolean | null
+          reminder_day: number
+          sent_at?: string
+          televendas_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          is_urgent?: boolean | null
+          reminder_day?: number
+          sent_at?: string
+          televendas_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "televendas_portability_reminders_televendas_id_fkey"
+            columns: ["televendas_id"]
+            isOneToOne: false
+            referencedRelation: "televendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       televendas_status_history: {
         Row: {
           changed_at: string
