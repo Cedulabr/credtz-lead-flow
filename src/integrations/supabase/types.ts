@@ -2779,6 +2779,7 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      normalize_cpf: { Args: { input_cpf: string }; Returns: string }
       process_expired_future_contacts: { Args: never; Returns: number }
       request_leads: {
         Args: {
