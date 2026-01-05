@@ -397,6 +397,53 @@ export type Database = {
         }
         Relationships: []
       }
+      baseoff_active_clients: {
+        Row: {
+          assigned_at: string
+          client_id: string
+          cpf: string
+          created_at: string
+          id: string
+          notes: string | null
+          status: string
+          status_updated_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          client_id: string
+          cpf: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          status_updated_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          client_id?: string
+          cpf?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          status_updated_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "baseoff_active_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "baseoff_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       baseoff_allowed_banks: {
         Row: {
           codigo_banco: string
