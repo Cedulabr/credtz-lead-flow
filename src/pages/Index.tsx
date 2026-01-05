@@ -31,6 +31,7 @@ import {
   LazyClientReuseAlerts
 } from "@/components/LazyComponents";
 import { PerformanceReport } from "@/components/PerformanceReport";
+import { Collaborative } from "@/components/Collaborative";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -203,6 +204,9 @@ const Index = () => {
       
       case "performance-report":
         return <PerformanceReport />;
+      
+      case "collaborative":
+        return <Collaborative />;
       
       case "notifications":
         return <Notifications />;
