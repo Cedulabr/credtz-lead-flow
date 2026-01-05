@@ -32,6 +32,7 @@ import {
 } from "@/components/LazyComponents";
 import { PerformanceReport } from "@/components/PerformanceReport";
 import { Collaborative } from "@/components/Collaborative";
+import { MyData } from "@/components/MyData";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -93,6 +94,13 @@ const Index = () => {
     switch (activeTab) {
       case "dashboard":
         return <Dashboard onNavigate={setActiveTab} />;
+      
+      case "my-data":
+        return (
+          <div className="p-4">
+            <MyData />
+          </div>
+        );
       
       case "indicate":
         if (!hasPermission('can_access_indicar')) {

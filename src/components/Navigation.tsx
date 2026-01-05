@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2 } from "lucide-react";
+import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2, UserCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ interface NavigationProps {
 // Navigation items with permission keys
 const navItems = [
   { id: "dashboard", label: "Início", icon: Home, permissionKey: null },
+  { id: "my-data", label: "Meus Dados", icon: UserCircle, permissionKey: null },
   { id: "indicate", label: "Indicar", icon: UserPlus, permissionKey: "can_access_indicar" },
   { id: "proposal-generator", label: "Gerador de Propostas", icon: FileText, permissionKey: "can_access_gerador_propostas" },
   { id: "activate-leads", label: "Activate Leads", icon: Zap, permissionKey: "can_access_activate_leads" },
