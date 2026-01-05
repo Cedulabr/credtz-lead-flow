@@ -30,6 +30,7 @@ import {
   LazyActivateLeads,
   LazyClientReuseAlerts
 } from "@/components/LazyComponents";
+import { PerformanceReport } from "@/components/PerformanceReport";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -199,6 +200,9 @@ const Index = () => {
             <LazyClientReuseAlerts />
           </Suspense>
         );
+      
+      case "performance-report":
+        return <PerformanceReport />;
       
       case "notifications":
         return <Notifications />;

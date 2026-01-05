@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,6 +31,7 @@ const navItems = [
   { id: "reuse-alerts", label: "Alertas", icon: Bell, permissionKey: "can_access_alertas" },
   { id: "commission-table", label: "Tabela de Comissões", icon: DollarSign, permissionKey: "can_access_tabela_comissoes" },
   { id: "commissions", label: "Minhas Comissões", icon: DollarSign, permissionKey: "can_access_minhas_comissoes" },
+  { id: "performance-report", label: "Relatório de Desempenho", icon: BarChart3, permissionKey: "admin_or_gestor" },
 ];
 
 // Mobile priority items - only icons
@@ -45,6 +47,26 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
   const { user, profile, signOut, isAdmin } = useAuth();
   const { companyName, logoUrl } = useWhitelabel();
 
+  const [isGestor, setIsGestor] = useState(false);
+
+  useEffect(() => {
+    const checkGestorAccess = async () => {
+      if (!user?.id) return;
+      
+      const { data } = await supabase
+        .from("user_companies")
+        .select("company_role")
+        .eq("user_id", user.id)
+        .eq("company_role", "gestor")
+        .eq("is_active", true)
+        .limit(1);
+      
+      setIsGestor(data && data.length > 0);
+    };
+    
+    checkGestorAccess();
+  }, [user?.id]);
+
   const handleSignOut = async () => {
     await signOut();
     toast.success("Signed out successfully");
@@ -54,6 +76,11 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
   const hasAccess = (permissionKey: string | null): boolean => {
     if (!permissionKey) return true; // Dashboard always accessible
     if (isAdmin) return true; // Admin has full access
+    
+    // Special permission for admin or gestor
+    if (permissionKey === "admin_or_gestor") {
+      return isAdmin || isGestor;
+    }
     
     // Check the specific permission in profile
     const profileData = profile as any;
