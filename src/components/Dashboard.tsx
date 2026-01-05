@@ -7,6 +7,7 @@ import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useWhitelabel } from "@/hooks/useWhitelabel";
+import { useTelevendasNotifications } from "@/hooks/useTelevendasNotifications";
 import { SalesRanking } from "./SalesRanking";
 import { 
   Users, 
@@ -96,6 +97,7 @@ interface FunnelData {
 export function Dashboard({ onNavigate }: DashboardProps) {
   const { user, profile, isAdmin } = useAuth();
   const { config } = useWhitelabel();
+  const { unreadCount: televendasUnreadCount } = useTelevendasNotifications();
   
   // Period and filters
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -737,12 +739,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     }
     
     setAlerts(alertsList);
-    setNotificationsCount(alertsList.length);
+    // Inclui notificações de televendas no contador
+    setNotificationsCount(alertsList.length + televendasUnreadCount);
   };
 
   useEffect(() => {
     fetchAlerts();
-  }, [financeAlerts]);
+  }, [financeAlerts, televendasUnreadCount]);
 
   const revenueChange = previousRevenue > 0 
     ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTelevendasNotifications } from "@/hooks/useTelevendasNotifications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,15 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Pencil, Trash2, Search, UserPlus, History } from "lucide-react";
+
+// Status que usuários comuns podem definir
+const USER_ALLOWED_STATUSES = ["solicitado_digitacao", "proposta_digitada"];
+
+// Status exclusivos para gestor/admin
+const GESTOR_ONLY_STATUSES = ["pendente", "pago", "cancelado"];
+
+// Todos os status disponíveis
+const ALL_STATUSES = [...USER_ALLOWED_STATUSES, ...GESTOR_ONLY_STATUSES];
 
 interface User {
   id: string;
@@ -119,6 +129,7 @@ const formatPhone = (value: string): string => {
 export const TelevendasManagement = () => {
   const { toast } = useToast();
   const { isAdmin, user } = useAuth();
+  const { createPendingNotification } = useTelevendasNotifications();
   const [televendas, setTelevendas] = useState<TelevendaWithUser[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [companyUsers, setCompanyUsers] = useState<User[]>([]);
@@ -137,6 +148,7 @@ export const TelevendasManagement = () => {
   const [userCompanyIds, setUserCompanyIds] = useState<string[]>([]);
   const [statusHistory, setStatusHistory] = useState<StatusHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [currentUserName, setCurrentUserName] = useState<string>("");
 
   // Form states for edit dialog with proper formatting
   const [editFormData, setEditFormData] = useState({
@@ -176,6 +188,29 @@ export const TelevendasManagement = () => {
     };
 
     checkGestorRole();
+  }, [user?.id]);
+
+  // Buscar nome do usuário atual para notificações
+  useEffect(() => {
+    const fetchCurrentUserName = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', user.id)
+          .single();
+        
+        if (!error && data) {
+          setCurrentUserName(data.name || 'Usuário');
+        }
+      } catch (error) {
+        console.error('Error fetching current user name:', error);
+      }
+    };
+
+    fetchCurrentUserName();
   }, [user?.id]);
 
   // Fetch users from the same company for gestor assignment
@@ -319,40 +354,54 @@ export const TelevendasManagement = () => {
     fetchTelevendas();
   }, [selectedMonth, selectedUserId]);
 
-  // Verificar se pode alterar status (apenas admin ou gestor)
+  // Verificar se pode alterar status (qualquer usuário pode alterar seus próprios, gestor/admin podem alterar todos)
   const canChangeStatus = (tv?: TelevendaWithUser) => {
     if (isAdmin) return true;
-    // Gestor só pode alterar status de propostas da sua empresa
+    // Gestor pode alterar status de propostas da sua empresa
     if (isGestor && tv?.company_id && userCompanyIds.includes(tv.company_id)) return true;
+    // Usuário comum pode alterar status das suas próprias propostas
+    if (tv?.user_id === user?.id) return true;
     return false;
   };
 
   // Verificar se pode mudar para um status específico
-  const canChangeToStatus = (newStatus: string) => {
-    // Apenas admin ou gestor podem mudar para "pago"
-    if (newStatus === "pago") {
-      return isAdmin || isGestor;
+  const canChangeToStatus = (newStatus: string, tv?: TelevendaWithUser) => {
+    // Admin e gestor podem mudar para qualquer status
+    if (isAdmin) return true;
+    if (isGestor && tv?.company_id && userCompanyIds.includes(tv.company_id)) return true;
+    
+    // Usuário comum só pode mudar para status permitidos
+    if (USER_ALLOWED_STATUSES.includes(newStatus)) {
+      return true;
     }
-    // Para outros status, admin e gestor podem alterar
-    return isAdmin || isGestor;
+    
+    return false;
+  };
+
+  // Obter status disponíveis para o usuário baseado na proposta
+  const getAvailableStatuses = (tv?: TelevendaWithUser) => {
+    if (isAdmin) return ALL_STATUSES;
+    if (isGestor && tv?.company_id && userCompanyIds.includes(tv.company_id)) return ALL_STATUSES;
+    // Usuário comum só pode usar status permitidos
+    return USER_ALLOWED_STATUSES;
   };
 
   const updateStatus = async (id: string, newStatus: string, tv?: TelevendaWithUser) => {
-    // Apenas admin ou gestor pode alterar status
+    // Verificar permissão para alterar status
     if (!canChangeStatus(tv)) {
       toast({
         title: "Sem permissão",
-        description: "Apenas gestores ou administradores podem alterar o status.",
+        description: "Você não tem permissão para alterar o status desta proposta.",
         variant: "destructive",
       });
       return;
     }
 
-    // Verificação adicional para status "pago"
-    if (!canChangeToStatus(newStatus)) {
+    // Verificação para status específicos (gestor only)
+    if (!canChangeToStatus(newStatus, tv)) {
       toast({
         title: "Sem permissão",
-        description: "Você não tem permissão para alterar para este status.",
+        description: "Este status só pode ser definido por gestores ou administradores.",
         variant: "destructive",
       });
       return;
@@ -360,7 +409,7 @@ export const TelevendasManagement = () => {
 
     try {
       // Buscar o status atual para registrar no histórico
-      const currentTv = televendas.find(tv => tv.id === id);
+      const currentTv = televendas.find(televenda => televenda.id === id);
       const fromStatus = currentTv?.status || null;
 
       // Atualizar o status com informações de auditoria
@@ -387,6 +436,16 @@ export const TelevendasManagement = () => {
 
       if (historyError) {
         console.error("Error inserting status history:", historyError);
+      }
+
+      // Se marcou como PENDENTE, criar notificação para o usuário responsável
+      if (newStatus === "pendente" && currentTv && currentTv.user_id !== user?.id) {
+        await createPendingNotification(
+          id,
+          currentTv.user_id,
+          currentTv.nome,
+          currentUserName
+        );
       }
 
       // Se marcou como PAGO, criar alerta de reaproveitamento
@@ -627,12 +686,27 @@ export const TelevendasManagement = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive"> = {
-      pendente: "default",
-      pago: "secondary",
-      cancelado: "destructive",
+    const statusConfig: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string; className?: string }> = {
+      solicitado_digitacao: { variant: "outline", label: "Solicitado Digitação", className: "bg-blue-500/10 text-blue-600 border-blue-300" },
+      proposta_digitada: { variant: "outline", label: "Proposta Digitada", className: "bg-purple-500/10 text-purple-600 border-purple-300" },
+      pendente: { variant: "default", label: "Pendente", className: "bg-yellow-500/10 text-yellow-600 border-yellow-300" },
+      pago: { variant: "secondary", label: "Pago", className: "bg-green-500/10 text-green-600 border-green-300" },
+      cancelado: { variant: "destructive", label: "Cancelado" },
     };
-    return <Badge variant={variants[status] || "default"}>{status}</Badge>;
+    
+    const config = statusConfig[status] || { variant: "default", label: status };
+    return <Badge variant={config.variant} className={config.className}>{config.label}</Badge>;
+  };
+
+  const getStatusLabel = (status: string): string => {
+    const labels: Record<string, string> = {
+      solicitado_digitacao: "Solicitado Digitação",
+      proposta_digitada: "Proposta Digitada",
+      pendente: "Pendente",
+      pago: "Pago",
+      cancelado: "Cancelado",
+    };
+    return labels[status] || status;
   };
 
   if (loading) {
@@ -712,6 +786,8 @@ export const TelevendasManagement = () => {
   // Status counts for badges
   const statusCounts = {
     all: televendas.length,
+    solicitado_digitacao: televendas.filter(tv => tv.status === "solicitado_digitacao").length,
+    proposta_digitada: televendas.filter(tv => tv.status === "proposta_digitada").length,
     pago: televendas.filter(tv => tv.status === "pago").length,
     pendente: televendas.filter(tv => tv.status === "pendente").length,
     cancelado: televendas.filter(tv => tv.status === "cancelado").length,
@@ -743,11 +819,18 @@ export const TelevendasManagement = () => {
                 Todos ({statusCounts.all})
               </Badge>
               <Badge 
-                variant={selectedStatus === "pago" ? "default" : "outline"}
-                className="cursor-pointer bg-green-500/10 text-green-600 hover:bg-green-500/20"
-                onClick={() => setSelectedStatus("pago")}
+                variant={selectedStatus === "solicitado_digitacao" ? "default" : "outline"}
+                className="cursor-pointer bg-blue-500/10 text-blue-600 hover:bg-blue-500/20"
+                onClick={() => setSelectedStatus("solicitado_digitacao")}
               >
-                ✓ Pagas ({statusCounts.pago})
+                📝 Solicitado ({statusCounts.solicitado_digitacao})
+              </Badge>
+              <Badge 
+                variant={selectedStatus === "proposta_digitada" ? "default" : "outline"}
+                className="cursor-pointer bg-purple-500/10 text-purple-600 hover:bg-purple-500/20"
+                onClick={() => setSelectedStatus("proposta_digitada")}
+              >
+                📋 Digitada ({statusCounts.proposta_digitada})
               </Badge>
               <Badge 
                 variant={selectedStatus === "pendente" ? "default" : "outline"}
@@ -755,6 +838,13 @@ export const TelevendasManagement = () => {
                 onClick={() => setSelectedStatus("pendente")}
               >
                 ⏳ Pendentes ({statusCounts.pendente})
+              </Badge>
+              <Badge 
+                variant={selectedStatus === "pago" ? "default" : "outline"}
+                className="cursor-pointer bg-green-500/10 text-green-600 hover:bg-green-500/20"
+                onClick={() => setSelectedStatus("pago")}
+              >
+                ✓ Pagas ({statusCounts.pago})
               </Badge>
               <Badge 
                 variant={selectedStatus === "cancelado" ? "default" : "outline"}
@@ -856,13 +946,17 @@ export const TelevendasManagement = () => {
                           value={tv.status}
                           onValueChange={(value) => updateStatus(tv.id, value, tv)}
                         >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
+                          <SelectTrigger className="w-40">
+                            <SelectValue>
+                              {getStatusLabel(tv.status)}
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="pendente">Pendente</SelectItem>
-                            <SelectItem value="pago">Pago</SelectItem>
-                            <SelectItem value="cancelado">Cancelado</SelectItem>
+                            {getAvailableStatuses(tv).map((status) => (
+                              <SelectItem key={status} value={status}>
+                                {getStatusLabel(status)}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       ) : (

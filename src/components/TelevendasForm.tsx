@@ -257,7 +257,7 @@ export const TelevendasForm = () => {
         saldo_devedor: saldoDevedorValue,
         tipo_operacao: values.tipo_operacao,
         observacao: values.observacao || null,
-        status: 'pendente', // Todas as propostas nascem como pendente
+        status: 'solicitado_digitacao', // Propostas começam como "Solicitado Digitação"
       });
 
       if (error) throw error;
