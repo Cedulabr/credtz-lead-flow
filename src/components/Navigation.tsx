@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3 } from "lucide-react";
+import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -32,6 +32,7 @@ const navItems = [
   { id: "commission-table", label: "Tabela de Comissões", icon: DollarSign, permissionKey: "can_access_tabela_comissoes" },
   { id: "commissions", label: "Minhas Comissões", icon: DollarSign, permissionKey: "can_access_minhas_comissoes" },
   { id: "performance-report", label: "Relatório de Desempenho", icon: BarChart3, permissionKey: "admin_or_gestor" },
+  { id: "collaborative", label: "Colaborativo", icon: Users2, permissionKey: null },
 ];
 
 // Mobile priority items - only icons

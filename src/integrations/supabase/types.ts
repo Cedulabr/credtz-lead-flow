@@ -1068,6 +1068,366 @@ export type Database = {
         }
         Relationships: []
       }
+      collaborative_audit_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          record_id: string
+          table_name: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          record_id: string
+          table_name: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          record_id?: string
+          table_name?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      collaborative_comments: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          record_id: string
+          table_name: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          record_id: string
+          table_name: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          record_id?: string
+          table_name?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      collaborative_documents: {
+        Row: {
+          category: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          name: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          category?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          category?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborative_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collaborative_links: {
+        Row: {
+          category:
+            | Database["public"]["Enums"]["collaborative_link_category"]
+            | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+          updated_by: string | null
+          url: string
+        }
+        Insert: {
+          category?:
+            | Database["public"]["Enums"]["collaborative_link_category"]
+            | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+          updated_by?: string | null
+          url: string
+        }
+        Update: {
+          category?:
+            | Database["public"]["Enums"]["collaborative_link_category"]
+            | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborative_links_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collaborative_password_history: {
+        Row: {
+          changed_at: string | null
+          changed_by: string | null
+          encrypted_password: string
+          id: string
+          password_id: string | null
+        }
+        Insert: {
+          changed_at?: string | null
+          changed_by?: string | null
+          encrypted_password: string
+          id?: string
+          password_id?: string | null
+        }
+        Update: {
+          changed_at?: string | null
+          changed_by?: string | null
+          encrypted_password?: string
+          id?: string
+          password_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborative_password_history_password_id_fkey"
+            columns: ["password_id"]
+            isOneToOne: false
+            referencedRelation: "collaborative_passwords"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collaborative_passwords: {
+        Row: {
+          access_type:
+            | Database["public"]["Enums"]["collaborative_access_type"]
+            | null
+          access_url: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          encrypted_password: string
+          id: string
+          login_user: string | null
+          observations: string | null
+          responsible_id: string | null
+          system_name: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          access_type?:
+            | Database["public"]["Enums"]["collaborative_access_type"]
+            | null
+          access_url?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          encrypted_password: string
+          id?: string
+          login_user?: string | null
+          observations?: string | null
+          responsible_id?: string | null
+          system_name: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          access_type?:
+            | Database["public"]["Enums"]["collaborative_access_type"]
+            | null
+          access_url?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          encrypted_password?: string
+          id?: string
+          login_user?: string | null
+          observations?: string | null
+          responsible_id?: string | null
+          system_name?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborative_passwords_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collaborative_processes: {
+        Row: {
+          attachments: Json | null
+          company_id: string | null
+          content: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          title: string
+          updated_at: string | null
+          updated_by: string | null
+          version: number | null
+        }
+        Insert: {
+          attachments?: Json | null
+          company_id?: string | null
+          content?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          title: string
+          updated_at?: string | null
+          updated_by?: string | null
+          version?: number | null
+        }
+        Update: {
+          attachments?: Json | null
+          company_id?: string | null
+          content?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          title?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborative_processes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collaborative_systems: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          environment: string | null
+          id: string
+          integrations: string[] | null
+          main_url: string | null
+          name: string
+          purpose: string | null
+          technical_notes: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          environment?: string | null
+          id?: string
+          integrations?: string[] | null
+          main_url?: string | null
+          name: string
+          purpose?: string | null
+          technical_notes?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          environment?: string | null
+          id?: string
+          integrations?: string[] | null
+          main_url?: string | null
+          name?: string
+          purpose?: string | null
+          technical_notes?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborative_systems_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_rules: {
         Row: {
           bank_name: string
@@ -2831,6 +3191,15 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "partner"
+      collaborative_access_type: "admin" | "operator" | "readonly"
+      collaborative_link_category:
+        | "banco"
+        | "governo"
+        | "parceiros"
+        | "marketing"
+        | "ferramentas"
+        | "outros"
+      collaborative_permission_type: "view" | "edit" | "create" | "delete"
       company_role: "gestor" | "colaborador"
       user_level: "bronze" | "prata" | "ouro" | "diamante"
     }
@@ -2961,6 +3330,16 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "partner"],
+      collaborative_access_type: ["admin", "operator", "readonly"],
+      collaborative_link_category: [
+        "banco",
+        "governo",
+        "parceiros",
+        "marketing",
+        "ferramentas",
+        "outros",
+      ],
+      collaborative_permission_type: ["view", "edit", "create", "delete"],
       company_role: ["gestor", "colaborador"],
       user_level: ["bronze", "prata", "ouro", "diamante"],
     },
