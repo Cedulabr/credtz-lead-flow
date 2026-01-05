@@ -13,9 +13,10 @@ interface PersonalDataFormProps {
   data: UserData | null;
   onSave: (data: Partial<UserData>) => Promise<void>;
   isAdmin?: boolean;
+  readOnly?: boolean;
 }
 
-export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProps) {
+export function PersonalDataForm({ data, onSave, isAdmin, readOnly }: PersonalDataFormProps) {
   const [formData, setFormData] = useState<Partial<UserData>>({
     person_type: 'pf',
     full_name: '',
@@ -166,13 +167,14 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
             value={formData.person_type}
             onValueChange={(value: PersonType) => handleChange('person_type', value)}
             className="flex gap-6"
+            disabled={readOnly}
           >
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="pf" id="pf" />
+              <RadioGroupItem value="pf" id="pf" disabled={readOnly} />
               <Label htmlFor="pf">Pessoa Física</Label>
             </div>
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="pj" id="pj" />
+              <RadioGroupItem value="pj" id="pj" disabled={readOnly} />
               <Label htmlFor="pj">Pessoa Jurídica</Label>
             </div>
           </RadioGroup>
@@ -195,6 +197,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
               value={formData.full_name || ''}
               onChange={(e) => handleChange('full_name', e.target.value)}
               placeholder={formData.person_type === 'pf' ? 'Digite seu nome completo' : 'Digite a razão social'}
+              disabled={readOnly}
             />
           </div>
 
@@ -206,6 +209,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
               onChange={(e) => handleChange('phone', formatPhone(e.target.value))}
               placeholder="(00) 00000-0000"
               maxLength={15}
+              disabled={readOnly}
             />
           </div>
 
@@ -217,6 +221,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
               value={formData.personal_email || ''}
               onChange={(e) => handleChange('personal_email', e.target.value)}
               placeholder="email@exemplo.com"
+              disabled={readOnly}
             />
           </div>
 
@@ -225,6 +230,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
             <Select
               value={formData.pix_key_type || ''}
               onValueChange={(value) => handleChange('pix_key_type', value)}
+              disabled={readOnly}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o tipo" />
@@ -246,6 +252,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
               value={formData.pix_key || ''}
               onChange={(e) => handleChange('pix_key', e.target.value)}
               placeholder="Digite sua chave Pix"
+              disabled={readOnly}
             />
           </div>
         </CardContent>
@@ -274,6 +281,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
                   onChange={(e) => handleChange('cpf', formatCpf(e.target.value))}
                   placeholder="000.000.000-00"
                   maxLength={14}
+                  disabled={readOnly}
                 />
               </div>
 
@@ -284,6 +292,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
                   value={formData.rg || ''}
                   onChange={(e) => handleChange('rg', e.target.value)}
                   placeholder="Digite o RG"
+                  disabled={readOnly}
                 />
               </div>
 
@@ -294,6 +303,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
                   type="date"
                   value={formData.birth_date || ''}
                   onChange={(e) => handleChange('birth_date', e.target.value)}
+                  disabled={readOnly}
                 />
               </div>
 
@@ -302,6 +312,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
                 <Select
                   value={formData.marital_status || ''}
                   onValueChange={(value) => handleChange('marital_status', value)}
+                  disabled={readOnly}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione" />
@@ -326,6 +337,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
                   onChange={(e) => handleChange('cnpj', formatCnpj(e.target.value))}
                   placeholder="00.000.000/0000-00"
                   maxLength={18}
+                  disabled={readOnly}
                 />
               </div>
 
@@ -336,6 +348,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
                   value={formData.trade_name || ''}
                   onChange={(e) => handleChange('trade_name', e.target.value)}
                   placeholder="Nome fantasia da empresa"
+                  disabled={readOnly}
                 />
               </div>
 
@@ -346,6 +359,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
                   value={formData.legal_representative || ''}
                   onChange={(e) => handleChange('legal_representative', e.target.value)}
                   placeholder="Nome do responsável"
+                  disabled={readOnly}
                 />
               </div>
 
@@ -357,6 +371,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
                   onChange={(e) => handleChange('legal_representative_cpf', formatCpf(e.target.value))}
                   placeholder="000.000.000-00"
                   maxLength={14}
+                  disabled={readOnly}
                 />
               </div>
             </>
@@ -380,17 +395,20 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
                 onChange={(e) => handleChange('cep', formatCep(e.target.value))}
                 placeholder="00000-000"
                 maxLength={9}
+                disabled={readOnly}
               />
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-6"
-              onClick={searchCep}
-              disabled={loadingCep}
-            >
-              {loadingCep ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            </Button>
+            {!readOnly && (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-6"
+                onClick={searchCep}
+                disabled={loadingCep}
+              >
+                {loadingCep ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              </Button>
+            )}
           </div>
 
           <div className="md:col-span-2">
@@ -400,6 +418,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
               value={formData.street || ''}
               onChange={(e) => handleChange('street', e.target.value)}
               placeholder="Nome da rua"
+              disabled={readOnly}
             />
           </div>
 
@@ -410,6 +429,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
               value={formData.number || ''}
               onChange={(e) => handleChange('number', e.target.value)}
               placeholder="Nº"
+              disabled={readOnly}
             />
           </div>
 
@@ -420,6 +440,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
               value={formData.complement || ''}
               onChange={(e) => handleChange('complement', e.target.value)}
               placeholder="Apto, Bloco, etc."
+              disabled={readOnly}
             />
           </div>
 
@@ -430,6 +451,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
               value={formData.neighborhood || ''}
               onChange={(e) => handleChange('neighborhood', e.target.value)}
               placeholder="Bairro"
+              disabled={readOnly}
             />
           </div>
 
@@ -440,6 +462,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
               value={formData.city || ''}
               onChange={(e) => handleChange('city', e.target.value)}
               placeholder="Cidade"
+              disabled={readOnly}
             />
           </div>
 
@@ -448,6 +471,7 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
             <Select
               value={formData.state || ''}
               onValueChange={(value) => handleChange('state', value)}
+              disabled={readOnly}
             >
               <SelectTrigger>
                 <SelectValue placeholder="UF" />
@@ -464,12 +488,14 @@ export function PersonalDataForm({ data, onSave, isAdmin }: PersonalDataFormProp
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
-        <Button type="submit" disabled={loading}>
-          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Salvar Dados
-        </Button>
-      </div>
+      {!readOnly && (
+        <div className="flex justify-end">
+          <Button type="submit" disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar Dados
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

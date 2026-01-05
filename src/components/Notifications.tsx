@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useTelevendasNotifications } from "@/hooks/useTelevendasNotifications";
+import { useUserDataNotifications } from "@/hooks/useUserDataNotifications";
 import { 
   Bell, 
   CheckCircle, 
@@ -20,7 +21,9 @@ import {
   Megaphone,
   RefreshCw,
   AlertTriangle,
-  FileText
+  FileText,
+  UserCheck,
+  UserX
 } from "lucide-react";
 
 interface Announcement {
@@ -42,6 +45,13 @@ export function Notifications() {
     markAllAsRead: markAllTelevendasAsRead,
     dismissNotification: dismissTelevendasNotification 
   } = useTelevendasNotifications();
+
+  const {
+    notifications: userDataNotifications,
+    unreadCount: userDataUnreadCount,
+    markAsRead: markUserDataAsRead,
+    markAllAsRead: markAllUserDataAsRead
+  } = useUserDataNotifications();
   
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,8 +171,9 @@ export function Notifications() {
     setNotifications(prev => 
       prev.map(notif => ({ ...notif, read: true }))
     );
-    // Também marcar notificações de televendas
+    // Também marcar notificações de televendas e user data
     await markAllTelevendasAsRead();
+    await markAllUserDataAsRead();
   };
 
   const deleteNotification = (id: number) => {
@@ -170,7 +181,7 @@ export function Notifications() {
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
-  const totalUnreadCount = unreadCount + televendasUnreadCount;
+  const totalUnreadCount = unreadCount + televendasUnreadCount + userDataUnreadCount;
 
   const typeConfig = {
     approval: { label: "Aprovação", bgColor: "bg-success/10", icon: CheckCircle },
@@ -182,7 +193,11 @@ export function Notifications() {
     referral: { label: "Indicação", bgColor: "bg-success/10", icon: Users },
     status_pendente: { label: "Pendência", bgColor: "bg-yellow-500/10", icon: AlertTriangle },
     portabilidade_reminder: { label: "Lembrete", bgColor: "bg-purple-500/10", icon: FileText },
-    portabilidade_urgent: { label: "Urgente", bgColor: "bg-red-500/10", icon: AlertCircle }
+    portabilidade_urgent: { label: "Urgente", bgColor: "bg-red-500/10", icon: AlertCircle },
+    user_data_approval: { label: "Cadastro Aprovado", bgColor: "bg-green-500/10", icon: UserCheck },
+    user_data_rejection: { label: "Cadastro Reprovado", bgColor: "bg-red-500/10", icon: UserX },
+    document_approval: { label: "Documento Aprovado", bgColor: "bg-green-500/10", icon: FileText },
+    document_rejection: { label: "Documento Reprovado", bgColor: "bg-red-500/10", icon: FileText }
   };
 
   const getTimeAgo = (date: string) => {
@@ -410,6 +425,89 @@ export function Notifications() {
         </Card>
       )}
 
+      {/* User Data Notifications */}
+      {userDataNotifications.length > 0 && (
+        <Card className="border-blue-500/20 bg-gradient-to-r from-blue-500/5 to-indigo-500/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-blue-600" />
+              Notificações de Cadastro
+              {userDataUnreadCount > 0 && (
+                <Badge variant="destructive" className="ml-2">
+                  {userDataUnreadCount} nova{userDataUnreadCount > 1 ? 's' : ''}
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {userDataNotifications.map((notification) => {
+                const typeKey = notification.type === 'approval' ? 'user_data_approval' 
+                  : notification.type === 'rejection' ? 'user_data_rejection'
+                  : notification.type === 'document_approval' ? 'document_approval'
+                  : notification.type === 'document_rejection' ? 'document_rejection'
+                  : 'system';
+                const typeInfo = typeConfig[typeKey as keyof typeof typeConfig] || { label: "Atualização", bgColor: "bg-muted", icon: Bell };
+                const Icon = typeInfo.icon;
+                
+                return (
+                  <div 
+                    key={notification.id} 
+                    className={`p-4 rounded-lg border transition-all ${
+                      !notification.is_read 
+                        ? "bg-blue-500/10 border-blue-500/30" 
+                        : "bg-background/50"
+                    }`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className={`p-2 rounded-lg ${typeInfo.bgColor} flex-shrink-0`}>
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h3 className={`font-semibold text-foreground ${!notification.is_read ? "font-bold" : ""}`}>
+                              {notification.title}
+                            </h3>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {notification.message}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Badge variant="outline" className={notification.type.includes('rejection') ? 'border-red-500 text-red-600' : 'border-green-500 text-green-600'}>
+                              {typeInfo.label}
+                            </Badge>
+                            {!notification.is_read && (
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between mt-3">
+                          <span className="text-xs text-muted-foreground">
+                            {getTimeAgo(notification.created_at)}
+                          </span>
+                          <div className="flex gap-2">
+                            {!notification.is_read && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => markUserDataAsRead(notification.id)}
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Regular Notifications List */}
       <div className="space-y-3">
         {notifications.map((notification) => {
@@ -498,7 +596,7 @@ export function Notifications() {
         })}
       </div>
 
-      {notifications.length === 0 && televendasNotifications.length === 0 && (
+      {notifications.length === 0 && televendasNotifications.length === 0 && userDataNotifications.length === 0 && (
         <Card>
           <CardContent className="p-8 text-center">
             <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
