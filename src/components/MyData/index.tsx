@@ -4,6 +4,8 @@ import { Loader2, User, FileText, History, Settings, Users } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 import { UserData, UserDocument, UserDataStatus, DocumentStatus } from './types';
 import { StatusCard } from './StatusCard';
@@ -19,6 +21,7 @@ export function MyData() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [documents, setDocuments] = useState<UserDocument[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
   
   // Admin/Partner view states
   const [viewMode, setViewMode] = useState<'my-data' | 'user-list' | 'user-detail'>('my-data');
@@ -28,6 +31,28 @@ export function MyData() {
   const isAdmin = profile?.role === 'admin';
   const isPartner = profile?.role === 'partner';
   const canManageUsers = isAdmin || isPartner;
+
+  // Set initial view based on role
+  useEffect(() => {
+    if (canManageUsers) {
+      setViewMode('user-list');
+    }
+  }, [canManageUsers]);
+
+  // Fetch pending count for admin/partner
+  useEffect(() => {
+    if (canManageUsers) {
+      fetchPendingCount();
+    }
+  }, [canManageUsers]);
+
+  const fetchPendingCount = async () => {
+    const { count } = await supabase
+      .from('user_data')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'in_review');
+    setPendingCount(count || 0);
+  };
 
   useEffect(() => {
     if (user) {
@@ -212,23 +237,47 @@ export function MyData() {
     );
   }
 
+  // Admin/Partner navigation tabs
+  const renderNavigationTabs = () => {
+    if (!canManageUsers) return null;
+
+    return (
+      <div className="flex gap-2 mb-6">
+        <Button
+          variant={viewMode === 'user-list' ? 'default' : 'outline'}
+          onClick={() => setViewMode('user-list')}
+          className="flex items-center gap-2"
+        >
+          <Users className="h-4 w-4" />
+          Gestão de Cadastros
+          {pendingCount > 0 && (
+            <Badge variant="secondary" className="ml-1 bg-orange-500 text-white">
+              {pendingCount}
+            </Badge>
+          )}
+        </Button>
+        <Button
+          variant={viewMode === 'my-data' ? 'default' : 'outline'}
+          onClick={() => setViewMode('my-data')}
+          className="flex items-center gap-2"
+        >
+          <User className="h-4 w-4" />
+          Meus Dados
+        </Button>
+      </div>
+    );
+  };
+
   // User list view for admin/partner
   if (viewMode === 'user-list' && canManageUsers) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Gestão de Cadastros</h1>
-            <p className="text-muted-foreground">
-              Gerencie os cadastros de todos os usuários
-            </p>
-          </div>
-          <button
-            onClick={() => setViewMode('my-data')}
-            className="text-sm text-primary hover:underline"
-          >
-            Ver Meus Dados
-          </button>
+        {renderNavigationTabs()}
+        <div>
+          <h1 className="text-2xl font-bold">Gestão de Cadastros</h1>
+          <p className="text-muted-foreground">
+            Gerencie os cadastros de todos os usuários
+          </p>
         </div>
         <UserDataList onSelectUser={handleSelectUser} />
       </div>
@@ -237,22 +286,12 @@ export function MyData() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Meus Dados</h1>
-          <p className="text-muted-foreground">
-            Gerencie suas informações pessoais e documentos
-          </p>
-        </div>
-        {canManageUsers && (
-          <button
-            onClick={() => setViewMode('user-list')}
-            className="flex items-center gap-2 text-sm text-primary hover:underline"
-          >
-            <Users className="h-4 w-4" />
-            Gestão de Cadastros
-          </button>
-        )}
+      {renderNavigationTabs()}
+      <div>
+        <h1 className="text-2xl font-bold">Meus Dados</h1>
+        <p className="text-muted-foreground">
+          Gerencie suas informações pessoais e documentos
+        </p>
       </div>
 
       <StatusCard
