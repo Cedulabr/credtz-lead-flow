@@ -635,6 +635,11 @@ export function BaseOffConsulta() {
                     <TableHead className="text-right">Parcela</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Averbação</TableHead>
+                    <TableHead>Situação</TableHead>
+                    <TableHead>Competência</TableHead>
+                    <TableHead>Comp. Final</TableHead>
+                    <TableHead className="text-right">Taxa</TableHead>
+                    <TableHead className="text-right">Saldo</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -648,6 +653,15 @@ export function BaseOffConsulta() {
                       <TableCell className="text-right">{formatCurrency(contract.vl_parcela)}</TableCell>
                       <TableCell>{contract.tipo_emprestimo || "-"}</TableCell>
                       <TableCell>{formatDate(contract.data_averbacao)}</TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusColor(contract.situacao_emprestimo) as any}>
+                          {contract.situacao_emprestimo || "-"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(contract.competencia)}</TableCell>
+                      <TableCell>{formatDate(contract.competencia_final)}</TableCell>
+                      <TableCell className="text-right">{contract.taxa ? `${contract.taxa}%` : "-"}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(contract.saldo)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
