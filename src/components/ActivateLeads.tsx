@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Search, 
   Filter, 
@@ -37,7 +38,10 @@ import {
   Target,
   Users,
   Zap,
-  UserPlus
+  UserPlus,
+  CheckSquare,
+  Square,
+  Shuffle
 } from 'lucide-react';
 import { format, addDays, parseISO, isToday, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -168,6 +172,14 @@ export const ActivateLeads = () => {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [availableUsers, setAvailableUsers] = useState<{ id: string; name: string; email: string }[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Bulk selection states
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
+  const [isBulkAssignModalOpen, setIsBulkAssignModalOpen] = useState(false);
+  const [bulkAssignMode, setBulkAssignMode] = useState<'single' | 'distribute'>('single');
+  const [selectedBulkUsers, setSelectedBulkUsers] = useState<string[]>([]);
+  const [maxLeadsPerUser, setMaxLeadsPerUser] = useState<number>(10);
+  const [bulkAssigning, setBulkAssigning] = useState(false);
 
   const isGestor = gestorId !== null;
   const canImport = isAdmin || isGestor;
@@ -357,6 +369,174 @@ export const ActivateLeads = () => {
   };
 
   const canAssignLead = isAdmin || isGestor;
+
+  // Bulk selection helpers
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeadIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(leadId)) {
+        newSet.delete(leadId);
+      } else {
+        newSet.add(leadId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedLeadIds.size === filteredLeads.length) {
+      setSelectedLeadIds(new Set());
+    } else {
+      setSelectedLeadIds(new Set(filteredLeads.map(l => l.id)));
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedLeadIds(new Set());
+  };
+
+  const getSelectedLeads = () => {
+    return leads.filter(l => selectedLeadIds.has(l.id));
+  };
+
+  // Bulk assign handler
+  const handleBulkAssign = async () => {
+    if (selectedLeadIds.size === 0) return;
+    
+    setBulkAssigning(true);
+    try {
+      const selectedLeads = getSelectedLeads();
+      
+      if (bulkAssignMode === 'single' && selectedUserId) {
+        // Assign all selected leads to a single user
+        const leadIds = selectedLeads.map(l => l.id);
+        
+        const { error } = await supabase
+          .from('activate_leads')
+          .update({ 
+            assigned_to: selectedUserId,
+            status: 'em_andamento',
+            ultima_interacao: new Date().toISOString()
+          })
+          .in('id', leadIds);
+
+        if (error) throw error;
+
+        // Record history for each lead
+        const historyEntries = selectedLeads.map(lead => ({
+          lead_id: lead.id,
+          user_id: user!.id,
+          action_type: 'bulk_assignment',
+          from_status: lead.status,
+          to_status: 'em_andamento',
+          notes: `Atribuição em massa para ${availableUsers.find(u => u.id === selectedUserId)?.name}`,
+          metadata: { assigned_to: selectedUserId, assigned_by: user!.id, bulk: true }
+        }));
+
+        await supabase.from('activate_leads_history').insert(historyEntries);
+
+        toast({
+          title: 'Leads atribuídos!',
+          description: `${selectedLeads.length} leads atribuídos para ${availableUsers.find(u => u.id === selectedUserId)?.name}`,
+        });
+
+      } else if (bulkAssignMode === 'distribute' && selectedBulkUsers.length > 0) {
+        // Distribute leads among multiple users
+        const leadsToDistribute = [...selectedLeads];
+        const usersCount = selectedBulkUsers.length;
+        const leadsPerUser = Math.min(
+          Math.ceil(leadsToDistribute.length / usersCount),
+          maxLeadsPerUser
+        );
+
+        const assignments: { leadId: string; userId: string }[] = [];
+        let userIndex = 0;
+        let userLeadCount = 0;
+
+        for (const lead of leadsToDistribute) {
+          if (userLeadCount >= leadsPerUser) {
+            userIndex = (userIndex + 1) % usersCount;
+            userLeadCount = 0;
+          }
+          
+          assignments.push({
+            leadId: lead.id,
+            userId: selectedBulkUsers[userIndex]
+          });
+          userLeadCount++;
+        }
+
+        // Update leads in batches by user
+        for (const userId of selectedBulkUsers) {
+          const userLeadIds = assignments.filter(a => a.userId === userId).map(a => a.leadId);
+          if (userLeadIds.length > 0) {
+            const { error } = await supabase
+              .from('activate_leads')
+              .update({ 
+                assigned_to: userId,
+                status: 'em_andamento',
+                ultima_interacao: new Date().toISOString()
+              })
+              .in('id', userLeadIds);
+
+            if (error) throw error;
+          }
+        }
+
+        // Record history
+        const historyEntries = assignments.map(({ leadId, userId }) => {
+          const lead = selectedLeads.find(l => l.id === leadId)!;
+          return {
+            lead_id: leadId,
+            user_id: user!.id,
+            action_type: 'bulk_distribution',
+            from_status: lead.status,
+            to_status: 'em_andamento',
+            notes: `Distribuição em massa para ${availableUsers.find(u => u.id === userId)?.name}`,
+            metadata: { assigned_to: userId, assigned_by: user!.id, bulk: true, distribution: true }
+          };
+        });
+
+        await supabase.from('activate_leads_history').insert(historyEntries);
+
+        const summary = selectedBulkUsers.map(userId => {
+          const count = assignments.filter(a => a.userId === userId).length;
+          const userName = availableUsers.find(u => u.id === userId)?.name;
+          return `${userName}: ${count}`;
+        }).join(', ');
+
+        toast({
+          title: 'Distribuição concluída!',
+          description: `${selectedLeads.length} leads distribuídos: ${summary}`,
+        });
+      }
+
+      setIsBulkAssignModalOpen(false);
+      clearSelection();
+      setSelectedUserId('');
+      setSelectedBulkUsers([]);
+      fetchLeads();
+    } catch (error: any) {
+      console.error('Error in bulk assignment:', error);
+      toast({
+        title: 'Erro na atribuição em massa',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkAssigning(false);
+    }
+  };
+
+  const toggleBulkUserSelection = (userId: string) => {
+    setSelectedBulkUsers(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId);
+      } else {
+        return [...prev, userId];
+      }
+    });
+  };
 
   const openAssignModal = (lead: ActivateLead) => {
     setLeadToAssign(lead);
@@ -1013,16 +1193,64 @@ export const ActivateLeads = () => {
         </CardContent>
       </Card>
 
+      {/* Bulk Actions Bar */}
+      {canAssignLead && selectedLeadIds.size > 0 && (
+        <Card className="border-2 border-primary/50 bg-primary/5 shadow-lg animate-in slide-in-from-top-2">
+          <CardContent className="p-4">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/20">
+                  <CheckSquare className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold">{selectedLeadIds.size} lead(s) selecionado(s)</p>
+                  <p className="text-sm text-muted-foreground">Selecione uma ação para aplicar em massa</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearSelection}
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Limpar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setIsBulkAssignModalOpen(true)}
+                  className="bg-gradient-to-r from-primary to-primary/80"
+                >
+                  <Shuffle className="h-4 w-4 mr-2" />
+                  Distribuir Leads
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Modern Table */}
       <Card className="border-2 border-muted/50 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="bg-gradient-to-r from-muted/50 to-muted/30 hover:from-muted/60 hover:to-muted/40">
+                {canAssignLead && (
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectedLeadIds.size === filteredLeads.length && filteredLeads.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Selecionar todos"
+                    />
+                  </TableHead>
+                )}
                 <TableHead className="font-semibold">Nome</TableHead>
                 <TableHead className="font-semibold">Telefone</TableHead>
                 <TableHead className="font-semibold">Origem</TableHead>
                 <TableHead className="font-semibold">Status</TableHead>
+                <TableHead className="font-semibold">Atribuído</TableHead>
                 <TableHead className="font-semibold">Próxima Ação</TableHead>
                 <TableHead className="font-semibold text-center">Ações</TableHead>
               </TableRow>
@@ -1030,7 +1258,7 @@ export const ActivateLeads = () => {
             <TableBody>
               {paginatedLeads.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32">
+                  <TableCell colSpan={canAssignLead ? 8 : 7} className="h-32">
                     <div className="flex flex-col items-center justify-center text-center">
                       <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-muted to-muted/50 flex items-center justify-center mb-4">
                         <Users className="h-8 w-8 text-muted-foreground" />
@@ -1046,15 +1274,27 @@ export const ActivateLeads = () => {
                   const hasAlert = lead.data_proxima_operacao && 
                     (isToday(parseISO(lead.data_proxima_operacao)) || 
                      isBefore(parseISO(lead.data_proxima_operacao), new Date()));
+                  const isSelected = selectedLeadIds.has(lead.id);
+                  const assignedUser = availableUsers.find(u => u.id === lead.assigned_to);
                   
                   return (
                     <TableRow 
                       key={lead.id} 
                       className={cn(
                         "group hover:bg-muted/30 transition-colors",
-                        hasAlert && "bg-orange-50/50 dark:bg-orange-950/20"
+                        hasAlert && "bg-orange-50/50 dark:bg-orange-950/20",
+                        isSelected && "bg-primary/10"
                       )}
                     >
+                      {canAssignLead && (
+                        <TableCell>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleLeadSelection(lead.id)}
+                            aria-label={`Selecionar ${lead.nome}`}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-lg bg-gradient-to-r from-primary/20 to-primary/10 flex items-center justify-center">
@@ -1081,6 +1321,20 @@ export const ActivateLeads = () => {
                           {statusConfig.icon}
                           {statusConfig.label}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {assignedUser ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                              <User className="h-3 w-3 text-primary" />
+                            </div>
+                            <span className="text-sm">{assignedUser.name}</span>
+                          </div>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            Disponível
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         {lead.proxima_acao || (lead.data_proxima_operacao 
@@ -1490,6 +1744,189 @@ export const ActivateLeads = () => {
             >
               <UserPlus className="h-4 w-4 mr-2" />
               Confirmar Atribuição
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Assign Modal */}
+      <Dialog open={isBulkAssignModalOpen} onOpenChange={setIsBulkAssignModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Shuffle className="h-5 w-5 text-primary" />
+              Distribuir {selectedLeadIds.size} Lead(s)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            {/* Mode Selection */}
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => setBulkAssignMode('single')}
+                className={cn(
+                  "p-4 rounded-xl border-2 text-left transition-all",
+                  bulkAssignMode === 'single' 
+                    ? "border-primary bg-primary/10" 
+                    : "border-muted hover:border-primary/50"
+                )}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                    <UserPlus className="h-5 w-5 text-primary" />
+                  </div>
+                  <span className="font-semibold">Usuário Único</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Atribuir todos os leads selecionados para um único usuário
+                </p>
+              </button>
+              
+              <button
+                onClick={() => setBulkAssignMode('distribute')}
+                className={cn(
+                  "p-4 rounded-xl border-2 text-left transition-all",
+                  bulkAssignMode === 'distribute' 
+                    ? "border-primary bg-primary/10" 
+                    : "border-muted hover:border-primary/50"
+                )}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                    <Users className="h-5 w-5 text-primary" />
+                  </div>
+                  <span className="font-semibold">Distribuição</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Distribuir leads de forma equilibrada entre vários usuários
+                </p>
+              </button>
+            </div>
+
+            {/* Single User Mode */}
+            {bulkAssignMode === 'single' && (
+              <div className="space-y-2">
+                <Label>Selecione o usuário</Label>
+                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                  <SelectTrigger className="border-2 focus:border-primary">
+                    <SelectValue placeholder="Selecione um usuário" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableUsers.map(u => (
+                      <SelectItem key={u.id} value={u.id}>
+                        <span className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          {u.name}
+                          {u.email && <span className="text-xs text-muted-foreground">({u.email})</span>}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Distribute Mode */}
+            {bulkAssignMode === 'distribute' && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Máximo de leads por usuário</Label>
+                  <Input
+                    type="number"
+                    value={maxLeadsPerUser}
+                    onChange={(e) => setMaxLeadsPerUser(Number(e.target.value))}
+                    min={1}
+                    max={100}
+                    className="border-2 focus:border-primary w-32"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Selecione os usuários para distribuição</Label>
+                  <div className="border-2 rounded-lg max-h-64 overflow-y-auto">
+                    {availableUsers.map(u => (
+                      <div
+                        key={u.id}
+                        onClick={() => toggleBulkUserSelection(u.id)}
+                        className={cn(
+                          "flex items-center gap-3 p-3 cursor-pointer border-b last:border-b-0 transition-colors",
+                          selectedBulkUsers.includes(u.id) 
+                            ? "bg-primary/10" 
+                            : "hover:bg-muted/50"
+                        )}
+                      >
+                        <Checkbox
+                          checked={selectedBulkUsers.includes(u.id)}
+                          onCheckedChange={() => toggleBulkUserSelection(u.id)}
+                        />
+                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                          <User className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{u.name}</p>
+                          {u.email && <p className="text-xs text-muted-foreground">{u.email}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedBulkUsers.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {selectedBulkUsers.length} usuário(s) selecionado(s) • 
+                      ~{Math.ceil(selectedLeadIds.size / selectedBulkUsers.length)} leads por usuário
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Summary */}
+            <div className="p-4 bg-muted/50 rounded-xl">
+              <h4 className="font-medium mb-2">Resumo da Distribuição</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Leads selecionados:</span>
+                  <span className="ml-2 font-semibold">{selectedLeadIds.size}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Modo:</span>
+                  <span className="ml-2 font-semibold">
+                    {bulkAssignMode === 'single' ? 'Usuário único' : 'Distribuição'}
+                  </span>
+                </div>
+                {bulkAssignMode === 'single' && selectedUserId && (
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Atribuir para:</span>
+                    <span className="ml-2 font-semibold">
+                      {availableUsers.find(u => u.id === selectedUserId)?.name}
+                    </span>
+                  </div>
+                )}
+                {bulkAssignMode === 'distribute' && selectedBulkUsers.length > 0 && (
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Distribuir entre:</span>
+                    <span className="ml-2 font-semibold">
+                      {selectedBulkUsers.map(id => availableUsers.find(u => u.id === id)?.name).join(', ')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBulkAssignModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleBulkAssign}
+              disabled={
+                bulkAssigning || 
+                (bulkAssignMode === 'single' && !selectedUserId) ||
+                (bulkAssignMode === 'distribute' && selectedBulkUsers.length === 0)
+              }
+              className="bg-gradient-to-r from-primary to-primary/80"
+            >
+              {bulkAssigning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Shuffle className="h-4 w-4 mr-2" />
+              Distribuir Leads
             </Button>
           </DialogFooter>
         </DialogContent>
