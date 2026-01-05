@@ -606,6 +606,48 @@ export const ActivateLeads = () => {
     setIsDateModalOpen(false);
   };
 
+  // Mensagens motivacionais para exibir ao gerar leads
+  const MOTIVATIONAL_MESSAGES = [
+    // 🔥 Motivação em Vendas
+    'Cada "não" te aproxima do próximo "sim".',
+    'Venda é constância, não sorte.',
+    'Quem acredita no produto, vende com verdade.',
+    'Meta não é pressão, é direção.',
+    'Hoje é dia de fechar negócio.',
+    'Disciplina vende mais que talento.',
+    'O cliente sente quando você confia.',
+    'Vendedor forte não desiste, ajusta.',
+    'Venda é serviço, não insistência.',
+    'Resultado é consequência da ação diária.',
+    // 🚀 Crescimento Profissional
+    'Evoluir um pouco todo dia muda tudo.',
+    'Quem se prepara, se destaca.',
+    'Profissional bom aprende. Excelente aplica.',
+    'Seu crescimento começa na sua atitude.',
+    'Conhecimento abre portas, ação atravessa.',
+    'Seja referência, não apenas mais um.',
+    'Crescer dói, mas ficar parado dói mais.',
+    'Aprender é investir em si mesmo.',
+    'Quem assume responsabilidade, assume o controle.',
+    'O profissional do futuro começa hoje.',
+    // 💼 Foco, Disciplina e Resultado
+    'Sem foco, não há crescimento.',
+    'Resultado gosta de rotina.',
+    'Faça bem feito, mesmo quando ninguém vê.',
+    'Pequenas ações geram grandes comissões.',
+    'Profissional consistente vence o improviso.',
+    'Quem acompanha números, melhora resultados.',
+    'Trabalhe como dono, colha como líder.',
+    'Persistência transforma metas em realidade.',
+    'Seu esforço de hoje paga o amanhã.',
+    'Compromisso gera confiança e sucesso.',
+  ];
+
+  const getRandomMotivationalMessage = () => {
+    const randomIndex = Math.floor(Math.random() * MOTIVATIONAL_MESSAGES.length);
+    return MOTIVATIONAL_MESSAGES[randomIndex];
+  };
+
   const handleGenerateLeads = async () => {
     if (!user?.id) return;
 
@@ -617,7 +659,7 @@ export const ActivateLeads = () => {
         .select('*')
         .is('assigned_to', null)
         .eq('status', 'novo')
-        .limit(10);
+        .limit(3);
 
       if (error) throw error;
 
@@ -645,9 +687,12 @@ export const ActivateLeads = () => {
 
       await supabase.from('activate_leads_distribution').insert(distributions);
 
+      // Exibir mensagem motivacional junto com a confirmação
+      const motivationalMessage = getRandomMotivationalMessage();
+      
       toast({
-        title: 'Leads gerados!',
-        description: `${availableLeads.length} leads foram atribuídos a você.`,
+        title: `🚀 ${availableLeads.length} leads gerados!`,
+        description: `💡 "${motivationalMessage}"`,
       });
 
       fetchLeads();
@@ -828,7 +873,7 @@ export const ActivateLeads = () => {
               className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/25"
             >
               <Zap className="h-4 w-4 mr-2" />
-              Gerar Leads (20)
+              Gerar Leads (3)
             </Button>
             
             {canImport && (
