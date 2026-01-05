@@ -2901,6 +2901,200 @@ export type Database = {
           },
         ]
       }
+      user_data: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          birth_date: string | null
+          cep: string | null
+          city: string | null
+          cnpj: string | null
+          complement: string | null
+          cpf: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          internal_observations: string | null
+          legal_representative: string | null
+          legal_representative_cpf: string | null
+          marital_status: string | null
+          neighborhood: string | null
+          number: string | null
+          person_type: Database["public"]["Enums"]["person_type"]
+          personal_email: string | null
+          phone: string | null
+          pix_key: string | null
+          pix_key_type: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
+          rg: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["user_data_status"]
+          street: string | null
+          trade_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          birth_date?: string | null
+          cep?: string | null
+          city?: string | null
+          cnpj?: string | null
+          complement?: string | null
+          cpf?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          internal_observations?: string | null
+          legal_representative?: string | null
+          legal_representative_cpf?: string | null
+          marital_status?: string | null
+          neighborhood?: string | null
+          number?: string | null
+          person_type?: Database["public"]["Enums"]["person_type"]
+          personal_email?: string | null
+          phone?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          rg?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["user_data_status"]
+          street?: string | null
+          trade_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          birth_date?: string | null
+          cep?: string | null
+          city?: string | null
+          cnpj?: string | null
+          complement?: string | null
+          cpf?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          internal_observations?: string | null
+          legal_representative?: string | null
+          legal_representative_cpf?: string | null
+          marital_status?: string | null
+          neighborhood?: string | null
+          number?: string | null
+          person_type?: Database["public"]["Enums"]["person_type"]
+          personal_email?: string | null
+          phone?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          rg?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["user_data_status"]
+          street?: string | null
+          trade_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_data_history: {
+        Row: {
+          action: string
+          changed_by: string | null
+          changes: Json | null
+          created_at: string
+          id: string
+          user_data_id: string
+        }
+        Insert: {
+          action: string
+          changed_by?: string | null
+          changes?: Json | null
+          created_at?: string
+          id?: string
+          user_data_id: string
+        }
+        Update: {
+          action?: string
+          changed_by?: string | null
+          changes?: Json | null
+          created_at?: string
+          id?: string
+          user_data_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_data_history_user_data_id_fkey"
+            columns: ["user_data_id"]
+            isOneToOne: false
+            referencedRelation: "user_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_documents: {
+        Row: {
+          created_at: string
+          document_name: string
+          document_type: string
+          file_name: string
+          file_size: number | null
+          file_url: string
+          id: string
+          mime_type: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["document_status"]
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          document_name: string
+          document_type: string
+          file_name: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["document_status"]
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          document_name?: string
+          document_type?: string
+          file_name?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["document_status"]
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: []
+      }
       whatsapp_conversations: {
         Row: {
           contact_name: string | null
@@ -3201,6 +3395,9 @@ export type Database = {
         | "outros"
       collaborative_permission_type: "view" | "edit" | "create" | "delete"
       company_role: "gestor" | "colaborador"
+      document_status: "pending" | "sent" | "approved" | "rejected"
+      person_type: "pf" | "pj"
+      user_data_status: "incomplete" | "in_review" | "approved" | "rejected"
       user_level: "bronze" | "prata" | "ouro" | "diamante"
     }
     CompositeTypes: {
@@ -3341,6 +3538,9 @@ export const Constants = {
       ],
       collaborative_permission_type: ["view", "edit", "create", "delete"],
       company_role: ["gestor", "colaborador"],
+      document_status: ["pending", "sent", "approved", "rejected"],
+      person_type: ["pf", "pj"],
+      user_data_status: ["incomplete", "in_review", "approved", "rejected"],
       user_level: ["bronze", "prata", "ouro", "diamante"],
     },
   },
