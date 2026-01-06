@@ -496,7 +496,8 @@ export const TelevendasManagement = () => {
       }
 
       // Calcular data do alerta (data_venda + prazo em meses)
-      const paymentDate = new Date(televenda.data_venda);
+      // Adicionar T12:00:00 para evitar problemas de timezone
+      const paymentDate = new Date(televenda.data_venda + 'T12:00:00');
       const alertDate = new Date(paymentDate);
       alertDate.setMonth(alertDate.getMonth() + bankSettings.reuse_months);
 
@@ -935,7 +936,7 @@ export const TelevendasManagement = () => {
                     <TableCell className="text-sm text-muted-foreground">{tv.user?.name || 'N/A'}</TableCell>
                     <TableCell>{tv.nome}</TableCell>
                     <TableCell>{formatCPF(tv.cpf)}</TableCell>
-                    <TableCell>{new Date(tv.data_venda).toLocaleDateString()}</TableCell>
+                    <TableCell>{tv.data_venda ? tv.data_venda.split('-').reverse().join('/') : '-'}</TableCell>
                     <TableCell>{tv.banco}</TableCell>
                     <TableCell>{tv.tipo_operacao}</TableCell>
                     <TableCell>R$ {formatCurrencyDisplay(tv.parcela)}</TableCell>
@@ -1030,11 +1031,7 @@ export const TelevendasManagement = () => {
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Data da Venda</Label>
                     <p className="font-medium text-foreground">
-                      {new Date(selectedTv.data_venda + 'T12:00:00').toLocaleDateString("pt-BR", {
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric'
-                      })}
+                      {selectedTv.data_venda ? selectedTv.data_venda.split('-').reverse().join('/') : '-'}
                     </p>
                   </div>
                 </div>
