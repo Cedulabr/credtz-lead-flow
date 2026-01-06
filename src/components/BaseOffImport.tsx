@@ -27,6 +27,8 @@ interface ImportResult {
   success: number;
   errors: number;
   duplicates: number;
+  contractsDetected: number;
+  contractsInserted: number;
   errorDetails: Array<{ row: number; error: string; data?: any }>;
 }
 
@@ -36,46 +38,164 @@ interface BaseOffImportProps {
 
 // Mapeamento das colunas do arquivo para os campos do banco
 const COLUMN_MAP: Record<string, string> = {
+  // Campos básicos do cliente
   NB: "nb",
   CPF: "cpf",
   NOME: "nome",
   DTNASCIMENTO: "data_nascimento",
+  "DT_NASCIMENTO": "data_nascimento",
+  "DATANASCIMENTO": "data_nascimento",
+  "DATA_NASCIMENTO": "data_nascimento",
   ESP: "esp",
   DIB: "dib",
   MR: "mr",
   BANCOPAGTO: "banco_pagto",
+  "BANCO_PAGTO": "banco_pagto",
   AGENCIAPAGTO: "agencia_pagto",
+  "AGENCIA_PAGTO": "agencia_pagto",
   ORGAOPAGADOR: "orgao_pagador",
+  "ORGAO_PAGADOR": "orgao_pagador",
   CONTACORRENTE: "conta_corrente",
+  "CONTA_CORRENTE": "conta_corrente",
   MEIOPAGTO: "meio_pagto",
+  "MEIO_PAGTO": "meio_pagto",
   STATUSBENEFICIO: "status_beneficio",
+  "STATUS_BENEFICIO": "status_beneficio",
   BLOQUEIO: "bloqueio",
   PENSAOALIMENTICIA: "pensao_alimenticia",
+  "PENSAO_ALIMENTICIA": "pensao_alimenticia",
   REPRESENTANTE: "representante",
   SEXO: "sexo",
   DDB: "ddb",
+  
+  // RMC e RCC
   BANCORMC: "banco_rmc",
+  "BANCO_RMC": "banco_rmc",
   VALORRMC: "valor_rmc",
+  "VALOR_RMC": "valor_rmc",
+  "VL_RMC": "valor_rmc",
   BANCORCC: "banco_rcc",
+  "BANCO_RCC": "banco_rcc",
   VALORRCC: "valor_rcc",
+  "VALOR_RCC": "valor_rcc",
+  "VL_RCC": "valor_rcc",
+  
+  // === COLUNAS DE CONTRATO/EMPRÉSTIMO - ALIASES AMPLIADOS ===
+  // Banco do empréstimo
   BANCOEMPRESTIMO: "banco_emprestimo",
+  "BANCO_EMPRESTIMO": "banco_emprestimo",
+  "BANCO EMPRESTIMO": "banco_emprestimo",
+  "BANCO_EMPRÉSTIMO": "banco_emprestimo",
+  "BANCO EMPRÉSTIMO": "banco_emprestimo",
+  "CD_BANCO_EMPRESTIMO": "banco_emprestimo",
+  "CDBANCO": "banco_emprestimo",
+  "CD_BANCO": "banco_emprestimo",
+  "CODIGOBANCO": "banco_emprestimo",
+  "CODIGO_BANCO": "banco_emprestimo",
+  
+  // Número do contrato
   CONTRATO: "contrato",
+  "NR_CONTRATO": "contrato",
+  "NRCONTRATO": "contrato",
+  "NUMERO_CONTRATO": "contrato",
+  "NUMEROCONTRATO": "contrato",
+  "NUM_CONTRATO": "contrato",
+  "NUMCONTRATO": "contrato",
+  "ID_CONTRATO": "contrato",
+  "IDCONTRATO": "contrato",
+  "CD_CONTRATO": "contrato",
+  "CDCONTRATO": "contrato",
+  "CONTRATO_NUMERO": "contrato",
+  
+  // Valor do empréstimo
   VLEMPRESTIMO: "vl_emprestimo",
+  "VL_EMPRESTIMO": "vl_emprestimo",
+  "VL EMPRESTIMO": "vl_emprestimo",
+  "VALOREMPRESTIMO": "vl_emprestimo",
+  "VALOR_EMPRESTIMO": "vl_emprestimo",
+  "VALOR EMPRESTIMO": "vl_emprestimo",
+  "VLEMPRÉSTIMO": "vl_emprestimo",
+  "VL_EMPRÉSTIMO": "vl_emprestimo",
+  
+  // Início do desconto
   INICIODODESCONTO: "inicio_desconto",
+  "INICIO_DESCONTO": "inicio_desconto",
+  "INICIO DESCONTO": "inicio_desconto",
+  "INICIODESCONTO": "inicio_desconto",
+  "DT_INICIO_DESCONTO": "inicio_desconto",
+  "DATA_INICIO_DESCONTO": "inicio_desconto",
+  
+  // Prazo
   PRAZO: "prazo",
+  "QT_PRAZO": "prazo",
+  "QTPRAZO": "prazo",
+  "PRAZO_TOTAL": "prazo",
+  
+  // Valor da parcela
   VLPARCELA: "vl_parcela",
+  "VL_PARCELA": "vl_parcela",
+  "VL PARCELA": "vl_parcela",
+  "VALORPARCELA": "vl_parcela",
+  "VALOR_PARCELA": "vl_parcela",
+  "VALOR PARCELA": "vl_parcela",
+  
+  // Tipo de empréstimo (ex: 98, 13, etc.)
   TIPOEMPRESTIMO: "tipo_emprestimo",
+  "TIPO_EMPRESTIMO": "tipo_emprestimo",
+  "TIPO EMPRESTIMO": "tipo_emprestimo",
+  "TIPOEMPRÉSTIMO": "tipo_emprestimo",
+  "TIPO_EMPRÉSTIMO": "tipo_emprestimo",
+  "CD_TIPO_EMPRESTIMO": "tipo_emprestimo",
+  "CDTIPOEMPRESTIMO": "tipo_emprestimo",
+  "TP_EMPRESTIMO": "tipo_emprestimo",
+  "TPEMPRESTIMO": "tipo_emprestimo",
+  
+  // Data de averbação
   DATAAVERBACAO: "data_averbacao",
+  "DATA_AVERBACAO": "data_averbacao",
+  "DATA AVERBACAO": "data_averbacao",
+  "DTAVERBACAO": "data_averbacao",
+  "DT_AVERBACAO": "data_averbacao",
+  
+  // Situação do empréstimo
   SITUACAOEMPRESTIMO: "situacao_emprestimo",
+  "SITUACAO_EMPRESTIMO": "situacao_emprestimo",
+  "SITUACAO EMPRESTIMO": "situacao_emprestimo",
+  "SITUACAOEMPRÉSTIMO": "situacao_emprestimo",
+  "ST_EMPRESTIMO": "situacao_emprestimo",
+  "STATUS_EMPRESTIMO": "situacao_emprestimo",
+  
+  // Competência
   COMPETENCIA: "competencia",
+  "COMPETÊNCIA": "competencia",
+  
+  // Competência final
   COMPETENCIA_FINAL: "competencia_final",
+  "COMPETENCIA FINAL": "competencia_final",
+  "COMPETENCIAFINAL": "competencia_final",
+  "COMPETÊNCIA_FINAL": "competencia_final",
+  
+  // Taxa
   TAXA: "taxa",
+  "TX_JUROS": "taxa",
+  "TXJUROS": "taxa",
+  "TAXA_JUROS": "taxa",
+  
+  // Saldo
   SALDO: "saldo",
+  "VL_SALDO": "saldo",
+  "VLSALDO": "saldo",
+  "SALDO_DEVEDOR": "saldo",
+  
+  // Endereço
   BAIRRO: "bairro",
   MUNICIPIO: "municipio",
+  "CIDADE": "municipio",
   UF: "uf",
+  "ESTADO": "uf",
   CEP: "cep",
   ENDERECO: "endereco",
+  "ENDEREÇO": "endereco",
   LOGR_TIPO_1: "logr_tipo_1",
   LOGR_TITULO_1: "logr_titulo_1",
   LOGR_NOME_1: "logr_nome_1",
@@ -85,16 +205,14 @@ const COLUMN_MAP: Record<string, string> = {
   CIDADE_1: "cidade_1",
   UF_1: "uf_1",
   CEP_1: "cep_1",
+  
+  // Telefones
   TELFIXO_1: "tel_fixo_1",
   TELFIXO_2: "tel_fixo_2",
   TELFIXO_3: "tel_fixo_3",
   TELCEL_1: "tel_cel_1",
   TELCEL_2: "tel_cel_2",
   TELCEL_3: "tel_cel_3",
-  EMAIL_1: "email_1",
-  EMAIL_2: "email_2",
-  EMAIL_3: "email_3",
-  // Aliases para variações comuns
   "TELCEL 1": "tel_cel_1",
   "TELCEL 2": "tel_cel_2",
   "TELCEL 3": "tel_cel_3",
@@ -107,9 +225,30 @@ const COLUMN_MAP: Record<string, string> = {
   "TEL_FIXO_1": "tel_fixo_1",
   "TEL_FIXO_2": "tel_fixo_2",
   "TEL_FIXO_3": "tel_fixo_3",
+  "TELEFONE1": "tel_cel_1",
+  "TELEFONE2": "tel_cel_2",
+  "TELEFONE3": "tel_cel_3",
+  "TELEFONE_1": "tel_cel_1",
+  "TELEFONE_2": "tel_cel_2",
+  "TELEFONE_3": "tel_cel_3",
+  
+  // E-mails
+  EMAIL_1: "email_1",
+  EMAIL_2: "email_2",
+  EMAIL_3: "email_3",
   "EMAIL 1": "email_1",
   "EMAIL 2": "email_2",
   "EMAIL 3": "email_3",
+  "EMAIL1": "email_1",
+  "EMAIL2": "email_2",
+  "EMAIL3": "email_3",
+  
+  // Nome da mãe/pai e naturalidade
+  NOME_MAE: "nome_mae",
+  "NOMEMAE": "nome_mae",
+  NOME_PAI: "nome_pai",
+  "NOMEPAI": "nome_pai",
+  NATURALIDADE: "naturalidade",
 };
 
 export function BaseOffImport({ onBack }: BaseOffImportProps) {
@@ -264,6 +403,8 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
       success: 0,
       errors: 0,
       duplicates: 0,
+      contractsDetected: 0,
+      contractsInserted: 0,
       errorDetails: [],
     };
 
@@ -317,6 +458,19 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
           headerToDbField[idx] = dbField;
         }
       });
+
+      // Log de debug para identificar colunas não mapeadas
+      const originalHeaders = rows[0].map((h) => String(h || "").trim());
+      const unmappedColumns = originalHeaders.filter((h, idx) => !headerToDbField[idx] && h.length > 0);
+      if (unmappedColumns.length > 0) {
+        console.log("Colunas não mapeadas do arquivo:", unmappedColumns);
+      }
+      
+      // Verificar se colunas de contrato foram mapeadas
+      const mappedFields = Object.values(headerToDbField);
+      const hasContractColumns = mappedFields.includes("contrato") && mappedFields.includes("banco_emprestimo");
+      console.log("Colunas mapeadas:", mappedFields);
+      console.log("Colunas de contrato encontradas:", hasContractColumns);
 
       const dataRows = rows.slice(1);
       importResult.total = dataRows.length;
@@ -538,6 +692,9 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
         console.warn(`Não foi possível resolver o ID de ${cpfsSemId} CPFs para vínculo de contratos.`);
       }
 
+      // Atualizar contagem de contratos detectados
+      importResult.contractsDetected = allContracts.length;
+
       if (allContracts.length > 0) {
         setProgressText(`Salvando ${allContracts.length} contratos...`);
 
@@ -556,10 +713,16 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
               row: 0,
               error: `Erro ao salvar contratos: ${error.message}`,
             });
+          } else {
+            importResult.contractsInserted += batch.length;
           }
 
           setProgress(75 + Math.round(((i + batchSize) / allContracts.length) * 25));
         }
+      } else {
+        // Log das colunas mapeadas para debug
+        console.log("Nenhum contrato detectado. Colunas mapeadas:", Object.values(headerToDbField));
+        console.log("Verificar se as colunas banco_emprestimo e contrato estão presentes");
       }
 
       // Atualizar lote de importação
@@ -578,7 +741,7 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
       setProgressText("Importação concluída!");
       setResult(importResult);
       toast.success(
-        `Importação concluída! ${importResult.success} clientes e ${allContracts.length} contratos processados.`
+        `Importação concluída! ${importResult.success} clientes e ${importResult.contractsInserted} contratos processados.`
       );
     } catch (error: any) {
       console.error("Erro na importação:", error);
@@ -687,7 +850,7 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div className="text-center p-4 bg-muted/50 rounded-lg">
                 <p className="text-2xl font-bold">{result.total}</p>
                 <p className="text-sm text-muted-foreground">Total de Linhas</p>
@@ -695,6 +858,14 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
               <div className="text-center p-4 bg-success/10 rounded-lg">
                 <p className="text-2xl font-bold text-success">{result.success}</p>
                 <p className="text-sm text-muted-foreground">Clientes Importados</p>
+              </div>
+              <div className="text-center p-4 bg-primary/10 rounded-lg">
+                <p className="text-2xl font-bold text-primary">{result.contractsDetected}</p>
+                <p className="text-sm text-muted-foreground">Contratos Detectados</p>
+              </div>
+              <div className="text-center p-4 bg-success/10 rounded-lg">
+                <p className="text-2xl font-bold text-success">{result.contractsInserted}</p>
+                <p className="text-sm text-muted-foreground">Contratos Salvos</p>
               </div>
               <div className="text-center p-4 bg-destructive/10 rounded-lg">
                 <p className="text-2xl font-bold text-destructive">{result.errors}</p>
@@ -705,6 +876,17 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
                 <p className="text-sm text-muted-foreground">Contratos Duplicados</p>
               </div>
             </div>
+
+            {result.contractsDetected === 0 && result.success > 0 && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Nenhum contrato detectado</AlertTitle>
+                <AlertDescription>
+                  Verifique se o arquivo contém as colunas de contrato (BANCO_EMPRESTIMO, CONTRATO, TIPO_EMPRESTIMO, etc.). 
+                  Os contratos tipo 98 (empréstimos) precisam dessas colunas para serem importados.
+                </AlertDescription>
+              </Alert>
+            )}
 
             {result.errorDetails.length > 0 && (
               <div>
