@@ -3443,6 +3443,10 @@ export type Database = {
         }[]
       }
       get_user_company_ids: { Args: { _user_id: string }; Returns: string[] }
+      get_user_data_company_ids: {
+        Args: { check_user_id: string }
+        Returns: string[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -3507,6 +3511,10 @@ export type Database = {
       }
       user_belongs_to_company: {
         Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_in_same_company: {
+        Args: { target_user_id: string }
         Returns: boolean
       }
       validate_cpf: { Args: { cpf_input: string }; Returns: boolean }
