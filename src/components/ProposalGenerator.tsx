@@ -107,6 +107,7 @@ export function ProposalGenerator() {
   const [loadingSaved, setLoadingSaved] = useState(false);
   const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   
   // Filters state
   const [filterUser, setFilterUser] = useState<string>("all");
@@ -525,6 +526,41 @@ export function ProposalGenerator() {
     await new Promise((resolve) => setTimeout(resolve, 500));
     setIsGenerating(false);
     setStep("summary");
+    
+    // Salvar automaticamente ao gerar a proposta
+    if (user && !editingProposalId) {
+      await saveProposalAuto();
+    }
+  };
+  
+  const saveProposalAuto = async () => {
+    if (!user) return;
+    
+    try {
+      const contractsData = proposalData.contracts.filter(c => c.isComplete) as unknown as any;
+      
+      const proposalPayload = {
+        user_id: user.id,
+        client_name: proposalData.clientName,
+        client_phone: proposalData.clientPhone,
+        contracts: contractsData,
+      };
+
+      const { data, error } = await supabase
+        .from("saved_proposals")
+        .insert([proposalPayload])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      setEditingProposalId(data.id);
+      setIsSaved(true);
+      toast.success("Proposta salva automaticamente!");
+      fetchSavedProposals();
+    } catch (error) {
+      console.error("Error auto-saving proposal:", error);
+    }
   };
 
   const copyToClipboard = async () => {
@@ -547,8 +583,8 @@ export function ProposalGenerator() {
     const pageWidth = doc.internal.pageSize.getWidth();
     let y = 20;
 
-    // Header
-    doc.setFillColor(59, 130, 246);
+    // Header - Cores neutras (cinza escuro)
+    doc.setFillColor(51, 51, 51);
     doc.rect(0, 0, pageWidth, 40, "F");
     
     doc.setTextColor(255, 255, 255);
@@ -581,13 +617,13 @@ export function ProposalGenerator() {
     completedContracts.forEach((c, i) => {
       const productInfo = getProductInfo(c.product);
       
-      // Contract card background
-      doc.setFillColor(248, 250, 252);
+      // Contract card background - cinza claro neutro
+      doc.setFillColor(245, 245, 245);
       doc.roundedRect(15, y - 5, pageWidth - 30, 35, 3, 3, "F");
 
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(59, 130, 246);
+      doc.setTextColor(51, 51, 51); // Cinza escuro para títulos
       doc.text(`${i + 1}. ${productInfo?.label || c.product}`, 20, y + 5);
 
       doc.setTextColor(0, 0, 0);
@@ -610,8 +646,8 @@ export function ProposalGenerator() {
 
     y += 10;
 
-    // Summary
-    doc.setFillColor(34, 197, 94);
+    // Summary - Cinza médio neutro
+    doc.setFillColor(75, 85, 99);
     doc.roundedRect(15, y - 5, pageWidth - 30, 45, 3, 3, "F");
     
     doc.setTextColor(255, 255, 255);
@@ -631,7 +667,7 @@ export function ProposalGenerator() {
 
     // Product-specific footers
     if (footers.length > 0) {
-      doc.setTextColor(59, 130, 246);
+      doc.setTextColor(55, 65, 81); // Cinza escuro
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       doc.text("INFORMAÇÕES IMPORTANTES:", 20, y);
@@ -669,6 +705,7 @@ export function ProposalGenerator() {
     setExpandedContracts(new Set());
     setBankInput("");
     setEditingProposalId(null);
+    setIsSaved(false);
   };
 
   const renderStepIndicator = () => {
