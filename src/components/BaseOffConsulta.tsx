@@ -156,6 +156,20 @@ const ESTADOS_BR = [
   "SP", "SE", "TO"
 ];
 
+// Opções de Espécies Consignáveis
+const ESPECIES_OPTIONS = [
+  { value: "todas", label: "Todas as espécies" },
+  { value: "exceto_32_92", label: "Consignáveis, exceto 32 e 92" },
+  { value: "exceto_loas", label: "Consignáveis, exceto LOAS (87 e 88)" },
+];
+
+// Opções de Representante Legal
+const REPRESENTANTE_OPTIONS = [
+  { value: "todos", label: "Todos" },
+  { value: "sim", label: "Sim (com representante)" },
+  { value: "nao", label: "Não (sem representante)" },
+];
+
 export function BaseOffConsulta() {
   const { isAdmin, user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
@@ -188,6 +202,12 @@ export function BaseOffConsulta() {
   const [selectedCidade, setSelectedCidade] = useState("");
   const [cidadesDisponiveis, setCidadesDisponiveis] = useState<string[]>([]);
   const [isLoadingCidades, setIsLoadingCidades] = useState(false);
+  
+  // Filtros avançados do Modal Ativo
+  const [especieFilter, setEspecieFilter] = useState("todas");
+  const [representanteFilter, setRepresentanteFilter] = useState("todos");
+  const [idadeMinima, setIdadeMinima] = useState("");
+  const [idadeMaxima, setIdadeMaxima] = useState("");
 
   // Buscar cidades quando UF é selecionado
   useEffect(() => {
@@ -389,6 +409,10 @@ export function BaseOffConsulta() {
   const handleAtivoClick = () => {
     setSelectedUF("");
     setSelectedCidade("");
+    setEspecieFilter("todas");
+    setRepresentanteFilter("todos");
+    setIdadeMinima("");
+    setIdadeMaxima("");
     setShowFilterModal(true);
   };
 
@@ -425,12 +449,44 @@ export function BaseOffConsulta() {
         .from("baseoff_clients")
         .select("*")
         .eq("uf", selectedUF)
-        .eq("municipio", selectedCidade)
-        .limit(50);
+        .eq("municipio", selectedCidade);
 
       if (assignedIds.length > 0) {
         query = query.not("id", "in", `(${assignedIds.join(",")})`);
       }
+
+      // Filtro de Espécies
+      if (especieFilter === "exceto_32_92") {
+        query = query.not("esp", "in", "(32,92)");
+      } else if (especieFilter === "exceto_loas") {
+        query = query.not("esp", "in", "(87,88)");
+      }
+
+      // Filtro de Representante Legal
+      if (representanteFilter === "sim") {
+        query = query.or("representante.eq.S,representante.ilike.%SIM%,representante.ilike.%REPRESENTANTE%");
+      } else if (representanteFilter === "nao") {
+        query = query.or("representante.eq.N,representante.is.null,representante.eq.");
+      }
+
+      // Filtro de Idade (calculado pela data de nascimento)
+      if (idadeMinima || idadeMaxima) {
+        const hoje = new Date();
+        
+        if (idadeMinima) {
+          const dataMaxNasc = new Date(hoje);
+          dataMaxNasc.setFullYear(dataMaxNasc.getFullYear() - parseInt(idadeMinima));
+          query = query.lte("data_nascimento", dataMaxNasc.toISOString().split("T")[0]);
+        }
+        
+        if (idadeMaxima) {
+          const dataMinNasc = new Date(hoje);
+          dataMinNasc.setFullYear(dataMinNasc.getFullYear() - parseInt(idadeMaxima) - 1);
+          query = query.gte("data_nascimento", dataMinNasc.toISOString().split("T")[0]);
+        }
+      }
+
+      query = query.limit(50);
 
       const { data: availableClients, error } = await query;
 
@@ -477,7 +533,22 @@ export function BaseOffConsulta() {
       setCurrentActiveIndex(0);
       setShowAtivo(true);
       
-      toast.success(`${availableClients.length} clientes de ${selectedCidade}/${selectedUF} carregados`);
+      // Feedback visual com filtros aplicados
+      const filtrosAplicados = [];
+      if (especieFilter !== "todas") {
+        filtrosAplicados.push(ESPECIES_OPTIONS.find(e => e.value === especieFilter)?.label);
+      }
+      if (representanteFilter !== "todos") {
+        filtrosAplicados.push(`Representante: ${representanteFilter === "sim" ? "Sim" : "Não"}`);
+      }
+      if (idadeMinima || idadeMaxima) {
+        filtrosAplicados.push(`Idade: ${idadeMinima || "0"}-${idadeMaxima || "∞"}`);
+      }
+
+      toast.success(
+        `${availableClients.length} clientes de ${selectedCidade}/${selectedUF} carregados` +
+        (filtrosAplicados.length > 0 ? ` (${filtrosAplicados.join(", ")})` : "")
+      );
     } catch (error) {
       console.error("Erro ao carregar clientes ativos:", error);
       toast.error("Erro ao carregar clientes");
@@ -991,14 +1062,15 @@ export function BaseOffConsulta() {
 
       {/* Modal de Filtro Regional */}
       <Dialog open={showFilterModal} onOpenChange={setShowFilterModal}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Filter className="h-5 w-5 text-primary" />
-              Selecione a Região
+              Filtros para Atendimento Ativo
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Região */}
             <div className="space-y-2">
               <Label>Estado (UF)</Label>
               <Select value={selectedUF} onValueChange={setSelectedUF}>
@@ -1045,6 +1117,69 @@ export function BaseOffConsulta() {
                   Nenhuma cidade encontrada para este estado
                 </p>
               )}
+            </div>
+
+            <div className="border-t pt-4 mt-4" />
+
+            {/* Espécies Consignáveis */}
+            <div className="space-y-2">
+              <Label>Espécies Consignáveis</Label>
+              <Select value={especieFilter} onValueChange={setEspecieFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o filtro de espécies..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {ESPECIES_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Representante Legal */}
+            <div className="space-y-2">
+              <Label>Representante Legal</Label>
+              <Select value={representanteFilter} onValueChange={setRepresentanteFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por representante..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {REPRESENTANTE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Faixa de Idade */}
+            <div className="space-y-2">
+              <Label>Faixa de Idade</Label>
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="number"
+                  placeholder="Mín"
+                  value={idadeMinima}
+                  onChange={(e) => setIdadeMinima(e.target.value)}
+                  className="w-24"
+                  min="18"
+                  max="120"
+                />
+                <span className="text-muted-foreground">até</span>
+                <Input
+                  type="number"
+                  placeholder="Máx"
+                  value={idadeMaxima}
+                  onChange={(e) => setIdadeMaxima(e.target.value)}
+                  className="w-24"
+                  min="18"
+                  max="120"
+                />
+                <span className="text-muted-foreground text-sm">anos</span>
+              </div>
             </div>
           </div>
           <DialogFooter>
