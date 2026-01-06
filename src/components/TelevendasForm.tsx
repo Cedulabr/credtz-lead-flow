@@ -264,7 +264,7 @@ export const TelevendasForm = () => {
         saldo_devedor: saldoDevedorValue,
         tipo_operacao: values.tipo_operacao,
         observacao: values.observacao || null,
-        status: 'pendente',
+        status: 'solicitado_digitacao',
       });
 
       if (error) throw error;
