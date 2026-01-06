@@ -238,11 +238,18 @@ export const TelevendasForm = () => {
 
       const companyId = userCompanyData?.company_id || null;
 
-      // Converter valores de centavos para reais (dividir por 100)
-      // Os valores são armazenados como centavos pela máscara de moeda
-      const parcelaValue = values.parcela ? parseInt(values.parcela) / 100 : 0;
-      const trocoValue = values.troco ? parseInt(values.troco) / 100 : null;
-      const saldoDevedorValue = values.saldo_devedor ? parseInt(values.saldo_devedor) / 100 : null;
+      // Converter valores formatados para número
+      // O formatCurrency retorna valores como "1.234,56" então precisamos limpar e converter
+      const parseCurrencyValue = (val: string | undefined): number | null => {
+        if (!val) return null;
+        const numbers = val.replace(/\D/g, "");
+        if (!numbers) return null;
+        return parseInt(numbers) / 100;
+      };
+
+      const parcelaValue = parseCurrencyValue(values.parcela) || 0;
+      const trocoValue = parseCurrencyValue(values.troco);
+      const saldoDevedorValue = parseCurrencyValue(values.saldo_devedor);
 
       const { error } = await (supabase as any).from("televendas").insert({
         user_id: user.id,
