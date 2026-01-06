@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { Navigation } from "@/components/Navigation";
 import { Dashboard } from "@/components/Dashboard";
 import { IndicateClient } from "@/components/IndicateClient";
-import IndicatedClientsTracking from "@/components/IndicatedClientsTracking";
 import { Notifications } from "@/components/Notifications";
 import { BlockedAccess } from "@/components/BlockedAccess";
 import { SystemStatus } from "@/components/SystemStatus";
@@ -106,12 +105,7 @@ const Index = () => {
         if (!hasPermission('can_access_indicar')) {
           return <BlockedAccess message="Acesso à seção Indicar bloqueado pelo administrador" />;
         }
-        return (
-          <div className="space-y-6">
-            <IndicateClient />
-            <IndicatedClientsTracking />
-          </div>
-        );
+        return <IndicateClient />;
       
       case "proposal-generator":
         if (!hasPermission('can_access_gerador_propostas')) {
