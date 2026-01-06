@@ -134,13 +134,20 @@ interface ActiveClient {
   contracts: BaseOffContract[];
 }
 
+// Status conforme especificação do módulo
 const STATUS_OPTIONS = [
-  "Contato iniciado",
-  "Sem WhatsApp",
-  "Sem contrato disponível",
-  "Agendado",
-  "Desinteresse momentâneo"
+  { value: "conseguiu_falar", label: "Conseguiu falar com o cliente", icon: "✅" },
+  { value: "sem_contato", label: "Cliente sem contato telefônico", icon: "📵" },
+  { value: "desinteressado", label: "Cliente desinteressado", icon: "❌" },
+  { value: "agendado", label: "Contato agendado", icon: "📅" },
+  { value: "sem_contrato", label: "Sem contrato disponível", icon: "📋" },
 ];
+
+// Helper para obter label do status
+const getStatusLabel = (statusValue: string) => {
+  const option = STATUS_OPTIONS.find(s => s.value === statusValue);
+  return option ? option.label : statusValue;
+};
 
 // Estados brasileiros
 const ESTADOS_BR = [
@@ -152,7 +159,7 @@ const ESTADOS_BR = [
 export function BaseOffConsulta() {
   const { isAdmin, user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
-  const [searchType, setSearchType] = useState<"cpf" | "nome" | "nb">("cpf");
+  const [searchType, setSearchType] = useState<"cpf" | "telefone" | "nome" | "nb">("cpf");
   const [isSearching, setIsSearching] = useState(false);
   const [selectedClient, setSelectedClient] = useState<BaseOffClient | null>(null);
   const [contracts, setContracts] = useState<BaseOffContract[]>([]);
@@ -218,6 +225,9 @@ export function BaseOffConsulta() {
     fetchCidades();
   }, [selectedUF]);
 
+  // Normalizar telefone para busca (remove tudo exceto dígitos)
+  const normalizePhone = (phone: string) => phone.replace(/\D/g, "");
+
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
       toast.error("Digite um termo para buscar");
@@ -230,20 +240,42 @@ export function BaseOffConsulta() {
     setContracts([]);
 
     try {
-      let query = supabase.from("baseoff_clients").select("*");
+      let data: BaseOffClient[] | null = null;
+      let error: any = null;
 
       if (searchType === "cpf") {
-        const cleanCpf = searchTerm.replace(/\D/g, "").padStart(11, "0");
-        query = query.eq("cpf", cleanCpf);
+        // Busca por CPF - normaliza removendo caracteres não numéricos
+        const cleanCpf = searchTerm.replace(/\D/g, "").padStart(11, "0").slice(0, 11);
+        const result = await supabase.from("baseoff_clients").select("*").eq("cpf", cleanCpf).limit(50);
+        data = result.data as BaseOffClient[];
+        error = result.error;
+      } else if (searchType === "telefone") {
+        // Busca por telefone - normaliza e busca em todas as colunas de telefone
+        const cleanPhone = normalizePhone(searchTerm);
+        if (cleanPhone.length < 8) {
+          toast.error("Digite pelo menos 8 dígitos do telefone");
+          setIsSearching(false);
+          return;
+        }
+        
+        // Busca telefone em qualquer uma das colunas de telefone
+        const result = await supabase
+          .from("baseoff_clients")
+          .select("*")
+          .or(`tel_cel_1.ilike.%${cleanPhone}%,tel_cel_2.ilike.%${cleanPhone}%,tel_cel_3.ilike.%${cleanPhone}%,tel_fixo_1.ilike.%${cleanPhone}%,tel_fixo_2.ilike.%${cleanPhone}%,tel_fixo_3.ilike.%${cleanPhone}%`)
+          .limit(50);
+        data = result.data as BaseOffClient[];
+        error = result.error;
       } else if (searchType === "nb") {
-        query = query.ilike("nb", `%${searchTerm}%`);
+        const result = await supabase.from("baseoff_clients").select("*").ilike("nb", `%${searchTerm}%`).limit(50);
+        data = result.data as BaseOffClient[];
+        error = result.error;
       } else {
-        query = query.ilike("nome", `%${searchTerm}%`);
+        // Busca por nome
+        const result = await supabase.from("baseoff_clients").select("*").ilike("nome", `%${searchTerm}%`).limit(50);
+        data = result.data as BaseOffClient[];
+        error = result.error;
       }
-
-      query = query.limit(50);
-
-      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -252,10 +284,10 @@ export function BaseOffConsulta() {
         return;
       }
 
-      setSearchResults(data as BaseOffClient[]);
+      setSearchResults(data);
 
       if (data.length === 1) {
-        await selectClient(data[0] as BaseOffClient);
+        await selectClient(data[0]);
       }
     } catch (error) {
       console.error("Erro na busca:", error);
@@ -726,7 +758,7 @@ export function BaseOffConsulta() {
             </div>
           </div>
           <Badge variant={currentClient.status === "Pendente" ? "destructive" : "default"}>
-            {currentClient.status}
+            {getStatusLabel(currentClient.status)}
           </Badge>
         </div>
 
@@ -824,8 +856,11 @@ export function BaseOffConsulta() {
                 </SelectTrigger>
                 <SelectContent>
                   {STATUS_OPTIONS.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status}
+                    <SelectItem key={status.value} value={status.value}>
+                      <span className="flex items-center gap-2">
+                        <span>{status.icon}</span>
+                        <span>{status.label}</span>
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -878,15 +913,15 @@ export function BaseOffConsulta() {
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-3">
-            <div className="flex gap-2">
-              {(["cpf", "nome", "nb"] as const).map((type) => (
+            <div className="flex flex-wrap gap-2">
+              {(["cpf", "telefone", "nome", "nb"] as const).map((type) => (
                 <Button
                   key={type}
                   variant={searchType === type ? "default" : "outline"}
                   size="sm"
                   onClick={() => setSearchType(type)}
                 >
-                  {type === "cpf" ? "CPF" : type === "nome" ? "Nome" : "NB"}
+                  {type === "cpf" ? "CPF" : type === "telefone" ? "Telefone" : type === "nome" ? "Nome" : "NB"}
                 </Button>
               ))}
             </div>
@@ -894,7 +929,9 @@ export function BaseOffConsulta() {
               <Input
                 placeholder={
                   searchType === "cpf"
-                    ? "Digite o CPF..."
+                    ? "Digite o CPF (apenas números)..."
+                    : searchType === "telefone"
+                    ? "Digite o telefone (DDD + número)..."
                     : searchType === "nome"
                     ? "Digite o nome..."
                     : "Digite o NB..."
@@ -1359,8 +1396,8 @@ export function BaseOffConsulta() {
             <Search className="h-12 w-12 text-muted-foreground/30 mb-4" />
             <h3 className="text-lg font-medium mb-2">Busque um cliente</h3>
             <p className="text-muted-foreground max-w-md">
-              Digite o CPF, nome ou número do benefício para consultar os dados cadastrais e
-              contratos do cliente. Ou clique em <strong>Ativo</strong> para iniciar atendimento.
+              Digite o <strong>CPF</strong>, <strong>Telefone</strong>, <strong>Nome</strong> ou <strong>NB</strong> para consultar os dados cadastrais e
+              contratos do cliente. Ou clique em <strong>Ativo</strong> para iniciar atendimento em lote.
             </p>
           </CardContent>
         </Card>
@@ -1488,10 +1525,19 @@ function SimulationBlock({
           </TableBody>
         </Table>
       </ScrollArea>
-      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg">
-        <p className="text-sm text-yellow-800 dark:text-yellow-200">
-          ⚠️ Os valores acima são apenas simulações informativas e não representam proposta formal.
-        </p>
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
+        <div className="flex items-start gap-3">
+          <span className="text-xl">⚠️</span>
+          <div>
+            <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
+              Simulação apenas estimativa
+            </p>
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              Os valores apresentados são simulações com base nos fatores informados e não representam proposta formal. 
+              Valores finais estão sujeitos à análise bancária e podem variar conforme critérios do banco.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
