@@ -416,7 +416,6 @@ export const ActivateLeads = () => {
           .from('activate_leads')
           .update({ 
             assigned_to: selectedUserId,
-            status: 'em_andamento',
             ultima_interacao: new Date().toISOString()
           })
           .in('id', leadIds);
@@ -429,7 +428,7 @@ export const ActivateLeads = () => {
           user_id: user!.id,
           action_type: 'bulk_assignment',
           from_status: lead.status,
-          to_status: 'em_andamento',
+          to_status: lead.status,
           notes: `Atribuição em massa para ${availableUsers.find(u => u.id === selectedUserId)?.name}`,
           metadata: { assigned_to: selectedUserId, assigned_by: user!.id, bulk: true }
         }));
@@ -475,7 +474,6 @@ export const ActivateLeads = () => {
               .from('activate_leads')
               .update({ 
                 assigned_to: userId,
-                status: 'em_andamento',
                 ultima_interacao: new Date().toISOString()
               })
               .in('id', userLeadIds);
@@ -492,7 +490,7 @@ export const ActivateLeads = () => {
             user_id: user!.id,
             action_type: 'bulk_distribution',
             from_status: lead.status,
-            to_status: 'em_andamento',
+            to_status: lead.status,
             notes: `Distribuição em massa para ${availableUsers.find(u => u.id === userId)?.name}`,
             metadata: { assigned_to: userId, assigned_by: user!.id, bulk: true, distribution: true }
           };
@@ -552,16 +550,11 @@ export const ActivateLeads = () => {
       // Tratar 'none' como null para remover atribuição
       const assignedTo = (selectedUserId && selectedUserId !== 'none') ? selectedUserId : null;
       
-      // Atualiza assigned_to e muda status para em_andamento (trava exclusividade)
+      // Atualiza apenas assigned_to - status permanece inalterado
       const updateData: any = {
         assigned_to: assignedTo,
         ultima_interacao: new Date().toISOString()
       };
-      
-      // Se estiver atribuindo (não removendo), muda status para em_andamento
-      if (assignedTo) {
-        updateData.status = 'em_andamento';
-      }
       
       const { error } = await supabase
         .from('activate_leads')
@@ -576,7 +569,7 @@ export const ActivateLeads = () => {
         user_id: user.id,
         action_type: 'assignment',
         from_status: leadToAssign.status,
-        to_status: assignedTo ? 'em_andamento' : leadToAssign.status,
+        to_status: leadToAssign.status,
         notes: assignedTo 
           ? `Lead atribuído ao usuário ${availableUsers.find(u => u.id === assignedTo)?.name || assignedTo}`
           : 'Atribuição do lead removida',
@@ -586,7 +579,7 @@ export const ActivateLeads = () => {
       toast({
         title: assignedTo ? 'Lead atribuído!' : 'Atribuição removida',
         description: assignedTo 
-          ? `Lead atribuído para ${availableUsers.find(u => u.id === assignedTo)?.name || 'usuário'} - Status: Em Andamento`
+          ? `Lead atribuído para ${availableUsers.find(u => u.id === assignedTo)?.name || 'usuário'}`
           : 'O lead agora está disponível para distribuição',
       });
 
