@@ -41,7 +41,8 @@ import {
   UserPlus,
   CheckSquare,
   Square,
-  Shuffle
+  Shuffle,
+  CalendarClock
 } from 'lucide-react';
 import { format, addDays, parseISO, isToday, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -129,6 +130,15 @@ const STATUS_CONFIG: Record<string, {
     icon: <UserX className="h-3.5 w-3.5" />,
     dotColor: 'bg-slate-500'
   },
+  contato_futuro: { 
+    label: 'Contato Futuro', 
+    color: 'from-purple-500 to-violet-500', 
+    textColor: 'text-purple-700', 
+    bgColor: 'bg-gradient-to-r from-purple-50 to-violet-100',
+    borderColor: 'border-purple-200',
+    icon: <CalendarClock className="h-3.5 w-3.5" />,
+    dotColor: 'bg-purple-500'
+  },
 };
 
 const ORIGEM_OPTIONS = ['site', 'aplicativo', 'importacao', 'indicacao'];
@@ -150,6 +160,7 @@ export const ActivateLeads = () => {
   const [isPullLeadsModalOpen, setIsPullLeadsModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
+  const [isFutureContactModalOpen, setIsFutureContactModalOpen] = useState(false);
   
   const [selectedLead, setSelectedLead] = useState<ActivateLead | null>(null);
   const [newStatus, setNewStatus] = useState<string>('');
@@ -617,6 +628,8 @@ export const ActivateLeads = () => {
       setIsStatusModalOpen(true);
     } else if (status === 'operacoes_recentes') {
       setIsDateModalOpen(true);
+    } else if (status === 'contato_futuro') {
+      setIsFutureContactModalOpen(true);
     } else if (status === 'fechado') {
       await handleFechado(lead);
     } else {
@@ -778,6 +791,23 @@ export const ActivateLeads = () => {
       proxima_acao: `Contato em ${format(dataProximaOperacao, 'dd/MM/yyyy')}`,
     });
     setIsDateModalOpen(false);
+  };
+
+  const handleFutureContactSubmit = () => {
+    if (!selectedLead || !dataProximaOperacao) {
+      toast({
+        title: 'Campo obrigatório',
+        description: 'Por favor, selecione a data do contato futuro.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    updateLeadStatus(selectedLead, 'contato_futuro', { 
+      data_proxima_operacao: format(dataProximaOperacao, 'yyyy-MM-dd'),
+      proxima_acao: `Retornar contato em ${format(dataProximaOperacao, 'dd/MM/yyyy')}`,
+    });
+    setIsFutureContactModalOpen(false);
   };
 
   // Mensagens motivacionais para exibir ao gerar leads
@@ -1390,13 +1420,26 @@ export const ActivateLeads = () => {
                             <MessageCircle className="h-4 w-4" />
                           </Button>
 
+                          {/* Botão de contato futuro */}
+                          {canEditLead(lead) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleStatusChange(lead, 'contato_futuro')}
+                              className="h-8 w-8 p-0 hover:bg-purple-100 hover:text-purple-700"
+                              title="Agendar contato futuro"
+                            >
+                              <CalendarClock className="h-4 w-4" />
+                            </Button>
+                          )}
+
                           {/* Botão de atribuir - só para Gestor/Admin */}
                           {canAssignLead && (
                             <Button
                               size="sm"
                               variant="ghost"
                               onClick={() => openAssignModal(lead)}
-                              className="h-8 w-8 p-0 hover:bg-purple-100 hover:text-purple-700"
+                              className="h-8 w-8 p-0 hover:bg-indigo-100 hover:text-indigo-700"
                               title={lead.assigned_to ? 'Reatribuir lead' : 'Atribuir lead'}
                             >
                               <UserPlus className="h-4 w-4" />
@@ -1652,6 +1695,78 @@ export const ActivateLeads = () => {
               className="bg-gradient-to-r from-orange-500 to-amber-500"
             >
               Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Future Contact Modal */}
+      <Dialog open={isFutureContactModalOpen} onOpenChange={setIsFutureContactModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <CalendarClock className="h-5 w-5 text-purple-500" />
+              Agendar Contato Futuro
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800">
+              <p className="text-sm text-purple-700 dark:text-purple-300">
+                <CalendarClock className="h-4 w-4 inline mr-2" />
+                Agende uma data para retornar o contato com este cliente
+              </p>
+            </div>
+            
+            <div className="p-3 rounded-lg bg-muted/50 border">
+              <p className="text-sm">
+                <strong>Lead:</strong> {selectedLead?.nome}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {selectedLead?.telefone && formatPhone(selectedLead.telefone)}
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Data do Contato Futuro</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal border-2",
+                      !dataProximaOperacao && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dataProximaOperacao 
+                      ? format(dataProximaOperacao, "dd/MM/yyyy", { locale: ptBR })
+                      : "Selecione a data"
+                    }
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dataProximaOperacao}
+                    onSelect={setDataProximaOperacao}
+                    disabled={(date) => date < new Date() || date > addDays(new Date(), 365)}
+                    initialFocus
+                    locale={ptBR}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsFutureContactModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleFutureContactSubmit} 
+              disabled={!dataProximaOperacao}
+              className="bg-gradient-to-r from-purple-500 to-violet-500"
+            >
+              Agendar Contato
             </Button>
           </DialogFooter>
         </DialogContent>
