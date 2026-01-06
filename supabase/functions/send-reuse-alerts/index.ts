@@ -208,8 +208,14 @@ function generateEmailHtml(
   isGestor: boolean = false,
   userName?: string | null
 ): string {
-  const paymentDate = new Date(alert.payment_date).toLocaleDateString("pt-BR");
-  const alertDate = new Date(alert.alert_date).toLocaleDateString("pt-BR");
+  // Formatar datas diretamente da string YYYY-MM-DD para evitar problemas de timezone
+  const formatDateBR = (dateStr: string) => {
+    if (!dateStr) return '-';
+    const parts = dateStr.split('T')[0].split('-');
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  };
+  const paymentDate = formatDateBR(alert.payment_date);
+  const alertDate = formatDateBR(alert.alert_date);
 
   return `
 <!DOCTYPE html>
