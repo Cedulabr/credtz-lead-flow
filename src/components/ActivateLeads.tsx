@@ -141,6 +141,7 @@ export const ActivateLeads = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [origemFilter, setOrigemFilter] = useState<string>('all');
+  const [userFilter, setUserFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [gestorId, setGestorId] = useState<string | null>(null);
 
@@ -986,15 +987,19 @@ export const ActivateLeads = () => {
       const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
       const matchesOrigem = origemFilter === 'all' || lead.origem === origemFilter;
       
+      // Filtro por usuário (apenas para admin/gestor)
+      const matchesUserFilter = userFilter === 'all' || 
+        (userFilter === 'unassigned' ? lead.assigned_to === null : lead.assigned_to === userFilter);
+      
       // Regra de exclusividade:
       // - Admin e Gestor veem todos os leads
       // - Colaborador vê apenas leads atribuídos a ele (exclusivos)
       // - Leads não atribuídos (assigned_to = null) só aparecem quando colaborador solicita via "Gerar Leads"
       const matchesUser = isAdmin || isGestor || lead.assigned_to === user?.id;
       
-      return matchesSearch && matchesStatus && matchesOrigem && matchesUser;
+      return matchesSearch && matchesStatus && matchesOrigem && matchesUser && matchesUserFilter;
     });
-  }, [leads, searchTerm, statusFilter, origemFilter, isAdmin, isGestor, user?.id]);
+  }, [leads, searchTerm, statusFilter, origemFilter, userFilter, isAdmin, isGestor, user?.id]);
 
   const totalPages = Math.ceil(filteredLeads.length / ITEMS_PER_PAGE);
   const paginatedLeads = filteredLeads.slice(
@@ -1188,6 +1193,37 @@ export const ActivateLeads = () => {
                   ))}
                 </SelectContent>
               </Select>
+              
+              {(isAdmin || isGestor) && (
+                <Select value={userFilter} onValueChange={setUserFilter}>
+                  <SelectTrigger className="w-full md:w-48 border-2 focus:border-primary">
+                    <Users className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Usuário" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      <span className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Todos Usuários
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="unassigned">
+                      <span className="flex items-center gap-2">
+                        <UserX className="h-4 w-4" />
+                        Não Atribuídos
+                      </span>
+                    </SelectItem>
+                    {availableUsers.map(u => (
+                      <SelectItem key={u.id} value={u.id}>
+                        <span className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          {u.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
         </CardContent>
