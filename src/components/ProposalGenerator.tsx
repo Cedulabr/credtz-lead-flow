@@ -85,8 +85,13 @@ const parseCurrency = (value: string): number => {
 };
 
 export function ProposalGenerator() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [activeTab, setActiveTab] = useState<"generator" | "saved">("generator");
+  
+  // Role checks for viewing all proposals
+  const isAdmin = profile?.role === 'admin';
+  const isGestor = profile?.role === 'partner';
+  const canViewAllProposals = isAdmin || isGestor;
   const [step, setStep] = useState<"client-name" | "client-phone" | "contracts" | "summary">("client-name");
   const [proposalData, setProposalData] = useState<ProposalData>({
     clientName: "",
@@ -145,25 +150,39 @@ export function ProposalGenerator() {
     if (!user) return;
     setLoadingSaved(true);
     try {
-      const { data, error } = await supabase
+      // Build query - admins/gestores see all, regular users see only their own
+      let query = supabase
         .from("saved_proposals")
         .select("*")
         .order("updated_at", { ascending: false });
+      
+      if (!canViewAllProposals) {
+        query = query.eq("user_id", user.id);
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
       
       // Fetch user profiles to get names
       const userIds = [...new Set((data || []).map((item: any) => item.user_id))];
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, name")
-        .in("id", userIds);
+      let profilesData: any[] = [];
       
-      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.name]));
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, name")
+          .in("id", userIds);
+        profilesData = profiles || [];
+      }
       
-      // Set unique users for filter
-      const users = (profiles || []).map((p: any) => ({ id: p.id, name: p.name || "Usuário" }));
-      setUniqueUsers(users);
+      const profileMap = new Map(profilesData.map((p: any) => [p.id, p.name]));
+      
+      // Set unique users for filter (only for admin/gestor)
+      if (canViewAllProposals) {
+        const users = profilesData.map((p: any) => ({ id: p.id, name: p.name || "Usuário" }));
+        setUniqueUsers(users);
+      }
       
       const proposals: SavedProposal[] = (data || []).map((item: any) => ({
         id: item.id,
@@ -1283,8 +1302,14 @@ export function ProposalGenerator() {
         <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
           <History className="w-8 h-8 text-primary" />
         </div>
-        <h2 className="text-2xl font-bold text-foreground">Propostas Salvas</h2>
-        <p className="text-muted-foreground">Clique em uma proposta para editar</p>
+        <h2 className="text-2xl font-bold text-foreground">
+          {canViewAllProposals ? "Histórico de Propostas" : "Propostas Salvas"}
+        </h2>
+        <p className="text-muted-foreground">
+          {canViewAllProposals 
+            ? "Visualize todas as propostas geradas pela equipe" 
+            : "Clique em uma proposta para editar"}
+        </p>
       </div>
 
       {!user && (
@@ -1350,24 +1375,31 @@ export function ProposalGenerator() {
               <div className="flex items-center gap-2 mb-3">
                 <Filter className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm font-medium text-foreground">Filtros</span>
+                {canViewAllProposals && (
+                  <Badge variant="outline" className="ml-auto text-xs">
+                    {isAdmin ? "Admin" : "Gestor"}
+                  </Badge>
+                )}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Users className="w-3 h-3" /> Por Usuário
-                  </label>
-                  <Select value={filterUser} onValueChange={setFilterUser}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Todos os usuários" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os usuários</SelectItem>
-                      {uniqueUsers.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className={cn("grid gap-3", canViewAllProposals ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
+                {canViewAllProposals && (
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Users className="w-3 h-3" /> Por Usuário
+                    </label>
+                    <Select value={filterUser} onValueChange={setFilterUser}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Todos os usuários" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os usuários</SelectItem>
+                        {uniqueUsers.map((u) => (
+                          <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground flex items-center gap-1">
                     <Calendar className="w-3 h-3" /> Por Data
