@@ -2668,6 +2668,7 @@ export type Database = {
         Row: {
           client_name: string
           client_phone: string
+          company_id: string | null
           contracts: Json
           created_at: string
           id: string
@@ -2677,6 +2678,7 @@ export type Database = {
         Insert: {
           client_name: string
           client_phone: string
+          company_id?: string | null
           contracts?: Json
           created_at?: string
           id?: string
@@ -2686,13 +2688,22 @@ export type Database = {
         Update: {
           client_name?: string
           client_phone?: string
+          company_id?: string | null
           contracts?: Json
           created_at?: string
           id?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "saved_proposals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sms_messages: {
         Row: {
@@ -3446,6 +3457,10 @@ export type Database = {
       get_user_data_company_ids: {
         Args: { check_user_id: string }
         Returns: string[]
+      }
+      get_user_primary_company_id: {
+        Args: { _user_id: string }
+        Returns: string
       }
       has_role: {
         Args: {
