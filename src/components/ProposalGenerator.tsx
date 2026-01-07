@@ -150,13 +150,31 @@ export function ProposalGenerator() {
     if (!user) return;
     setLoadingSaved(true);
     try {
-      // Build query - admins/gestores see all, regular users see only their own
+      // First, get user's company IDs if gestor (not admin)
+      let userCompanyIds: string[] = [];
+      if (isGestor && !isAdmin) {
+        const { data: userCompanies } = await supabase
+          .from("user_companies")
+          .select("company_id")
+          .eq("user_id", user.id)
+          .eq("is_active", true);
+        
+        userCompanyIds = (userCompanies || []).map((uc: any) => uc.company_id);
+      }
+      
+      // Build query based on role
       let query = supabase
         .from("saved_proposals")
         .select("*")
         .order("updated_at", { ascending: false });
       
-      if (!canViewAllProposals) {
+      if (isAdmin) {
+        // Admin sees all proposals - no filter
+      } else if (isGestor && userCompanyIds.length > 0) {
+        // Gestor sees only proposals from users in their companies
+        query = query.in("company_id", userCompanyIds);
+      } else {
+        // Regular user sees only their own proposals
         query = query.eq("user_id", user.id);
       }
       
