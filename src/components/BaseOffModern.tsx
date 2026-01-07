@@ -64,7 +64,10 @@ export function BaseOffModern() {
     "Aguardando retorno",
     "Cliente Fechado",
     "Oferta negada",
-    "Contato Futuro"
+    "Contato Futuro",
+    "Não é o cliente",
+    "Sem Interesse",
+    "Sem retorno"
   ];
   
   // Generate list states
