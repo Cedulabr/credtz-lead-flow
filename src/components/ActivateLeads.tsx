@@ -20,6 +20,7 @@ import {
   Upload, 
   RefreshCw, 
   Phone, 
+  PhoneOff,
   User, 
   CalendarIcon, 
   Download,
@@ -138,6 +139,33 @@ const STATUS_CONFIG: Record<string, {
     borderColor: 'border-purple-200',
     icon: <CalendarClock className="h-3.5 w-3.5" />,
     dotColor: 'bg-purple-500'
+  },
+  nao_e_cliente: { 
+    label: 'Não é o cliente', 
+    color: 'from-gray-500 to-zinc-500', 
+    textColor: 'text-gray-700', 
+    bgColor: 'bg-gradient-to-r from-gray-50 to-zinc-100',
+    borderColor: 'border-gray-200',
+    icon: <UserX className="h-3.5 w-3.5" />,
+    dotColor: 'bg-gray-500'
+  },
+  sem_interesse: { 
+    label: 'Sem Interesse', 
+    color: 'from-red-400 to-rose-500', 
+    textColor: 'text-red-700', 
+    bgColor: 'bg-gradient-to-r from-red-50 to-rose-100',
+    borderColor: 'border-red-200',
+    icon: <XCircle className="h-3.5 w-3.5" />,
+    dotColor: 'bg-red-400'
+  },
+  sem_retorno: { 
+    label: 'Sem retorno', 
+    color: 'from-zinc-400 to-neutral-500', 
+    textColor: 'text-zinc-700', 
+    bgColor: 'bg-gradient-to-r from-zinc-50 to-neutral-100',
+    borderColor: 'border-zinc-200',
+    icon: <PhoneOff className="h-3.5 w-3.5" />,
+    dotColor: 'bg-zinc-400'
   },
 };
 
