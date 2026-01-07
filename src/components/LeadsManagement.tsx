@@ -14,7 +14,8 @@ import { ImportBase } from "./ImportBase";
 import { 
   Search, 
   Filter, 
-  Phone, 
+  Phone,
+  PhoneOff,
   MessageCircle, 
   Clock, 
   CheckCircle, 
@@ -35,6 +36,7 @@ import {
   Ban,
   ArrowRightCircle,
   UserCheck,
+  UserX,
   History,
   Sparkles
 } from "lucide-react";
@@ -124,6 +126,33 @@ const STATUS_CONFIG = {
     borderColor: "border-slate-200",
     icon: Calendar,
     dotColor: "bg-slate-500"
+  },
+  nao_e_cliente: {
+    label: "Não é o cliente",
+    color: "from-gray-500 to-zinc-500",
+    textColor: "text-gray-700",
+    bgColor: "bg-gradient-to-r from-gray-50 to-zinc-100",
+    borderColor: "border-gray-200",
+    icon: UserX,
+    dotColor: "bg-gray-500"
+  },
+  sem_interesse: {
+    label: "Sem Interesse",
+    color: "from-yellow-500 to-amber-600",
+    textColor: "text-yellow-800",
+    bgColor: "bg-gradient-to-r from-yellow-50 to-amber-100",
+    borderColor: "border-yellow-200",
+    icon: Ban,
+    dotColor: "bg-yellow-500"
+  },
+  sem_retorno: {
+    label: "Sem retorno",
+    color: "from-zinc-500 to-neutral-600",
+    textColor: "text-zinc-700",
+    bgColor: "bg-gradient-to-r from-zinc-50 to-neutral-100",
+    borderColor: "border-zinc-200",
+    icon: PhoneOff,
+    dotColor: "bg-zinc-500"
   }
 };
 
