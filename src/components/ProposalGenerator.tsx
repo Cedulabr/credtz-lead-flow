@@ -150,17 +150,15 @@ export function ProposalGenerator() {
     if (!user) return;
     setLoadingSaved(true);
     try {
-      // First, get user's company IDs if gestor (not admin)
+      // First, get user's company IDs
       let userCompanyIds: string[] = [];
-      if (isGestor && !isAdmin) {
-        const { data: userCompanies } = await supabase
-          .from("user_companies")
-          .select("company_id")
-          .eq("user_id", user.id)
-          .eq("is_active", true);
-        
-        userCompanyIds = (userCompanies || []).map((uc: any) => uc.company_id);
-      }
+      const { data: userCompanies } = await supabase
+        .from("user_companies")
+        .select("company_id")
+        .eq("user_id", user.id)
+        .eq("is_active", true);
+      
+      userCompanyIds = (userCompanies || []).map((uc: any) => uc.company_id);
       
       // Build query based on role
       let query = supabase
@@ -182,7 +180,49 @@ export function ProposalGenerator() {
       
       if (error) throw error;
       
-      // Fetch user profiles to get names
+      // For admin/gestor, fetch ALL users who have proposals (within scope)
+      // to populate the filter dropdown
+      if (canViewAllProposals) {
+        // Get unique user IDs from proposals
+        const proposalUserIds = [...new Set((data || []).map((item: any) => item.user_id))];
+        
+        // For gestor, also fetch all users from their companies for a complete user list
+        let allUserIds: string[] = proposalUserIds;
+        
+        if (isAdmin) {
+          // Admin: get all users who have proposals
+          allUserIds = proposalUserIds;
+        } else if (isGestor && userCompanyIds.length > 0) {
+          // Gestor: get all users from their companies
+          const { data: companyUsers } = await supabase
+            .from("user_companies")
+            .select("user_id")
+            .in("company_id", userCompanyIds)
+            .eq("is_active", true);
+          
+          const companyUserIds = (companyUsers || []).map((cu: any) => cu.user_id);
+          // Combine with proposal user IDs to ensure we have all
+          allUserIds = [...new Set([...proposalUserIds, ...companyUserIds])];
+        }
+        
+        if (allUserIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, name")
+            .in("id", allUserIds);
+          
+          const users = (profiles || []).map((p: any) => ({ 
+            id: p.id, 
+            name: p.name || "Usuário" 
+          })).sort((a, b) => a.name.localeCompare(b.name));
+          
+          setUniqueUsers(users);
+        } else {
+          setUniqueUsers([]);
+        }
+      }
+      
+      // Fetch user profiles to get names for proposals
       const userIds = [...new Set((data || []).map((item: any) => item.user_id))];
       let profilesData: any[] = [];
       
@@ -195,12 +235,6 @@ export function ProposalGenerator() {
       }
       
       const profileMap = new Map(profilesData.map((p: any) => [p.id, p.name]));
-      
-      // Set unique users for filter (only for admin/gestor)
-      if (canViewAllProposals) {
-        const users = profilesData.map((p: any) => ({ id: p.id, name: p.name || "Usuário" }));
-        setUniqueUsers(users);
-      }
       
       const proposals: SavedProposal[] = (data || []).map((item: any) => ({
         id: item.id,
