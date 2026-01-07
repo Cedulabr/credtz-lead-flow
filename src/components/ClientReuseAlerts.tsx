@@ -47,10 +47,12 @@ import {
   BarChart3,
   Target,
   Timer,
+  ArrowRightLeft,
 } from "lucide-react";
 import { format, isToday, isPast, isFuture, addDays, differenceInDays, differenceInHours } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { PortabilityAlerts } from "./PortabilityAlerts";
 
 interface ClientReuseAlert {
   id: string;
@@ -92,6 +94,7 @@ export function ClientReuseAlerts() {
   const [actionNotes, setActionNotes] = useState("");
   const [isGestor, setIsGestor] = useState(false);
   const [activeView, setActiveView] = useState<"dashboard" | "list">("dashboard");
+  const [mainTab, setMainTab] = useState<"portability" | "reuse">("portability");
 
   // Colors for charts
   const CHART_COLORS = [
@@ -427,36 +430,66 @@ export function ClientReuseAlerts() {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      {/* Header */}
+      {/* Header with Main Tabs */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Bell className="h-6 w-6 text-primary" />
-            Alertas de Reaproveitamento
+            Central de Alertas
           </h1>
           <p className="text-sm text-muted-foreground">
-            Clientes aptos para nova operação
+            Acompanhamento de portabilidades e reaproveitamentos
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Tabs value={activeView} onValueChange={(v) => setActiveView(v as "dashboard" | "list")}>
-            <TabsList>
-              <TabsTrigger value="dashboard" className="gap-2">
-                <BarChart3 className="h-4 w-4" />
-                Dashboard
-              </TabsTrigger>
-              <TabsTrigger value="list" className="gap-2">
-                <Bell className="h-4 w-4" />
-                Alertas
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <Button variant="outline" onClick={fetchAlerts}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Atualizar
-          </Button>
-        </div>
       </div>
+
+      {/* Main Tabs - Portabilidade vs Reaproveitamento */}
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "portability" | "reuse")} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="portability" className="gap-2">
+            <ArrowRightLeft className="h-4 w-4" />
+            Portabilidade
+          </TabsTrigger>
+          <TabsTrigger value="reuse" className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Reaproveitamento
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="portability" className="mt-6">
+          <PortabilityAlerts />
+        </TabsContent>
+
+        <TabsContent value="reuse" className="mt-6">
+          {/* Reuse Alerts Content */}
+          <div className="space-y-6">
+            {/* Sub Header with View Toggle */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h2 className="text-xl font-semibold">Alertas de Reaproveitamento</h2>
+                <p className="text-sm text-muted-foreground">
+                  Clientes aptos para nova operação
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Tabs value={activeView} onValueChange={(v) => setActiveView(v as "dashboard" | "list")}>
+                  <TabsList>
+                    <TabsTrigger value="dashboard" className="gap-2">
+                      <BarChart3 className="h-4 w-4" />
+                      Dashboard
+                    </TabsTrigger>
+                    <TabsTrigger value="list" className="gap-2">
+                      <Bell className="h-4 w-4" />
+                      Alertas
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <Button variant="outline" onClick={fetchAlerts}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Atualizar
+                </Button>
+              </div>
+            </div>
 
       {activeView === "dashboard" ? (
         <>
@@ -1013,6 +1046,9 @@ export function ClientReuseAlerts() {
           )}
         </DialogContent>
       </Dialog>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
