@@ -164,13 +164,18 @@ export function LeadsDatabase() {
     setIsDeleting(true);
     try {
       const idsToDelete = Array.from(selectedLeads);
+      const batchSize = 100; // Supabase tem limite no operador .in()
       
-      const { error } = await supabase
-        .from('leads_database')
-        .delete()
-        .in('id', idsToDelete);
+      // Dividir em lotes para evitar "Bad Request"
+      for (let i = 0; i < idsToDelete.length; i += batchSize) {
+        const batch = idsToDelete.slice(i, i + batchSize);
+        const { error } = await supabase
+          .from('leads_database')
+          .delete()
+          .in('id', batch);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
       toast({
         title: "Leads excluídos",
