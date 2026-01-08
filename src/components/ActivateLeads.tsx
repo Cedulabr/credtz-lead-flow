@@ -14,6 +14,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ImportHistory } from '@/components/ImportHistory';
 import { 
   Search, 
   Filter, 
@@ -1154,6 +1155,7 @@ export const ActivateLeads = () => {
                   <Download className="h-4 w-4 mr-2" />
                   <span className="hidden sm:inline">Puxar</span>
                 </Button>
+                <ImportHistory module="activate_leads" title="Activate Leads" />
               </>
             )}
           </div>
