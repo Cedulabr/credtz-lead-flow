@@ -986,19 +986,67 @@ export const ActivateLeads = () => {
 
     setImporting(true);
     try {
-      const leadsToInsert = parsedLeads.map(lead => ({
-        nome: lead.nome,
-        telefone: lead.telefone,
-        origem: 'importacao',
-        status: 'novo',
-        created_by: user.id,
-      }));
-
-      const { error } = await supabase
+      // Verificar duplicidade: nome + telefone
+      const phonesToCheck = parsedLeads.map(l => normalizePhone(l.telefone));
+      
+      const { data: existingLeads, error: checkError } = await supabase
         .from('activate_leads')
-        .insert(leadsToInsert);
+        .select('id, nome, telefone, created_at')
+        .in('telefone', phonesToCheck);
 
-      if (error) throw error;
+      if (checkError) throw checkError;
+
+      // Criar mapa de leads existentes por nome+telefone
+      const existingMap = new Map<string, { nome: string; telefone: string; created_at: string }>();
+      (existingLeads || []).forEach(lead => {
+        const key = `${lead.nome.toLowerCase().trim()}_${normalizePhone(lead.telefone)}`;
+        existingMap.set(key, {
+          nome: lead.nome,
+          telefone: lead.telefone,
+          created_at: lead.created_at
+        });
+      });
+
+      // Separar leads válidos e duplicados
+      const duplicates: Array<{ nome: string; telefone: string; importado_em: string }> = [];
+      const validLeads: Array<{ nome: string; telefone: string }> = [];
+
+      parsedLeads.forEach(lead => {
+        const normalizedPhone = normalizePhone(lead.telefone);
+        const key = `${lead.nome.toLowerCase().trim()}_${normalizedPhone}`;
+        
+        if (existingMap.has(key)) {
+          const existing = existingMap.get(key)!;
+          duplicates.push({
+            nome: lead.nome,
+            telefone: lead.telefone,
+            importado_em: existing.created_at
+          });
+        } else {
+          validLeads.push(lead);
+          // Adicionar ao mapa para evitar duplicatas dentro do mesmo arquivo
+          existingMap.set(key, { nome: lead.nome, telefone: lead.telefone, created_at: new Date().toISOString() });
+        }
+      });
+
+      let successCount = 0;
+
+      if (validLeads.length > 0) {
+        const leadsToInsert = validLeads.map(lead => ({
+          nome: lead.nome,
+          telefone: normalizePhone(lead.telefone),
+          origem: 'importacao',
+          status: 'novo',
+          created_by: user.id,
+        }));
+
+        const { error } = await supabase
+          .from('activate_leads')
+          .insert(leadsToInsert);
+
+        if (error) throw error;
+        successCount = validLeads.length;
+      }
 
       // Registrar log de importação
       const companyId = profile?.company || null;
@@ -1006,18 +1054,41 @@ export const ActivateLeads = () => {
         module: 'activate_leads',
         file_name: csvFile.name,
         total_records: parsedLeads.length,
-        success_count: parsedLeads.length,
+        success_count: successCount,
         error_count: 0,
-        duplicate_count: 0,
+        duplicate_count: duplicates.length,
         status: 'completed',
         imported_by: user.id,
         company_id: companyId,
+        error_details: duplicates.length > 0 ? { duplicates: duplicates.slice(0, 100) } : null,
       });
 
-      toast({
-        title: 'Importação concluída!',
-        description: `${parsedLeads.length} leads foram importados com sucesso.`,
-      });
+      // Montar mensagem de resultado
+      if (duplicates.length > 0) {
+        const duplicateList = duplicates.slice(0, 5).map(d => 
+          `• ${d.nome} (${formatPhone(d.telefone)}) - Importado em ${format(parseISO(d.importado_em), 'dd/MM/yyyy', { locale: ptBR })}`
+        ).join('\n');
+
+        toast({
+          title: successCount > 0 ? 'Importação parcial' : 'Nenhum lead importado',
+          description: (
+            <div className="space-y-2">
+              <p>{successCount} leads importados, {duplicates.length} duplicados.</p>
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground">Ver duplicados</summary>
+                <pre className="mt-2 whitespace-pre-wrap">{duplicateList}</pre>
+                {duplicates.length > 5 && <p className="text-muted-foreground">e mais {duplicates.length - 5}...</p>}
+              </details>
+            </div>
+          ),
+          variant: successCount === 0 ? 'destructive' : 'default',
+        });
+      } else {
+        toast({
+          title: 'Importação concluída!',
+          description: `${successCount} leads foram importados com sucesso.`,
+        });
+      }
 
       setIsImportModalOpen(false);
       setCsvFile(null);
