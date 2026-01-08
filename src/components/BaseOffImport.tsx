@@ -737,8 +737,30 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
         })
         .eq("id", batchId);
 
-      // Registrar log de importação na tabela import_logs
-      const companyId = (profile as any)?.company || null;
+      // Registrar log de importação - buscar company_id correto (UUID)
+      let companyId: string | null = null;
+      
+      const { data: userCompany } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+
+      if (userCompany?.company_id) {
+        companyId = userCompany.company_id;
+      } else if ((profile as any)?.company) {
+        const { data: company } = await supabase
+          .from('companies')
+          .select('id')
+          .ilike('name', (profile as any).company)
+          .limit(1)
+          .single();
+        
+        companyId = company?.id || null;
+      }
+      
       await supabase.from('import_logs').insert({
         module: 'baseoff_clients',
         file_name: selectedFile.name,
@@ -766,8 +788,32 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
         error: error.message,
       });
       
-      // Registrar log de erro
-      const companyId = (profile as any)?.company || null;
+      // Registrar log de erro - buscar company_id correto (UUID)
+      let errorCompanyId: string | null = null;
+      
+      if (user?.id) {
+        const { data: userCompanyErr } = await supabase
+          .from('user_companies')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .limit(1)
+          .single();
+
+        if (userCompanyErr?.company_id) {
+          errorCompanyId = userCompanyErr.company_id;
+        } else if ((profile as any)?.company) {
+          const { data: companyErr } = await supabase
+            .from('companies')
+            .select('id')
+            .ilike('name', (profile as any).company)
+            .limit(1)
+            .single();
+          
+          errorCompanyId = companyErr?.id || null;
+        }
+      }
+      
       await supabase.from('import_logs').insert({
         module: 'baseoff_clients',
         file_name: selectedFile?.name || 'unknown',
@@ -777,7 +823,7 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
         duplicate_count: importResult.duplicates,
         status: 'failed',
         imported_by: user?.id || '',
-        company_id: companyId,
+        company_id: errorCompanyId,
         error_details: { message: error.message },
       });
       

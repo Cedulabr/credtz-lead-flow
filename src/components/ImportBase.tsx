@@ -238,8 +238,32 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       setImportResult(result);
       setShowResultDialog(true);
 
-      // Registrar log de importação
-      const companyId = profile?.company || null;
+      // Registrar log de importação - buscar company_id correto (UUID)
+      let companyId: string | null = null;
+      
+      // 1. Tentar buscar da tabela user_companies
+      const { data: userCompany } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user!.id)
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+
+      if (userCompany?.company_id) {
+        companyId = userCompany.company_id;
+      } else if (profile?.company) {
+        // 2. Fallback: buscar pelo nome da empresa
+        const { data: company } = await supabase
+          .from('companies')
+          .select('id')
+          .ilike('name', profile.company)
+          .limit(1)
+          .single();
+        
+        companyId = company?.id || null;
+      }
+      
       await supabase.from('import_logs').insert({
         module: 'leads_database',
         file_name: file?.name || 'unknown.csv',
@@ -270,8 +294,30 @@ export function ImportBase({ onBack }: ImportBaseProps) {
     } catch (error: any) {
       console.error('Error importing leads:', error);
       
-      // Registrar log de erro
-      const companyId = profile?.company || null;
+      // Registrar log de erro - buscar company_id correto (UUID)
+      let errorCompanyId: string | null = null;
+      
+      const { data: userCompanyErr } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user!.id)
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+
+      if (userCompanyErr?.company_id) {
+        errorCompanyId = userCompanyErr.company_id;
+      } else if (profile?.company) {
+        const { data: companyErr } = await supabase
+          .from('companies')
+          .select('id')
+          .ilike('name', profile.company)
+          .limit(1)
+          .single();
+        
+        errorCompanyId = companyErr?.id || null;
+      }
+      
       await supabase.from('import_logs').insert({
         module: 'leads_database',
         file_name: file?.name || 'unknown.csv',
@@ -281,7 +327,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         duplicate_count: 0,
         status: 'failed',
         imported_by: user!.id,
-        company_id: companyId,
+        company_id: errorCompanyId,
         error_details: { message: error.message },
       });
       

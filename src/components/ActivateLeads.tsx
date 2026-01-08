@@ -1048,8 +1048,32 @@ export const ActivateLeads = () => {
         successCount = validLeads.length;
       }
 
-      // Registrar log de importação
-      const companyId = profile?.company || null;
+      // Registrar log de importação - buscar company_id correto (UUID)
+      let companyId: string | null = null;
+      
+      // 1. Tentar buscar da tabela user_companies
+      const { data: userCompany } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+
+      if (userCompany?.company_id) {
+        companyId = userCompany.company_id;
+      } else if (profile?.company) {
+        // 2. Fallback: buscar pelo nome da empresa
+        const { data: company } = await supabase
+          .from('companies')
+          .select('id')
+          .ilike('name', profile.company)
+          .limit(1)
+          .single();
+        
+        companyId = company?.id || null;
+      }
+      
       await supabase.from('import_logs').insert({
         module: 'activate_leads',
         file_name: csvFile.name,
