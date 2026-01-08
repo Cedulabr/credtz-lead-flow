@@ -1751,6 +1751,42 @@ export type Database = {
         }
         Relationships: []
       }
+      credits_history: {
+        Row: {
+          action: string
+          admin_id: string
+          amount: number
+          balance_after: number
+          balance_before: number
+          created_at: string
+          id: string
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          admin_id: string
+          amount: number
+          balance_after: number
+          balance_before: number
+          created_at?: string
+          id?: string
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          admin_id?: string
+          amount?: number
+          balance_after?: number
+          balance_before?: number
+          created_at?: string
+          id?: string
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       daily_limits: {
         Row: {
           created_at: string
@@ -3053,6 +3089,30 @@ export type Database = {
           },
         ]
       }
+      user_credits: {
+        Row: {
+          created_at: string
+          credits_balance: number
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_balance?: number
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_balance?: number
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_data: {
         Row: {
           approved_at: string | null
@@ -3445,6 +3505,15 @@ export type Database = {
         Args: { blacklist_reason?: string; lead_cpf: string }
         Returns: undefined
       }
+      admin_manage_credits: {
+        Args: {
+          credit_action: string
+          credit_amount: number
+          credit_reason?: string
+          target_user_id: string
+        }
+        Returns: Json
+      }
       check_baseoff_daily_limit: {
         Args: { user_id_param: string }
         Returns: number
@@ -3507,6 +3576,7 @@ export type Database = {
         }[]
       }
       get_user_company_ids: { Args: { _user_id: string }; Returns: string[] }
+      get_user_credits: { Args: { target_user_id?: string }; Returns: number }
       get_user_data_company_ids: {
         Args: { check_user_id: string }
         Returns: string[]
@@ -3538,6 +3608,23 @@ export type Database = {
       normalize_cpf: { Args: { input_cpf: string }; Returns: string }
       process_expired_future_contacts: { Args: never; Returns: number }
       request_leads: {
+        Args: {
+          banco_filter?: string
+          convenio_filter?: string
+          leads_requested?: number
+          produto_filter?: string
+        }
+        Returns: {
+          banco: string
+          convenio: string
+          cpf: string
+          lead_id: string
+          name: string
+          phone: string
+          tipo_beneficio: string
+        }[]
+      }
+      request_leads_with_credits: {
         Args: {
           banco_filter?: string
           convenio_filter?: string

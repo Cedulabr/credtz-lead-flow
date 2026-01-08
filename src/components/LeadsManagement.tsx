@@ -175,8 +175,7 @@ export function LeadsManagement() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [leads, setLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [dailyLimit, setDailyLimit] = useState(30);
-  const [remainingLeads, setRemainingLeads] = useState(30);
+  const [userCredits, setUserCredits] = useState(0);
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [showImportBase, setShowImportBase] = useState(false);
   const [leadRequest, setLeadRequest] = useState<LeadRequest>({
@@ -207,7 +206,7 @@ export function LeadsManagement() {
   useEffect(() => {
     if (user) {
       fetchLeads();
-      checkDailyLimit();
+      fetchUserCredits();
       processExpiredFutureContacts();
     }
   }, [user]);
@@ -258,25 +257,36 @@ export function LeadsManagement() {
     }
   };
 
-  const checkDailyLimit = async () => {
+  const fetchUserCredits = async () => {
     try {
       const { data, error } = await supabase
-        .rpc('check_daily_lead_limit', { user_id_param: user?.id });
+        .rpc('get_user_credits', { target_user_id: user?.id });
 
       if (error) throw error;
-      setRemainingLeads(data || 0);
+      setUserCredits(data || 0);
     } catch (error) {
-      console.error('Error checking daily limit:', error);
+      console.error('Error fetching user credits:', error);
+      setUserCredits(0);
     }
   };
 
   const requestLeads = async () => {
     if (!user) return;
 
-    if (leadRequest.count > remainingLeads) {
+    // Check credits first
+    if (userCredits <= 0) {
       toast({
-        title: "Limite excedido",
-        description: `Você só pode solicitar ${remainingLeads} leads hoje.`,
+        title: "Sem créditos",
+        description: "Seus créditos de leads acabaram. Solicite liberação ao administrador.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (leadRequest.count > userCredits) {
+      toast({
+        title: "Créditos insuficientes",
+        description: `Você só possui ${userCredits} créditos disponíveis.`,
         variant: "destructive",
       });
       return;
@@ -284,8 +294,9 @@ export function LeadsManagement() {
 
     setIsLoading(true);
     try {
+      // Use the new credits-based function
       const { data, error } = await supabase
-        .rpc('request_leads', {
+        .rpc('request_leads_with_credits', {
           convenio_filter: leadRequest.convenio || null,
           banco_filter: null,
           produto_filter: null,
@@ -322,12 +333,12 @@ export function LeadsManagement() {
 
         toast({
           title: "Leads solicitados!",
-          description: `${data.length} leads foram adicionados à sua lista.`,
+          description: `${data.length} leads foram adicionados à sua lista. Créditos restantes: ${userCredits - data.length}`,
         });
 
         setShowRequestDialog(false);
         fetchLeads();
-        checkDailyLimit();
+        fetchUserCredits();
         setLeadRequest({ convenio: "", count: 10 });
       } else {
         toast({
@@ -673,8 +684,8 @@ export function LeadsManagement() {
     completed: leads.filter(l => l.status === "cliente_fechado").length,
     rejected: leads.filter(l => l.status === "recusou_oferta").length,
     rework: leads.filter(l => l.is_rework).length,
-    remaining: remainingLeads
-  }), [leads, remainingLeads]);
+    credits: userCredits
+  }), [leads, userCredits]);
 
   if (showImportBase) {
     return (
@@ -737,10 +748,15 @@ export function LeadsManagement() {
                   <DialogTitle className="text-2xl font-bold">🎯 Solicitar Leads</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-6 py-4">
-                  <div className="p-4 rounded-xl bg-gradient-to-r from-primary/10 to-primary/5 border-2 border-primary/20">
+                  <div className={`p-4 rounded-xl border-2 ${userCredits === 0 ? 'bg-gradient-to-r from-red-500/10 to-red-500/5 border-red-500/30' : 'bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20'}`}>
                     <p className="text-lg text-muted-foreground">
-                      Leads restantes hoje: <span className="font-black text-primary text-2xl">{remainingLeads}</span>
+                      Créditos disponíveis: <span className={`font-black text-2xl ${userCredits === 0 ? 'text-red-500' : 'text-primary'}`}>{userCredits}</span>
                     </p>
+                    {userCredits === 0 && (
+                      <p className="text-sm text-red-500 mt-2 font-medium">
+                        ⚠️ Seus créditos de leads acabaram. Solicite liberação ao administrador.
+                      </p>
+                    )}
                   </div>
                   
                   <div className="space-y-3">
@@ -768,7 +784,7 @@ export function LeadsManagement() {
                       value={leadRequest.count}
                       onChange={(e) => setLeadRequest(prev => ({ 
                         ...prev, 
-                        count: Math.min(Number(e.target.value), 80, remainingLeads) 
+                        count: Math.min(Number(e.target.value), 80, userCredits) 
                       }))}
                       placeholder="Número de leads (máx. 80)"
                       className="border-2 focus:border-primary h-12 text-lg font-semibold"
@@ -777,10 +793,10 @@ export function LeadsManagement() {
 
                   <Button 
                     onClick={requestLeads} 
-                    disabled={isLoading || remainingLeads === 0}
+                    disabled={isLoading || userCredits === 0}
                     className="w-full bg-gradient-to-r from-primary to-primary/80 h-14 text-lg font-bold"
                   >
-                    {isLoading ? "Solicitando..." : "🚀 Pedir Leads Agora!"}
+                    {isLoading ? "Solicitando..." : userCredits === 0 ? "❌ Sem Créditos" : "🚀 Pedir Leads Agora!"}
                   </Button>
                 </div>
               </DialogContent>
@@ -845,8 +861,8 @@ export function LeadsManagement() {
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center mx-auto mb-3 shadow-lg">
                 <Users className="h-7 w-7 text-white" />
               </div>
-              <p className="text-4xl font-black text-purple-700 dark:text-purple-300">{stats.remaining}</p>
-              <p className="text-sm font-semibold text-purple-600 dark:text-purple-400 mt-1">RESTANTES</p>
+              <p className={`text-4xl font-black ${stats.credits === 0 ? 'text-red-500' : 'text-purple-700 dark:text-purple-300'}`}>{stats.credits}</p>
+              <p className="text-sm font-semibold text-purple-600 dark:text-purple-400 mt-1">CRÉDITOS</p>
             </CardContent>
           </Card>
         </div>

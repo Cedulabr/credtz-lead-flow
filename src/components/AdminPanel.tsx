@@ -29,6 +29,7 @@ import { AdminCompanies } from "./AdminCompanies";
 import { AdminTelevendasBanks } from "./AdminTelevendasBanks";
 import { AdminCommissionRules } from "./AdminCommissionRules";
 import { AdminBankReuseSettings } from "./AdminBankReuseSettings";
+import { AdminCreditsManagement } from "./AdminCreditsManagement";
 
 interface Announcement {
   id: number;
@@ -339,8 +340,9 @@ export function AdminPanel() {
       </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-9' : 'grid-cols-1'}`}>
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-10' : 'grid-cols-1'}`}>
             <TabsTrigger value="announcements">Avisos</TabsTrigger>
+            {isAdmin && <TabsTrigger value="credits">💰 Créditos</TabsTrigger>}
             {isAdmin && <TabsTrigger value="commission-rules">Regras Flexíveis</TabsTrigger>}
             {isAdmin && <TabsTrigger value="companies">Empresas</TabsTrigger>}
             {isAdmin && <TabsTrigger value="televendas-banks">Banco Televendas</TabsTrigger>}
@@ -447,6 +449,13 @@ export function AdminPanel() {
             ))}
           </div>
         </TabsContent>
+
+        {/* Credits Management Tab */}
+        {isAdmin && (
+          <TabsContent value="credits" className="space-y-4">
+            <AdminCreditsManagement />
+          </TabsContent>
+        )}
 
         {/* Commission Rules Tab - Regras Flexíveis */}
         {isAdmin && (
