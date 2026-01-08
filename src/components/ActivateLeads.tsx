@@ -981,7 +981,7 @@ export const ActivateLeads = () => {
   };
 
   const handleImportSubmit = async () => {
-    if (!user?.id || parsedLeads.length === 0) return;
+    if (!user?.id || parsedLeads.length === 0 || !csvFile) return;
 
     setImporting(true);
     try {
@@ -999,6 +999,20 @@ export const ActivateLeads = () => {
 
       if (error) throw error;
 
+      // Registrar log de importação
+      const companyId = profile?.company || null;
+      await supabase.from('import_logs').insert({
+        module: 'activate_leads',
+        file_name: csvFile.name,
+        total_records: parsedLeads.length,
+        success_count: parsedLeads.length,
+        error_count: 0,
+        duplicate_count: 0,
+        status: 'completed',
+        imported_by: user.id,
+        company_id: companyId,
+      });
+
       toast({
         title: 'Importação concluída!',
         description: `${parsedLeads.length} leads foram importados com sucesso.`,
@@ -1010,6 +1024,24 @@ export const ActivateLeads = () => {
       fetchLeads();
     } catch (error: any) {
       console.error('Error importing leads:', error);
+      
+      // Registrar log de erro
+      if (csvFile) {
+        const companyId = profile?.company || null;
+        await supabase.from('import_logs').insert({
+          module: 'activate_leads',
+          file_name: csvFile.name,
+          total_records: parsedLeads.length,
+          success_count: 0,
+          error_count: parsedLeads.length,
+          duplicate_count: 0,
+          status: 'failed',
+          imported_by: user.id,
+          company_id: companyId,
+          error_details: { message: error.message },
+        });
+      }
+      
       toast({
         title: 'Erro na importação',
         description: error.message,

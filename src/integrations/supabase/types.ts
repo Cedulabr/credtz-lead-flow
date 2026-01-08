@@ -1889,6 +1889,59 @@ export type Database = {
         }
         Relationships: []
       }
+      import_logs: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          duplicate_count: number
+          error_count: number
+          error_details: Json | null
+          file_name: string
+          id: string
+          imported_by: string
+          module: string
+          status: string
+          success_count: number
+          total_records: number
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          duplicate_count?: number
+          error_count?: number
+          error_details?: Json | null
+          file_name: string
+          id?: string
+          imported_by: string
+          module: string
+          status?: string
+          success_count?: number
+          total_records?: number
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          duplicate_count?: number
+          error_count?: number
+          error_details?: Json | null
+          file_name?: string
+          id?: string
+          imported_by?: string
+          module?: string
+          status?: string
+          success_count?: number
+          total_records?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invitations: {
         Row: {
           accepted_at: string | null
