@@ -237,6 +237,20 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       setImportResult(result);
       setShowResultDialog(true);
 
+      // Registrar log de importação
+      const companyId = profile?.company || null;
+      await supabase.from('import_logs').insert({
+        module: 'leads_database',
+        file_name: file?.name || 'unknown.csv',
+        total_records: parsedLeads.length,
+        success_count: result.imported,
+        error_count: result.invalid || 0,
+        duplicate_count: result.duplicates,
+        status: 'completed',
+        imported_by: user!.id,
+        company_id: companyId,
+      });
+
       toast({
         title: "Importação concluída",
         description: `${result.imported} leads importados, ${result.duplicates} duplicados`,
@@ -254,6 +268,22 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       }
     } catch (error: any) {
       console.error('Error importing leads:', error);
+      
+      // Registrar log de erro
+      const companyId = profile?.company || null;
+      await supabase.from('import_logs').insert({
+        module: 'leads_database',
+        file_name: file?.name || 'unknown.csv',
+        total_records: parsedLeads.length,
+        success_count: 0,
+        error_count: parsedLeads.length,
+        duplicate_count: 0,
+        status: 'failed',
+        imported_by: user!.id,
+        company_id: companyId,
+        error_details: { message: error.message },
+      });
+      
       toast({
         title: "Erro na importação",
         description: error.message || "Não foi possível importar os leads",

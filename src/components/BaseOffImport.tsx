@@ -252,7 +252,7 @@ const COLUMN_MAP: Record<string, string> = {
 };
 
 export function BaseOffImport({ onBack }: BaseOffImportProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -737,6 +737,20 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
         })
         .eq("id", batchId);
 
+      // Registrar log de importação na tabela import_logs
+      const companyId = (profile as any)?.company || null;
+      await supabase.from('import_logs').insert({
+        module: 'baseoff_clients',
+        file_name: selectedFile.name,
+        total_records: importResult.total,
+        success_count: importResult.success,
+        error_count: importResult.errors,
+        duplicate_count: importResult.duplicates,
+        status: 'completed',
+        imported_by: user.id,
+        company_id: companyId,
+      });
+
       setProgress(100);
       setProgressText("Importação concluída!");
       setResult(importResult);
@@ -751,6 +765,22 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
         row: 0,
         error: error.message,
       });
+      
+      // Registrar log de erro
+      const companyId = (profile as any)?.company || null;
+      await supabase.from('import_logs').insert({
+        module: 'baseoff_clients',
+        file_name: selectedFile?.name || 'unknown',
+        total_records: importResult.total,
+        success_count: importResult.success,
+        error_count: importResult.errors,
+        duplicate_count: importResult.duplicates,
+        status: 'failed',
+        imported_by: user?.id || '',
+        company_id: companyId,
+        error_details: { message: error.message },
+      });
+      
       setResult(importResult);
     } finally {
       setIsImporting(false);
