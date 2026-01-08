@@ -201,18 +201,41 @@ export function LeadsManagement() {
 
   // Future contact form
   const [futureContactDate, setFutureContactDate] = useState("");
+  
+  // Dynamic convenios from database
+  const [availableConvenios, setAvailableConvenios] = useState<{convenio: string, available_count: number}[]>([]);
+  const [loadingConvenios, setLoadingConvenios] = useState(false);
+  const [totalAvailableLeads, setTotalAvailableLeads] = useState(0);
 
   const isAdmin = profile?.role === 'admin';
-
-  const conveniOptions = ["INSS", "SIAPE", "GOV BA", "Servidor Federal", "Servidor Estadual", "Servidor Municipal", "FGTS", "Forças Armadas"];
 
   useEffect(() => {
     if (user) {
       fetchLeads();
       fetchUserCredits();
+      fetchAvailableConvenios();
       processExpiredFutureContacts();
     }
   }, [user]);
+
+  const fetchAvailableConvenios = async () => {
+    try {
+      setLoadingConvenios(true);
+      const { data, error } = await supabase.rpc('get_available_convenios');
+      
+      if (error) throw error;
+      
+      const convenios = data || [];
+      setAvailableConvenios(convenios);
+      setTotalAvailableLeads(convenios.reduce((sum: number, c: any) => sum + Number(c.available_count), 0));
+    } catch (error) {
+      console.error('Error fetching available convenios:', error);
+      setAvailableConvenios([]);
+      setTotalAvailableLeads(0);
+    } finally {
+      setLoadingConvenios(false);
+    }
+  };
 
   const fetchLeads = async () => {
     try {
@@ -782,20 +805,46 @@ export function LeadsManagement() {
                     )}
                   </div>
                   
+                  {/* Disponibilidade de Leads */}
+                  <div className={`p-4 rounded-xl border-2 ${totalAvailableLeads === 0 ? 'bg-gradient-to-r from-amber-500/10 to-amber-500/5 border-amber-500/30' : 'bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 border-emerald-500/20'}`}>
+                    <p className="text-lg text-muted-foreground">
+                      Leads disponíveis no sistema: <span className={`font-black text-2xl ${totalAvailableLeads === 0 ? 'text-amber-500' : 'text-emerald-600'}`}>{totalAvailableLeads}</span>
+                    </p>
+                    {totalAvailableLeads === 0 && (
+                      <p className="text-sm text-amber-600 mt-2 font-medium">
+                        ⚠️ Não há leads disponíveis no momento. Aguarde novas importações.
+                      </p>
+                    )}
+                  </div>
+
                   <div className="space-y-3">
                     <label className="text-base font-semibold">Convênio</label>
-                    <Select value={leadRequest.convenio} onValueChange={(value) => 
-                      setLeadRequest(prev => ({ ...prev, convenio: value }))
-                    }>
-                      <SelectTrigger className="border-2 focus:border-primary h-12 text-base">
-                        <SelectValue placeholder="Selecione o convênio" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {conveniOptions.map(option => (
-                          <SelectItem key={option} value={option} className="text-base py-3">{option}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {loadingConvenios ? (
+                      <div className="h-12 flex items-center justify-center text-muted-foreground">
+                        Carregando convênios...
+                      </div>
+                    ) : availableConvenios.length === 0 ? (
+                      <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-center">
+                        <p className="text-amber-700 dark:text-amber-400 font-medium">
+                          Nenhum convênio disponível no momento
+                        </p>
+                      </div>
+                    ) : (
+                      <Select value={leadRequest.convenio} onValueChange={(value) => 
+                        setLeadRequest(prev => ({ ...prev, convenio: value }))
+                      }>
+                        <SelectTrigger className="border-2 focus:border-primary h-12 text-base">
+                          <SelectValue placeholder="Selecione o convênio" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableConvenios.map(option => (
+                            <SelectItem key={option.convenio} value={option.convenio} className="text-base py-3">
+                              {option.convenio} ({option.available_count} disponíveis)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   <div className="space-y-3">
@@ -816,10 +865,10 @@ export function LeadsManagement() {
 
                   <Button 
                     onClick={requestLeads} 
-                    disabled={isLoading || userCredits === 0}
+                    disabled={isLoading || userCredits === 0 || totalAvailableLeads === 0 || availableConvenios.length === 0}
                     className="w-full bg-gradient-to-r from-primary to-primary/80 h-14 text-lg font-bold"
                   >
-                    {isLoading ? "Solicitando..." : userCredits === 0 ? "❌ Sem Créditos" : "🚀 Pedir Leads Agora!"}
+                    {isLoading ? "Solicitando..." : userCredits === 0 ? "❌ Sem Créditos" : totalAvailableLeads === 0 ? "⚠️ Sem Leads Disponíveis" : "🚀 Pedir Leads Agora!"}
                   </Button>
                 </div>
               </DialogContent>

@@ -3544,6 +3544,13 @@ export type Database = {
           codigo_banco: string
         }[]
       }
+      get_available_convenios: {
+        Args: never
+        Returns: {
+          available_count: number
+          convenio: string
+        }[]
+      }
       get_available_ufs: {
         Args: never
         Returns: {
