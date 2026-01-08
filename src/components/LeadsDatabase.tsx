@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Search, 
@@ -16,7 +17,9 @@ import {
   AlertTriangle,
   Users,
   RefreshCw,
-  CheckCircle
+  CheckCircle,
+  Calendar,
+  CheckSquare
 } from "lucide-react";
 
 interface Lead {
@@ -41,8 +44,27 @@ export function LeadsDatabase() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [selectedDate, setSelectedDate] = useState<string>("all");
 
   const isAdmin = profile?.role === 'admin';
+
+  // Extract unique import dates from leads
+  const importDates = useMemo(() => {
+    const dates = new Set<string>();
+    leads.forEach(lead => {
+      if (lead.created_at) {
+        const date = new Date(lead.created_at).toLocaleDateString('pt-BR');
+        dates.add(date);
+      }
+    });
+    return Array.from(dates).sort((a, b) => {
+      const [dayA, monthA, yearA] = a.split('/').map(Number);
+      const [dayB, monthB, yearB] = b.split('/').map(Number);
+      const dateA = new Date(yearA, monthA - 1, dayA);
+      const dateB = new Date(yearB, monthB - 1, dayB);
+      return dateB.getTime() - dateA.getTime();
+    });
+  }, [leads]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -52,7 +74,7 @@ export function LeadsDatabase() {
 
   useEffect(() => {
     filterLeads();
-  }, [searchTerm, leads]);
+  }, [searchTerm, leads, selectedDate]);
 
   const fetchLeads = async () => {
     setIsLoading(true);
@@ -69,7 +91,7 @@ export function LeadsDatabase() {
         .from('leads_database')
         .select('id, name, phone, convenio, cpf, is_available, created_at')
         .order('created_at', { ascending: false })
-        .limit(500);
+        .limit(1000);
 
       if (error) throw error;
       setLeads(data || []);
@@ -86,27 +108,44 @@ export function LeadsDatabase() {
   };
 
   const filterLeads = () => {
-    if (!searchTerm.trim()) {
-      setFilteredLeads(leads);
-      return;
+    let filtered = [...leads];
+
+    // Filter by date
+    if (selectedDate !== "all") {
+      filtered = filtered.filter(lead => {
+        const leadDate = new Date(lead.created_at).toLocaleDateString('pt-BR');
+        return leadDate === selectedDate;
+      });
     }
 
-    const term = searchTerm.toLowerCase();
-    const filtered = leads.filter(lead => 
-      lead.name?.toLowerCase().includes(term) ||
-      lead.phone?.includes(term) ||
-      lead.convenio?.toLowerCase().includes(term) ||
-      lead.cpf?.includes(term)
-    );
+    // Filter by search term
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(lead => 
+        lead.name?.toLowerCase().includes(term) ||
+        lead.phone?.includes(term) ||
+        lead.convenio?.toLowerCase().includes(term) ||
+        lead.cpf?.includes(term)
+      );
+    }
+
     setFilteredLeads(filtered);
   };
 
   const toggleSelectAll = () => {
-    if (selectedLeads.size === filteredLeads.length) {
+    if (selectedLeads.size === filteredLeads.length && filteredLeads.length > 0) {
       setSelectedLeads(new Set());
     } else {
       setSelectedLeads(new Set(filteredLeads.map(l => l.id)));
     }
+  };
+
+  const selectAllFiltered = () => {
+    setSelectedLeads(new Set(filteredLeads.map(l => l.id)));
+    toast({
+      title: "Seleção atualizada",
+      description: `${filteredLeads.length} leads selecionados`,
+    });
   };
 
   const toggleSelectLead = (id: string) => {
@@ -210,16 +249,63 @@ export function LeadsDatabase() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome, telefone, convênio ou CPF..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, telefone, convênio ou CPF..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          {/* Date Filter */}
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Select value={selectedDate} onValueChange={setSelectedDate}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Data de importação" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as datas</SelectItem>
+                {importDates.map(date => (
+                  <SelectItem key={date} value={date}>{date}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Select All Button */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={selectAllFiltered}
+            disabled={filteredLeads.length === 0}
+            className="whitespace-nowrap"
+          >
+            <CheckSquare className="h-4 w-4 mr-2" />
+            Selecionar Todos ({filteredLeads.length})
+          </Button>
         </div>
+
+        {/* Selection Info */}
+        {selectedLeads.size > 0 && (
+          <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg border border-primary/20">
+            <span className="text-sm font-medium">
+              {selectedLeads.size} lead(s) selecionado(s)
+            </span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSelectedLeads(new Set())}
+            >
+              Limpar seleção
+            </Button>
+          </div>
+        )}
 
         {/* Table */}
         {isLoading ? (
@@ -292,7 +378,7 @@ export function LeadsDatabase() {
 
         {leads.length < totalCount && (
           <p className="text-sm text-muted-foreground text-center">
-            Mostrando os 500 leads mais recentes. Use a busca para encontrar leads específicos.
+            Mostrando os 1000 leads mais recentes. Use os filtros para encontrar leads específicos.
           </p>
         )}
       </CardContent>
