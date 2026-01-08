@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
+import { ImportHistory } from "@/components/ImportHistory";
 import { 
   Search, 
   User, 
@@ -972,10 +973,13 @@ export function BaseOffConsulta() {
         </div>
         <div className="flex gap-2">
           {isAdmin && (
-            <Button onClick={() => setShowImport(true)} variant="outline">
-              <Upload className="h-4 w-4 mr-2" />
-              Importar Base
-            </Button>
+            <>
+              <Button onClick={() => setShowImport(true)} variant="outline">
+                <Upload className="h-4 w-4 mr-2" />
+                Importar Base
+              </Button>
+              <ImportHistory module="baseoff_clients" title="Base Off" />
+            </>
           )}
         </div>
       </div>

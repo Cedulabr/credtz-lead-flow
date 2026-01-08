@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { ImportHistory } from "@/components/ImportHistory";
 import { 
   Upload, 
   FileSpreadsheet, 
@@ -339,17 +340,20 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Database className="h-6 w-6 text-primary" />
-            Importar Base de Leads
-          </h2>
-          <p className="text-muted-foreground">Importe leads em massa via arquivo CSV</p>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={onBack}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              <Database className="h-6 w-6 text-primary" />
+              Importar Base de Leads
+            </h2>
+            <p className="text-muted-foreground">Importe leads em massa via arquivo CSV</p>
+          </div>
         </div>
+        <ImportHistory module="leads_database" title="Leads Premium" />
       </div>
 
       {/* Instructions Card */}
