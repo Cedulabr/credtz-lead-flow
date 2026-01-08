@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ImportBase } from "./ImportBase";
+import { DistributedLeadsManager } from "./DistributedLeadsManager";
 import { 
   Search, 
   Filter, 
@@ -38,7 +39,8 @@ import {
   UserCheck,
   UserX,
   History,
-  Sparkles
+  Sparkles,
+  Settings
 } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -178,6 +180,7 @@ export function LeadsManagement() {
   const [userCredits, setUserCredits] = useState(0);
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [showImportBase, setShowImportBase] = useState(false);
+  const [showDistributedManager, setShowDistributedManager] = useState(false);
   const [leadRequest, setLeadRequest] = useState<LeadRequest>({
     convenio: "",
     count: 10
@@ -695,6 +698,14 @@ export function LeadsManagement() {
     );
   }
 
+  if (showDistributedManager) {
+    return (
+      <div className="p-4 md:p-6 pb-20 md:pb-6">
+        <DistributedLeadsManager onBack={() => setShowDistributedManager(false)} />
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-8 space-y-8 pb-24 md:pb-8 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen">
       {/* Header Simplificado */}
@@ -722,15 +733,27 @@ export function LeadsManagement() {
             </Button>
             
             {isAdmin && (
-              <Button 
-                variant="outline" 
-                size="lg"
-                className="flex items-center gap-2 hover:bg-primary/10 text-base font-semibold h-12"
-                onClick={() => setShowImportBase(true)}
-              >
-                <Upload className="h-5 w-5" />
-                Importar
-              </Button>
+              <>
+                <Button 
+                  variant="outline" 
+                  size="lg"
+                  className="flex items-center gap-2 hover:bg-primary/10 text-base font-semibold h-12"
+                  onClick={() => setShowImportBase(true)}
+                >
+                  <Upload className="h-5 w-5" />
+                  Importar
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  size="lg"
+                  className="flex items-center gap-2 hover:bg-orange-500/10 text-orange-600 border-orange-200 text-base font-semibold h-12"
+                  onClick={() => setShowDistributedManager(true)}
+                >
+                  <Settings className="h-5 w-5" />
+                  Gerenciar Distribuídos
+                </Button>
+              </>
             )}
             
             <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
