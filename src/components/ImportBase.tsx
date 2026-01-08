@@ -10,8 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ImportHistory } from "@/components/ImportHistory";
+import { LeadsDatabase } from "@/components/LeadsDatabase";
 import { 
   Upload, 
   FileSpreadsheet, 
@@ -22,7 +24,9 @@ import {
   FileText,
   Loader2,
   ArrowLeft,
-  Database
+  Database,
+  Users,
+  Trash2
 } from "lucide-react";
 
 interface ParsedLead {
@@ -378,13 +382,28 @@ export function ImportBase({ onBack }: ImportBaseProps) {
           <div>
             <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <Database className="h-6 w-6 text-primary" />
-              Importar Base de Leads
+              Leads Premium
             </h2>
-            <p className="text-muted-foreground">Importe leads em massa via arquivo CSV</p>
+            <p className="text-muted-foreground">Importe e gerencie sua base de leads</p>
           </div>
         </div>
         <ImportHistory module="leads_database" title="Leads Premium" />
       </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="import" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="import" className="gap-2">
+            <Upload className="h-4 w-4" />
+            Importar
+          </TabsTrigger>
+          <TabsTrigger value="manage" className="gap-2">
+            <Users className="h-4 w-4" />
+            Gerenciar Base
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="import" className="space-y-6 mt-6">
 
       {/* Instructions Card */}
       <Card className="border-0 shadow-lg bg-gradient-to-r from-primary/5 to-transparent">
@@ -659,6 +678,12 @@ export function ImportBase({ onBack }: ImportBaseProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        <TabsContent value="manage" className="mt-6">
+          <LeadsDatabase />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
