@@ -2271,6 +2271,7 @@ export type Database = {
           distributed_at: string
           expires_at: string
           id: string
+          lead_id: string | null
           user_id: string
         }
         Insert: {
@@ -2279,6 +2280,7 @@ export type Database = {
           distributed_at?: string
           expires_at?: string
           id?: string
+          lead_id?: string | null
           user_id: string
         }
         Update: {
@@ -2287,9 +2289,18 @@ export type Database = {
           distributed_at?: string
           expires_at?: string
           id?: string
+          lead_id?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "leads_distribution_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads_database"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       leads_indicados: {
         Row: {
