@@ -27,7 +27,6 @@ import {
 
 interface ParsedLead {
   nome: string;
-  cpf: string;
   convenio: string;
   telefone: string;
   valid: boolean;
@@ -41,7 +40,6 @@ interface ImportResult {
   invalid: number;
   duplicate_details: Array<{
     nome: string;
-    cpf: string;
     telefone: string;
     convenio: string;
     motivo: string;
@@ -106,14 +104,13 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       const headers = parseCSVLine(headerLine);
       
       const nomeIndex = headers.findIndex(h => h.includes('nome'));
-      const cpfIndex = headers.findIndex(h => h.includes('cpf'));
       const convenioIndex = headers.findIndex(h => h.includes('convenio') || h.includes('convênio'));
       const telefoneIndex = headers.findIndex(h => h.includes('telefone') || h.includes('phone') || h.includes('fone'));
 
-      if (nomeIndex === -1 || cpfIndex === -1 || convenioIndex === -1 || telefoneIndex === -1) {
+      if (nomeIndex === -1 || convenioIndex === -1 || telefoneIndex === -1) {
         toast({
           title: "Colunas obrigatórias não encontradas",
-          description: "O arquivo deve conter as colunas: Nome, CPF, Convênio, Telefone",
+          description: "O arquivo deve conter as colunas: Nome, Convênio, Telefone",
           variant: "destructive",
         });
         setIsParsing(false);
@@ -126,11 +123,6 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         const values = parseCSVLine(lines[i]);
         
         const nome = values[nomeIndex]?.trim() || '';
-        // Remove non-digits and pad with leading zeros to ensure 11 digits
-        let cpf = values[cpfIndex]?.replace(/\D/g, '') || '';
-        if (cpf && cpf.length < 11) {
-          cpf = cpf.padStart(11, '0');
-        }
         const convenio = values[convenioIndex]?.trim() || '';
         const telefone = values[telefoneIndex]?.replace(/\D/g, '') || '';
 
@@ -140,18 +132,15 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         if (!nome) {
           valid = false;
           error = 'Nome vazio';
-        } else if (!cpf || cpf.length !== 11) {
-          valid = false;
-          error = 'CPF inválido';
-        } else if (!telefone || telefone.length < 10) {
-          valid = false;
-          error = 'Telefone inválido';
         } else if (!convenio) {
           valid = false;
           error = 'Convênio vazio';
+        } else if (!telefone || telefone.length < 10) {
+          valid = false;
+          error = 'Telefone inválido';
         }
 
-        leads.push({ nome, cpf, convenio, telefone, valid, error });
+        leads.push({ nome, convenio, telefone, valid, error });
       }
 
       setParsedLeads(leads);
@@ -223,7 +212,6 @@ export function ImportBase({ onBack }: ImportBaseProps) {
     try {
       const leadsData = validLeads.map(lead => ({
         nome: lead.nome,
-        cpf: lead.cpf,
         convenio: lead.convenio,
         telefone: lead.telefone
       }));
@@ -342,7 +330,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   };
 
   const downloadTemplate = () => {
-    const template = 'Nome,CPF,Convênio,Telefone\nJoão Silva,12345678901,INSS,11999998888\nMaria Santos,98765432109,SIAPE,21988887777';
+    const template = 'Nome,Convênio,Telefone\nJoão Silva,INSS,11999998888\nMaria Santos,SIAPE,21988887777';
     const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -350,10 +338,6 @@ export function ImportBase({ onBack }: ImportBaseProps) {
     link.click();
   };
 
-  const formatCPF = (cpf: string) => {
-    if (!cpf || cpf.length !== 11) return cpf;
-    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-  };
 
   const formatPhone = (phone: string) => {
     if (!phone) return phone;
@@ -424,7 +408,6 @@ export function ImportBase({ onBack }: ImportBaseProps) {
               <h4 className="font-medium mb-2">Colunas Obrigatórias</h4>
               <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• <strong>Nome</strong> - Nome completo do lead</li>
-                <li>• <strong>CPF</strong> - 11 dígitos (com ou sem formatação)</li>
                 <li>• <strong>Convênio</strong> - Ex: INSS, SIAPE, etc</li>
                 <li>• <strong>Telefone</strong> - 10 ou 11 dígitos</li>
               </ul>
@@ -555,7 +538,6 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                     <TableHead className="w-12">#</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Nome</TableHead>
-                    <TableHead>CPF</TableHead>
                     <TableHead>Convênio</TableHead>
                     <TableHead>Telefone</TableHead>
                   </TableRow>
@@ -578,7 +560,6 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                         )}
                       </TableCell>
                       <TableCell className="font-medium">{lead.nome || '-'}</TableCell>
-                      <TableCell className="font-mono text-sm">{formatCPF(lead.cpf) || '-'}</TableCell>
                       <TableCell>{lead.convenio || '-'}</TableCell>
                       <TableCell className="font-mono text-sm">{formatPhone(lead.telefone) || '-'}</TableCell>
                     </TableRow>
@@ -642,7 +623,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Nome</TableHead>
-                          <TableHead>CPF</TableHead>
+                          <TableHead>Convênio</TableHead>
                           <TableHead>Motivo</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -650,7 +631,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                         {importResult.duplicate_details.slice(0, 20).map((dup, index) => (
                           <TableRow key={index}>
                             <TableCell className="text-sm">{dup.nome}</TableCell>
-                            <TableCell className="font-mono text-xs">{formatCPF(dup.cpf)}</TableCell>
+                            <TableCell className="text-sm">{dup.convenio}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
                                 {dup.motivo}
