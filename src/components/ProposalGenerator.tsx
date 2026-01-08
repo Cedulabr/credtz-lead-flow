@@ -1538,7 +1538,7 @@ export function ProposalGenerator() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 pb-32">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 pb-32" translate="no">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b">
         <div className="container max-w-4xl mx-auto px-4 py-4">

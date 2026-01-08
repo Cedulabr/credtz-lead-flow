@@ -3,6 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
+// Erros causados por extensões de navegador (Google Translate, etc.)
+const EXTENSION_ERROR_RE =
+  /removeChild|insertBefore|appendChild|not a child of this node|Failed to execute '(removeChild|insertBefore|appendChild)' on 'Node'/i;
+
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
@@ -11,23 +15,46 @@ interface Props {
 interface State {
   hasError: boolean;
   error?: Error;
+  retryCount: number;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
-    hasError: false
+    hasError: false,
+    retryCount: 0
   };
 
-  public static getDerivedStateFromError(error: Error): State {
+  private isExtensionError(error: Error): boolean {
+    return EXTENSION_ERROR_RE.test(error.message);
+  }
+
+  public static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Se for erro de extensão, tentar recuperar automaticamente
+    if (this.isExtensionError(error)) {
+      console.warn('[ErrorBoundary] Erro de extensão detectado, tentando recuperar:', error.message);
+      
+      // Recuperar automaticamente após pequeno delay (máximo 3 tentativas)
+      if (this.state.retryCount < 3) {
+        setTimeout(() => {
+          this.setState(prev => ({ 
+            hasError: false, 
+            error: undefined,
+            retryCount: prev.retryCount + 1 
+          }));
+        }, 100);
+        return;
+      }
+    }
+    
     console.error('ErrorBoundary caught an error:', error, errorInfo);
   }
 
   private handleRetry = () => {
-    this.setState({ hasError: false, error: undefined });
+    this.setState({ hasError: false, error: undefined, retryCount: 0 });
   };
 
   public render() {
