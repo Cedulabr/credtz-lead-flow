@@ -229,11 +229,13 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="flex md:flex">
+    <div className="min-h-screen bg-background overflow-x-hidden">
+      <div className="flex flex-col md:flex-row min-h-screen">
         <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="flex-1 w-full md:w-auto">
-          {renderActiveComponent()}
+        <main className="flex-1 w-full max-w-full overflow-x-hidden pt-14 pb-20 md:pt-0 md:pb-0">
+          <div className="w-full max-w-full overflow-x-hidden">
+            {renderActiveComponent()}
+          </div>
         </main>
       </div>
     </div>

@@ -788,9 +788,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Top Bar */}
-      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+    <div className="min-h-screen bg-background w-full max-w-full overflow-x-hidden">
+      {/* Top Bar - Hidden on mobile since we have the Navigation header */}
+      <div className="hidden md:block sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
             {config?.logo_url ? (
@@ -891,7 +891,73 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       </div>
 
-      <div className="p-3 md:p-4 space-y-4 pb-24">
+      {/* Mobile Header with filters */}
+      <div className="md:hidden px-3 py-2 bg-background border-b">
+        <div className="flex items-center gap-2 mb-2">
+          <p className="text-sm text-muted-foreground flex-1">Olá, <span className="font-medium text-foreground">{userName}</span></p>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8"
+            onClick={() => fetchAllData()}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+        <div className="flex gap-2">
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="flex-1 h-8 text-xs">
+              <Calendar className="h-3 w-3 mr-1" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {(isAdmin || companies.length > 1) && (
+            <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+              <SelectTrigger className="flex-1 h-8 text-xs">
+                <Building2 className="h-3 w-3 mr-1" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {companies.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        
+        {/* Mobile Quick Stats */}
+        <div className="grid grid-cols-4 gap-1 mt-2 py-2 border-t">
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">Vendas</p>
+            <p className="text-sm font-bold">{totalSales}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">Valor</p>
+            <p className="text-xs font-bold text-success">{formatCurrency(totalRevenue).replace('R$', '').trim()}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">Comissão</p>
+            <p className="text-xs font-bold">{formatCurrency(totalCommissions).replace('R$', '').trim()}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">Var.</p>
+            <p className={`text-xs font-bold ${revenueChange >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {revenueChange >= 0 ? '+' : ''}{revenueChange.toFixed(0)}%
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-3 md:p-4 space-y-4 w-full max-w-full overflow-x-hidden">
         {/* Main KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
           {/* Vendas do Mês */}
