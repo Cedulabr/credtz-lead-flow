@@ -541,8 +541,8 @@ export function ProposalGenerator() {
   const generateProposalText = () => {
     const completedContracts = getCompletedContracts();
     const totalTroco = calculateTotalTroco();
-    const totalParcela = calculateTotalParcela();
     const footers = getUniqueProductFooters();
+    const userName = profile?.name || 'Consultor';
     
     let text = `✨ *PROPOSTA COMERCIAL* ✨\n\n`;
     text += `👤 *Cliente:* ${proposalData.clientName}\n`;
@@ -562,7 +562,12 @@ export function ProposalGenerator() {
       text += `\n`;
     });
 
+    if (totalTroco > 0) {
+      text += `💰 *Troco Total Estimado:* ${formatCurrency(String(totalTroco * 100))}\n\n`;
+    }
+    
     text += `📅 Data: ${new Date().toLocaleDateString("pt-BR")}\n`;
+    text += `👨‍💼 Consultor: ${userName}\n`;
     
     // Add product-specific footers
     if (footers.length > 0) {
@@ -709,6 +714,18 @@ export function ProposalGenerator() {
 
     y += 10;
 
+    // Troco Total Estimado
+    if (totalTroco > 0) {
+      doc.setFillColor(16, 185, 129); // emerald-500
+      doc.roundedRect(15, y - 5, pageWidth - 30, 20, 3, 3, "F");
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text(`Troco Total Estimado: ${formatCurrency(String(totalTroco * 100))}`, pageWidth / 2, y + 5, { align: "center" });
+      y += 25;
+    }
+
     // Product-specific footers
     if (footers.length > 0) {
       doc.setTextColor(55, 65, 81); // Cinza escuro
@@ -726,11 +743,13 @@ export function ProposalGenerator() {
       y += 5;
     }
 
-    // Footer
+    // Footer with user name
+    const userName = profile?.name || 'Consultor';
     doc.setTextColor(128, 128, 128);
     doc.setFontSize(9);
     doc.text(`Data: ${new Date().toLocaleDateString("pt-BR")}`, 20, y);
-    doc.text("Proposta sujeita à análise de crédito", 20, y + 7);
+    doc.text(`Consultor: ${userName}`, 20, y + 7);
+    doc.text("Proposta sujeita à análise de crédito", 20, y + 14);
 
     // Save
     doc.save(`proposta_${proposalData.clientName.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`);
