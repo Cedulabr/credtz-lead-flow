@@ -3062,6 +3062,198 @@ export type Database = {
           },
         ]
       }
+      time_clock: {
+        Row: {
+          city: string | null
+          clock_date: string
+          clock_time: string
+          clock_type: Database["public"]["Enums"]["time_clock_type"]
+          company_id: string | null
+          created_at: string
+          device_info: Json | null
+          id: string
+          ip_address: string | null
+          latitude: number | null
+          longitude: number | null
+          notes: string | null
+          photo_url: string | null
+          state: string | null
+          status: Database["public"]["Enums"]["time_clock_status"]
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          city?: string | null
+          clock_date?: string
+          clock_time?: string
+          clock_type: Database["public"]["Enums"]["time_clock_type"]
+          company_id?: string | null
+          created_at?: string
+          device_info?: Json | null
+          id?: string
+          ip_address?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          photo_url?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["time_clock_status"]
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          city?: string | null
+          clock_date?: string
+          clock_time?: string
+          clock_type?: Database["public"]["Enums"]["time_clock_type"]
+          company_id?: string | null
+          created_at?: string
+          device_info?: Json | null
+          id?: string
+          ip_address?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          photo_url?: string | null
+          state?: string | null
+          status?: Database["public"]["Enums"]["time_clock_status"]
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_clock_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      time_clock_consent: {
+        Row: {
+          consent_date: string | null
+          consent_given: boolean
+          created_at: string
+          id: string
+          ip_address: string | null
+          user_id: string
+        }
+        Insert: {
+          consent_date?: string | null
+          consent_given?: boolean
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          user_id: string
+        }
+        Update: {
+          consent_date?: string | null
+          consent_given?: boolean
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      time_clock_logs: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          new_values: Json | null
+          old_values: Json | null
+          performed_by: string
+          reason: string | null
+          time_clock_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          performed_by: string
+          reason?: string | null
+          time_clock_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          performed_by?: string
+          reason?: string | null
+          time_clock_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_clock_logs_time_clock_id_fkey"
+            columns: ["time_clock_id"]
+            isOneToOne: false
+            referencedRelation: "time_clock"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      time_clock_settings: {
+        Row: {
+          allow_manual_adjustment: boolean | null
+          block_duplicate_clock: boolean | null
+          company_id: string | null
+          created_at: string
+          default_entry_time: string | null
+          default_exit_time: string | null
+          id: string
+          require_location: boolean | null
+          require_photo: boolean | null
+          retention_years: number | null
+          tolerance_minutes: number | null
+          updated_at: string
+        }
+        Insert: {
+          allow_manual_adjustment?: boolean | null
+          block_duplicate_clock?: boolean | null
+          company_id?: string | null
+          created_at?: string
+          default_entry_time?: string | null
+          default_exit_time?: string | null
+          id?: string
+          require_location?: boolean | null
+          require_photo?: boolean | null
+          retention_years?: number | null
+          tolerance_minutes?: number | null
+          updated_at?: string
+        }
+        Update: {
+          allow_manual_adjustment?: boolean | null
+          block_duplicate_clock?: boolean | null
+          company_id?: string | null
+          created_at?: string
+          default_entry_time?: string | null
+          default_exit_time?: string | null
+          id?: string
+          require_location?: boolean | null
+          require_photo?: boolean | null
+          retention_years?: number | null
+          tolerance_minutes?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_clock_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_companies: {
         Row: {
           company_id: string
@@ -3708,6 +3900,8 @@ export type Database = {
       company_role: "gestor" | "colaborador"
       document_status: "pending" | "sent" | "approved" | "rejected"
       person_type: "pf" | "pj"
+      time_clock_status: "completo" | "incompleto" | "ajustado" | "pendente"
+      time_clock_type: "entrada" | "pausa_inicio" | "pausa_fim" | "saida"
       user_data_status: "incomplete" | "in_review" | "approved" | "rejected"
       user_level: "bronze" | "prata" | "ouro" | "diamante"
     }
@@ -3851,6 +4045,8 @@ export const Constants = {
       company_role: ["gestor", "colaborador"],
       document_status: ["pending", "sent", "approved", "rejected"],
       person_type: ["pf", "pj"],
+      time_clock_status: ["completo", "incompleto", "ajustado", "pendente"],
+      time_clock_type: ["entrada", "pausa_inicio", "pausa_fim", "saida"],
       user_data_status: ["incomplete", "in_review", "approved", "rejected"],
       user_level: ["bronze", "prata", "ouro", "diamante"],
     },
