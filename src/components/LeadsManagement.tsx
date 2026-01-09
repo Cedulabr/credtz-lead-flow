@@ -53,12 +53,14 @@ interface Lead {
   convenio: string;
   status: string;
   created_at: string;
+  updated_at?: string;
   assigned_to?: string;
   created_by?: string;
   is_rework?: boolean;
   rework_date?: string;
   notes?: string;
   future_contact_date?: string;
+  future_contact_time?: string;
   rejection_reason?: string;
   rejection_offered_value?: number;
   rejection_bank?: string;
@@ -66,6 +68,12 @@ interface Lead {
   banco_operacao?: string;
   valor_operacao?: number;
   history?: any;
+}
+
+interface UserProfile {
+  id: string;
+  name: string | null;
+  email: string | null;
 }
 
 interface LeadRequest {
@@ -129,6 +137,15 @@ const STATUS_CONFIG = {
     icon: Calendar,
     dotColor: "bg-slate-500"
   },
+  agendamento: { 
+    label: "Agendamento", 
+    color: "from-indigo-500 to-violet-500", 
+    textColor: "text-indigo-700", 
+    bgColor: "bg-gradient-to-r from-indigo-50 to-violet-100",
+    borderColor: "border-indigo-200",
+    icon: Calendar,
+    dotColor: "bg-indigo-500"
+  },
   nao_e_cliente: {
     label: "Não é o cliente",
     color: "from-gray-500 to-zinc-500",
@@ -175,12 +192,18 @@ export function LeadsManagement() {
   const { user, profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [userFilter, setUserFilter] = useState("all");
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [userCredits, setUserCredits] = useState(0);
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [showImportBase, setShowImportBase] = useState(false);
   const [showDistributedManager, setShowDistributedManager] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [selectedLeadsForAssign, setSelectedLeadsForAssign] = useState<string[]>([]);
+  const [targetUserId, setTargetUserId] = useState("");
   const [leadRequest, setLeadRequest] = useState<LeadRequest>({
     convenio: "",
     count: 10
@@ -202,6 +225,10 @@ export function LeadsManagement() {
   // Future contact form
   const [futureContactDate, setFutureContactDate] = useState("");
   
+  // Schedule form (agendamento)
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  
   // Dynamic convenios from database
   const [availableConvenios, setAvailableConvenios] = useState<{convenio: string, available_count: number}[]>([]);
   const [loadingConvenios, setLoadingConvenios] = useState(false);
@@ -215,8 +242,11 @@ export function LeadsManagement() {
       fetchUserCredits();
       fetchAvailableConvenios();
       processExpiredFutureContacts();
+      if (isAdmin) {
+        fetchUsers();
+      }
     }
-  }, [user]);
+  }, [user, isAdmin]);
 
   const fetchAvailableConvenios = async () => {
     try {
@@ -234,6 +264,21 @@ export function LeadsManagement() {
       setTotalAvailableLeads(0);
     } finally {
       setLoadingConvenios(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
     }
   };
 
@@ -409,6 +454,10 @@ export function LeadsManagement() {
       const defaultDate = format(addDays(new Date(), 30), 'yyyy-MM-dd');
       setFutureContactDate(defaultDate);
       setShowFutureContactModal(true);
+    } else if (newStatus === 'agendamento') {
+      setScheduleDate(format(new Date(), 'yyyy-MM-dd'));
+      setScheduleTime("10:00");
+      setShowScheduleModal(true);
     } else if (newStatus === 'cliente_fechado') {
       await handleClienteFechado(lead);
     } else {
@@ -637,6 +686,117 @@ export function LeadsManagement() {
     }
   };
 
+  const handleScheduleSubmit = async () => {
+    if (!selectedLead || !scheduleDate || !scheduleTime) {
+      toast({
+        title: "Erro",
+        description: "Preencha a data e horário do agendamento",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const scheduledDateTime = `${scheduleDate}T${scheduleTime}:00`;
+      const historyEntry = {
+        action: 'status_change',
+        from_status: selectedLead.status,
+        to_status: 'agendamento',
+        timestamp: new Date().toISOString(),
+        user_id: user?.id,
+        note: `Agendamento marcado para ${format(new Date(scheduledDateTime), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`,
+        scheduled_date: scheduleDate,
+        scheduled_time: scheduleTime
+      };
+
+      const currentHistory = selectedLead.history || [];
+
+      const { error } = await supabase
+        .from('leads')
+        .update({ 
+          status: 'agendamento',
+          future_contact_date: scheduleDate,
+          future_contact_time: scheduleTime,
+          notes: `Agendamento: ${format(new Date(scheduledDateTime), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`,
+          history: [...currentHistory, historyEntry],
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedLead.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Agendamento Confirmado",
+        description: `Agendamento marcado para ${format(new Date(scheduledDateTime), 'dd/MM/yyyy HH:mm', { locale: ptBR })}.`,
+      });
+
+      setShowScheduleModal(false);
+      setSelectedLead(null);
+      fetchLeads();
+    } catch (error) {
+      console.error('Error setting schedule:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao agendar",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAssignLeads = async () => {
+    if (!targetUserId || selectedLeadsForAssign.length === 0) {
+      toast({
+        title: "Erro",
+        description: "Selecione um usuário e pelo menos um lead",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ 
+          assigned_to: targetUserId,
+          updated_at: new Date().toISOString()
+        })
+        .in('id', selectedLeadsForAssign);
+
+      if (error) throw error;
+
+      toast({
+        title: "Leads Atribuídos",
+        description: `${selectedLeadsForAssign.length} lead(s) atribuídos com sucesso.`,
+      });
+
+      setShowAssignModal(false);
+      setSelectedLeadsForAssign([]);
+      setTargetUserId("");
+      fetchLeads();
+    } catch (error) {
+      console.error('Error assigning leads:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atribuir leads",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeadsForAssign(prev => 
+      prev.includes(leadId) 
+        ? prev.filter(id => id !== leadId)
+        : [...prev, leadId]
+    );
+  };
+
+  const getUserName = (userId: string | undefined) => {
+    if (!userId) return 'Não atribuído';
+    const foundUser = users.find(u => u.id === userId);
+    return foundUser?.name || foundUser?.email || 'Usuário';
+  };
+
   const updateLeadStatus = async (leadId: string, newStatus: string) => {
     try {
       const lead = leads.find(l => l.id === leadId);
@@ -656,14 +816,15 @@ export function LeadsManagement() {
         .from('leads')
         .update({ 
           status: newStatus,
-          history: [...currentHistory, historyEntry]
+          history: [...currentHistory, historyEntry],
+          updated_at: new Date().toISOString()
         })
         .eq('id', leadId);
 
       if (error) throw error;
 
       setLeads(prev => prev.map(l => 
-        l.id === leadId ? { ...l, status: newStatus } : l
+        l.id === leadId ? { ...l, status: newStatus, updated_at: new Date().toISOString() } : l
       ));
 
       const statusLabel = STATUS_CONFIG[newStatus as keyof typeof STATUS_CONFIG]?.label || newStatus;
@@ -699,9 +860,11 @@ export function LeadsManagement() {
       
       const matchesStatus = statusFilter === "all" || lead.status === statusFilter;
       
-      return matchesSearch && matchesStatus;
+      const matchesUser = userFilter === "all" || lead.assigned_to === userFilter;
+      
+      return matchesSearch && matchesStatus && matchesUser;
     });
-  }, [leads, searchTerm, statusFilter]);
+  }, [leads, searchTerm, statusFilter, userFilter]);
 
   const stats = useMemo(() => ({
     total: leads.length,
@@ -943,43 +1106,107 @@ export function LeadsManagement() {
       {/* Filtros Simplificados */}
       <Card className="border-2 border-muted/50 shadow-lg">
         <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  placeholder="🔍 Buscar nome, CPF, telefone..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-12 border-2 focus:border-primary transition-colors h-14 text-lg font-medium"
-                />
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    placeholder="🔍 Buscar nome, CPF, telefone..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-12 border-2 focus:border-primary transition-colors h-14 text-lg font-medium"
+                  />
+                </div>
               </div>
-            </div>
-            
-            <div className="flex gap-3 flex-wrap">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full md:w-60 border-2 focus:border-primary h-14 text-base font-semibold">
-                  <Filter className="h-5 w-5 mr-2" />
-                  <SelectValue placeholder="Filtrar Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-base py-3">
-                    <span className="flex items-center gap-2 font-semibold">
-                      <span className="w-3 h-3 rounded-full bg-slate-400"></span>
-                      Todos os Status
-                    </span>
-                  </SelectItem>
-                  {Object.entries(STATUS_CONFIG).map(([key, config]) => (
-                    <SelectItem key={key} value={key} className="text-base py-3">
+              
+              <div className="flex gap-3 flex-wrap">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full md:w-60 border-2 focus:border-primary h-14 text-base font-semibold">
+                    <Filter className="h-5 w-5 mr-2" />
+                    <SelectValue placeholder="Filtrar Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-base py-3">
                       <span className="flex items-center gap-2 font-semibold">
-                        <span className={`w-3 h-3 rounded-full ${config.dotColor}`}></span>
-                        {config.label}
+                        <span className="w-3 h-3 rounded-full bg-slate-400"></span>
+                        Todos os Status
                       </span>
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                      <SelectItem key={key} value={key} className="text-base py-3">
+                        <span className="flex items-center gap-2 font-semibold">
+                          <span className={`w-3 h-3 rounded-full ${config.dotColor}`}></span>
+                          {config.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {isAdmin && (
+                  <Select value={userFilter} onValueChange={setUserFilter}>
+                    <SelectTrigger className="w-full md:w-60 border-2 focus:border-primary h-14 text-base font-semibold">
+                      <User className="h-5 w-5 mr-2" />
+                      <SelectValue placeholder="Filtrar Usuário" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" className="text-base py-3">
+                        <span className="flex items-center gap-2 font-semibold">
+                          <Users className="h-4 w-4" />
+                          Todos os Usuários
+                        </span>
+                      </SelectItem>
+                      {users.map(u => (
+                        <SelectItem key={u.id} value={u.id} className="text-base py-3">
+                          <span className="flex items-center gap-2 font-semibold">
+                            <User className="h-4 w-4" />
+                            {u.name || u.email || 'Usuário'}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
             </div>
+
+            {/* Ações para Admin - Atribuir Leads */}
+            {isAdmin && (
+              <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 border border-indigo-200 dark:border-indigo-800">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedLeadsForAssign.length > 0 && selectedLeadsForAssign.length === filteredLeads.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedLeadsForAssign(filteredLeads.map(l => l.id));
+                      } else {
+                        setSelectedLeadsForAssign([]);
+                      }
+                    }}
+                    className="h-5 w-5 rounded border-2 border-indigo-400"
+                  />
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {selectedLeadsForAssign.length > 0 
+                      ? `${selectedLeadsForAssign.length} lead(s) selecionado(s)`
+                      : 'Selecionar leads para atribuir'
+                    }
+                  </span>
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="lg"
+                  disabled={selectedLeadsForAssign.length === 0}
+                  onClick={() => setShowAssignModal(true)}
+                  className="border-indigo-300 hover:bg-indigo-100 hover:text-indigo-700 font-semibold"
+                >
+                  <UserCheck className="h-5 w-5 mr-2" />
+                  Atribuir Leads
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -989,11 +1216,12 @@ export function LeadsManagement() {
         {filteredLeads.map((lead) => {
           const status = STATUS_CONFIG[lead.status as keyof typeof STATUS_CONFIG];
           const StatusIcon = status?.icon || AlertCircle;
+          const isSelected = selectedLeadsForAssign.includes(lead.id);
           
           return (
             <Card 
               key={lead.id} 
-              className={`border-2 ${status?.borderColor || 'border-muted'} hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden`}
+              className={`border-2 ${isSelected ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20' : status?.borderColor || 'border-muted'} hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden`}
             >
               <CardContent className="p-0">
                 <div className="flex flex-col md:flex-row">
@@ -1003,6 +1231,18 @@ export function LeadsManagement() {
                   {/* Conteúdo Principal */}
                   <div className="flex-1 p-5">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                      {/* Checkbox para seleção (admin) */}
+                      {isAdmin && (
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleLeadSelection(lead.id)}
+                            className="h-5 w-5 rounded border-2 border-indigo-400 mr-4"
+                          />
+                        </div>
+                      )}
+                      
                       {/* Info do Lead */}
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-3 flex-wrap">
@@ -1026,6 +1266,26 @@ export function LeadsManagement() {
                           <Badge variant="outline" className="font-bold text-sm px-3 py-1">
                             {lead.convenio}
                           </Badge>
+                          {isAdmin && lead.assigned_to && (
+                            <Badge variant="secondary" className="font-semibold text-sm px-3 py-1">
+                              <User className="h-3 w-3 mr-1" />
+                              {getUserName(lead.assigned_to)}
+                            </Badge>
+                          )}
+                          {lead.updated_at && (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <History className="h-3 w-3" />
+                              {format(new Date(lead.updated_at), 'dd/MM HH:mm', { locale: ptBR })}
+                            </span>
+                          )}
+                          {lead.status === 'agendamento' && lead.future_contact_date && (
+                            <Badge className="bg-indigo-100 text-indigo-700 border-indigo-300 font-semibold">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {format(new Date(lead.future_contact_date + (lead.future_contact_time ? `T${lead.future_contact_time}` : '')), 
+                                lead.future_contact_time ? 'dd/MM/yyyy HH:mm' : 'dd/MM/yyyy', 
+                                { locale: ptBR })}
+                            </Badge>
+                          )}
                         </div>
                       </div>
 
@@ -1249,6 +1509,127 @@ export function LeadsManagement() {
               className="bg-gradient-to-r from-slate-500 to-gray-500"
             >
               Agendar Contato
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule Modal (Agendamento) */}
+      <Dialog open={showScheduleModal} onOpenChange={setShowScheduleModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-indigo-500" />
+              Agendar Atendimento
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-800">
+              <p className="text-sm text-indigo-700 dark:text-indigo-300">
+                <strong>Lead:</strong> {selectedLead?.name}
+              </p>
+            </div>
+
+            <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                <Clock className="h-4 w-4 inline mr-2" />
+                Informe a data e horário do agendamento com o cliente.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Data do Agendamento *</label>
+                <Input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  min={format(new Date(), 'yyyy-MM-dd')}
+                  className="border-2 focus:border-indigo-500"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Horário *</label>
+                <Input
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="border-2 focus:border-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowScheduleModal(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleScheduleSubmit}
+              className="bg-gradient-to-r from-indigo-500 to-violet-500"
+            >
+              Confirmar Agendamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Leads Modal */}
+      <Dialog open={showAssignModal} onOpenChange={setShowAssignModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-indigo-500" />
+              Atribuir Leads
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="p-4 rounded-lg bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-800">
+              <p className="text-lg text-indigo-700 dark:text-indigo-300 font-semibold">
+                {selectedLeadsForAssign.length} lead(s) selecionado(s)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Atribuir para o Usuário</label>
+              <Select 
+                value={targetUserId} 
+                onValueChange={setTargetUserId}
+              >
+                <SelectTrigger className="border-2 focus:border-indigo-500 h-12">
+                  <SelectValue placeholder="Selecione o usuário" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map(u => (
+                    <SelectItem key={u.id} value={u.id} className="text-base py-3">
+                      <span className="flex items-center gap-2 font-semibold">
+                        <User className="h-4 w-4" />
+                        {u.name || u.email || 'Usuário'}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowAssignModal(false);
+              setSelectedLeadsForAssign([]);
+              setTargetUserId("");
+            }}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleAssignLeads}
+              disabled={!targetUserId}
+              className="bg-gradient-to-r from-indigo-500 to-violet-500"
+            >
+              Atribuir Leads
             </Button>
           </DialogFooter>
         </DialogContent>
