@@ -1,14 +1,22 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
 import { Badge } from "./ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { ScrollArea } from "./ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { Label } from "./ui/label";
 import {
   Upload,
   FileText,
@@ -19,6 +27,10 @@ import {
   Download,
   RefreshCw,
   FileSpreadsheet,
+  Settings,
+  Loader2,
+  Database,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -36,9 +48,25 @@ interface BaseOffImportProps {
   onBack: () => void;
 }
 
+// Limites de importação
+const IMPORT_LIMITS = {
+  maxFileSize: 100 * 1024 * 1024, // 100MB
+  maxRows: 200000, // 200k linhas
+  recommendedRows: 50000, // 50k linhas recomendado
+  chunkSize: {
+    small: 100,
+    medium: 250,
+    large: 500,
+  },
+  dbBatchSize: {
+    small: 50,
+    medium: 100,
+    large: 200,
+  }
+};
+
 // Mapeamento das colunas do arquivo para os campos do banco
 const COLUMN_MAP: Record<string, string> = {
-  // Campos básicos do cliente
   NB: "nb",
   CPF: "cpf",
   NOME: "nome",
@@ -67,8 +95,6 @@ const COLUMN_MAP: Record<string, string> = {
   REPRESENTANTE: "representante",
   SEXO: "sexo",
   DDB: "ddb",
-  
-  // RMC e RCC
   BANCORMC: "banco_rmc",
   "BANCO_RMC": "banco_rmc",
   VALORRMC: "valor_rmc",
@@ -79,9 +105,6 @@ const COLUMN_MAP: Record<string, string> = {
   VALORRCC: "valor_rcc",
   "VALOR_RCC": "valor_rcc",
   "VL_RCC": "valor_rcc",
-  
-  // === COLUNAS DE CONTRATO/EMPRÉSTIMO - ALIASES AMPLIADOS ===
-  // Banco do empréstimo
   BANCOEMPRESTIMO: "banco_emprestimo",
   "BANCO_EMPRESTIMO": "banco_emprestimo",
   "BANCO EMPRESTIMO": "banco_emprestimo",
@@ -92,8 +115,6 @@ const COLUMN_MAP: Record<string, string> = {
   "CD_BANCO": "banco_emprestimo",
   "CODIGOBANCO": "banco_emprestimo",
   "CODIGO_BANCO": "banco_emprestimo",
-  
-  // Número do contrato
   CONTRATO: "contrato",
   "NR_CONTRATO": "contrato",
   "NRCONTRATO": "contrato",
@@ -106,8 +127,6 @@ const COLUMN_MAP: Record<string, string> = {
   "CD_CONTRATO": "contrato",
   "CDCONTRATO": "contrato",
   "CONTRATO_NUMERO": "contrato",
-  
-  // Valor do empréstimo
   VLEMPRESTIMO: "vl_emprestimo",
   "VL_EMPRESTIMO": "vl_emprestimo",
   "VL EMPRESTIMO": "vl_emprestimo",
@@ -116,30 +135,22 @@ const COLUMN_MAP: Record<string, string> = {
   "VALOR EMPRESTIMO": "vl_emprestimo",
   "VLEMPRÉSTIMO": "vl_emprestimo",
   "VL_EMPRÉSTIMO": "vl_emprestimo",
-  
-  // Início do desconto
   INICIODODESCONTO: "inicio_desconto",
   "INICIO_DESCONTO": "inicio_desconto",
   "INICIO DESCONTO": "inicio_desconto",
   "INICIODESCONTO": "inicio_desconto",
   "DT_INICIO_DESCONTO": "inicio_desconto",
   "DATA_INICIO_DESCONTO": "inicio_desconto",
-  
-  // Prazo
   PRAZO: "prazo",
   "QT_PRAZO": "prazo",
   "QTPRAZO": "prazo",
   "PRAZO_TOTAL": "prazo",
-  
-  // Valor da parcela
   VLPARCELA: "vl_parcela",
   "VL_PARCELA": "vl_parcela",
   "VL PARCELA": "vl_parcela",
   "VALORPARCELA": "vl_parcela",
   "VALOR_PARCELA": "vl_parcela",
   "VALOR PARCELA": "vl_parcela",
-  
-  // Tipo de empréstimo (ex: 98, 13, etc.)
   TIPOEMPRESTIMO: "tipo_emprestimo",
   "TIPO_EMPRESTIMO": "tipo_emprestimo",
   "TIPO EMPRESTIMO": "tipo_emprestimo",
@@ -149,45 +160,31 @@ const COLUMN_MAP: Record<string, string> = {
   "CDTIPOEMPRESTIMO": "tipo_emprestimo",
   "TP_EMPRESTIMO": "tipo_emprestimo",
   "TPEMPRESTIMO": "tipo_emprestimo",
-  
-  // Data de averbação
   DATAAVERBACAO: "data_averbacao",
   "DATA_AVERBACAO": "data_averbacao",
   "DATA AVERBACAO": "data_averbacao",
   "DTAVERBACAO": "data_averbacao",
   "DT_AVERBACAO": "data_averbacao",
-  
-  // Situação do empréstimo
   SITUACAOEMPRESTIMO: "situacao_emprestimo",
   "SITUACAO_EMPRESTIMO": "situacao_emprestimo",
   "SITUACAO EMPRESTIMO": "situacao_emprestimo",
   "SITUACAOEMPRÉSTIMO": "situacao_emprestimo",
   "ST_EMPRESTIMO": "situacao_emprestimo",
   "STATUS_EMPRESTIMO": "situacao_emprestimo",
-  
-  // Competência
   COMPETENCIA: "competencia",
   "COMPETÊNCIA": "competencia",
-  
-  // Competência final
   COMPETENCIA_FINAL: "competencia_final",
   "COMPETENCIA FINAL": "competencia_final",
   "COMPETENCIAFINAL": "competencia_final",
   "COMPETÊNCIA_FINAL": "competencia_final",
-  
-  // Taxa
   TAXA: "taxa",
   "TX_JUROS": "taxa",
   "TXJUROS": "taxa",
   "TAXA_JUROS": "taxa",
-  
-  // Saldo
   SALDO: "saldo",
   "VL_SALDO": "saldo",
   "VLSALDO": "saldo",
   "SALDO_DEVEDOR": "saldo",
-  
-  // Endereço
   BAIRRO: "bairro",
   MUNICIPIO: "municipio",
   "CIDADE": "municipio",
@@ -205,8 +202,6 @@ const COLUMN_MAP: Record<string, string> = {
   CIDADE_1: "cidade_1",
   UF_1: "uf_1",
   CEP_1: "cep_1",
-  
-  // Telefones
   TELFIXO_1: "tel_fixo_1",
   TELFIXO_2: "tel_fixo_2",
   TELFIXO_3: "tel_fixo_3",
@@ -231,8 +226,6 @@ const COLUMN_MAP: Record<string, string> = {
   "TELEFONE_1": "tel_cel_1",
   "TELEFONE_2": "tel_cel_2",
   "TELEFONE_3": "tel_cel_3",
-  
-  // E-mails
   EMAIL_1: "email_1",
   EMAIL_2: "email_2",
   EMAIL_3: "email_3",
@@ -242,8 +235,6 @@ const COLUMN_MAP: Record<string, string> = {
   "EMAIL1": "email_1",
   "EMAIL2": "email_2",
   "EMAIL3": "email_3",
-  
-  // Nome da mãe/pai e naturalidade
   NOME_MAE: "nome_mae",
   "NOMEMAE": "nome_mae",
   NOME_PAI: "nome_pai",
@@ -251,19 +242,41 @@ const COLUMN_MAP: Record<string, string> = {
   NATURALIDADE: "naturalidade",
 };
 
+type ImportPhase = "idle" | "reading" | "processing" | "saving_clients" | "saving_contracts" | "done" | "error";
+
 export function BaseOffImport({ onBack }: BaseOffImportProps) {
   const { user, profile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef(false);
+  
+  const [phase, setPhase] = useState<ImportPhase>("idle");
   const [isImporting, setIsImporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState("");
   const [result, setResult] = useState<ImportResult | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileInfo, setFileInfo] = useState<{ size: string; rows: number } | null>(null);
+  const [batchSizeOption, setBatchSizeOption] = useState<"small" | "medium" | "large">("medium");
+  
+  // Refs para processamento em streaming
+  const clientsBufferRef = useRef<Map<string, any>>(new Map());
+  const contractsBufferRef = useRef<Map<string, any[]>>(new Map());
+  const processedContractsRef = useRef<Set<string>>(new Set());
+  const headerMapRef = useRef<Record<number, string>>({});
+  const importResultRef = useRef<ImportResult>({
+    total: 0,
+    success: 0,
+    errors: 0,
+    duplicates: 0,
+    contractsDetected: 0,
+    contractsInserted: 0,
+    errorDetails: [],
+  });
+  const batchIdRef = useRef<string | null>(null);
 
   const parseDate = (dateValue: any): string | null => {
     if (!dateValue) return null;
     
-    // Se for número (Excel date serial)
     if (typeof dateValue === "number") {
       const date = XLSX.SSF.parse_date_code(dateValue);
       if (date) {
@@ -278,19 +291,16 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
     const dateStr = String(dateValue).trim();
     if (dateStr === "") return null;
 
-    // Formato DD/MM/YYYY
     const brMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (brMatch) {
       return `${brMatch[3]}-${brMatch[2].padStart(2, "0")}-${brMatch[1].padStart(2, "0")}`;
     }
 
-    // Formato YYYY-MM-DD
     const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (isoMatch) {
       return dateStr;
     }
 
-    // Formato YYYYMMDD
     const numMatch = dateStr.match(/^(\d{4})(\d{2})(\d{2})$/);
     if (numMatch) {
       return `${numMatch[1]}-${numMatch[2]}-${numMatch[3]}`;
@@ -314,91 +324,91 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
     return isNaN(num) ? null : num;
   };
 
-  // Função melhorada para CPF - preserva zeros à esquerda
   const cleanCPF = (cpfValue: any): string | null => {
     if (cpfValue === null || cpfValue === undefined) return null;
     
-    // Converter para string, tratando números
     let cpfStr = String(cpfValue);
-    
-    // Remover caracteres não numéricos
     const clean = cpfStr.replace(/\D/g, "");
     
     if (clean.length === 0) return null;
     
-    // Garantir que tem 11 dígitos, preenchendo com zeros à esquerda
     return clean.padStart(11, "0").slice(0, 11);
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const validExtensions = [".csv", ".xlsx", ".xls"];
-      const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
-      
-      if (!validExtensions.includes(fileExtension)) {
-        toast.error("Formato inválido. Use arquivos CSV ou XLSX.");
-        return;
-      }
-      
-      setSelectedFile(file);
-      setResult(null);
-    }
-  };
+    if (!file) return;
 
-  const readFileData = async (file: File): Promise<any[][]> => {
-    const extension = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
+    const validExtensions = [".csv", ".xlsx", ".xls"];
+    const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
     
-    if (extension === ".csv") {
-      const text = await file.text();
-      return parseCSV(text);
-    } else {
-      // XLSX ou XLS
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array", cellDates: true, raw: false });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      
-      // Converter para array com header
-      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, raw: false, defval: "" });
-      return jsonData as any[][];
+    if (!validExtensions.includes(fileExtension)) {
+      toast.error("Formato inválido. Use arquivos CSV ou XLSX.");
+      return;
     }
-  };
-
-  const parseCSV = (text: string): string[][] => {
-    const lines = text.split(/\r?\n/).filter((line) => line.trim());
-    const result: string[][] = [];
-
-    for (const line of lines) {
-      const row: string[] = [];
-      let current = "";
-      let inQuotes = false;
-
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if ((char === "," || char === ";") && !inQuotes) {
-          row.push(current.trim());
-          current = "";
-        } else {
-          current += char;
-        }
-      }
-      row.push(current.trim());
-      result.push(row);
+    
+    if (file.size > IMPORT_LIMITS.maxFileSize) {
+      toast.error(`Arquivo muito grande. Tamanho máximo: ${formatFileSize(IMPORT_LIMITS.maxFileSize)}`);
+      return;
     }
-
-    return result;
-  };
-
-  const processImport = async () => {
-    if (!selectedFile || !user?.id) return;
-
-    setIsImporting(true);
-    setProgress(0);
+    
+    setSelectedFile(file);
     setResult(null);
+    setPhase("idle");
+    setFileInfo({ size: formatFileSize(file.size), rows: 0 });
+    
+    // Resetar buffers
+    resetBuffers();
+    
+    // Estimar número de linhas
+    try {
+      setProgressText("Analisando arquivo...");
+      const extension = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
+      let estimatedRows = 0;
+      
+      if (extension === ".csv") {
+        const text = await file.text();
+        estimatedRows = text.split(/\r?\n/).filter(l => l.trim()).length - 1;
+      } else {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array", sheetRows: 1 });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const range = XLSX.utils.decode_range(firstSheet["!ref"] || "A1");
+        
+        // Re-read para contar linhas reais
+        const fullWorkbook = XLSX.read(buffer, { type: "array", sheetRows: 0 });
+        const fullSheet = fullWorkbook.Sheets[fullWorkbook.SheetNames[0]];
+        const fullRange = XLSX.utils.decode_range(fullSheet["!ref"] || "A1");
+        estimatedRows = fullRange.e.r;
+      }
+      
+      setFileInfo({ size: formatFileSize(file.size), rows: estimatedRows });
+      
+      if (estimatedRows > IMPORT_LIMITS.maxRows) {
+        toast.warning(`Arquivo com ${estimatedRows.toLocaleString()} linhas. Limite máximo: ${IMPORT_LIMITS.maxRows.toLocaleString()} linhas.`);
+      } else if (estimatedRows > IMPORT_LIMITS.recommendedRows) {
+        toast.info(`Arquivo grande (${estimatedRows.toLocaleString()} linhas). Recomendamos usar lote "Pequeno" para maior estabilidade.`);
+      }
+      
+      setProgressText("");
+    } catch (error) {
+      console.error("Erro ao analisar arquivo:", error);
+      setFileInfo({ size: formatFileSize(file.size), rows: 0 });
+    }
+  };
 
-    const importResult: ImportResult = {
+  const resetBuffers = () => {
+    clientsBufferRef.current.clear();
+    contractsBufferRef.current.clear();
+    processedContractsRef.current.clear();
+    headerMapRef.current = {};
+    importResultRef.current = {
       total: 0,
       success: 0,
       errors: 0,
@@ -407,9 +417,156 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
       contractsInserted: 0,
       errorDetails: [],
     };
+    batchIdRef.current = null;
+    abortRef.current = false;
+  };
+
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  const processRowData = (row: any[], headerMap: Record<number, string>, rowIndex: number) => {
+    const rowData: Record<string, any> = {};
+
+    Object.entries(headerMap).forEach(([idxStr, dbField]) => {
+      const idx = parseInt(idxStr);
+      if (row[idx] !== undefined && row[idx] !== null && String(row[idx]).trim() !== "") {
+        rowData[dbField] = row[idx];
+      }
+    });
+
+    const cpf = cleanCPF(rowData.cpf);
+    if (!cpf) {
+      importResultRef.current.errors++;
+      if (importResultRef.current.errorDetails.length < 100) {
+        importResultRef.current.errorDetails.push({
+          row: rowIndex + 2,
+          error: "CPF inválido ou ausente",
+        });
+      }
+      return;
+    }
+
+    const nb = String(rowData.nb || "").trim();
+    if (!nb) {
+      importResultRef.current.errors++;
+      if (importResultRef.current.errorDetails.length < 100) {
+        importResultRef.current.errorDetails.push({
+          row: rowIndex + 2,
+          error: "NB ausente",
+        });
+      }
+      return;
+    }
+
+    // Adiciona cliente se não existir no buffer
+    if (!clientsBufferRef.current.has(cpf)) {
+      clientsBufferRef.current.set(cpf, {
+        nb: nb,
+        cpf: cpf,
+        nome: rowData.nome || "Não informado",
+        data_nascimento: parseDate(rowData.data_nascimento),
+        sexo: rowData.sexo ? String(rowData.sexo) : null,
+        esp: rowData.esp ? String(rowData.esp) : null,
+        dib: parseDate(rowData.dib),
+        mr: parseNumber(rowData.mr),
+        banco_pagto: rowData.banco_pagto ? String(rowData.banco_pagto) : null,
+        agencia_pagto: rowData.agencia_pagto ? String(rowData.agencia_pagto) : null,
+        orgao_pagador: rowData.orgao_pagador ? String(rowData.orgao_pagador) : null,
+        conta_corrente: rowData.conta_corrente ? String(rowData.conta_corrente) : null,
+        meio_pagto: rowData.meio_pagto ? String(rowData.meio_pagto) : null,
+        status_beneficio: rowData.status_beneficio ? String(rowData.status_beneficio) : null,
+        bloqueio: rowData.bloqueio ? String(rowData.bloqueio) : null,
+        pensao_alimenticia: rowData.pensao_alimenticia ? String(rowData.pensao_alimenticia) : null,
+        representante: rowData.representante ? String(rowData.representante) : null,
+        ddb: parseDate(rowData.ddb),
+        banco_rmc: rowData.banco_rmc ? String(rowData.banco_rmc) : null,
+        valor_rmc: parseNumber(rowData.valor_rmc),
+        banco_rcc: rowData.banco_rcc ? String(rowData.banco_rcc) : null,
+        valor_rcc: parseNumber(rowData.valor_rcc),
+        bairro: rowData.bairro ? String(rowData.bairro) : null,
+        municipio: rowData.municipio ? String(rowData.municipio) : null,
+        uf: rowData.uf ? String(rowData.uf) : null,
+        cep: rowData.cep ? String(rowData.cep) : null,
+        endereco: rowData.endereco ? String(rowData.endereco) : null,
+        logr_tipo_1: rowData.logr_tipo_1 ? String(rowData.logr_tipo_1) : null,
+        logr_titulo_1: rowData.logr_titulo_1 ? String(rowData.logr_titulo_1) : null,
+        logr_nome_1: rowData.logr_nome_1 ? String(rowData.logr_nome_1) : null,
+        logr_numero_1: rowData.logr_numero_1 ? String(rowData.logr_numero_1) : null,
+        logr_complemento_1: rowData.logr_complemento_1 ? String(rowData.logr_complemento_1) : null,
+        bairro_1: rowData.bairro_1 ? String(rowData.bairro_1) : null,
+        cidade_1: rowData.cidade_1 ? String(rowData.cidade_1) : null,
+        uf_1: rowData.uf_1 ? String(rowData.uf_1) : null,
+        cep_1: rowData.cep_1 ? String(rowData.cep_1) : null,
+        tel_fixo_1: rowData.tel_fixo_1 ? String(rowData.tel_fixo_1) : null,
+        tel_fixo_2: rowData.tel_fixo_2 ? String(rowData.tel_fixo_2) : null,
+        tel_fixo_3: rowData.tel_fixo_3 ? String(rowData.tel_fixo_3) : null,
+        tel_cel_1: rowData.tel_cel_1 ? String(rowData.tel_cel_1) : null,
+        tel_cel_2: rowData.tel_cel_2 ? String(rowData.tel_cel_2) : null,
+        tel_cel_3: rowData.tel_cel_3 ? String(rowData.tel_cel_3) : null,
+        email_1: rowData.email_1 ? String(rowData.email_1) : null,
+        email_2: rowData.email_2 ? String(rowData.email_2) : null,
+        email_3: rowData.email_3 ? String(rowData.email_3) : null,
+        imported_by: user?.id,
+        import_batch_id: batchIdRef.current,
+      });
+    }
+
+    // Processa contrato se houver
+    const contrato = rowData.contrato ? String(rowData.contrato).trim() : null;
+    const bancoEmprestimo = rowData.banco_emprestimo ? String(rowData.banco_emprestimo).trim() : null;
+    
+    if (contrato && bancoEmprestimo) {
+      const contractKey = `${cpf}-${contrato}`;
+      
+      if (!processedContractsRef.current.has(contractKey)) {
+        processedContractsRef.current.add(contractKey);
+        
+        if (!contractsBufferRef.current.has(cpf)) {
+          contractsBufferRef.current.set(cpf, []);
+        }
+
+        contractsBufferRef.current.get(cpf)!.push({
+          cpf: cpf,
+          banco_emprestimo: bancoEmprestimo,
+          contrato: contrato,
+          vl_emprestimo: parseNumber(rowData.vl_emprestimo),
+          inicio_desconto: parseDate(rowData.inicio_desconto),
+          prazo: rowData.prazo ? parseInt(String(rowData.prazo)) : null,
+          vl_parcela: parseNumber(rowData.vl_parcela),
+          tipo_emprestimo: rowData.tipo_emprestimo ? String(rowData.tipo_emprestimo) : null,
+          data_averbacao: parseDate(rowData.data_averbacao),
+          situacao_emprestimo: rowData.situacao_emprestimo ? String(rowData.situacao_emprestimo) : null,
+          competencia: parseDate(rowData.competencia),
+          competencia_final: parseDate(rowData.competencia_final),
+          taxa: parseNumber(rowData.taxa),
+          saldo: parseNumber(rowData.saldo),
+        });
+      } else {
+        importResultRef.current.duplicates++;
+      }
+    }
+  };
+
+  const processImport = async () => {
+    if (!selectedFile || !user?.id) return;
+
+    if (fileInfo && fileInfo.rows > IMPORT_LIMITS.maxRows) {
+      toast.error(`Arquivo excede o limite de ${IMPORT_LIMITS.maxRows.toLocaleString()} linhas. Divida o arquivo em partes menores.`);
+      return;
+    }
+
+    setIsImporting(true);
+    setProgress(0);
+    setResult(null);
+    resetBuffers();
+
+    const chunkSize = IMPORT_LIMITS.chunkSize[batchSizeOption];
+    const dbBatchSize = IMPORT_LIMITS.dbBatchSize[batchSizeOption];
 
     try {
       // Criar lote de importação
+      setPhase("reading");
+      setProgressText("Criando lote de importação...");
+      
       const { data: batchData, error: batchError } = await supabase
         .from("baseoff_import_batches")
         .insert({
@@ -421,28 +578,100 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
         .single();
 
       if (batchError) throw batchError;
-      const batchId = batchData.id;
+      batchIdRef.current = batchData.id;
 
       // Ler arquivo
       setProgressText("Lendo arquivo...");
-      const rows = await readFileData(selectedFile);
+      const extension = selectedFile.name.toLowerCase().slice(selectedFile.name.lastIndexOf("."));
+      
+      let headers: string[] = [];
+      let dataRows: any[][] = [];
 
-      if (rows.length < 2) {
-        throw new Error("Arquivo vazio ou sem dados");
+      if (extension === ".csv") {
+        const text = await selectedFile.text();
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        
+        if (lines.length < 2) throw new Error("Arquivo vazio ou sem dados");
+        
+        // Parse header
+        headers = parseCSVLine(lines[0]);
+        
+        // Parse data em chunks
+        setPhase("processing");
+        for (let i = 1; i < lines.length; i += chunkSize) {
+          if (abortRef.current) break;
+          
+          const chunkEnd = Math.min(i + chunkSize, lines.length);
+          for (let j = i; j < chunkEnd; j++) {
+            dataRows.push(parseCSVLine(lines[j]));
+          }
+          
+          const percent = Math.round((i / lines.length) * 30);
+          setProgress(percent);
+          setProgressText(`Lendo CSV: ${i.toLocaleString()}/${(lines.length - 1).toLocaleString()} linhas`);
+          
+          await delay(0); // Yield to UI
+        }
+      } else {
+        // XLSX/XLS - ler em chunks
+        const buffer = await selectedFile.arrayBuffer();
+        setProgress(10);
+        
+        const workbook = XLSX.read(buffer, { 
+          type: "array", 
+          cellDates: true, 
+          raw: false 
+        });
+        
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const range = XLSX.utils.decode_range(firstSheet["!ref"] || "A1");
+        const totalRows = range.e.r;
+        
+        if (totalRows < 1) throw new Error("Arquivo vazio ou sem dados");
+
+        // Extract headers
+        const headerRow = XLSX.utils.sheet_to_json(firstSheet, { 
+          header: 1, 
+          raw: false, 
+          defval: "",
+          range: { s: { r: 0, c: 0 }, e: { r: 0, c: range.e.c } }
+        }) as any[][];
+        
+        headers = headerRow[0]?.map(h => String(h || "").trim()) || [];
+
+        // Extract data em chunks
+        setPhase("processing");
+        for (let startRow = 1; startRow <= totalRows; startRow += chunkSize) {
+          if (abortRef.current) break;
+          
+          const endRow = Math.min(startRow + chunkSize - 1, totalRows);
+          
+          const chunkData = XLSX.utils.sheet_to_json(firstSheet, {
+            header: 1,
+            raw: false,
+            defval: "",
+            range: { s: { r: startRow, c: 0 }, e: { r: endRow, c: range.e.c } }
+          }) as any[][];
+          
+          dataRows.push(...chunkData);
+          
+          const percent = 10 + Math.round((startRow / totalRows) * 20);
+          setProgress(percent);
+          setProgressText(`Lendo Excel: ${startRow.toLocaleString()}/${totalRows.toLocaleString()} linhas`);
+          
+          await delay(0);
+        }
       }
 
-      // Normalizar headers
-      const headers = rows[0].map((h) => 
+      // Normalizar headers e criar mapa
+      const normalizedHeaders = headers.map((h) => 
         String(h || "").toUpperCase().trim().replace(/[_\s]+/g, "").replace(/[^A-Z0-9]/g, "")
       );
       
-      // Criar mapa de índice para campo
       const headerToDbField: Record<number, string> = {};
-      headers.forEach((header, idx) => {
-        // Tentar encontrar correspondência exata
+      normalizedHeaders.forEach((header, idx) => {
         let dbField = COLUMN_MAP[header];
         
-        // Se não encontrou, tentar com variações
         if (!dbField) {
           const variations = Object.keys(COLUMN_MAP);
           for (const variation of variations) {
@@ -459,162 +688,41 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
         }
       });
 
-      // Log de debug para identificar colunas não mapeadas
-      const originalHeaders = rows[0].map((h) => String(h || "").trim());
-      const unmappedColumns = originalHeaders.filter((h, idx) => !headerToDbField[idx] && h.length > 0);
-      if (unmappedColumns.length > 0) {
-        console.log("Colunas não mapeadas do arquivo:", unmappedColumns);
-      }
+      headerMapRef.current = headerToDbField;
+      importResultRef.current.total = dataRows.length;
+
+      // Processar linhas em chunks
+      setProgressText(`Processando ${dataRows.length.toLocaleString()} registros...`);
       
-      // Verificar se colunas de contrato foram mapeadas
-      const mappedFields = Object.values(headerToDbField);
-      const hasContractColumns = mappedFields.includes("contrato") && mappedFields.includes("banco_emprestimo");
-      console.log("Colunas mapeadas:", mappedFields);
-      console.log("Colunas de contrato encontradas:", hasContractColumns);
-
-      const dataRows = rows.slice(1);
-      importResult.total = dataRows.length;
-
-      setProgressText(`Processando ${dataRows.length} registros...`);
-
-      // Agrupar por CPF para processar clientes e contratos
-      const clientsMap = new Map<string, any>();
-      const contractsMap = new Map<string, any[]>();
-      const processedContracts = new Set<string>(); // Para evitar duplicados
-
-      for (let i = 0; i < dataRows.length; i++) {
-        const row = dataRows[i];
-        const rowData: Record<string, any> = {};
-
-        // Mapear colunas usando o mapa de índices
-        Object.entries(headerToDbField).forEach(([idxStr, dbField]) => {
-          const idx = parseInt(idxStr);
-          if (row[idx] !== undefined && row[idx] !== null && String(row[idx]).trim() !== "") {
-            rowData[dbField] = row[idx];
-          }
-        });
-
-        const cpf = cleanCPF(rowData.cpf);
-        if (!cpf) {
-          importResult.errors++;
-          importResult.errorDetails.push({
-            row: i + 2,
-            error: "CPF inválido ou ausente",
-            data: rowData,
-          });
-          continue;
-        }
-
-        const nb = String(rowData.nb || "").trim();
-        if (!nb) {
-          importResult.errors++;
-          importResult.errorDetails.push({
-            row: i + 2,
-            error: "NB ausente",
-            data: rowData,
-          });
-          continue;
-        }
-
-        // Dados do cliente - só adiciona se ainda não existe
-        if (!clientsMap.has(cpf)) {
-          clientsMap.set(cpf, {
-            nb: nb,
-            cpf: cpf,
-            nome: rowData.nome || "Não informado",
-            data_nascimento: parseDate(rowData.data_nascimento),
-            sexo: rowData.sexo ? String(rowData.sexo) : null,
-            esp: rowData.esp ? String(rowData.esp) : null,
-            dib: parseDate(rowData.dib),
-            mr: parseNumber(rowData.mr),
-            banco_pagto: rowData.banco_pagto ? String(rowData.banco_pagto) : null,
-            agencia_pagto: rowData.agencia_pagto ? String(rowData.agencia_pagto) : null,
-            orgao_pagador: rowData.orgao_pagador ? String(rowData.orgao_pagador) : null,
-            conta_corrente: rowData.conta_corrente ? String(rowData.conta_corrente) : null,
-            meio_pagto: rowData.meio_pagto ? String(rowData.meio_pagto) : null,
-            status_beneficio: rowData.status_beneficio ? String(rowData.status_beneficio) : null,
-            bloqueio: rowData.bloqueio ? String(rowData.bloqueio) : null,
-            pensao_alimenticia: rowData.pensao_alimenticia ? String(rowData.pensao_alimenticia) : null,
-            representante: rowData.representante ? String(rowData.representante) : null,
-            ddb: parseDate(rowData.ddb),
-            banco_rmc: rowData.banco_rmc ? String(rowData.banco_rmc) : null,
-            valor_rmc: parseNumber(rowData.valor_rmc),
-            banco_rcc: rowData.banco_rcc ? String(rowData.banco_rcc) : null,
-            valor_rcc: parseNumber(rowData.valor_rcc),
-            bairro: rowData.bairro ? String(rowData.bairro) : null,
-            municipio: rowData.municipio ? String(rowData.municipio) : null,
-            uf: rowData.uf ? String(rowData.uf) : null,
-            cep: rowData.cep ? String(rowData.cep) : null,
-            endereco: rowData.endereco ? String(rowData.endereco) : null,
-            logr_tipo_1: rowData.logr_tipo_1 ? String(rowData.logr_tipo_1) : null,
-            logr_titulo_1: rowData.logr_titulo_1 ? String(rowData.logr_titulo_1) : null,
-            logr_nome_1: rowData.logr_nome_1 ? String(rowData.logr_nome_1) : null,
-            logr_numero_1: rowData.logr_numero_1 ? String(rowData.logr_numero_1) : null,
-            logr_complemento_1: rowData.logr_complemento_1 ? String(rowData.logr_complemento_1) : null,
-            bairro_1: rowData.bairro_1 ? String(rowData.bairro_1) : null,
-            cidade_1: rowData.cidade_1 ? String(rowData.cidade_1) : null,
-            uf_1: rowData.uf_1 ? String(rowData.uf_1) : null,
-            cep_1: rowData.cep_1 ? String(rowData.cep_1) : null,
-            tel_fixo_1: rowData.tel_fixo_1 ? String(rowData.tel_fixo_1) : null,
-            tel_fixo_2: rowData.tel_fixo_2 ? String(rowData.tel_fixo_2) : null,
-            tel_fixo_3: rowData.tel_fixo_3 ? String(rowData.tel_fixo_3) : null,
-            tel_cel_1: rowData.tel_cel_1 ? String(rowData.tel_cel_1) : null,
-            tel_cel_2: rowData.tel_cel_2 ? String(rowData.tel_cel_2) : null,
-            tel_cel_3: rowData.tel_cel_3 ? String(rowData.tel_cel_3) : null,
-            email_1: rowData.email_1 ? String(rowData.email_1) : null,
-            email_2: rowData.email_2 ? String(rowData.email_2) : null,
-            email_3: rowData.email_3 ? String(rowData.email_3) : null,
-            imported_by: user.id,
-            import_batch_id: batchId,
-          });
-        }
-
-        // Dados do contrato (se houver)
-        const contrato = rowData.contrato ? String(rowData.contrato).trim() : null;
-        const bancoEmprestimo = rowData.banco_emprestimo ? String(rowData.banco_emprestimo).trim() : null;
+      for (let i = 0; i < dataRows.length; i += chunkSize) {
+        if (abortRef.current) break;
         
-        if (contrato && bancoEmprestimo) {
-          const contractKey = `${cpf}-${contrato}`;
-          
-          // Verificar se já processamos este contrato (evitar duplicados)
-          if (!processedContracts.has(contractKey)) {
-            processedContracts.add(contractKey);
-            
-            if (!contractsMap.has(cpf)) {
-              contractsMap.set(cpf, []);
-            }
-
-            contractsMap.get(cpf)!.push({
-              cpf: cpf,
-              banco_emprestimo: bancoEmprestimo,
-              contrato: contrato,
-              vl_emprestimo: parseNumber(rowData.vl_emprestimo),
-              inicio_desconto: parseDate(rowData.inicio_desconto),
-              prazo: rowData.prazo ? parseInt(String(rowData.prazo)) : null,
-              vl_parcela: parseNumber(rowData.vl_parcela),
-              tipo_emprestimo: rowData.tipo_emprestimo ? String(rowData.tipo_emprestimo) : null,
-              data_averbacao: parseDate(rowData.data_averbacao),
-              situacao_emprestimo: rowData.situacao_emprestimo ? String(rowData.situacao_emprestimo) : null,
-              competencia: parseDate(rowData.competencia),
-              competencia_final: parseDate(rowData.competencia_final),
-              taxa: parseNumber(rowData.taxa),
-              saldo: parseNumber(rowData.saldo),
-            });
-          } else {
-            importResult.duplicates++;
-          }
+        const chunkEnd = Math.min(i + chunkSize, dataRows.length);
+        for (let j = i; j < chunkEnd; j++) {
+          processRowData(dataRows[j], headerToDbField, j);
         }
-
-        setProgress(Math.round(((i + 1) / dataRows.length) * 50));
+        
+        const percent = 30 + Math.round(((i + chunkSize) / dataRows.length) * 20);
+        setProgress(Math.min(percent, 50));
+        setProgressText(`Processando: ${Math.min(i + chunkSize, dataRows.length).toLocaleString()}/${dataRows.length.toLocaleString()} linhas`);
+        
+        await delay(0);
       }
 
-      // Inserir/Atualizar clientes em lotes
-      setProgressText("Salvando clientes...");
-      const clientsArray = Array.from(clientsMap.values());
-      const batchSize = 100;
+      // Liberar memória do dataRows
+      dataRows = [];
 
-      for (let i = 0; i < clientsArray.length; i += batchSize) {
-        const batch = clientsArray.slice(i, i + batchSize);
+      // Salvar clientes em lotes
+      setPhase("saving_clients");
+      setProgressText("Salvando clientes no banco de dados...");
+      
+      const clientsArray = Array.from(clientsBufferRef.current.values());
+      let savedClients = 0;
+
+      for (let i = 0; i < clientsArray.length; i += dbBatchSize) {
+        if (abortRef.current) break;
+        
+        const batch = clientsArray.slice(i, i + dbBatchSize);
 
         const { error } = await supabase.from("baseoff_clients").upsert(batch, {
           onConflict: "cpf",
@@ -623,83 +731,64 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
 
         if (error) {
           console.error("Erro ao inserir clientes:", error);
-          batch.forEach((client, idx) => {
-            importResult.errors++;
-            importResult.errorDetails.push({
-              row: i + idx + 2,
-              error: error.message,
-              data: client,
-            });
-          });
+          importResultRef.current.errors += batch.length;
         } else {
-          importResult.success += batch.length;
+          savedClients += batch.length;
+          importResultRef.current.success = savedClients;
         }
 
-        setProgress(50 + Math.round(((i + batchSize) / clientsArray.length) * 25));
+        const percent = 50 + Math.round((savedClients / clientsArray.length) * 20);
+        setProgress(percent);
+        setProgressText(`Salvando clientes: ${savedClients.toLocaleString()}/${clientsArray.length.toLocaleString()}`);
+        
+        // Pequeno delay para não sobrecarregar o banco
+        await delay(50);
       }
 
-      // Buscar IDs dos clientes inseridos (em lotes para evitar limite de query/URL)
+      // Buscar IDs dos clientes para vincular contratos
       setProgressText("Vinculando contratos...");
-      const cpfList = Array.from(clientsMap.keys());
+      const cpfList = Array.from(clientsBufferRef.current.keys());
       const cpfToIdMap = new Map<string, string>();
-      const cpfBatchSize = 1000;
 
-      for (let i = 0; i < cpfList.length; i += cpfBatchSize) {
-        const cpfBatch = cpfList.slice(i, i + cpfBatchSize);
+      for (let i = 0; i < cpfList.length; i += 1000) {
+        if (abortRef.current) break;
+        
+        const cpfBatch = cpfList.slice(i, i + 1000);
 
-        const { data: insertedClientsBatch, error: insertedClientsError } = await supabase
+        const { data: clientsBatch } = await supabase
           .from("baseoff_clients")
           .select("id, cpf")
           .in("cpf", cpfBatch)
-          .limit(cpfBatchSize);
+          .limit(1000);
 
-        if (insertedClientsError) {
-          console.error("Erro ao buscar IDs dos clientes:", insertedClientsError);
-          importResult.errors++;
-          importResult.errorDetails.push({
-            row: 0,
-            error: `Erro ao vincular contratos (buscar IDs de clientes): ${insertedClientsError.message}`,
-          });
-          continue;
-        }
-
-        insertedClientsBatch?.forEach((c) => cpfToIdMap.set(c.cpf, c.id));
-
-        // Progresso: 50 -> 75 durante vínculo
-        setProgress(50 + Math.round(((i + cpfBatch.length) / cpfList.length) * 25));
+        clientsBatch?.forEach((c) => cpfToIdMap.set(c.cpf, c.id));
+        
+        await delay(10);
       }
 
-      // Inserir contratos
+      // Preparar contratos com client_id
       const allContracts: any[] = [];
-      let cpfsSemId = 0;
-
-      contractsMap.forEach((contracts, cpf) => {
+      contractsBufferRef.current.forEach((contracts, cpf) => {
         const clientId = cpfToIdMap.get(cpf);
-        if (!clientId) {
-          cpfsSemId++;
-          return;
-        }
-
-        contracts.forEach((contract) => {
-          allContracts.push({
-            ...contract,
-            client_id: clientId,
+        if (clientId) {
+          contracts.forEach((contract) => {
+            allContracts.push({ ...contract, client_id: clientId });
           });
-        });
+        }
       });
 
-      if (cpfsSemId > 0) {
-        console.warn(`Não foi possível resolver o ID de ${cpfsSemId} CPFs para vínculo de contratos.`);
-      }
+      importResultRef.current.contractsDetected = allContracts.length;
 
-      // Atualizar contagem de contratos detectados
-      importResult.contractsDetected = allContracts.length;
-
+      // Salvar contratos em lotes
       if (allContracts.length > 0) {
-        setProgressText(`Salvando ${allContracts.length} contratos...`);
+        setPhase("saving_contracts");
+        setProgressText(`Salvando ${allContracts.length.toLocaleString()} contratos...`);
+        let savedContracts = 0;
 
-        for (let i = 0; i < allContracts.length; i += batchSize) {
-          const batch = allContracts.slice(i, i + batchSize);
+        for (let i = 0; i < allContracts.length; i += dbBatchSize) {
+          if (abortRef.current) break;
+          
+          const batch = allContracts.slice(i, i + dbBatchSize);
 
           const { error } = await supabase.from("baseoff_contracts").upsert(batch, {
             onConflict: "cpf,contrato",
@@ -708,38 +797,33 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
 
           if (error) {
             console.error("Erro ao inserir contratos:", error);
-            importResult.errors++;
-            importResult.errorDetails.push({
-              row: 0,
-              error: `Erro ao salvar contratos: ${error.message}`,
-            });
           } else {
-            importResult.contractsInserted += batch.length;
+            savedContracts += batch.length;
+            importResultRef.current.contractsInserted = savedContracts;
           }
 
-          setProgress(75 + Math.round(((i + batchSize) / allContracts.length) * 25));
+          const percent = 70 + Math.round((savedContracts / allContracts.length) * 25);
+          setProgress(percent);
+          setProgressText(`Salvando contratos: ${savedContracts.toLocaleString()}/${allContracts.length.toLocaleString()}`);
+          
+          await delay(50);
         }
-      } else {
-        // Log das colunas mapeadas para debug
-        console.log("Nenhum contrato detectado. Colunas mapeadas:", Object.values(headerToDbField));
-        console.log("Verificar se as colunas banco_emprestimo e contrato estão presentes");
       }
 
       // Atualizar lote de importação
       await supabase
         .from("baseoff_import_batches")
         .update({
-          status: "completed",
-          total_records: importResult.total,
-          success_count: importResult.success,
-          error_count: importResult.errors,
+          status: abortRef.current ? "cancelled" : "completed",
+          total_records: importResultRef.current.total,
+          success_count: importResultRef.current.success,
+          error_count: importResultRef.current.errors,
           completed_at: new Date().toISOString(),
         })
-        .eq("id", batchId);
+        .eq("id", batchIdRef.current);
 
-      // Registrar log de importação - buscar company_id correto (UUID)
+      // Registrar log de importação
       let companyId: string | null = null;
-      
       const { data: userCompany } = await supabase
         .from('user_companies')
         .select('company_id')
@@ -750,47 +834,44 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
 
       if (userCompany?.company_id) {
         companyId = userCompany.company_id;
-      } else if ((profile as any)?.company) {
-        const { data: company } = await supabase
-          .from('companies')
-          .select('id')
-          .ilike('name', (profile as any).company)
-          .limit(1)
-          .single();
-        
-        companyId = company?.id || null;
       }
       
       await supabase.from('import_logs').insert({
         module: 'baseoff_clients',
         file_name: selectedFile.name,
-        total_records: importResult.total,
-        success_count: importResult.success,
-        error_count: importResult.errors,
-        duplicate_count: importResult.duplicates,
-        status: 'completed',
+        total_records: importResultRef.current.total,
+        success_count: importResultRef.current.success,
+        error_count: importResultRef.current.errors,
+        duplicate_count: importResultRef.current.duplicates,
+        status: abortRef.current ? 'cancelled' : 'completed',
         imported_by: user.id,
         company_id: companyId,
       });
 
       setProgress(100);
+      setPhase("done");
       setProgressText("Importação concluída!");
-      setResult(importResult);
-      toast.success(
-        `Importação concluída! ${importResult.success} clientes e ${importResult.contractsInserted} contratos processados.`
-      );
+      setResult({ ...importResultRef.current });
+      
+      if (abortRef.current) {
+        toast.warning("Importação cancelada pelo usuário.");
+      } else {
+        toast.success(
+          `Importação concluída! ${importResultRef.current.success.toLocaleString()} clientes e ${importResultRef.current.contractsInserted.toLocaleString()} contratos processados.`
+        );
+      }
     } catch (error: any) {
       console.error("Erro na importação:", error);
+      setPhase("error");
       toast.error(`Erro na importação: ${error.message}`);
-      importResult.errors++;
-      importResult.errorDetails.push({
+      importResultRef.current.errors++;
+      importResultRef.current.errorDetails.push({
         row: 0,
         error: error.message,
       });
+      setResult({ ...importResultRef.current });
       
-      // Registrar log de erro - buscar company_id correto (UUID)
-      let errorCompanyId: string | null = null;
-      
+      // Registrar log de erro
       if (user?.id) {
         const { data: userCompanyErr } = await supabase
           .from('user_companies')
@@ -799,179 +880,350 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
           .eq('is_active', true)
           .limit(1)
           .single();
-
-        if (userCompanyErr?.company_id) {
-          errorCompanyId = userCompanyErr.company_id;
-        } else if ((profile as any)?.company) {
-          const { data: companyErr } = await supabase
-            .from('companies')
-            .select('id')
-            .ilike('name', (profile as any).company)
-            .limit(1)
-            .single();
-          
-          errorCompanyId = companyErr?.id || null;
-        }
+        
+        await supabase.from('import_logs').insert({
+          module: 'baseoff_clients',
+          file_name: selectedFile.name,
+          total_records: importResultRef.current.total,
+          success_count: importResultRef.current.success,
+          error_count: importResultRef.current.errors,
+          duplicate_count: importResultRef.current.duplicates,
+          status: 'error',
+          imported_by: user.id,
+          company_id: userCompanyErr?.company_id || null,
+          error_message: error.message,
+        });
       }
-      
-      await supabase.from('import_logs').insert({
-        module: 'baseoff_clients',
-        file_name: selectedFile?.name || 'unknown',
-        total_records: importResult.total,
-        success_count: importResult.success,
-        error_count: importResult.errors,
-        duplicate_count: importResult.duplicates,
-        status: 'failed',
-        imported_by: user?.id || '',
-        company_id: errorCompanyId,
-        error_details: { message: error.message },
-      });
-      
-      setResult(importResult);
+
+      if (batchIdRef.current) {
+        await supabase
+          .from("baseoff_import_batches")
+          .update({
+            status: "error",
+            error_count: importResultRef.current.errors,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", batchIdRef.current);
+      }
     } finally {
       setIsImporting(false);
     }
   };
 
+  const parseCSVLine = (line: string): string[] => {
+    const row: string[] = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if ((char === "," || char === ";") && !inQuotes) {
+        row.push(current.trim());
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+    row.push(current.trim());
+    return row;
+  };
+
+  const handleAbort = () => {
+    abortRef.current = true;
+    toast.info("Cancelando importação...");
+  };
+
+  const getPhaseLabel = () => {
+    switch (phase) {
+      case "reading": return "Lendo arquivo";
+      case "processing": return "Processando dados";
+      case "saving_clients": return "Salvando clientes";
+      case "saving_contracts": return "Salvando contratos";
+      case "done": return "Concluído";
+      case "error": return "Erro";
+      default: return "Aguardando";
+    }
+  };
+
   return (
-    <div className="p-4 space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Voltar
+        <Button variant="ghost" size="icon" onClick={onBack}>
+          <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Upload className="h-6 w-6 text-primary" />
-            Importação de Base OFF
-          </h1>
+          <h2 className="text-xl font-bold">Importar Base Off</h2>
           <p className="text-sm text-muted-foreground">
-            Importe dados de clientes e contratos via arquivo CSV ou XLSX
+            Importe arquivos CSV ou XLSX com dados de clientes e contratos
           </p>
         </div>
       </div>
 
-      {/* Upload Area */}
+      {/* Limites e Configurações */}
+      <Card className="border-blue-200 bg-blue-50/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base text-blue-800">
+            <Settings className="h-4 w-4" />
+            Limites e Configurações
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="space-y-1">
+              <p className="text-muted-foreground">Tamanho máximo</p>
+              <p className="font-medium">{formatFileSize(IMPORT_LIMITS.maxFileSize)}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-muted-foreground">Linhas máximas</p>
+              <p className="font-medium">{IMPORT_LIMITS.maxRows.toLocaleString()}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-muted-foreground">Recomendado</p>
+              <p className="font-medium">{IMPORT_LIMITS.recommendedRows.toLocaleString()} linhas</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-muted-foreground">Formatos aceitos</p>
+              <p className="font-medium">CSV, XLSX, XLS</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end pt-2 border-t">
+            <div className="space-y-2 flex-1">
+              <Label htmlFor="batchSize">Tamanho do lote (para arquivos grandes)</Label>
+              <Select value={batchSizeOption} onValueChange={(v: any) => setBatchSizeOption(v)}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="small">
+                    <div className="flex items-center gap-2">
+                      <Database className="h-4 w-4" />
+                      Pequeno (mais estável)
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="medium">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4" />
+                      Médio (recomendado)
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="large">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4" />
+                      Grande (mais rápido)
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Para arquivos acima de 50 mil linhas, use o tamanho "Pequeno" para evitar erros de memória.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Upload de Arquivo */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Selecionar Arquivo</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Selecionar Arquivo
+          </CardTitle>
+          <CardDescription>
+            Selecione um arquivo CSV ou Excel com os dados da base
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
-              selectedFile
-                ? "border-primary/50 bg-primary/5"
-                : "border-muted-foreground/25 hover:border-primary/50"
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              selectedFile ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
             }`}
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => !isImporting && fileInputRef.current?.click()}
           >
             <input
               ref={fileInputRef}
               type="file"
               accept=".csv,.xlsx,.xls"
-              onChange={handleFileSelect}
               className="hidden"
+              onChange={handleFileSelect}
+              disabled={isImporting}
             />
-            <FileSpreadsheet className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+            
             {selectedFile ? (
-              <div>
-                <p className="font-medium text-foreground">{selectedFile.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                </p>
-                <Button variant="link" className="mt-2">
-                  Trocar arquivo
-                </Button>
+              <div className="space-y-2">
+                <FileSpreadsheet className="h-12 w-12 mx-auto text-primary" />
+                <p className="font-medium">{selectedFile.name}</p>
+                {fileInfo && (
+                  <div className="flex gap-4 justify-center text-sm text-muted-foreground">
+                    <span>Tamanho: {fileInfo.size}</span>
+                    {fileInfo.rows > 0 && (
+                      <span>Linhas: {fileInfo.rows.toLocaleString()}</span>
+                    )}
+                  </div>
+                )}
+                {!isImporting && (
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setFileInfo(null); }}>
+                    Remover
+                  </Button>
+                )}
               </div>
             ) : (
-              <div>
-                <p className="font-medium">Clique para selecionar um arquivo</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Formatos aceitos: CSV, XLSX, XLS
+              <div className="space-y-2">
+                <Upload className="h-12 w-12 mx-auto text-muted-foreground" />
+                <p className="text-muted-foreground">
+                  Clique para selecionar ou arraste um arquivo
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  CSV, XLSX ou XLS (máx. {formatFileSize(IMPORT_LIMITS.maxFileSize)})
                 </p>
               </div>
             )}
           </div>
 
-          {selectedFile && !isImporting && !result && (
-            <Button onClick={processImport} className="w-full">
-              <Upload className="h-4 w-4 mr-2" />
-              Iniciar Importação
-            </Button>
+          {/* Avisos do arquivo */}
+          {fileInfo && fileInfo.rows > IMPORT_LIMITS.recommendedRows && (
+            <Alert variant={fileInfo.rows > IMPORT_LIMITS.maxRows ? "destructive" : "default"}>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>
+                {fileInfo.rows > IMPORT_LIMITS.maxRows ? "Arquivo muito grande" : "Arquivo grande detectado"}
+              </AlertTitle>
+              <AlertDescription>
+                {fileInfo.rows > IMPORT_LIMITS.maxRows ? (
+                  <>
+                    Este arquivo tem {fileInfo.rows.toLocaleString()} linhas, excedendo o limite de {IMPORT_LIMITS.maxRows.toLocaleString()}.
+                    Por favor, divida o arquivo em partes menores.
+                  </>
+                ) : (
+                  <>
+                    Este arquivo tem {fileInfo.rows.toLocaleString()} linhas. 
+                    Recomendamos usar o tamanho de lote "Pequeno" para maior estabilidade.
+                  </>
+                )}
+              </AlertDescription>
+            </Alert>
           )}
 
-          {isImporting && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span>{progressText}</span>
-                <span>{progress}%</span>
-              </div>
-              <Progress value={progress} />
-            </div>
-          )}
+          {/* Botões de ação */}
+          <div className="flex gap-2">
+            <Button
+              onClick={processImport}
+              disabled={!selectedFile || isImporting || (fileInfo && fileInfo.rows > IMPORT_LIMITS.maxRows)}
+              className="flex-1"
+            >
+              {isImporting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Importando...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Iniciar Importação
+                </>
+              )}
+            </Button>
+            
+            {isImporting && (
+              <Button variant="destructive" onClick={handleAbort}>
+                Cancelar
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 
-      {/* Results */}
-      {result && (
+      {/* Progresso */}
+      {isImporting && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              {result.errors === 0 ? (
-                <CheckCircle className="h-5 w-5 text-success" />
+            <CardTitle className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Processando Importação
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between text-sm">
+              <Badge variant="outline">{getPhaseLabel()}</Badge>
+              <span className="font-medium">{progress}%</span>
+            </div>
+            <Progress value={progress} className="h-3" />
+            <p className="text-sm text-muted-foreground text-center">{progressText}</p>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-primary">{importResultRef.current.total.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Total</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-green-600">{importResultRef.current.success.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Clientes salvos</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-blue-600">{importResultRef.current.contractsInserted.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Contratos salvos</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-red-600">{importResultRef.current.errors.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Erros</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Resultado */}
+      {result && !isImporting && (
+        <Card className={result.errors > 0 ? "border-yellow-200" : "border-green-200"}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {result.errors > 0 ? (
+                <AlertTriangle className="h-5 w-5 text-yellow-500" />
               ) : (
-                <AlertTriangle className="h-5 w-5 text-warning" />
+                <CheckCircle className="h-5 w-5 text-green-500" />
               )}
               Resultado da Importação
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center p-4 bg-muted/50 rounded-lg">
-                <p className="text-2xl font-bold">{result.total}</p>
-                <p className="text-sm text-muted-foreground">Total de Linhas</p>
+                <p className="text-3xl font-bold">{result.total.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground">Total de linhas</p>
               </div>
-              <div className="text-center p-4 bg-success/10 rounded-lg">
-                <p className="text-2xl font-bold text-success">{result.success}</p>
-                <p className="text-sm text-muted-foreground">Clientes Importados</p>
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <p className="text-3xl font-bold text-green-600">{result.success.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground">Clientes importados</p>
               </div>
-              <div className="text-center p-4 bg-primary/10 rounded-lg">
-                <p className="text-2xl font-bold text-primary">{result.contractsDetected}</p>
-                <p className="text-sm text-muted-foreground">Contratos Detectados</p>
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <p className="text-3xl font-bold text-blue-600">{result.contractsInserted.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground">Contratos importados</p>
               </div>
-              <div className="text-center p-4 bg-success/10 rounded-lg">
-                <p className="text-2xl font-bold text-success">{result.contractsInserted}</p>
-                <p className="text-sm text-muted-foreground">Contratos Salvos</p>
-              </div>
-              <div className="text-center p-4 bg-destructive/10 rounded-lg">
-                <p className="text-2xl font-bold text-destructive">{result.errors}</p>
+              <div className="text-center p-4 bg-red-50 rounded-lg">
+                <p className="text-3xl font-bold text-red-600">{result.errors.toLocaleString()}</p>
                 <p className="text-sm text-muted-foreground">Erros</p>
-              </div>
-              <div className="text-center p-4 bg-warning/10 rounded-lg">
-                <p className="text-2xl font-bold text-warning">{result.duplicates}</p>
-                <p className="text-sm text-muted-foreground">Contratos Duplicados</p>
               </div>
             </div>
 
-            {result.contractsDetected === 0 && result.success > 0 && (
-              <Alert variant="destructive">
+            {result.duplicates > 0 && (
+              <Alert>
                 <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Nenhum contrato detectado</AlertTitle>
                 <AlertDescription>
-                  Verifique se o arquivo contém as colunas de contrato (BANCO_EMPRESTIMO, CONTRATO, TIPO_EMPRESTIMO, etc.). 
-                  Os contratos tipo 98 (empréstimos) precisam dessas colunas para serem importados.
+                  {result.duplicates.toLocaleString()} contratos duplicados foram ignorados.
                 </AlertDescription>
               </Alert>
             )}
 
             {result.errorDetails.length > 0 && (
-              <div>
-                <h4 className="font-medium mb-2">Detalhes dos Erros</h4>
-                <ScrollArea className="h-48 border rounded-lg">
+              <div className="space-y-2">
+                <h4 className="font-medium">Detalhes dos erros (primeiros 100):</h4>
+                <ScrollArea className="h-40 border rounded-md">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Linha</TableHead>
+                        <TableHead className="w-20">Linha</TableHead>
                         <TableHead>Erro</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -979,7 +1231,7 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
                       {result.errorDetails.slice(0, 100).map((err, idx) => (
                         <TableRow key={idx}>
                           <TableCell>{err.row}</TableCell>
-                          <TableCell className="text-destructive">{err.error}</TableCell>
+                          <TableCell className="text-red-600">{err.error}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -989,63 +1241,14 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
             )}
 
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSelectedFile(null);
-                  setResult(null);
-                  setProgress(0);
-                }}
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
+              <Button variant="outline" onClick={() => { setResult(null); setSelectedFile(null); setFileInfo(null); }}>
+                <RefreshCw className="mr-2 h-4 w-4" />
                 Nova Importação
-              </Button>
-              <Button variant="outline" onClick={onBack}>
-                Voltar para Consulta
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
-
-      {/* Instructions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Instruções</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <Alert>
-            <FileSpreadsheet className="h-4 w-4" />
-            <AlertTitle>Formatos Aceitos</AlertTitle>
-            <AlertDescription>
-              O arquivo pode estar no formato CSV, XLSX ou XLS. CPFs com zeros à esquerda
-              serão preservados corretamente.
-            </AlertDescription>
-          </Alert>
-
-          <div>
-            <h4 className="font-medium mb-2">Colunas obrigatórias:</h4>
-            <div className="flex flex-wrap gap-1">
-              <Badge variant="outline">NB</Badge>
-              <Badge variant="outline">CPF</Badge>
-              <Badge variant="outline">NOME</Badge>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="font-medium mb-2">Regras de importação:</h4>
-            <ul className="list-disc list-inside text-muted-foreground space-y-1">
-              <li>CPFs duplicados serão atualizados com os novos dados</li>
-              <li>Contratos com mesmo CPF e número serão atualizados</li>
-              <li>Contratos duplicados no mesmo arquivo são ignorados</li>
-              <li>Um cliente pode ter múltiplos contratos</li>
-              <li>Datas devem estar no formato DD/MM/YYYY ou YYYY-MM-DD</li>
-              <li>Valores numéricos podem usar vírgula ou ponto como separador decimal</li>
-              <li>CPFs com zeros à esquerda são tratados corretamente</li>
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
