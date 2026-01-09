@@ -1,4 +1,4 @@
-import { Users, PhoneCall, FileText, CheckCircle, XCircle, DollarSign, TrendingUp } from "lucide-react";
+import { Users, PhoneCall, FileText, CheckCircle, XCircle, DollarSign, TrendingUp, Zap, FolderOpen, FileCheck } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ReportSummary } from "./types";
 
@@ -22,6 +22,13 @@ export function SummaryCards({ summary, isLoading }: SummaryCardsProps) {
       icon: PhoneCall,
       color: "text-purple-600",
       bgColor: "bg-purple-100",
+    },
+    {
+      title: "Leads Ativados",
+      value: summary.activatedLeads,
+      icon: Zap,
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-100",
     },
     {
       title: "Propostas Criadas",
@@ -66,12 +73,26 @@ export function SummaryCards({ summary, isLoading }: SummaryCardsProps) {
       bgColor: "bg-indigo-100",
       isMonetary: true,
     },
+    {
+      title: "Documentos Salvos",
+      value: summary.documentsSaved,
+      icon: FolderOpen,
+      color: "text-cyan-600",
+      bgColor: "bg-cyan-100",
+    },
+    {
+      title: "Propostas Geradas",
+      value: summary.savedProposals,
+      icon: FileCheck,
+      color: "text-pink-600",
+      bgColor: "bg-pink-100",
+    },
   ];
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
-        {Array.from({ length: 7 }).map((_, i) => (
+      <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-5 gap-4 mb-6">
+        {Array.from({ length: 10 }).map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardContent className="p-4">
               <div className="h-4 bg-muted rounded w-20 mb-2" />
@@ -84,7 +105,7 @@ export function SummaryCards({ summary, isLoading }: SummaryCardsProps) {
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+    <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-5 gap-4 mb-6">
       {cards.map((card, index) => {
         const Icon = card.icon;
         return (
@@ -96,7 +117,7 @@ export function SummaryCards({ summary, isLoading }: SummaryCardsProps) {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mb-1">{card.title}</p>
-              <p className={`text-lg font-bold ${card.isMonetary ? 'text-foreground' : 'text-foreground'}`}>
+              <p className="text-lg font-bold text-foreground">
                 {card.value}
               </p>
             </CardContent>
