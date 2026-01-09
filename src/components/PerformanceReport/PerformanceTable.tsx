@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
+import { Eye, ArrowUpDown, ChevronUp, ChevronDown, Target, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -59,12 +59,12 @@ export function PerformanceTable({ data, isLoading, onViewDetails }: Performance
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) {
-      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+      return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />;
     }
     return sortOrder === "asc" ? (
-      <ChevronUp className="h-4 w-4 ml-1" />
+      <ChevronUp className="h-3 w-3 ml-1" />
     ) : (
-      <ChevronDown className="h-4 w-4 ml-1" />
+      <ChevronDown className="h-3 w-3 ml-1" />
     );
   };
 
@@ -72,25 +72,27 @@ export function PerformanceTable({ data, isLoading, onViewDetails }: Performance
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(value);
   };
 
   const getConversionBadgeColor = (rate: number) => {
-    if (rate >= 50) return "bg-green-100 text-green-800";
-    if (rate >= 30) return "bg-yellow-100 text-yellow-800";
-    return "bg-red-100 text-red-800";
+    if (rate >= 50) return "bg-green-100 text-green-800 border-green-200";
+    if (rate >= 30) return "bg-yellow-100 text-yellow-800 border-yellow-200";
+    return "bg-red-100 text-red-800 border-red-200";
   };
 
   if (isLoading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Relatório por Colaborador</CardTitle>
+          <CardTitle>Desempenho por Colaborador</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-12 bg-muted rounded animate-pulse" />
+              <div key={i} className="h-14 bg-muted rounded-lg animate-pulse" />
             ))}
           </div>
         </CardContent>
@@ -99,48 +101,58 @@ export function PerformanceTable({ data, isLoading, onViewDetails }: Performance
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          Relatório por Colaborador
-          <Badge variant="secondary">{data.length} colaboradores</Badge>
-        </CardTitle>
+    <Card className="border shadow-sm">
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg font-semibold">
+            Desempenho por Colaborador
+          </CardTitle>
+          <Badge variant="secondary" className="text-xs">
+            {data.length} colaboradores
+          </Badge>
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>
+              <TableRow className="bg-muted/50 hover:bg-muted/50">
+                <TableHead className="font-semibold">
                   <button
-                    className="flex items-center hover:text-foreground"
+                    className="flex items-center hover:text-foreground text-xs"
                     onClick={() => handleSort("userName")}
                   >
-                    Nome
+                    Colaborador
                     <SortIcon field="userName" />
                   </button>
                 </TableHead>
-                <TableHead className="text-center">
+                
+                {/* Seção de Leads */}
+                <TableHead className="text-center bg-purple-50/50">
                   <button
-                    className="flex items-center justify-center hover:text-foreground w-full"
-                    onClick={() => handleSort("totalLeads")}
+                    className="flex items-center justify-center hover:text-foreground w-full text-xs"
+                    onClick={() => handleSort("premiumLeads")}
                   >
-                    Leads
-                    <SortIcon field="totalLeads" />
+                    <Target className="h-3 w-3 mr-1 text-purple-600" />
+                    Premium
+                    <SortIcon field="premiumLeads" />
                   </button>
                 </TableHead>
-                <TableHead className="text-center">
+                <TableHead className="text-center bg-yellow-50/50">
                   <button
-                    className="flex items-center justify-center hover:text-foreground w-full"
+                    className="flex items-center justify-center hover:text-foreground w-full text-xs"
                     onClick={() => handleSort("activatedLeads")}
                   >
+                    <Zap className="h-3 w-3 mr-1 text-yellow-600" />
                     Ativados
                     <SortIcon field="activatedLeads" />
                   </button>
                 </TableHead>
+
+                {/* Seção de Propostas */}
                 <TableHead className="text-center">
                   <button
-                    className="flex items-center justify-center hover:text-foreground w-full"
+                    className="flex items-center justify-center hover:text-foreground w-full text-xs"
                     onClick={() => handleSort("proposalsCreated")}
                   >
                     Criadas
@@ -149,7 +161,7 @@ export function PerformanceTable({ data, isLoading, onViewDetails }: Performance
                 </TableHead>
                 <TableHead className="text-center">
                   <button
-                    className="flex items-center justify-center hover:text-foreground w-full"
+                    className="flex items-center justify-center hover:text-foreground w-full text-xs"
                     onClick={() => handleSort("proposalsPaid")}
                   >
                     Pagas
@@ -158,7 +170,7 @@ export function PerformanceTable({ data, isLoading, onViewDetails }: Performance
                 </TableHead>
                 <TableHead className="text-center">
                   <button
-                    className="flex items-center justify-center hover:text-foreground w-full"
+                    className="flex items-center justify-center hover:text-foreground w-full text-xs"
                     onClick={() => handleSort("proposalsCancelled")}
                   >
                     Cancel.
@@ -167,16 +179,18 @@ export function PerformanceTable({ data, isLoading, onViewDetails }: Performance
                 </TableHead>
                 <TableHead className="text-center">
                   <button
-                    className="flex items-center justify-center hover:text-foreground w-full"
+                    className="flex items-center justify-center hover:text-foreground w-full text-xs"
                     onClick={() => handleSort("conversionRate")}
                   >
                     Conv.
                     <SortIcon field="conversionRate" />
                   </button>
                 </TableHead>
+
+                {/* Valores */}
                 <TableHead className="text-right">
                   <button
-                    className="flex items-center justify-end hover:text-foreground w-full"
+                    className="flex items-center justify-end hover:text-foreground w-full text-xs"
                     onClick={() => handleSort("totalSold")}
                   >
                     Vendido
@@ -185,90 +199,113 @@ export function PerformanceTable({ data, isLoading, onViewDetails }: Performance
                 </TableHead>
                 <TableHead className="text-right">
                   <button
-                    className="flex items-center justify-end hover:text-foreground w-full"
+                    className="flex items-center justify-end hover:text-foreground w-full text-xs"
                     onClick={() => handleSort("commissionGenerated")}
                   >
                     Comissão
                     <SortIcon field="commissionGenerated" />
                   </button>
                 </TableHead>
+
+                {/* Outros */}
                 <TableHead className="text-center">
                   <button
-                    className="flex items-center justify-center hover:text-foreground w-full"
+                    className="flex items-center justify-center hover:text-foreground w-full text-xs"
                     onClick={() => handleSort("documentsSaved")}
                   >
                     Docs
                     <SortIcon field="documentsSaved" />
                   </button>
                 </TableHead>
-                <TableHead className="text-center">
-                  <button
-                    className="flex items-center justify-center hover:text-foreground w-full"
-                    onClick={() => handleSort("savedProposals")}
-                  >
-                    Props.
-                    <SortIcon field="savedProposals" />
-                  </button>
-                </TableHead>
-                <TableHead className="text-center">Última Ativ.</TableHead>
-                <TableHead className="text-center">Ações</TableHead>
+                <TableHead className="text-center text-xs">Última Ativ.</TableHead>
+                <TableHead className="text-center text-xs">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={13} className="text-center py-8">
-                    <p className="text-muted-foreground">
-                      Nenhum dado encontrado para o período selecionado
-                    </p>
+                  <TableCell colSpan={12} className="text-center py-12">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="p-3 bg-muted rounded-full">
+                        <Eye className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <p className="text-muted-foreground font-medium">
+                        Nenhum dado encontrado
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Ajuste os filtros para ver resultados
+                      </p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
-                sortedData.map((user) => (
-                  <TableRow key={user.userId} className="hover:bg-muted/50">
-                    <TableCell className="font-medium">{user.userName}</TableCell>
-                    <TableCell className="text-center">{user.totalLeads}</TableCell>
-                    <TableCell className="text-center">
-                      <span className="text-yellow-600 font-medium">
+                sortedData.map((user, index) => (
+                  <TableRow 
+                    key={user.userId} 
+                    className={`hover:bg-muted/30 ${index % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}
+                  >
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                          {user.userName.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="truncate max-w-[120px]">{user.userName}</span>
+                      </div>
+                    </TableCell>
+                    
+                    {/* Leads Premium */}
+                    <TableCell className="text-center bg-purple-50/30">
+                      <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-1 rounded-full bg-purple-100 text-purple-700 font-semibold text-sm">
+                        {user.premiumLeads}
+                      </span>
+                    </TableCell>
+                    
+                    {/* Leads Ativados */}
+                    <TableCell className="text-center bg-yellow-50/30">
+                      <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 font-semibold text-sm">
                         {user.activatedLeads}
                       </span>
                     </TableCell>
-                    <TableCell className="text-center">{user.proposalsCreated}</TableCell>
+
                     <TableCell className="text-center">
-                      <span className="text-green-600 font-medium">
+                      <span className="font-medium">{user.proposalsCreated}</span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className="text-green-600 font-semibold">
                         {user.proposalsPaid}
                       </span>
                     </TableCell>
                     <TableCell className="text-center">
-                      <span className="text-red-600 font-medium">
+                      <span className="text-red-500 font-medium">
                         {user.proposalsCancelled}
                       </span>
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge
-                        variant="secondary"
-                        className={getConversionBadgeColor(user.conversionRate)}
+                        variant="outline"
+                        className={`text-xs font-semibold ${getConversionBadgeColor(user.conversionRate)}`}
                       >
-                        {user.conversionRate.toFixed(1)}%
+                        {user.conversionRate.toFixed(0)}%
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatCurrency(user.totalSold)}
+
+                    <TableCell className="text-right">
+                      <span className="font-semibold text-emerald-600">
+                        {formatCurrency(user.totalSold)}
+                      </span>
                     </TableCell>
-                    <TableCell className="text-right font-medium text-green-600">
-                      {formatCurrency(user.commissionGenerated)}
+                    <TableCell className="text-right">
+                      <span className="font-medium text-violet-600">
+                        {formatCurrency(user.commissionGenerated)}
+                      </span>
                     </TableCell>
+
                     <TableCell className="text-center">
                       <span className="text-cyan-600 font-medium">
                         {user.documentsSaved}
                       </span>
                     </TableCell>
-                    <TableCell className="text-center">
-                      <span className="text-pink-600 font-medium">
-                        {user.savedProposals}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-center text-sm text-muted-foreground">
+                    <TableCell className="text-center text-xs text-muted-foreground">
                       {user.lastActivity
                         ? format(new Date(user.lastActivity), "dd/MM HH:mm", {
                             locale: ptBR,
@@ -279,6 +316,7 @@ export function PerformanceTable({ data, isLoading, onViewDetails }: Performance
                       <Button
                         variant="ghost"
                         size="sm"
+                        className="h-8 w-8 p-0"
                         onClick={() => onViewDetails(user.userId, user.userName)}
                       >
                         <Eye className="h-4 w-4" />

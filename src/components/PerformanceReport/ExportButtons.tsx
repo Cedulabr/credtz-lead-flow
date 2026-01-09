@@ -41,7 +41,8 @@ export function ExportButtons({ data, summary, startDate, endDate }: ExportButto
       // Summary sheet
       const summaryData = [
         { Métrica: "Colaboradores Ativos", Valor: summary.totalActiveUsers },
-        { Métrica: "Leads Trabalhados", Valor: summary.totalLeadsWorked },
+        { Métrica: "Leads Premium", Valor: summary.premiumLeadsWorked },
+        { Métrica: "Leads Ativados", Valor: summary.activatedLeadsWorked },
         { Métrica: "Propostas Criadas", Valor: summary.totalProposalsCreated },
         { Métrica: "Propostas Pagas", Valor: summary.proposalsPaid },
         { Métrica: "Propostas Canceladas", Valor: summary.proposalsCancelled },
@@ -52,7 +53,8 @@ export function ExportButtons({ data, summary, startDate, endDate }: ExportButto
       // Performance sheet
       const performanceData = data.map((user) => ({
         Colaborador: user.userName,
-        "Leads Atendidos": user.totalLeads,
+        "Leads Premium": user.premiumLeads,
+        "Leads Ativados": user.activatedLeads,
         "Propostas Criadas": user.proposalsCreated,
         "Propostas Pagas": user.proposalsPaid,
         "Propostas Canceladas": user.proposalsCancelled,
@@ -84,7 +86,8 @@ export function ExportButtons({ data, summary, startDate, endDate }: ExportButto
     try {
       const headers = [
         "Colaborador",
-        "Leads Atendidos",
+        "Leads Premium",
+        "Leads Ativados",
         "Propostas Criadas",
         "Propostas Pagas",
         "Propostas Canceladas",
@@ -97,7 +100,8 @@ export function ExportButtons({ data, summary, startDate, endDate }: ExportButto
       const rows = data.map((user) =>
         [
           `"${user.userName}"`,
-          user.totalLeads,
+          user.premiumLeads,
+          user.activatedLeads,
           user.proposalsCreated,
           user.proposalsPaid,
           user.proposalsCancelled,
@@ -152,12 +156,13 @@ export function ExportButtons({ data, summary, startDate, endDate }: ExportButto
       doc.setFontSize(10);
       const summaryY = 48;
       doc.text(`Colaboradores Ativos: ${summary.totalActiveUsers}`, 14, summaryY);
-      doc.text(`Leads Trabalhados: ${summary.totalLeadsWorked}`, 14, summaryY + 6);
-      doc.text(`Propostas Criadas: ${summary.totalProposalsCreated}`, 14, summaryY + 12);
-      doc.text(`Propostas Pagas: ${summary.proposalsPaid}`, 100, summaryY);
-      doc.text(`Propostas Canceladas: ${summary.proposalsCancelled}`, 100, summaryY + 6);
-      doc.text(`Valor Total Vendido: ${formatCurrency(summary.totalSoldValue)}`, 100, summaryY + 12);
-      doc.text(`Comissões Geradas: ${formatCurrency(summary.totalCommissions)}`, 14, summaryY + 18);
+      doc.text(`Leads Premium: ${summary.premiumLeadsWorked}`, 14, summaryY + 6);
+      doc.text(`Leads Ativados: ${summary.activatedLeadsWorked}`, 14, summaryY + 12);
+      doc.text(`Propostas Criadas: ${summary.totalProposalsCreated}`, 100, summaryY);
+      doc.text(`Propostas Pagas: ${summary.proposalsPaid}`, 100, summaryY + 6);
+      doc.text(`Propostas Canceladas: ${summary.proposalsCancelled}`, 100, summaryY + 12);
+      doc.text(`Valor Total Vendido: ${formatCurrency(summary.totalSoldValue)}`, 14, summaryY + 18);
+      doc.text(`Comissões Geradas: ${formatCurrency(summary.totalCommissions)}`, 100, summaryY + 18);
 
       // Performance table
       doc.setFontSize(14);
@@ -167,8 +172,8 @@ export function ExportButtons({ data, summary, startDate, endDate }: ExportButto
       let tableY = 88;
       
       // Table headers
-      const headers = ["Nome", "Leads", "Criadas", "Pagas", "Conv.%", "Valor", "Comissão"];
-      const colWidths = [50, 15, 18, 15, 15, 35, 35];
+      const headers = ["Nome", "Premium", "Ativados", "Criadas", "Pagas", "Conv.%", "Valor", "Comissão"];
+      const colWidths = [40, 18, 18, 18, 15, 15, 30, 30];
       let xPos = 14;
       
       doc.setFont("helvetica", "bold");
@@ -179,7 +184,7 @@ export function ExportButtons({ data, summary, startDate, endDate }: ExportButto
 
       // Table rows
       doc.setFont("helvetica", "normal");
-      data.forEach((user, index) => {
+      data.forEach((user) => {
         tableY += 7;
         if (tableY > 270) {
           doc.addPage();
@@ -188,8 +193,9 @@ export function ExportButtons({ data, summary, startDate, endDate }: ExportButto
 
         xPos = 14;
         const rowData = [
-          user.userName.substring(0, 20),
-          user.totalLeads.toString(),
+          user.userName.substring(0, 18),
+          user.premiumLeads.toString(),
+          user.activatedLeads.toString(),
           user.proposalsCreated.toString(),
           user.proposalsPaid.toString(),
           `${user.conversionRate.toFixed(1)}%`,
