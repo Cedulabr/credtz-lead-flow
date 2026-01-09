@@ -48,20 +48,29 @@ interface BaseOffImportProps {
   onBack: () => void;
 }
 
-// Limites de importação
+// Limites de importação - Suporte para arquivos grandes até 400MB
 const IMPORT_LIMITS = {
-  maxFileSize: 100 * 1024 * 1024, // 100MB
-  maxRows: 200000, // 200k linhas
-  recommendedRows: 50000, // 50k linhas recomendado
+  maxFileSize: 400 * 1024 * 1024, // 400MB - Limite máximo
+  maxRows: 500000, // 500k linhas
+  recommendedRows: 100000, // 100k linhas recomendado
+  warningRows: 200000, // Alerta a partir de 200k
+  // Tamanhos de chunk para leitura do arquivo (linhas por vez)
   chunkSize: {
-    small: 100,
-    medium: 250,
-    large: 500,
+    small: 500, // Mais estável, menos memória
+    medium: 1000, // Balanceado
+    large: 2000, // Mais rápido, mais memória
   },
+  // Tamanhos de lote para envio ao banco de dados
   dbBatchSize: {
-    small: 50,
-    medium: 100,
-    large: 200,
+    small: 25, // Ultra seguro - para arquivos muito grandes
+    medium: 50, // Recomendado para arquivos grandes
+    large: 100, // Para arquivos menores
+  },
+  // Delay entre lotes para evitar sobrecarga
+  batchDelay: {
+    small: 100, // ms entre lotes
+    medium: 50,
+    large: 10,
   }
 };
 
@@ -366,40 +375,73 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
     // Resetar buffers
     resetBuffers();
     
-    // Estimar número de linhas
+    // Estimar número de linhas - para arquivos grandes, usar estimativa por tamanho
     try {
       setProgressText("Analisando arquivo...");
       const extension = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
       let estimatedRows = 0;
       
+      // Para arquivos maiores que 50MB, estimar por tamanho ao invés de ler todo
+      const isLargeFile = file.size > 50 * 1024 * 1024;
+      
       if (extension === ".csv") {
-        const text = await file.text();
-        estimatedRows = text.split(/\r?\n/).filter(l => l.trim()).length - 1;
+        if (isLargeFile) {
+          // Estimar: ~100 bytes por linha em média para CSV
+          estimatedRows = Math.round(file.size / 100);
+        } else {
+          const text = await file.text();
+          estimatedRows = text.split(/\r?\n/).filter(l => l.trim()).length - 1;
+        }
       } else {
-        const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: "array", sheetRows: 1 });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const range = XLSX.utils.decode_range(firstSheet["!ref"] || "A1");
-        
-        // Re-read para contar linhas reais
-        const fullWorkbook = XLSX.read(buffer, { type: "array", sheetRows: 0 });
-        const fullSheet = fullWorkbook.Sheets[fullWorkbook.SheetNames[0]];
-        const fullRange = XLSX.utils.decode_range(fullSheet["!ref"] || "A1");
-        estimatedRows = fullRange.e.r;
+        if (isLargeFile) {
+          // Estimar: ~150 bytes por linha em média para XLSX
+          estimatedRows = Math.round(file.size / 150);
+        } else {
+          const buffer = await file.arrayBuffer();
+          const workbook = XLSX.read(buffer, { type: "array", sheetRows: 1 });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          
+          // Re-read para contar linhas reais
+          const fullWorkbook = XLSX.read(buffer, { type: "array", sheetRows: 0 });
+          const fullSheet = fullWorkbook.Sheets[fullWorkbook.SheetNames[0]];
+          const fullRange = XLSX.utils.decode_range(fullSheet["!ref"] || "A1");
+          estimatedRows = fullRange.e.r;
+        }
       }
       
       setFileInfo({ size: formatFileSize(file.size), rows: estimatedRows });
       
-      if (estimatedRows > IMPORT_LIMITS.maxRows) {
-        toast.warning(`Arquivo com ${estimatedRows.toLocaleString()} linhas. Limite máximo: ${IMPORT_LIMITS.maxRows.toLocaleString()} linhas.`);
+      // Configurar automaticamente tamanho de lote para arquivos muito grandes
+      if (estimatedRows > IMPORT_LIMITS.warningRows) {
+        setBatchSizeOption("small");
+        toast.warning(
+          `Arquivo muito grande (~${estimatedRows.toLocaleString()} linhas). Lote "Ultra Seguro" selecionado automaticamente.`,
+          { duration: 5000 }
+        );
       } else if (estimatedRows > IMPORT_LIMITS.recommendedRows) {
-        toast.info(`Arquivo grande (${estimatedRows.toLocaleString()} linhas). Recomendamos usar lote "Pequeno" para maior estabilidade.`);
+        setBatchSizeOption("small");
+        toast.info(
+          `Arquivo grande (~${estimatedRows.toLocaleString()} linhas). Lote "Pequeno" recomendado.`,
+          { duration: 4000 }
+        );
+      } else if (estimatedRows > IMPORT_LIMITS.maxRows) {
+        toast.error(
+          `Arquivo excede o limite de ${IMPORT_LIMITS.maxRows.toLocaleString()} linhas. Por favor, divida o arquivo.`
+        );
+        setSelectedFile(null);
+        return;
       }
       
       setProgressText("");
     } catch (error) {
       console.error("Erro ao analisar arquivo:", error);
-      setFileInfo({ size: formatFileSize(file.size), rows: 0 });
+      // Estimar por tamanho em caso de erro
+      const estimatedRows = Math.round(file.size / 120);
+      setFileInfo({ size: formatFileSize(file.size), rows: estimatedRows });
+      
+      if (estimatedRows > IMPORT_LIMITS.warningRows) {
+        setBatchSizeOption("small");
+      }
     }
   };
 
@@ -741,8 +783,8 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
         setProgress(percent);
         setProgressText(`Salvando clientes: ${savedClients.toLocaleString()}/${clientsArray.length.toLocaleString()}`);
         
-        // Pequeno delay para não sobrecarregar o banco
-        await delay(50);
+        // Delay configurável para não sobrecarregar o banco
+        await delay(IMPORT_LIMITS.batchDelay[batchSizeOption]);
       }
 
       // Buscar IDs dos clientes para vincular contratos
@@ -806,7 +848,7 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
           setProgress(percent);
           setProgressText(`Salvando contratos: ${savedContracts.toLocaleString()}/${allContracts.length.toLocaleString()}`);
           
-          await delay(50);
+          await delay(IMPORT_LIMITS.batchDelay[batchSizeOption]);
         }
       }
 
@@ -956,10 +998,25 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
         <div>
           <h2 className="text-xl font-bold">Importar Base Off</h2>
           <p className="text-sm text-muted-foreground">
-            Importe arquivos CSV ou XLSX com dados de clientes e contratos
+            Importe arquivos CSV ou XLSX de até 400MB com dados de clientes e contratos
           </p>
         </div>
       </div>
+
+      {/* Alerta para arquivos grandes */}
+      <Alert className="border-amber-200 bg-amber-50/50">
+        <AlertTriangle className="h-4 w-4 text-amber-600" />
+        <AlertTitle className="text-amber-800">Importação de Arquivos Grandes</AlertTitle>
+        <AlertDescription className="text-amber-700 text-sm space-y-1">
+          <p>Para arquivos acima de 100MB ou 150 mil linhas:</p>
+          <ul className="list-disc ml-4 space-y-0.5">
+            <li>Selecione o modo <strong>"Ultra Seguro"</strong> antes de iniciar</li>
+            <li>O processo pode levar de 5 a 30 minutos dependendo do tamanho</li>
+            <li>Não feche a janela durante a importação</li>
+            <li>Os dados são enviados em pequenos lotes para evitar sobrecarga</li>
+          </ul>
+        </AlertDescription>
+      </Alert>
 
       {/* Limites e Configurações */}
       <Card className="border-blue-200 bg-blue-50/50">
@@ -1000,27 +1057,29 @@ export function BaseOffImport({ onBack }: BaseOffImportProps) {
                   <SelectItem value="small">
                     <div className="flex items-center gap-2">
                       <Database className="h-4 w-4" />
-                      Pequeno (mais estável)
+                      Ultra Seguro (arquivos 200k+ linhas)
                     </div>
                   </SelectItem>
                   <SelectItem value="medium">
                     <div className="flex items-center gap-2">
-                      <Zap className="h-4 w-4" />
-                      Médio (recomendado)
+                      <Database className="h-4 w-4" />
+                      Pequeno (arquivos 50k-200k linhas)
                     </div>
                   </SelectItem>
                   <SelectItem value="large">
                     <div className="flex items-center gap-2">
                       <Zap className="h-4 w-4" />
-                      Grande (mais rápido)
+                      Rápido (arquivos até 50k linhas)
                     </div>
                   </SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Para arquivos acima de 50 mil linhas, use o tamanho "Pequeno" para evitar erros de memória.
-            </p>
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p><strong>Ultra Seguro:</strong> Lotes de {IMPORT_LIMITS.dbBatchSize.small} registros - ideal para arquivos de 200k+ linhas ou 400MB</p>
+              <p><strong>Pequeno:</strong> Lotes de {IMPORT_LIMITS.dbBatchSize.medium} registros - para arquivos de 50k a 200k linhas</p>
+              <p><strong>Rápido:</strong> Lotes de {IMPORT_LIMITS.dbBatchSize.large} registros - para arquivos menores</p>
+            </div>
           </div>
         </CardContent>
       </Card>
