@@ -37,7 +37,9 @@ import {
   ChevronRight,
   Filter,
   XCircle,
-  Eye
+  Eye,
+  Zap,
+  UserPlus
 } from "lucide-react";
 import {
   BarChart,
@@ -51,15 +53,10 @@ import {
   Pie,
   Cell,
   Legend,
-  LineChart,
-  Line,
   AreaChart,
-  Area,
-  FunnelChart,
-  Funnel,
-  LabelList
+  Area
 } from "recharts";
-import { format, startOfMonth, endOfMonth, isBefore, isAfter, addDays, subMonths, eachDayOfInterval, startOfWeek, endOfWeek } from "date-fns";
+import { format, startOfMonth, endOfMonth, isBefore, isAfter, addDays, subMonths, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { parseDateSafe } from "@/lib/date";
 
@@ -101,8 +98,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const { unreadCount: televendasUnreadCount } = useTelevendasNotifications();
   const { unreadCount: userDataUnreadCount } = useUserDataNotifications();
   
-  // Total unread count for notifications badge
   const totalNotificationsCount = televendasUnreadCount + userDataUnreadCount;
+  
   // Period and filters
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
@@ -143,10 +140,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     totalPayable: number;
   }>({ overdue: [], dueSoon: [], totalOverdue: 0, totalDueSoon: 0, totalPayable: 0 });
   
-  // Leads
+  // Leads - SEPARADOS
   const [leadsStats, setLeadsStats] = useState({
     premium: 0,
-    worked: 0,
+    premiumWorked: 0,
+    activated: 0,
+    activatedWorked: 0,
     conversionRate: 0,
     activeClients: 0,
     newClients: 0
@@ -182,13 +181,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         setIsGestor(gestorCompanies.length > 0);
         setUserCompanyIds((data || []).map(uc => uc.company_id));
         
-        // Get unique companies
         const uniqueCompanies = (data || [])
           .filter(uc => uc.companies)
           .map(uc => ({ id: uc.company_id, name: (uc.companies as any).name }));
         setCompanies(uniqueCompanies);
         
-        // If admin, fetch all companies
         if (isAdmin) {
           const { data: allCompanies } = await supabase
             .from('companies')
@@ -224,7 +221,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const getCompanyFilter = () => {
     if (selectedCompany !== 'all') return [selectedCompany];
-    if (isAdmin) return null; // No filter for admin when "all" is selected
+    if (isAdmin) return null;
     return userCompanyIds.length > 0 ? userCompanyIds : null;
   };
 
@@ -247,72 +244,46 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     }
   };
 
-  // Função para calcular valor baseado na regra de comissão flexível
   const calculateSaleValue = (sale: any, commissionRules: any[], companyId?: string | null) => {
     const tipoOperacao = sale.tipo_operacao?.toLowerCase()?.trim() || '';
     const bancoNome = sale.banco?.toLowerCase()?.trim() || '';
     
-    // Buscar regra aplicável: priorizar regra específica da empresa, depois regra global
-    // 1. Primeiro busca regra específica da empresa + banco + produto
-    // 2. Depois busca regra global (company_id = null) + banco + produto
     const applicableRule = commissionRules.find(rule => {
       const ruleBank = rule.bank_name?.toLowerCase()?.trim() || '';
       const ruleProduct = rule.product_name?.toLowerCase()?.trim() || '';
       
-      // Match exato do banco
       const bankMatch = ruleBank === bancoNome;
-      
-      // Match do produto (Portabilidade, Novo, Refinanciamento, etc.)
       const productMatch = ruleProduct === tipoOperacao || 
                           ruleProduct.includes(tipoOperacao) || 
                           tipoOperacao.includes(ruleProduct);
       
-      // Verificar empresa (específica ou global)
       const isCompanyRule = rule.company_id === companyId && companyId;
       const isGlobalRule = !rule.company_id;
       
       return bankMatch && productMatch && (isCompanyRule || isGlobalRule);
     }) || commissionRules.find(rule => {
-      // Fallback: buscar apenas pelo banco se não encontrou pelo produto
       const ruleBank = rule.bank_name?.toLowerCase()?.trim() || '';
       return ruleBank === bancoNome;
     });
     
-    // Se houver regra flexível, usar o modelo de cálculo configurado
     if (applicableRule) {
       const calculationModel = applicableRule.calculation_model?.toLowerCase()?.trim();
       
-      console.log(`[Dashboard] Regra encontrada para ${sale.banco} - ${sale.tipo_operacao}:`, {
-        ruleId: applicableRule.id,
-        calculationModel,
-        bankName: applicableRule.bank_name,
-        productName: applicableRule.product_name
-      });
-      
       if (calculationModel === 'saldo_devedor') {
-        // Banrisul e outros: apenas saldo devedor
         return sale.saldo_devedor || 0;
       } else if (calculationModel === 'valor_bruto' || calculationModel === 'bruto') {
-        // Valor bruto = saldo devedor + troco
         return (sale.saldo_devedor || 0) + (sale.troco || 0);
       } else if (calculationModel === 'troco') {
-        // Apenas troco
         return sale.troco || 0;
       } else if (calculationModel === 'ambos') {
-        // Para modelo "ambos", calcular conforme configurado
         return (sale.saldo_devedor || 0) + (sale.troco || 0);
       }
     }
     
-    // Regra padrão por tipo de operação (quando não há regra cadastrada)
-    console.log(`[Dashboard] Nenhuma regra encontrada para ${sale.banco} - ${sale.tipo_operacao}, usando padrão`);
-    
     if (tipoOperacao === 'portabilidade') {
-      // Portabilidade: considera saldo devedor por padrão
       return sale.saldo_devedor || 0;
     }
     
-    // Para outros tipos (Novo, Refinanciamento, Cartão), usar a parcela
     return sale.parcela || 0;
   };
 
@@ -321,7 +292,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       const { startDate, endDate, previousStart, previousEnd } = getDateRange();
       const companyFilter = getCompanyFilter();
       
-      // Buscar regras de comissão flexíveis
       let rulesQuery = supabase
         .from('commission_rules')
         .select('*')
@@ -334,13 +304,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       const { data: commissionRules } = await rulesQuery;
       const rules = commissionRules || [];
       
-      // Formatar datas para comparação com data_venda (data de competência)
       const startDateStr = format(startDate, 'yyyy-MM-dd');
       const endDateStr = format(endDate, 'yyyy-MM-dd');
       const prevStartStr = format(previousStart, 'yyyy-MM-dd');
       const prevEndStr = format(previousEnd, 'yyyy-MM-dd');
       
-      // Current period sales - usando data_venda (data de competência)
       let salesQuery = supabase
         .from('televendas')
         .select('*')
@@ -355,10 +323,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       
       const { data: salesData } = await salesQuery;
       
-      // Apenas propostas PAGAS vão para o dashboard
       const paidSales = salesData?.filter(s => s.status === 'pago') || [];
       
-      // Calcular valor total respeitando as regras de comissão flexíveis
       const totalValue = paidSales.reduce((sum, sale) => {
         return sum + calculateSaleValue(sale, rules, sale.company_id);
       }, 0);
@@ -367,7 +333,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       setTotalRevenue(totalValue);
       setAverageTicket(paidSales.length > 0 ? totalValue / paidSales.length : 0);
       
-      // Previous period sales - usando data_venda (data de competência)
       let prevQuery = supabase
         .from('televendas')
         .select('*')
@@ -387,7 +352,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       }, 0);
       setPreviousRevenue(prevTotalValue);
       
-      // Daily sales for chart - usando data_venda (data de competência)
       const daysInMonth = eachDayOfInterval({ start: startDate, end: endDate });
       const dailyData = daysInMonth.map(day => {
         const dayStr = format(day, 'yyyy-MM-dd');
@@ -401,7 +365,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       });
       setDailySalesData(dailyData);
       
-      // Product stats - usando valores calculados
       const productMap = new Map<string, { value: number; count: number }>();
       paidSales.forEach(sale => {
         const product = sale.tipo_operacao || 'Outros';
@@ -427,11 +390,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       const { startDate, endDate } = getDateRange();
       const companyFilter = getCompanyFilter();
       
-      // Formatar datas para comparação com proposal_date (data de competência)
       const startDateStr = format(startDate, 'yyyy-MM-dd');
       const endDateStr = format(endDate, 'yyyy-MM-dd');
       
-      // Usar proposal_date (data de competência) ao invés de created_at
       let query = supabase
         .from('commissions')
         .select('*')
@@ -453,7 +414,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       setCommissionsPreview(positiveCommissions.filter(c => c.status === 'preview').reduce((sum, c) => sum + Number(c.commission_amount), 0));
       setCommissionsPaid(positiveCommissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + Number(c.commission_amount), 0));
       
-      // Get user names for commissions table
       if (commissions.length > 0) {
         const userIds = [...new Set(commissions.map(c => c.user_id))];
         const { data: profiles } = await supabase
@@ -527,24 +487,39 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       const { startDate, endDate } = getDateRange();
       const companyFilter = getCompanyFilter();
       
-      // Leads indicados
-      let leadsQuery = supabase
-        .from('leads_indicados')
+      // Leads Premium (tabela leads)
+      let premiumQuery = supabase
+        .from('leads')
         .select('*')
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
       
       if (!isAdmin && !isGestor) {
-        leadsQuery = leadsQuery.eq('created_by', user?.id);
+        premiumQuery = premiumQuery.eq('assigned_to', user?.id);
       } else if (companyFilter) {
-        leadsQuery = leadsQuery.in('company_id', companyFilter);
+        premiumQuery = premiumQuery.in('company_id', companyFilter);
       }
       
-      const { data: leadsData } = await leadsQuery;
+      const { data: premiumData } = await premiumQuery;
+      const premiumLeads = premiumData || [];
+      const premiumWorked = premiumLeads.filter(l => l.status && l.status !== 'novo').length;
       
-      const leads = leadsData || [];
-      const worked = leads.filter(l => l.status !== 'lead_digitado').length;
-      const converted = leads.filter(l => l.status === 'cliente_fechado').length;
+      // Activate Leads (tabela activate_leads)
+      let activateQuery = supabase
+        .from('activate_leads')
+        .select('*')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
+      
+      if (!isAdmin && !isGestor) {
+        activateQuery = activateQuery.eq('assigned_to', user?.id);
+      } else if (companyFilter) {
+        activateQuery = activateQuery.in('company_id', companyFilter);
+      }
+      
+      const { data: activateData } = await activateQuery;
+      const activateLeads = activateData || [];
+      const activatedWorked = activateLeads.filter(l => l.status && l.status !== 'novo').length;
       
       // Active clients (from propostas)
       let propostasQuery = supabase
@@ -558,12 +533,19 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         propostasQuery = propostasQuery.in('company_id', companyFilter);
       }
       
-      const { data: activeData, count } = await propostasQuery;
+      const { data: activeData } = await propostasQuery;
+      
+      // Conversões
+      const totalLeads = premiumLeads.length + activateLeads.length;
+      const converted = premiumLeads.filter(l => l.status === 'convertido' || l.status === 'fechado').length +
+                       activateLeads.filter(l => l.status === 'convertido' || l.status === 'fechado').length;
       
       setLeadsStats({
-        premium: leads.length,
-        worked,
-        conversionRate: leads.length > 0 ? (converted / leads.length) * 100 : 0,
+        premium: premiumLeads.length,
+        premiumWorked,
+        activated: activateLeads.length,
+        activatedWorked,
+        conversionRate: totalLeads > 0 ? (converted / totalLeads) * 100 : 0,
         activeClients: activeData?.length || 0,
         newClients: converted
       });
@@ -617,7 +599,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       const { startDate, endDate } = getDateRange();
       const companyFilter = getCompanyFilter();
       
-      // Buscar regras de comissão flexíveis para calcular corretamente
       let rulesQuery = supabase
         .from('commission_rules')
         .select('*')
@@ -630,7 +611,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       const { data: commissionRules } = await rulesQuery;
       const rules = commissionRules || [];
       
-      // Get users
       let usersQuery = supabase.from('profiles').select('id, name, email');
       
       if (!isAdmin && companyFilter) {
@@ -648,7 +628,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       
       const { data: profiles } = await usersQuery;
       
-      // Get sales with all fields needed for flexible rule calculation
       let salesQuery = supabase
         .from('televendas')
         .select('user_id, parcela, status, tipo_operacao, banco, saldo_devedor, troco, company_id')
@@ -661,7 +640,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       
       const { data: allSales } = await salesQuery;
       
-      // Get commissions
       let commissionsQuery = supabase
         .from('commissions')
         .select('user_id, commission_amount')
@@ -674,7 +652,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       
       const { data: allCommissions } = await commissionsQuery;
       
-      // Build vendor stats
       const vendorMap = new Map<string, VendorStats>();
       
       profiles?.forEach(p => {
@@ -688,13 +665,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         });
       });
       
-      // Calcular valor usando as regras flexíveis
       allSales?.forEach(sale => {
         if (sale.status === 'pago' && sale.user_id) {
           const vendor = vendorMap.get(sale.user_id);
           if (vendor) {
             vendor.totalSales++;
-            // Usar a função calculateSaleValue que respeita as regras flexíveis
             vendor.totalValue += calculateSaleValue(sale, rules, sale.company_id);
           }
         }
@@ -723,7 +698,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const fetchAlerts = async () => {
     const alertsList: {type: string; message: string; action: string; count?: number}[] = [];
     
-    // Finance alerts
     if (financeAlerts.overdue.length > 0) {
       alertsList.push({
         type: 'error',
@@ -743,7 +717,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     }
     
     setAlerts(alertsList);
-    // Inclui notificações de televendas no contador
     setNotificationsCount(alertsList.length + televendasUnreadCount);
   };
 
@@ -759,18 +732,25 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
+  const formatCompactCurrency = (value: number) => {
+    if (value >= 1000000) {
+      return `R$ ${(value / 1000000).toFixed(1)}M`;
+    } else if (value >= 1000) {
+      return `R$ ${(value / 1000).toFixed(1)}K`;
+    }
+    return formatCurrency(value);
+  };
+
   const CHART_COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--destructive))', 'hsl(var(--secondary))'];
 
-  // Generate month options - incluindo dezembro de 2025
   const monthOptions = useMemo(() => {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
     const months = [];
     
-    // Começar em dezembro de 2025
     const startYear = 2025;
-    const startMonth = 11; // Dezembro (0-indexed)
+    const startMonth = 11;
     
     for (let y = startYear; y <= currentYear; y++) {
       const mStart = (y === startYear) ? startMonth : 0;
@@ -788,29 +768,28 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background w-full max-w-full overflow-x-hidden">
-      {/* Top Bar - Hidden on mobile since we have the Navigation header */}
-      <div className="hidden md:block sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 w-full max-w-full overflow-x-hidden">
+      {/* Top Bar Desktop */}
+      <div className="hidden md:block sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-4">
             {config?.logo_url ? (
-              <img src={config.logo_url} alt={companyName} className="h-8 w-auto" />
+              <img src={config.logo_url} alt={companyName} className="h-10 w-auto" />
             ) : (
-              <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
-                <Building2 className="h-5 w-5 text-primary-foreground" />
+              <div className="h-10 w-10 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-lg">
+                <Building2 className="h-6 w-6 text-primary-foreground" />
               </div>
             )}
             <div>
-              <h1 className="font-bold text-foreground">{companyName}</h1>
-              <p className="text-xs text-muted-foreground">Olá, {userName}</p>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">{companyName}</h1>
+              <p className="text-sm text-muted-foreground">Olá, {userName} 👋</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
-            {/* Filters */}
+          <div className="flex items-center gap-3">
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-36 h-9 text-xs">
-                <Calendar className="h-3 w-3 mr-1" />
+              <SelectTrigger className="w-44 h-10 bg-muted/50 border-border/50">
+                <Calendar className="h-4 w-4 mr-2 text-primary" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -822,12 +801,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             
             {(isAdmin || companies.length > 1) && (
               <Select value={selectedCompany} onValueChange={setSelectedCompany}>
-                <SelectTrigger className="w-32 h-9 text-xs">
-                  <Building2 className="h-3 w-3 mr-1" />
+                <SelectTrigger className="w-40 h-10 bg-muted/50 border-border/50">
+                  <Building2 className="h-4 w-4 mr-2 text-primary" />
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="all">Todas Empresas</SelectItem>
                   {companies.map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
@@ -835,79 +814,65 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </Select>
             )}
             
-            {/* Refresh */}
             <Button 
               variant="outline" 
               size="icon" 
-              className="h-9 w-9"
+              className="h-10 w-10 bg-muted/50 border-border/50"
               onClick={() => fetchAllData()}
               disabled={isRefreshing}
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
             
-            {/* Notifications */}
             <Button 
               variant="outline" 
               size="icon" 
-              className="h-9 w-9 relative"
+              className="h-10 w-10 relative bg-muted/50 border-border/50"
               onClick={() => onNavigate('notifications')}
             >
               <Bell className="h-4 w-4" />
               {notificationsCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 h-5 w-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center font-medium animate-pulse">
                   {notificationsCount}
                 </span>
               )}
             </Button>
           </div>
         </div>
-        
-        {/* Quick Stats Bar */}
-        <div className="grid grid-cols-2 md:grid-cols-4 px-4 py-2 bg-muted/30 border-t gap-2">
-          <div className="flex items-center gap-1.5">
-            <TrendingUp className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-            <span className="text-xs text-muted-foreground hidden sm:inline">Vendas:</span>
-            <span className="text-xs font-bold">{totalSales}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <DollarSign className="h-3.5 w-3.5 text-success flex-shrink-0" />
-            <span className="text-xs font-bold text-success truncate">{formatCurrency(totalRevenue)}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <CreditCard className="h-3.5 w-3.5 text-warning flex-shrink-0" />
-            <span className="text-xs font-bold truncate">{formatCurrency(totalCommissions)}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            {revenueChange >= 0 ? (
-              <TrendingUp className="h-3.5 w-3.5 text-success flex-shrink-0" />
-            ) : (
-              <TrendingDown className="h-3.5 w-3.5 text-destructive flex-shrink-0" />
-            )}
-            <span className={`text-xs font-bold ${revenueChange >= 0 ? 'text-success' : 'text-destructive'}`}>
-              {revenueChange >= 0 ? '+' : ''}{revenueChange.toFixed(1)}%
-            </span>
-          </div>
-        </div>
       </div>
 
-      {/* Mobile Header with filters */}
-      <div className="md:hidden px-3 py-2 bg-background border-b">
-        <div className="flex items-center gap-2 mb-2">
-          <p className="text-sm text-muted-foreground flex-1">Olá, <span className="font-medium text-foreground">{userName}</span></p>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8"
-            onClick={() => fetchAllData()}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </Button>
+      {/* Mobile Header */}
+      <div className="md:hidden px-4 py-3 bg-background/80 backdrop-blur-xl border-b border-border/50">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm text-muted-foreground">Olá, <span className="font-semibold text-foreground">{userName}</span> 👋</p>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8"
+              onClick={() => fetchAllData()}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 relative"
+              onClick={() => onNavigate('notifications')}
+            >
+              <Bell className="h-4 w-4" />
+              {notificationsCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center font-medium">
+                  {notificationsCount}
+                </span>
+              )}
+            </Button>
+          </div>
         </div>
         <div className="flex gap-2">
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="flex-1 h-8 text-xs">
+            <SelectTrigger className="flex-1 h-9 text-xs bg-muted/50">
               <Calendar className="h-3 w-3 mr-1" />
               <SelectValue />
             </SelectTrigger>
@@ -920,7 +885,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           
           {(isAdmin || companies.length > 1) && (
             <Select value={selectedCompany} onValueChange={setSelectedCompany}>
-              <SelectTrigger className="flex-1 h-8 text-xs">
+              <SelectTrigger className="flex-1 h-9 text-xs bg-muted/50">
                 <Building2 className="h-3 w-3 mr-1" />
                 <SelectValue />
               </SelectTrigger>
@@ -933,134 +898,205 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </Select>
           )}
         </div>
-        
-        {/* Mobile Quick Stats */}
-        <div className="grid grid-cols-4 gap-1 mt-2 py-2 border-t">
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground">Vendas</p>
-            <p className="text-sm font-bold">{totalSales}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground">Valor</p>
-            <p className="text-xs font-bold text-success">{formatCurrency(totalRevenue).replace('R$', '').trim()}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground">Comissão</p>
-            <p className="text-xs font-bold">{formatCurrency(totalCommissions).replace('R$', '').trim()}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground">Var.</p>
-            <p className={`text-xs font-bold ${revenueChange >= 0 ? 'text-success' : 'text-destructive'}`}>
-              {revenueChange >= 0 ? '+' : ''}{revenueChange.toFixed(0)}%
-            </p>
-          </div>
-        </div>
       </div>
 
-      <div className="p-3 md:p-4 space-y-4 w-full max-w-full overflow-x-hidden">
-        {/* Main KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
-          {/* Vendas do Mês */}
-          <Card className="border-2 shadow-card hover:shadow-elevation transition-shadow cursor-pointer" onClick={() => onNavigate('televendas')}>
-            <CardContent className="p-3 md:p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="h-8 w-8 md:h-10 md:w-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                  <ShoppingCart className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+      <div className="p-4 md:p-6 space-y-6 w-full max-w-full overflow-x-hidden">
+        {/* Alerts Banner */}
+        {alerts.length > 0 && (
+          <div className="bg-gradient-to-r from-destructive/10 to-warning/10 border border-destructive/20 rounded-2xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 bg-destructive/20 rounded-xl flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-destructive">Atenção!</p>
+                <p className="text-sm text-muted-foreground">{alerts.map(a => a.message).join(' • ')}</p>
+              </div>
+              <Button variant="destructive" size="sm" onClick={() => onNavigate('finances')}>
+                Ver
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Main KPIs Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          {/* Vendas */}
+          <Card className="group relative overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/10" onClick={() => onNavigate('televendas')}>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-16 translate-x-16" />
+            <CardContent className="p-4 md:p-5 relative">
+              <div className="flex items-center justify-between mb-3">
+                <div className="h-11 w-11 bg-primary/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <ShoppingCart className="h-5 w-5 text-primary" />
                 </div>
-                <Badge variant="outline" className="text-[10px] hidden md:inline-flex">
-                  vs. mês anterior
+                <Badge variant="outline" className={`text-[10px] ${revenueChange >= 0 ? 'bg-success/10 text-success border-success/30' : 'bg-destructive/10 text-destructive border-destructive/30'}`}>
+                  {revenueChange >= 0 ? '+' : ''}{revenueChange.toFixed(1)}%
                 </Badge>
               </div>
-              <p className="text-[10px] md:text-xs text-muted-foreground">Vendas do Mês</p>
-              <p className="text-xl md:text-2xl font-bold text-foreground">{totalSales}</p>
-              <div className="flex items-center gap-1 mt-1">
-                {revenueChange >= 0 ? (
-                  <TrendingUp className="h-3 w-3 text-success" />
-                ) : (
-                  <TrendingDown className="h-3 w-3 text-destructive" />
-                )}
-                <span className={`text-xs ${revenueChange >= 0 ? 'text-success' : 'text-destructive'}`}>
-                  {Math.abs(revenueChange).toFixed(1)}%
-                </span>
-              </div>
+              <p className="text-xs text-muted-foreground mb-1">Vendas Pagas</p>
+              <p className="text-2xl md:text-3xl font-bold text-foreground">{totalSales}</p>
+              <p className="text-xs text-muted-foreground mt-1">este mês</p>
             </CardContent>
           </Card>
 
-          {/* Valor Produzido */}
-          <Card className="border-2 shadow-card hover:shadow-elevation transition-shadow cursor-pointer" onClick={() => onNavigate('televendas')}>
-            <CardContent className="p-3 md:p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="h-8 w-8 md:h-10 md:w-10 bg-success/10 rounded-xl flex items-center justify-center">
-                  <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-success" />
+          {/* Faturamento */}
+          <Card className="group relative overflow-hidden bg-gradient-to-br from-success/5 to-success/10 border-success/20 hover:border-success/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-success/10" onClick={() => onNavigate('televendas')}>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-success/5 rounded-full -translate-y-16 translate-x-16" />
+            <CardContent className="p-4 md:p-5 relative">
+              <div className="flex items-center justify-between mb-3">
+                <div className="h-11 w-11 bg-success/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <DollarSign className="h-5 w-5 text-success" />
                 </div>
               </div>
-              <p className="text-[10px] md:text-xs text-muted-foreground">Valor Produzido</p>
-              <p className="text-lg md:text-2xl font-bold text-success truncate">{formatCurrency(totalRevenue)}</p>
-              <p className="text-[10px] md:text-xs text-muted-foreground mt-1 truncate">Ticket: {formatCurrency(averageTicket)}</p>
+              <p className="text-xs text-muted-foreground mb-1">Faturamento</p>
+              <p className="text-xl md:text-2xl font-bold text-success truncate">{formatCompactCurrency(totalRevenue)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Ticket: {formatCompactCurrency(averageTicket)}</p>
             </CardContent>
           </Card>
 
           {/* Comissões */}
-          <Card className="border-2 shadow-card hover:shadow-elevation transition-shadow cursor-pointer" onClick={() => onNavigate('minhas-comissoes')}>
-            <CardContent className="p-3 md:p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="h-8 w-8 md:h-10 md:w-10 bg-warning/10 rounded-xl flex items-center justify-center">
-                  <CreditCard className="h-4 w-4 md:h-5 md:w-5 text-warning" />
+          <Card className="group relative overflow-hidden bg-gradient-to-br from-warning/5 to-warning/10 border-warning/20 hover:border-warning/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-warning/10" onClick={() => onNavigate('minhas-comissoes')}>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-warning/5 rounded-full -translate-y-16 translate-x-16" />
+            <CardContent className="p-4 md:p-5 relative">
+              <div className="flex items-center justify-between mb-3">
+                <div className="h-11 w-11 bg-warning/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <CreditCard className="h-5 w-5 text-warning" />
                 </div>
               </div>
-              <p className="text-[10px] md:text-xs text-muted-foreground">Comissões</p>
-              <p className="text-lg md:text-2xl font-bold text-foreground truncate">{formatCurrency(totalCommissions)}</p>
-              <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/30 mt-1">
-                Pago: {formatCurrency(commissionsPaid)}
-              </Badge>
+              <p className="text-xs text-muted-foreground mb-1">Comissões</p>
+              <p className="text-xl md:text-2xl font-bold text-warning truncate">{formatCompactCurrency(totalCommissions)}</p>
+              <div className="flex gap-2 mt-1">
+                <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/30">
+                  Pago: {formatCompactCurrency(commissionsPaid)}
+                </Badge>
+              </div>
             </CardContent>
           </Card>
 
-          {/* Performance Equipe */}
+          {/* Performance / Conversão */}
           {(isAdmin || isGestor) && vendorStats.length > 0 ? (
-            <Card className="border-2 shadow-card hover:shadow-elevation transition-shadow">
-              <CardContent className="p-3 md:p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="h-8 w-8 md:h-10 md:w-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                    <Trophy className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            <Card className="group relative overflow-hidden bg-gradient-to-br from-purple-500/5 to-purple-500/10 border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-purple-500/10" onClick={() => onNavigate('performance-report')}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full -translate-y-16 translate-x-16" />
+              <CardContent className="p-4 md:p-5 relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="h-11 w-11 bg-purple-500/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Trophy className="h-5 w-5 text-purple-500" />
                   </div>
                 </div>
-                <p className="text-[10px] md:text-xs text-muted-foreground">Top Vendedor</p>
-                <p className="text-sm md:text-lg font-bold text-foreground truncate">{vendorStats[0]?.name}</p>
-                <p className="text-xs text-success truncate">{formatCurrency(vendorStats[0]?.totalValue || 0)}</p>
+                <p className="text-xs text-muted-foreground mb-1">Top Vendedor</p>
+                <p className="text-sm md:text-base font-bold text-foreground truncate">{vendorStats[0]?.name}</p>
+                <p className="text-xs text-purple-500 truncate mt-1">{formatCompactCurrency(vendorStats[0]?.totalValue || 0)}</p>
               </CardContent>
             </Card>
           ) : (
-            <Card className="border-2 shadow-card">
-              <CardContent className="p-3 md:p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="h-8 w-8 md:h-10 md:w-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                    <Percent className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            <Card className="group relative overflow-hidden bg-gradient-to-br from-purple-500/5 to-purple-500/10 border-purple-500/20">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full -translate-y-16 translate-x-16" />
+              <CardContent className="p-4 md:p-5 relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="h-11 w-11 bg-purple-500/20 rounded-2xl flex items-center justify-center">
+                    <Percent className="h-5 w-5 text-purple-500" />
                   </div>
                 </div>
-                <p className="text-[10px] md:text-xs text-muted-foreground">Conversão</p>
-                <p className="text-xl md:text-2xl font-bold text-foreground">{leadsStats.conversionRate.toFixed(0)}%</p>
-                <p className="text-[10px] md:text-xs text-muted-foreground mt-1">{leadsStats.worked} leads</p>
+                <p className="text-xs text-muted-foreground mb-1">Conversão</p>
+                <p className="text-2xl md:text-3xl font-bold text-foreground">{leadsStats.conversionRate.toFixed(0)}%</p>
+                <p className="text-xs text-muted-foreground mt-1">{leadsStats.premiumWorked + leadsStats.activatedWorked} leads trabalhados</p>
               </CardContent>
             </Card>
           )}
         </div>
 
+        {/* Leads Section - SEPARADOS */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Leads Premium */}
+          <Card className="border-2 border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-transparent">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <div className="h-8 w-8 bg-amber-500/20 rounded-xl flex items-center justify-center">
+                    <Star className="h-4 w-4 text-amber-500" />
+                  </div>
+                  Leads Premium
+                </CardTitle>
+                <Button variant="ghost" size="sm" className="h-8" onClick={() => onNavigate('leads')}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="text-center p-4 bg-amber-500/10 rounded-2xl">
+                  <p className="text-3xl font-bold text-amber-500">{leadsStats.premium}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Total</p>
+                </div>
+                <div className="text-center p-4 bg-success/10 rounded-2xl">
+                  <p className="text-3xl font-bold text-success">{leadsStats.premiumWorked}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Trabalhados</p>
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                  <span>Progresso</span>
+                  <span>{leadsStats.premium > 0 ? ((leadsStats.premiumWorked / leadsStats.premium) * 100).toFixed(0) : 0}%</span>
+                </div>
+                <Progress value={leadsStats.premium > 0 ? (leadsStats.premiumWorked / leadsStats.premium) * 100 : 0} className="h-2" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Activate Leads */}
+          <Card className="border-2 border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-transparent">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <div className="h-8 w-8 bg-cyan-500/20 rounded-xl flex items-center justify-center">
+                    <Zap className="h-4 w-4 text-cyan-500" />
+                  </div>
+                  Activate Leads
+                </CardTitle>
+                <Button variant="ghost" size="sm" className="h-8" onClick={() => onNavigate('activate-leads')}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="text-center p-4 bg-cyan-500/10 rounded-2xl">
+                  <p className="text-3xl font-bold text-cyan-500">{leadsStats.activated}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Total</p>
+                </div>
+                <div className="text-center p-4 bg-success/10 rounded-2xl">
+                  <p className="text-3xl font-bold text-success">{leadsStats.activatedWorked}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Trabalhados</p>
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                  <span>Progresso</span>
+                  <span>{leadsStats.activated > 0 ? ((leadsStats.activatedWorked / leadsStats.activated) * 100).toFixed(0) : 0}%</span>
+                </div>
+                <Progress value={leadsStats.activated > 0 ? (leadsStats.activatedWorked / leadsStats.activated) * 100 : 0} className="h-2" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Sales Chart */}
-        <Card className="border-2 shadow-card">
+        <Card className="border-2 shadow-lg">
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <CardTitle className="flex items-center gap-2 text-base">
-                <BarChart3 className="h-5 w-5 text-primary" />
+                <div className="h-8 w-8 bg-primary/20 rounded-xl flex items-center justify-center">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                </div>
                 Vendas por Período
               </CardTitle>
-              <div className="flex gap-1">
+              <div className="flex gap-1 bg-muted/50 p-1 rounded-xl">
                 {['day', 'week', 'month'].map((view) => (
                   <Button
                     key={view}
-                    variant={chartView === view ? 'default' : 'outline'}
+                    variant={chartView === view ? 'default' : 'ghost'}
                     size="sm"
-                    className="h-7 text-xs px-2"
+                    className="h-8 text-xs px-3 rounded-lg"
                     onClick={() => setChartView(view as any)}
                   >
                     {view === 'day' ? 'Dia' : view === 'week' ? 'Semana' : 'Mês'}
@@ -1070,18 +1106,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
+            <div className="h-64 md:h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={dailySalesData}>
                   <defs>
                     <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/>
                       <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-20" />
+                  <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip 
                     formatter={(value: number, name: string) => [
                       name === 'value' ? formatCurrency(value) : value,
@@ -1091,7 +1127,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     contentStyle={{ 
                       backgroundColor: 'hsl(var(--background))', 
                       border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
+                      borderRadius: '12px',
+                      boxShadow: '0 10px 40px -10px rgba(0,0,0,0.2)'
                     }}
                   />
                   <Area 
@@ -1100,7 +1137,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     stroke="hsl(var(--primary))" 
                     fillOpacity={1} 
                     fill="url(#colorValue)" 
-                    strokeWidth={2}
+                    strokeWidth={3}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -1108,7 +1145,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </CardContent>
         </Card>
 
-        {/* Sales Ranking - Gamificação */}
+        {/* Sales Ranking */}
         <SalesRanking 
           companyFilter={getCompanyFilter()} 
           selectedMonth={selectedMonth}
@@ -1117,28 +1154,30 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         {/* Funnel + Finance Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Sales Funnel */}
-          <Card className="border-2 shadow-card">
+          <Card className="border-2 shadow-lg">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
-                <Filter className="h-5 w-5 text-primary" />
+                <div className="h-8 w-8 bg-primary/20 rounded-xl flex items-center justify-center">
+                  <Filter className="h-4 w-4 text-primary" />
+                </div>
                 Funil de Televendas
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {funnelData.map((item, index) => (
-                  <div key={item.name} className="space-y-1">
+                  <div key={item.name} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{item.name}</span>
-                      <span className="font-bold">{item.value}</span>
+                      <span className="text-muted-foreground font-medium">{item.name}</span>
+                      <span className="font-bold text-lg">{item.value}</span>
                     </div>
-                    <div className="h-8 rounded-lg overflow-hidden bg-muted/30">
+                    <div className="h-10 rounded-2xl overflow-hidden bg-muted/30">
                       <div 
-                        className="h-full rounded-lg transition-all duration-500 flex items-center justify-center text-xs font-medium text-white"
+                        className="h-full rounded-2xl transition-all duration-700 flex items-center justify-center text-xs font-semibold text-white shadow-lg"
                         style={{ 
-                          width: `${funnelData[0]?.value ? (item.value / funnelData[0].value) * 100 : 0}%`,
+                          width: `${funnelData[0]?.value ? Math.max((item.value / funnelData[0].value) * 100, item.value > 0 ? 15 : 0) : 0}%`,
                           backgroundColor: item.fill,
-                          minWidth: item.value > 0 ? '40px' : '0'
+                          minWidth: item.value > 0 ? '60px' : '0'
                         }}
                       >
                         {item.value > 0 && `${((item.value / (funnelData[0]?.value || 1)) * 100).toFixed(0)}%`}
@@ -1151,153 +1190,91 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </Card>
 
           {/* Finance Summary */}
-          <Card className="border-2 shadow-card">
+          <Card className="border-2 shadow-lg">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <Wallet className="h-5 w-5 text-primary" />
+                  <div className="h-8 w-8 bg-primary/20 rounded-xl flex items-center justify-center">
+                    <Wallet className="h-4 w-4 text-primary" />
+                  </div>
                   Resumo Financeiro
                 </CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => onNavigate('finances')}>
+                <Button variant="ghost" size="sm" className="h-8" onClick={() => onNavigate('finances')}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-destructive/10 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <XCircle className="h-5 w-5 text-destructive" />
+              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-destructive/10 to-destructive/5 rounded-2xl border border-destructive/20">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-destructive/20 rounded-xl flex items-center justify-center">
+                    <XCircle className="h-5 w-5 text-destructive" />
+                  </div>
                   <div>
-                    <p className="text-sm font-medium">Contas Vencidas</p>
+                    <p className="font-semibold">Contas Vencidas</p>
                     <p className="text-xs text-muted-foreground">{financeAlerts.overdue.length} pendência(s)</p>
                   </div>
                 </div>
-                <span className="font-bold text-destructive">{formatCurrency(financeAlerts.totalOverdue)}</span>
+                <span className="font-bold text-destructive text-lg">{formatCompactCurrency(financeAlerts.totalOverdue)}</span>
               </div>
               
-              <div className="flex items-center justify-between p-3 bg-warning/10 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-warning" />
+              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-warning/10 to-warning/5 rounded-2xl border border-warning/20">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-warning/20 rounded-xl flex items-center justify-center">
+                    <Clock className="h-5 w-5 text-warning" />
+                  </div>
                   <div>
-                    <p className="text-sm font-medium">Vencendo em Breve</p>
+                    <p className="font-semibold">Vencendo em Breve</p>
                     <p className="text-xs text-muted-foreground">Próximos 3 dias</p>
                   </div>
                 </div>
-                <span className="font-bold text-warning">{formatCurrency(financeAlerts.totalDueSoon)}</span>
+                <span className="font-bold text-warning text-lg">{formatCompactCurrency(financeAlerts.totalDueSoon)}</span>
               </div>
               
-              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">Total a Pagar</p>
-                    <p className="text-xs text-muted-foreground">Este período</p>
-                  </div>
-                </div>
-                <span className="font-bold">{formatCurrency(financeAlerts.totalPayable)}</span>
-              </div>
-              
-              <Button variant="outline" className="w-full" onClick={() => onNavigate('finances')}>
+              <Button className="w-full h-11 rounded-xl" onClick={() => onNavigate('finances')}>
+                <Wallet className="h-4 w-4 mr-2" />
                 Acessar Kanban Financeiro
               </Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* Leads + Clients Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Leads Premium */}
-          <Card className="border-2 shadow-card">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Star className="h-5 w-5 text-warning" />
-                  Leads Premium
-                </CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => onNavigate('leads')}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="text-center p-3 bg-primary/10 rounded-lg">
-                  <p className="text-2xl font-bold text-primary">{leadsStats.premium}</p>
-                  <p className="text-xs text-muted-foreground">Disponíveis</p>
-                </div>
-                <div className="text-center p-3 bg-warning/10 rounded-lg">
-                  <p className="text-2xl font-bold text-warning">{leadsStats.worked}</p>
-                  <p className="text-xs text-muted-foreground">Trabalhados</p>
-                </div>
-                <div className="text-center p-3 bg-success/10 rounded-lg">
-                  <p className="text-2xl font-bold text-success">{leadsStats.conversionRate.toFixed(0)}%</p>
-                  <p className="text-xs text-muted-foreground">Conversão</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Meus Clientes */}
-          <Card className="border-2 shadow-card">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Users className="h-5 w-5 text-primary" />
-                  Meus Clientes
-                </CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => onNavigate('meus-clientes')}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="text-center p-3 bg-primary/10 rounded-lg">
-                  <p className="text-2xl font-bold text-primary">{leadsStats.activeClients}</p>
-                  <p className="text-xs text-muted-foreground">Ativos</p>
-                </div>
-                <div className="text-center p-3 bg-success/10 rounded-lg">
-                  <p className="text-2xl font-bold text-success">{leadsStats.newClients}</p>
-                  <p className="text-xs text-muted-foreground">Novos</p>
-                </div>
-                <div className="text-center p-3 bg-muted/30 rounded-lg">
-                  <Button variant="ghost" size="sm" className="h-full w-full" onClick={() => onNavigate('indicate')}>
-                    <Users className="h-5 w-5 mr-1" />
-                    Indicar
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Team Performance - Admin/Gestor Only */}
         {(isAdmin || isGestor) && vendorStats.length > 0 && (
-          <Card className="border-2 shadow-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Trophy className="h-5 w-5 text-warning" />
-                Top 3 Vendedores
-              </CardTitle>
+          <Card className="border-2 shadow-lg bg-gradient-to-br from-amber-500/5 to-transparent">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <div className="h-8 w-8 bg-amber-500/20 rounded-xl flex items-center justify-center">
+                    <Trophy className="h-4 w-4 text-amber-500" />
+                  </div>
+                  Top Vendedores
+                </CardTitle>
+                <Button variant="ghost" size="sm" className="h-8" onClick={() => onNavigate('performance-report')}>
+                  Ver Relatório
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {vendorStats.slice(0, 3).map((vendor, index) => (
-                  <div key={vendor.id} className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                      index === 0 ? 'bg-yellow-500 text-white' :
-                      index === 1 ? 'bg-gray-400 text-white' :
-                      'bg-amber-700 text-white'
+                {vendorStats.slice(0, 5).map((vendor, index) => (
+                  <div key={vendor.id} className="flex items-center gap-4 p-4 bg-muted/30 rounded-2xl hover:bg-muted/50 transition-colors">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg shadow-lg ${
+                      index === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-white' :
+                      index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-500 text-white' :
+                      index === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-800 text-white' :
+                      'bg-muted text-muted-foreground'
                     }`}>
-                      {index + 1}
+                      {index + 1}º
                     </div>
-                    <div className="flex-1">
-                      <p className="font-medium">{vendor.name}</p>
-                      <p className="text-xs text-muted-foreground">{vendor.totalSales} vendas</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate">{vendor.name}</p>
+                      <p className="text-sm text-muted-foreground">{vendor.totalSales} vendas</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-success">{formatCurrency(vendor.totalValue)}</p>
-                      <p className="text-xs text-muted-foreground">Comissão: {formatCurrency(vendor.commissionTotal)}</p>
+                      <p className="font-bold text-success">{formatCompactCurrency(vendor.totalValue)}</p>
+                      <p className="text-xs text-muted-foreground">Com: {formatCompactCurrency(vendor.commissionTotal)}</p>
                     </div>
                   </div>
                 ))}
@@ -1306,163 +1283,53 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </Card>
         )}
 
-        {/* Commissions Table */}
-        {commissionsData.length > 0 && (
-          <Card className="border-2 shadow-card">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <CreditCard className="h-5 w-5 text-primary" />
-                  Comissões Recentes
-                </CardTitle>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => onNavigate('tabela-comissoes')}>
-                    Tabela
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => onNavigate('minhas-comissoes')}>
-                    Minhas
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-2 text-muted-foreground font-medium">Colaborador</th>
-                      <th className="text-left p-2 text-muted-foreground font-medium">Banco</th>
-                      <th className="text-left p-2 text-muted-foreground font-medium">Produto</th>
-                      <th className="text-right p-2 text-muted-foreground font-medium">%</th>
-                      <th className="text-right p-2 text-muted-foreground font-medium">Valor</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {commissionsData.slice(0, 5).map((comm) => (
-                      <tr key={comm.id} className="border-b last:border-0 hover:bg-muted/30">
-                        <td className="p-2">{comm.user_name}</td>
-                        <td className="p-2">{comm.bank_name}</td>
-                        <td className="p-2">{comm.product_type}</td>
-                        <td className="p-2 text-right">{comm.commission_percentage}%</td>
-                        <td className="p-2 text-right font-medium text-success">{formatCurrency(Number(comm.commission_amount))}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Alerts Section */}
-        {alerts.length > 0 && (
-          <Card className="border-2 border-destructive/30 shadow-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base text-destructive">
-                <AlertTriangle className="h-5 w-5" />
-                Alertas e Notificações
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {alerts.map((alert, index) => (
-                <div 
-                  key={index} 
-                  className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
-                    alert.type === 'error' ? 'bg-destructive/10 hover:bg-destructive/20' : 'bg-warning/10 hover:bg-warning/20'
-                  }`}
-                  onClick={() => onNavigate(alert.action)}
-                >
-                  <div className="flex items-center gap-2">
-                    {alert.type === 'error' ? (
-                      <AlertCircle className="h-5 w-5 text-destructive" />
-                    ) : (
-                      <AlertTriangle className="h-5 w-5 text-warning" />
-                    )}
-                    <span className="font-medium">{alert.message}</span>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    <Eye className="h-4 w-4 mr-1" />
-                    Ver
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
         {/* Quick Actions */}
-        <Card className="border-2 shadow-card bg-gradient-to-br from-primary/5 to-transparent">
+        <Card className="border-2 shadow-lg bg-gradient-to-br from-primary/5 to-transparent">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
-              <ArrowUpRight className="h-5 w-5 text-primary" />
+            <CardTitle className="flex items-center gap-2 text-base">
+              <div className="h-8 w-8 bg-primary/20 rounded-xl flex items-center justify-center">
+                <Zap className="h-4 w-4 text-primary" />
+              </div>
               Ações Rápidas
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
-              <Button 
-                variant="outline"
-                onClick={() => onNavigate("indicate")}
-                className="h-16 flex flex-col gap-1 hover:bg-primary hover:text-primary-foreground transition-all"
-              >
-                <Users className="h-5 w-5" />
-                <span className="text-xs font-medium">Indicar</span>
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => onNavigate("televendas")}
-                className="h-16 flex flex-col gap-1 hover:bg-primary hover:text-primary-foreground transition-all"
-              >
-                <ShoppingCart className="h-5 w-5" />
-                <span className="text-xs font-medium">Televendas</span>
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => onNavigate("meus-clientes")}
-                className="h-16 flex flex-col gap-1 hover:bg-primary hover:text-primary-foreground transition-all"
-              >
-                <Star className="h-5 w-5" />
-                <span className="text-xs font-medium">Clientes</span>
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => onNavigate("finances")}
-                className="h-16 flex flex-col gap-1 hover:bg-primary hover:text-primary-foreground transition-all"
-              >
-                <Wallet className="h-5 w-5" />
-                <span className="text-xs font-medium">Finanças</span>
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => onNavigate("minhas-comissoes")}
-                className="h-16 flex flex-col gap-1 hover:bg-primary hover:text-primary-foreground transition-all"
-              >
-                <CreditCard className="h-5 w-5" />
-                <span className="text-xs font-medium">Comissões</span>
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => onNavigate("tabela-comissoes")}
-                className="h-16 flex flex-col gap-1 hover:bg-primary hover:text-primary-foreground transition-all"
-              >
-                <FileText className="h-5 w-5" />
-                <span className="text-xs font-medium">Tabela</span>
-              </Button>
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+              {[
+                { icon: UserPlus, label: 'Indicar', action: 'indicate' },
+                { icon: ShoppingCart, label: 'Televendas', action: 'televendas' },
+                { icon: Star, label: 'Clientes', action: 'meus-clientes' },
+                { icon: Wallet, label: 'Finanças', action: 'finances' },
+                { icon: CreditCard, label: 'Comissões', action: 'minhas-comissoes' },
+                { icon: FileText, label: 'Tabela', action: 'tabela-comissoes' },
+              ].map((item) => (
+                <Button 
+                  key={item.action}
+                  variant="outline"
+                  onClick={() => onNavigate(item.action)}
+                  className="h-20 flex flex-col gap-2 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all rounded-2xl group"
+                >
+                  <item.icon className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-medium">{item.label}</span>
+                </Button>
+              ))}
             </div>
           </CardContent>
         </Card>
 
         {/* Product Distribution */}
         {productStats.length > 0 && (
-          <Card className="border-2 shadow-card">
+          <Card className="border-2 shadow-lg">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
-                <BarChart3 className="h-5 w-5 text-primary" />
+                <div className="h-8 w-8 bg-primary/20 rounded-xl flex items-center justify-center">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                </div>
                 Vendas por Produto
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-64">
+              <div className="h-64 md:h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -1472,6 +1339,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       cx="50%"
                       cy="50%"
                       outerRadius={80}
+                      innerRadius={40}
+                      paddingAngle={2}
                       label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
                     >
                       {productStats.map((_, index) => (
