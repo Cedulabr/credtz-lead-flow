@@ -562,15 +562,7 @@ export function ProposalGenerator() {
       text += `\n`;
     });
 
-    text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-    text += `📊 *RESUMO*\n`;
-    text += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
-    text += `📋 Total de Contratos: ${completedContracts.length}\n`;
-    text += `💵 Parcela Total: ${formatCurrency(String(totalParcela * 100))}\n`;
-    if (totalTroco > 0) {
-      text += `💰 Troco Total Estimado: ${formatCurrency(String(totalTroco * 100))}\n`;
-    }
-    text += `\n📅 Data: ${new Date().toLocaleDateString("pt-BR")}\n`;
+    text += `📅 Data: ${new Date().toLocaleDateString("pt-BR")}\n`;
     
     // Add product-specific footers
     if (footers.length > 0) {
@@ -716,25 +708,6 @@ export function ProposalGenerator() {
     });
 
     y += 10;
-
-    // Summary - Cinza médio neutro
-    doc.setFillColor(75, 85, 99);
-    doc.roundedRect(15, y - 5, pageWidth - 30, 45, 3, 3, "F");
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("RESUMO DA PROPOSTA", 20, y + 5);
-    
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Total de Contratos: ${completedContracts.length}`, 20, y + 15);
-    doc.text(`Parcela Total: ${formatCurrency(String(totalParcela * 100))}`, 20, y + 23);
-    if (totalTroco > 0) {
-      doc.text(`Troco Total Estimado: ${formatCurrency(String(totalTroco * 100))}`, 20, y + 31);
-    }
-
-    y += 55;
 
     // Product-specific footers
     if (footers.length > 0) {
