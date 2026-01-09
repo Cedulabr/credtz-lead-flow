@@ -14,14 +14,18 @@ export interface ReportFilters {
 export interface UserPerformance {
   userId: string;
   userName: string;
-  totalLeads: number;
-  activatedLeads: number;
+  // Leads separados
+  premiumLeads: number;       // Leads da tabela leads_database/leads
+  activatedLeads: number;     // Leads da tabela activate_leads
+  // Propostas
   proposalsCreated: number;
   proposalsPaid: number;
   proposalsCancelled: number;
   conversionRate: number;
+  // Valores
   totalSold: number;
   commissionGenerated: number;
+  // Outros
   documentsSaved: number;
   savedProposals: number;
   lastActivity: string | null;
@@ -43,13 +47,17 @@ export interface ActivityLog {
 
 export interface ReportSummary {
   totalActiveUsers: number;
-  totalLeadsWorked: number;
-  activatedLeads: number;
+  // Leads separados
+  premiumLeadsWorked: number;
+  activatedLeadsWorked: number;
+  // Propostas
   totalProposalsCreated: number;
   proposalsPaid: number;
   proposalsCancelled: number;
+  // Valores
   totalSoldValue: number;
   totalCommissions: number;
+  // Outros
   documentsSaved: number;
   savedProposals: number;
 }

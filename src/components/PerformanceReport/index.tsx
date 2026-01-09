@@ -26,8 +26,8 @@ export function PerformanceReport() {
   const [performanceData, setPerformanceData] = useState<UserPerformance[]>([]);
   const [summary, setSummary] = useState<ReportSummary>({
     totalActiveUsers: 0,
-    totalLeadsWorked: 0,
-    activatedLeads: 0,
+    premiumLeadsWorked: 0,
+    activatedLeadsWorked: 0,
     totalProposalsCreated: 0,
     proposalsPaid: 0,
     proposalsCancelled: 0,
@@ -277,7 +277,7 @@ export function PerformanceReport() {
           userMap.set(userId, {
             userId,
             userName,
-            totalLeads: 0,
+            premiumLeads: 0,
             activatedLeads: 0,
             proposalsCreated: 0,
             proposalsPaid: 0,
@@ -350,14 +350,14 @@ export function PerformanceReport() {
         }
       });
 
-      // Process Leads
+      // Process Leads (Premium Leads)
       leads.forEach((lead: any) => {
         const userId = lead.created_by || lead.assigned_to;
         if (!userId) return;
         if (filters.userId && userId !== filters.userId) return;
 
         const user = getOrCreateUser(userId);
-        user.totalLeads++;
+        user.premiumLeads++;
       });
 
       // Process Activate Leads
@@ -413,8 +413,8 @@ export function PerformanceReport() {
       // Calculate summary
       const newSummary: ReportSummary = {
         totalActiveUsers: performanceArray.length,
-        totalLeadsWorked: performanceArray.reduce((sum, u) => sum + u.totalLeads, 0),
-        activatedLeads: performanceArray.reduce((sum, u) => sum + u.activatedLeads, 0),
+        premiumLeadsWorked: performanceArray.reduce((sum, u) => sum + u.premiumLeads, 0),
+        activatedLeadsWorked: performanceArray.reduce((sum, u) => sum + u.activatedLeads, 0),
         totalProposalsCreated: performanceArray.reduce((sum, u) => sum + u.proposalsCreated, 0),
         proposalsPaid: performanceArray.reduce((sum, u) => sum + u.proposalsPaid, 0),
         proposalsCancelled: performanceArray.reduce((sum, u) => sum + u.proposalsCancelled, 0),
