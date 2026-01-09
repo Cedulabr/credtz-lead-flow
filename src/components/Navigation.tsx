@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2, UserCircle } from "lucide-react";
+import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2, UserCircle, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -34,6 +34,7 @@ const navItems = [
   { id: "commissions", label: "Minhas Comissões", icon: DollarSign, permissionKey: "can_access_minhas_comissoes" },
   { id: "performance-report", label: "Relatório de Desempenho", icon: BarChart3, permissionKey: "admin_or_gestor" },
   { id: "collaborative", label: "Colaborativo", icon: Users2, permissionKey: null },
+  { id: "time-clock", label: "Controle de Ponto", icon: Clock, permissionKey: null },
 ];
 
 // Mobile priority items - only icons

@@ -32,6 +32,7 @@ import {
 import { PerformanceReport } from "@/components/PerformanceReport";
 import { Collaborative } from "@/components/Collaborative";
 import { MyData } from "@/components/MyData";
+import { TimeClock } from "@/components/TimeClock";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -209,6 +210,9 @@ const Index = () => {
       
       case "collaborative":
         return <Collaborative />;
+      
+      case "time-clock":
+        return <TimeClock />;
       
       case "notifications":
         return <Notifications />;
