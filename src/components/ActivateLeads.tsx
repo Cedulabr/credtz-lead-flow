@@ -252,15 +252,56 @@ export const ActivateLeads = () => {
     
     setLoading(true);
     try {
+      // Para Gestor: primeiro buscar os IDs dos usuários da mesma empresa
+      let companyUserIds: string[] = [];
+      
+      if (isGestor && !isAdmin) {
+        // Buscar empresas do gestor
+        const { data: gestorCompanies } = await supabase
+          .from('user_companies')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .eq('company_role', 'gestor')
+          .eq('is_active', true);
+        
+        if (gestorCompanies && gestorCompanies.length > 0) {
+          const companyIds = gestorCompanies.map(gc => gc.company_id);
+          
+          // Buscar usuários dessas empresas
+          const { data: companyUsers } = await supabase
+            .from('user_companies')
+            .select('user_id')
+            .in('company_id', companyIds)
+            .eq('is_active', true);
+          
+          if (companyUsers) {
+            companyUserIds = [...new Set(companyUsers.map(cu => cu.user_id))];
+          }
+        }
+      }
+
       let query = supabase
         .from('activate_leads')
         .select('*')
         .order('created_at', { ascending: false });
 
-      // Regra de visibilidade: usuário comum só vê leads atribuídos a ele
-      // Admin e Gestor veem todos os leads
-      if (!isAdmin && !isGestor) {
-        query = query.eq('assigned_to', user.id);
+      // Regra de visibilidade:
+      // - Admin vê todos os leads
+      // - Gestor vê leads atribuídos aos usuários da sua empresa
+      // - Usuário comum só vê leads atribuídos a ele
+      if (!isAdmin) {
+        if (isGestor && companyUserIds.length > 0) {
+          // Gestor vê leads atribuídos aos usuários da sua empresa
+          query = query.in('assigned_to', companyUserIds);
+        } else if (!isGestor) {
+          // Usuário comum só vê seus próprios leads
+          query = query.eq('assigned_to', user.id);
+        } else {
+          // Gestor sem usuários na empresa, não mostra nada
+          setLeads([]);
+          setLoading(false);
+          return;
+        }
       }
 
       const { data, error } = await query;
