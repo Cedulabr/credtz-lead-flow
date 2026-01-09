@@ -29,15 +29,18 @@ const dateOptions = [
   { value: "today", label: "Hoje" },
   { value: "yesterday", label: "Ontem" },
   { value: "last7days", label: "Últimos 7 dias" },
+  { value: "last30days", label: "Últimos 30 dias" },
+  { value: "thisMonth", label: "Este mês" },
   { value: "custom", label: "Personalizado" },
 ];
 
 const statusOptions = [
   { value: "all", label: "Todos" },
-  { value: "em_andamento", label: "Em andamento" },
-  { value: "paga", label: "Paga" },
-  { value: "cancelada", label: "Cancelada" },
-  { value: "reprovada", label: "Reprovada" },
+  { value: "pendente", label: "Pendente" },
+  { value: "pago", label: "Pago" },
+  { value: "cancelado", label: "Cancelado" },
+  { value: "proposta_digitada", label: "Proposta Digitada" },
+  { value: "solicitado_digitacao", label: "Solicitado Digitação" },
 ];
 
 const originOptions = [

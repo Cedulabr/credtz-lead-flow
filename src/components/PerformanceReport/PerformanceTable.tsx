@@ -132,6 +132,15 @@ export function PerformanceTable({ data, isLoading, onViewDetails }: Performance
                 <TableHead className="text-center">
                   <button
                     className="flex items-center justify-center hover:text-foreground w-full"
+                    onClick={() => handleSort("activatedLeads")}
+                  >
+                    Ativados
+                    <SortIcon field="activatedLeads" />
+                  </button>
+                </TableHead>
+                <TableHead className="text-center">
+                  <button
+                    className="flex items-center justify-center hover:text-foreground w-full"
                     onClick={() => handleSort("proposalsCreated")}
                   >
                     Criadas
@@ -152,7 +161,7 @@ export function PerformanceTable({ data, isLoading, onViewDetails }: Performance
                     className="flex items-center justify-center hover:text-foreground w-full"
                     onClick={() => handleSort("proposalsCancelled")}
                   >
-                    Canceladas
+                    Cancel.
                     <SortIcon field="proposalsCancelled" />
                   </button>
                 </TableHead>
@@ -161,7 +170,7 @@ export function PerformanceTable({ data, isLoading, onViewDetails }: Performance
                     className="flex items-center justify-center hover:text-foreground w-full"
                     onClick={() => handleSort("conversionRate")}
                   >
-                    Conversão
+                    Conv.
                     <SortIcon field="conversionRate" />
                   </button>
                 </TableHead>
@@ -170,7 +179,7 @@ export function PerformanceTable({ data, isLoading, onViewDetails }: Performance
                     className="flex items-center justify-end hover:text-foreground w-full"
                     onClick={() => handleSort("totalSold")}
                   >
-                    Valor Vendido
+                    Vendido
                     <SortIcon field="totalSold" />
                   </button>
                 </TableHead>
@@ -183,14 +192,32 @@ export function PerformanceTable({ data, isLoading, onViewDetails }: Performance
                     <SortIcon field="commissionGenerated" />
                   </button>
                 </TableHead>
-                <TableHead className="text-center">Última Atividade</TableHead>
+                <TableHead className="text-center">
+                  <button
+                    className="flex items-center justify-center hover:text-foreground w-full"
+                    onClick={() => handleSort("documentsSaved")}
+                  >
+                    Docs
+                    <SortIcon field="documentsSaved" />
+                  </button>
+                </TableHead>
+                <TableHead className="text-center">
+                  <button
+                    className="flex items-center justify-center hover:text-foreground w-full"
+                    onClick={() => handleSort("savedProposals")}
+                  >
+                    Props.
+                    <SortIcon field="savedProposals" />
+                  </button>
+                </TableHead>
+                <TableHead className="text-center">Última Ativ.</TableHead>
                 <TableHead className="text-center">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8">
+                  <TableCell colSpan={13} className="text-center py-8">
                     <p className="text-muted-foreground">
                       Nenhum dado encontrado para o período selecionado
                     </p>
@@ -201,6 +228,11 @@ export function PerformanceTable({ data, isLoading, onViewDetails }: Performance
                   <TableRow key={user.userId} className="hover:bg-muted/50">
                     <TableCell className="font-medium">{user.userName}</TableCell>
                     <TableCell className="text-center">{user.totalLeads}</TableCell>
+                    <TableCell className="text-center">
+                      <span className="text-yellow-600 font-medium">
+                        {user.activatedLeads}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-center">{user.proposalsCreated}</TableCell>
                     <TableCell className="text-center">
                       <span className="text-green-600 font-medium">
@@ -225,6 +257,16 @@ export function PerformanceTable({ data, isLoading, onViewDetails }: Performance
                     </TableCell>
                     <TableCell className="text-right font-medium text-green-600">
                       {formatCurrency(user.commissionGenerated)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className="text-cyan-600 font-medium">
+                        {user.documentsSaved}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className="text-pink-600 font-medium">
+                        {user.savedProposals}
+                      </span>
                     </TableCell>
                     <TableCell className="text-center text-sm text-muted-foreground">
                       {user.lastActivity

@@ -1,5 +1,5 @@
 export interface DateFilter {
-  type: 'today' | 'yesterday' | 'last7days' | 'custom';
+  type: 'today' | 'yesterday' | 'last7days' | 'last30days' | 'thisMonth' | 'custom';
   startDate?: Date;
   endDate?: Date;
 }
@@ -15,12 +15,15 @@ export interface UserPerformance {
   userId: string;
   userName: string;
   totalLeads: number;
+  activatedLeads: number;
   proposalsCreated: number;
   proposalsPaid: number;
   proposalsCancelled: number;
   conversionRate: number;
   totalSold: number;
   commissionGenerated: number;
+  documentsSaved: number;
+  savedProposals: number;
   lastActivity: string | null;
   averageResponseTime: number | null;
 }
@@ -41,9 +44,12 @@ export interface ActivityLog {
 export interface ReportSummary {
   totalActiveUsers: number;
   totalLeadsWorked: number;
+  activatedLeads: number;
   totalProposalsCreated: number;
   proposalsPaid: number;
   proposalsCancelled: number;
   totalSoldValue: number;
   totalCommissions: number;
+  documentsSaved: number;
+  savedProposals: number;
 }

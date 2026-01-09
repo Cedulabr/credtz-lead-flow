@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { BarChart3, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReportFilters } from "./ReportFilters";
 import { SummaryCards } from "./SummaryCards";
 import { PerformanceTable } from "./PerformanceTable";
@@ -17,7 +16,7 @@ import {
   UserPerformance,
   ReportSummary,
 } from "./types";
-import { startOfDay, endOfDay, subDays } from "date-fns";
+import { startOfDay, endOfDay, subDays, startOfMonth } from "date-fns";
 
 export function PerformanceReport() {
   const { profile, isAdmin } = useAuth();
@@ -28,15 +27,18 @@ export function PerformanceReport() {
   const [summary, setSummary] = useState<ReportSummary>({
     totalActiveUsers: 0,
     totalLeadsWorked: 0,
+    activatedLeads: 0,
     totalProposalsCreated: 0,
     proposalsPaid: 0,
     proposalsCancelled: 0,
     totalSoldValue: 0,
     totalCommissions: 0,
+    documentsSaved: 0,
+    savedProposals: 0,
   });
 
   const [filters, setFilters] = useState<ReportFiltersType>({
-    dateFilter: { type: "today" },
+    dateFilter: { type: "thisMonth" },
     userId: null,
     proposalStatus: null,
     origin: null,
@@ -92,6 +94,12 @@ export function PerformanceReport() {
       case "last7days":
         start = startOfDay(subDays(now, 7));
         break;
+      case "last30days":
+        start = startOfDay(subDays(now, 30));
+        break;
+      case "thisMonth":
+        start = startOfMonth(now);
+        break;
       case "custom":
         start = filters.dateFilter.startDate
           ? startOfDay(filters.dateFilter.startDate)
@@ -141,93 +149,148 @@ export function PerformanceReport() {
       const startISO = dateRange.start.toISOString();
       const endISO = dateRange.end.toISOString();
 
-      // Build query for proposals
-      let proposalsQuery = supabase
-        .from("propostas")
-        .select("*, profiles!propostas_created_by_id_fkey(id, name)")
-        .gte("created_at", startISO)
-        .lte("created_at", endISO);
+      // Fetch all data sources in parallel
+      const [
+        televendasResult,
+        proposalsResult,
+        leadsResult,
+        activateLeadsResult,
+        commissionsResult,
+        documentsResult,
+        savedProposalsResult,
+      ] = await Promise.all([
+        // Televendas - main sales data
+        supabase
+          .from("televendas")
+          .select("*, profiles:user_id(id, name)")
+          .gte("created_at", startISO)
+          .lte("created_at", endISO),
+        
+        // Propostas
+        supabase
+          .from("propostas")
+          .select("*, profiles:created_by_id(id, name)")
+          .gte("created_at", startISO)
+          .lte("created_at", endISO),
+        
+        // Leads
+        supabase
+          .from("leads")
+          .select("*")
+          .gte("created_at", startISO)
+          .lte("created_at", endISO),
+        
+        // Activate Leads
+        supabase
+          .from("activate_leads")
+          .select("*")
+          .gte("created_at", startISO)
+          .lte("created_at", endISO),
+        
+        // Commissions
+        supabase
+          .from("commissions")
+          .select("*")
+          .gte("created_at", startISO)
+          .lte("created_at", endISO),
+        
+        // Client Documents
+        supabase
+          .from("client_documents")
+          .select("*")
+          .gte("created_at", startISO)
+          .lte("created_at", endISO),
+        
+        // Saved Proposals
+        supabase
+          .from("saved_proposals")
+          .select("*")
+          .gte("created_at", startISO)
+          .lte("created_at", endISO),
+      ]);
 
-      if (filters.userId) {
-        proposalsQuery = proposalsQuery.eq("created_by_id", filters.userId);
-      }
-
-      if (filters.proposalStatus) {
-        proposalsQuery = proposalsQuery.eq("status", filters.proposalStatus);
-      }
-
-      if (filters.origin) {
-        proposalsQuery = proposalsQuery.eq("origem_lead", filters.origin);
-      }
-
-      const { data: proposals, error: proposalsError } = await proposalsQuery;
-
-      if (proposalsError) throw proposalsError;
-
-      // Fetch leads
-      let leadsQuery = supabase
-        .from("leads")
-        .select("*")
-        .gte("created_at", startISO)
-        .lte("created_at", endISO);
-
-      if (filters.userId) {
-        leadsQuery = leadsQuery.or(`created_by.eq.${filters.userId},assigned_to.eq.${filters.userId}`);
-      }
-
-      const { data: leads, error: leadsError } = await leadsQuery;
-      if (leadsError) throw leadsError;
-
-      // Fetch commissions
-      let commissionsQuery = supabase
-        .from("commissions")
-        .select("*")
-        .gte("created_at", startISO)
-        .lte("created_at", endISO);
-
-      if (filters.userId) {
-        commissionsQuery = commissionsQuery.eq("user_id", filters.userId);
-      }
-
-      const { data: commissions, error: commissionsError } = await commissionsQuery;
-      if (commissionsError) throw commissionsError;
+      const televendas = televendasResult.data || [];
+      const proposals = proposalsResult.data || [];
+      const leads = leadsResult.data || [];
+      const activateLeads = activateLeadsResult.data || [];
+      const commissions = commissionsResult.data || [];
+      const documents = documentsResult.data || [];
+      const savedProposals = savedProposalsResult.data || [];
 
       // Process data by user
       const userMap = new Map<string, UserPerformance>();
 
-      // Process proposals
-      proposals?.forEach((proposal: any) => {
-        const userId = proposal.created_by_id;
-        const userName = proposal.profiles?.name || "Desconhecido";
-
-        if (!userId) return;
-
+      const getOrCreateUser = (userId: string, userName: string): UserPerformance => {
         if (!userMap.has(userId)) {
           userMap.set(userId, {
             userId,
-            userName,
+            userName: userName || "Desconhecido",
             totalLeads: 0,
+            activatedLeads: 0,
             proposalsCreated: 0,
             proposalsPaid: 0,
             proposalsCancelled: 0,
             conversionRate: 0,
             totalSold: 0,
             commissionGenerated: 0,
+            documentsSaved: 0,
+            savedProposals: 0,
             lastActivity: null,
             averageResponseTime: null,
           });
         }
+        return userMap.get(userId)!;
+      };
 
-        const user = userMap.get(userId)!;
+      // Process Televendas (main sales data)
+      televendas.forEach((tv: any) => {
+        const userId = tv.user_id;
+        if (!userId) return;
+        if (filters.userId && userId !== filters.userId) return;
+
+        const userName = tv.profiles?.name || "Desconhecido";
+        const user = getOrCreateUser(userId, userName);
+
         user.proposalsCreated++;
 
-        if (proposal.status === "paga" || proposal.status === "Pago") {
+        if (tv.status === "pago") {
           user.proposalsPaid++;
-          user.totalSold += proposal.valor_proposta || 0;
+          user.totalSold += Number(tv.parcela) || 0;
+          if (tv.troco) {
+            user.totalSold += Number(tv.troco) || 0;
+          }
         }
 
-        if (proposal.status === "cancelada" || proposal.status === "Cancelado") {
+        if (tv.status === "cancelado") {
           user.proposalsCancelled++;
+        }
+
+        if (!user.lastActivity || new Date(tv.created_at) > new Date(user.lastActivity)) {
+          user.lastActivity = tv.created_at;
+        }
+      });
+
+      // Process Propostas (kanban proposals)
+      proposals.forEach((proposal: any) => {
+        const userId = proposal.created_by_id;
+        if (!userId) return;
+        if (filters.userId && userId !== filters.userId) return;
+
+        const userName = proposal.profiles?.name || "Desconhecido";
+        const user = getOrCreateUser(userId, userName);
+
+        // Only count if not already counted in televendas
+        if (!televendas.some((tv: any) => tv.cpf === proposal.cpf)) {
+          user.proposalsCreated++;
+
+          if (proposal.status === "paga" || proposal.status === "Pago" || proposal.pipeline_stage === "pago") {
+            user.proposalsPaid++;
+            user.totalSold += Number(proposal.valor_proposta) || 0;
+          }
+
+          if (proposal.status === "cancelada" || proposal.status === "Cancelado" || proposal.pipeline_stage === "cancelado") {
+            user.proposalsCancelled++;
+          }
         }
 
         if (!user.lastActivity || new Date(proposal.created_at) > new Date(user.lastActivity)) {
@@ -235,22 +298,54 @@ export function PerformanceReport() {
         }
       });
 
-      // Process leads
-      leads?.forEach((lead) => {
+      // Process Leads
+      leads.forEach((lead: any) => {
         const userId = lead.created_by || lead.assigned_to;
-        if (!userId || !userMap.has(userId)) return;
+        if (!userId) return;
+        if (filters.userId && userId !== filters.userId) return;
 
-        const user = userMap.get(userId)!;
+        const user = getOrCreateUser(userId, "Desconhecido");
         user.totalLeads++;
       });
 
-      // Process commissions
-      commissions?.forEach((commission) => {
-        const userId = commission.user_id;
-        if (!userId || !userMap.has(userId)) return;
+      // Process Activate Leads
+      activateLeads.forEach((lead: any) => {
+        const userId = lead.created_by || lead.assigned_to;
+        if (!userId) return;
+        if (filters.userId && userId !== filters.userId) return;
 
-        const user = userMap.get(userId)!;
-        user.commissionGenerated += commission.commission_amount || 0;
+        const user = getOrCreateUser(userId, "Desconhecido");
+        user.activatedLeads++;
+      });
+
+      // Process Commissions
+      commissions.forEach((commission: any) => {
+        const userId = commission.user_id;
+        if (!userId) return;
+        if (filters.userId && userId !== filters.userId) return;
+
+        const user = getOrCreateUser(userId, "Desconhecido");
+        user.commissionGenerated += Number(commission.commission_amount) || 0;
+      });
+
+      // Process Documents
+      documents.forEach((doc: any) => {
+        const userId = doc.uploaded_by;
+        if (!userId) return;
+        if (filters.userId && userId !== filters.userId) return;
+
+        const user = getOrCreateUser(userId, "Desconhecido");
+        user.documentsSaved++;
+      });
+
+      // Process Saved Proposals
+      savedProposals.forEach((sp: any) => {
+        const userId = sp.user_id;
+        if (!userId) return;
+        if (filters.userId && userId !== filters.userId) return;
+
+        const user = getOrCreateUser(userId, "Desconhecido");
+        user.savedProposals++;
       });
 
       // Calculate conversion rates
@@ -267,11 +362,14 @@ export function PerformanceReport() {
       const newSummary: ReportSummary = {
         totalActiveUsers: performanceArray.length,
         totalLeadsWorked: performanceArray.reduce((sum, u) => sum + u.totalLeads, 0),
+        activatedLeads: performanceArray.reduce((sum, u) => sum + u.activatedLeads, 0),
         totalProposalsCreated: performanceArray.reduce((sum, u) => sum + u.proposalsCreated, 0),
         proposalsPaid: performanceArray.reduce((sum, u) => sum + u.proposalsPaid, 0),
         proposalsCancelled: performanceArray.reduce((sum, u) => sum + u.proposalsCancelled, 0),
         totalSoldValue: performanceArray.reduce((sum, u) => sum + u.totalSold, 0),
         totalCommissions: performanceArray.reduce((sum, u) => sum + u.commissionGenerated, 0),
+        documentsSaved: performanceArray.reduce((sum, u) => sum + u.documentsSaved, 0),
+        savedProposals: performanceArray.reduce((sum, u) => sum + u.savedProposals, 0),
       };
 
       setSummary(newSummary);
