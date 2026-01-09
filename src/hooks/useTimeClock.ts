@@ -123,7 +123,8 @@ export function useTimeClock(userId: string | undefined) {
   const registerClock = async (
     clockType: TimeClockType,
     photoBlob: Blob | null,
-    companyId: string | null
+    companyId: string | null,
+    breakTypeId?: string | null
   ): Promise<boolean> => {
     if (!userId) return false;
     setLoading(true);
@@ -159,6 +160,7 @@ export function useTimeClock(userId: string | undefined) {
           language: navigator.language,
           screen: { width: window.screen.width, height: window.screen.height },
         },
+        break_type_id: breakTypeId || null,
       });
 
       if (error) throw error;
