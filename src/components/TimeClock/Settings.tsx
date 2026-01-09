@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Settings as SettingsIcon, Save, Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Settings as SettingsIcon, Save, Loader2, Coffee } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { TimeClockSettings } from './types';
+import { BreakTypesManager } from './BreakTypesManager';
 
 export function Settings() {
   const [loading, setLoading] = useState(false);
@@ -93,151 +95,170 @@ export function Settings() {
     );
   }
 
-  if (!settings) return null;
-
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <SettingsIcon className="h-5 w-5" />
-          Configurações do Ponto
-        </CardTitle>
-        <CardDescription>
-          Configure as regras do controle de ponto
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid gap-6 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="entry_time">Horário Padrão de Entrada</Label>
-            <Input
-              id="entry_time"
-              type="time"
-              value={settings.default_entry_time}
-              onChange={(e) =>
-                setSettings({ ...settings, default_entry_time: e.target.value })
-              }
-            />
-          </div>
+    <Tabs defaultValue="general" className="space-y-4">
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="general" className="flex items-center gap-2">
+          <SettingsIcon className="h-4 w-4" />
+          Geral
+        </TabsTrigger>
+        <TabsTrigger value="breaks" className="flex items-center gap-2">
+          <Coffee className="h-4 w-4" />
+          Tipos de Pausa
+        </TabsTrigger>
+      </TabsList>
 
-          <div className="space-y-2">
-            <Label htmlFor="exit_time">Horário Padrão de Saída</Label>
-            <Input
-              id="exit_time"
-              type="time"
-              value={settings.default_exit_time}
-              onChange={(e) =>
-                setSettings({ ...settings, default_exit_time: e.target.value })
-              }
-            />
-          </div>
+      <TabsContent value="general">
+        {settings && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <SettingsIcon className="h-5 w-5" />
+                Configurações do Ponto
+              </CardTitle>
+              <CardDescription>
+                Configure as regras do controle de ponto
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="entry_time">Horário Padrão de Entrada</Label>
+                  <Input
+                    id="entry_time"
+                    type="time"
+                    value={settings.default_entry_time}
+                    onChange={(e) =>
+                      setSettings({ ...settings, default_entry_time: e.target.value })
+                    }
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="tolerance">Tolerância (minutos)</Label>
-            <Input
-              id="tolerance"
-              type="number"
-              min="0"
-              max="60"
-              value={settings.tolerance_minutes}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  tolerance_minutes: parseInt(e.target.value) || 0,
-                })
-              }
-            />
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="exit_time">Horário Padrão de Saída</Label>
+                  <Input
+                    id="exit_time"
+                    type="time"
+                    value={settings.default_exit_time}
+                    onChange={(e) =>
+                      setSettings({ ...settings, default_exit_time: e.target.value })
+                    }
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="retention">Retenção de Dados (anos)</Label>
-            <Input
-              id="retention"
-              type="number"
-              min="1"
-              max="10"
-              value={settings.retention_years}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  retention_years: parseInt(e.target.value) || 5,
-                })
-              }
-            />
-          </div>
-        </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tolerance">Tolerância (minutos)</Label>
+                  <Input
+                    id="tolerance"
+                    type="number"
+                    min="0"
+                    max="60"
+                    value={settings.tolerance_minutes}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        tolerance_minutes: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Exigir Foto</Label>
-              <p className="text-sm text-muted-foreground">
-                Colaboradores devem tirar foto ao registrar ponto
-              </p>
-            </div>
-            <Switch
-              checked={settings.require_photo}
-              onCheckedChange={(checked) =>
-                setSettings({ ...settings, require_photo: checked })
-              }
-            />
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="retention">Retenção de Dados (anos)</Label>
+                  <Input
+                    id="retention"
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={settings.retention_years}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        retention_years: parseInt(e.target.value) || 5,
+                      })
+                    }
+                  />
+                </div>
+              </div>
 
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Exigir Localização</Label>
-              <p className="text-sm text-muted-foreground">
-                Capturar GPS ao registrar ponto
-              </p>
-            </div>
-            <Switch
-              checked={settings.require_location}
-              onCheckedChange={(checked) =>
-                setSettings({ ...settings, require_location: checked })
-              }
-            />
-          </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Exigir Foto</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Colaboradores devem tirar foto ao registrar ponto
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.require_photo}
+                    onCheckedChange={(checked) =>
+                      setSettings({ ...settings, require_photo: checked })
+                    }
+                  />
+                </div>
 
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Permitir Ajuste Manual</Label>
-              <p className="text-sm text-muted-foreground">
-                Gestores podem ajustar horários com justificativa
-              </p>
-            </div>
-            <Switch
-              checked={settings.allow_manual_adjustment}
-              onCheckedChange={(checked) =>
-                setSettings({ ...settings, allow_manual_adjustment: checked })
-              }
-            />
-          </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Exigir Localização</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Capturar GPS ao registrar ponto
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.require_location}
+                    onCheckedChange={(checked) =>
+                      setSettings({ ...settings, require_location: checked })
+                    }
+                  />
+                </div>
 
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Bloquear Ponto Duplicado</Label>
-              <p className="text-sm text-muted-foreground">
-                Impedir múltiplos registros do mesmo tipo no dia
-              </p>
-            </div>
-            <Switch
-              checked={settings.block_duplicate_clock}
-              onCheckedChange={(checked) =>
-                setSettings({ ...settings, block_duplicate_clock: checked })
-              }
-            />
-          </div>
-        </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Permitir Ajuste Manual</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Gestores podem ajustar horários com justificativa
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.allow_manual_adjustment}
+                    onCheckedChange={(checked) =>
+                      setSettings({ ...settings, allow_manual_adjustment: checked })
+                    }
+                  />
+                </div>
 
-        <Button onClick={handleSave} disabled={saving} className="w-full">
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          ) : (
-            <Save className="h-4 w-4 mr-2" />
-          )}
-          Salvar Configurações
-        </Button>
-      </CardContent>
-    </Card>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Bloquear Ponto Duplicado</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Impedir múltiplos registros do mesmo tipo no dia
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.block_duplicate_clock}
+                    onCheckedChange={(checked) =>
+                      setSettings({ ...settings, block_duplicate_clock: checked })
+                    }
+                  />
+                </div>
+              </div>
+
+              <Button onClick={handleSave} disabled={saving} className="w-full">
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Salvar Configurações
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </TabsContent>
+
+      <TabsContent value="breaks">
+        <BreakTypesManager />
+      </TabsContent>
+    </Tabs>
   );
 }

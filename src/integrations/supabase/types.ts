@@ -3064,6 +3064,7 @@ export type Database = {
       }
       time_clock: {
         Row: {
+          break_type_id: string | null
           city: string | null
           clock_date: string
           clock_time: string
@@ -3084,6 +3085,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          break_type_id?: string | null
           city?: string | null
           clock_date?: string
           clock_time?: string
@@ -3104,6 +3106,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          break_type_id?: string | null
           city?: string | null
           clock_date?: string
           clock_time?: string
@@ -3125,7 +3128,61 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "time_clock_break_type_id_fkey"
+            columns: ["break_type_id"]
+            isOneToOne: false
+            referencedRelation: "time_clock_break_types"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "time_clock_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      time_clock_break_types: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          is_paid: boolean | null
+          max_duration_minutes: number | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_paid?: boolean | null
+          max_duration_minutes?: number | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_paid?: boolean | null
+          max_duration_minutes?: number | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_clock_break_types_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"

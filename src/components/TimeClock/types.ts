@@ -18,6 +18,7 @@ export interface TimeClock {
   device_info: any;
   status: TimeClockStatus;
   notes: string | null;
+  break_type_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -55,6 +56,19 @@ export interface TimeClockConsent {
   consent_date: string | null;
   ip_address: string | null;
   created_at: string;
+}
+
+export interface TimeClockBreakType {
+  id: string;
+  company_id: string | null;
+  name: string;
+  description: string | null;
+  is_paid: boolean;
+  max_duration_minutes: number | null;
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface DailyRecord {
