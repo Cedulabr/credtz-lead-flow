@@ -38,6 +38,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { BaseOffImport } from "./BaseOffImport";
+import { BaseOffImportEngine } from "./BaseOffImportEngine";
 
 interface BaseOffClient {
   id: string;
@@ -181,6 +182,7 @@ export function BaseOffConsulta() {
   const [searchResults, setSearchResults] = useState<BaseOffClient[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
+  const [showOptimizedImport, setShowOptimizedImport] = useState(false);
   const [activeTab, setActiveTab] = useState("dados");
   
   // Simulação
@@ -800,6 +802,10 @@ export function BaseOffConsulta() {
     );
   };
 
+  if (showOptimizedImport && isAdmin) {
+    return <BaseOffImportEngine onBack={() => setShowOptimizedImport(false)} />;
+  }
+
   if (showImport && isAdmin) {
     return <BaseOffImport onBack={() => setShowImport(false)} />;
   }
@@ -974,6 +980,10 @@ export function BaseOffConsulta() {
         <div className="flex gap-2">
           {isAdmin && (
             <>
+              <Button onClick={() => setShowOptimizedImport(true)} variant="default">
+                <Upload className="h-4 w-4 mr-2" />
+                Importar (Arquivos Grandes)
+              </Button>
               <Button onClick={() => setShowImport(true)} variant="outline">
                 <Upload className="h-4 w-4 mr-2" />
                 Importar Base
