@@ -149,6 +149,45 @@ export function PerformanceReport() {
       const startISO = dateRange.start.toISOString();
       const endISO = dateRange.end.toISOString();
 
+      // First, get the company IDs for gestor filtering
+      let allowedUserIds: string[] | null = null;
+      
+      if (!isAdmin && isGestor && profile?.id) {
+        // Fetch the companies this gestor manages
+        const { data: gestorCompanies } = await supabase
+          .from("user_companies")
+          .select("company_id")
+          .eq("user_id", profile.id)
+          .eq("company_role", "gestor")
+          .eq("is_active", true);
+        
+        if (gestorCompanies && gestorCompanies.length > 0) {
+          const companyIds = gestorCompanies.map(c => c.company_id);
+          
+          // Get all users from these companies
+          const { data: companyUsers } = await supabase
+            .from("user_companies")
+            .select("user_id")
+            .in("company_id", companyIds)
+            .eq("is_active", true);
+          
+          allowedUserIds = companyUsers?.map(u => u.user_id) || [];
+        }
+      }
+
+      // Fetch all profiles first to create a name lookup map
+      const { data: allProfiles } = await supabase
+        .from("profiles")
+        .select("id, name")
+        .eq("is_active", true);
+      
+      const profileNameMap = new Map<string, string>();
+      allProfiles?.forEach(p => {
+        if (p.name) {
+          profileNameMap.set(p.id, p.name);
+        }
+      });
+
       // Fetch all data sources in parallel
       const [
         televendasResult,
@@ -209,22 +248,35 @@ export function PerformanceReport() {
           .lte("created_at", endISO),
       ]);
 
-      const televendas = televendasResult.data || [];
-      const proposals = proposalsResult.data || [];
-      const leads = leadsResult.data || [];
-      const activateLeads = activateLeadsResult.data || [];
-      const commissions = commissionsResult.data || [];
-      const documents = documentsResult.data || [];
-      const savedProposals = savedProposalsResult.data || [];
+      let televendas = televendasResult.data || [];
+      let proposals = proposalsResult.data || [];
+      let leads = leadsResult.data || [];
+      let activateLeads = activateLeadsResult.data || [];
+      let commissions = commissionsResult.data || [];
+      let documents = documentsResult.data || [];
+      let savedProposals = savedProposalsResult.data || [];
+
+      // Filter by allowed users if gestor
+      if (allowedUserIds) {
+        televendas = televendas.filter((t: any) => allowedUserIds!.includes(t.user_id));
+        proposals = proposals.filter((p: any) => allowedUserIds!.includes(p.created_by_id));
+        leads = leads.filter((l: any) => allowedUserIds!.includes(l.created_by) || allowedUserIds!.includes(l.assigned_to));
+        activateLeads = activateLeads.filter((a: any) => allowedUserIds!.includes(a.created_by) || allowedUserIds!.includes(a.assigned_to));
+        commissions = commissions.filter((c: any) => allowedUserIds!.includes(c.user_id));
+        documents = documents.filter((d: any) => allowedUserIds!.includes(d.uploaded_by));
+        savedProposals = savedProposals.filter((s: any) => allowedUserIds!.includes(s.user_id));
+      }
 
       // Process data by user
       const userMap = new Map<string, UserPerformance>();
 
-      const getOrCreateUser = (userId: string, userName: string): UserPerformance => {
+      const getOrCreateUser = (userId: string, fallbackName?: string): UserPerformance => {
         if (!userMap.has(userId)) {
+          // Look up the name from profile map first
+          const userName = profileNameMap.get(userId) || fallbackName || "Desconhecido";
           userMap.set(userId, {
             userId,
-            userName: userName || "Desconhecido",
+            userName,
             totalLeads: 0,
             activatedLeads: 0,
             proposalsCreated: 0,
@@ -304,7 +356,7 @@ export function PerformanceReport() {
         if (!userId) return;
         if (filters.userId && userId !== filters.userId) return;
 
-        const user = getOrCreateUser(userId, "Desconhecido");
+        const user = getOrCreateUser(userId);
         user.totalLeads++;
       });
 
@@ -314,7 +366,7 @@ export function PerformanceReport() {
         if (!userId) return;
         if (filters.userId && userId !== filters.userId) return;
 
-        const user = getOrCreateUser(userId, "Desconhecido");
+        const user = getOrCreateUser(userId);
         user.activatedLeads++;
       });
 
@@ -324,7 +376,7 @@ export function PerformanceReport() {
         if (!userId) return;
         if (filters.userId && userId !== filters.userId) return;
 
-        const user = getOrCreateUser(userId, "Desconhecido");
+        const user = getOrCreateUser(userId);
         user.commissionGenerated += Number(commission.commission_amount) || 0;
       });
 
@@ -334,7 +386,7 @@ export function PerformanceReport() {
         if (!userId) return;
         if (filters.userId && userId !== filters.userId) return;
 
-        const user = getOrCreateUser(userId, "Desconhecido");
+        const user = getOrCreateUser(userId);
         user.documentsSaved++;
       });
 
@@ -344,7 +396,7 @@ export function PerformanceReport() {
         if (!userId) return;
         if (filters.userId && userId !== filters.userId) return;
 
-        const user = getOrCreateUser(userId, "Desconhecido");
+        const user = getOrCreateUser(userId);
         user.savedProposals++;
       });
 
