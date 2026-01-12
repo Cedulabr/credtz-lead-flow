@@ -40,8 +40,13 @@ import {
   UserX,
   History,
   Sparkles,
-  Settings
+  Settings,
+  FileEdit,
+  Building2,
+  Loader2,
+  Send
 } from "lucide-react";
+import { Label } from "./ui/label";
 import { format, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -234,6 +239,20 @@ export function LeadsManagement() {
   const [loadingConvenios, setLoadingConvenios] = useState(false);
   const [totalAvailableLeads, setTotalAvailableLeads] = useState(0);
 
+  // Solicitar Digitação states
+  const [showDigitacaoModal, setShowDigitacaoModal] = useState(false);
+  const [digitacaoForm, setDigitacaoForm] = useState({
+    banco: "",
+    parcela: "",
+    troco: "",
+    saldo_devedor: "",
+    tipo_operacao: "Novo empréstimo",
+    observacao: ""
+  });
+  const [televendasBanks, setTelevendasBanks] = useState<{id: string, name: string}[]>([]);
+  const [loadingBanks, setLoadingBanks] = useState(false);
+  const [submittingDigitacao, setSubmittingDigitacao] = useState(false);
+
   const isAdmin = profile?.role === 'admin';
 
   useEffect(() => {
@@ -241,12 +260,33 @@ export function LeadsManagement() {
       fetchLeads();
       fetchUserCredits();
       fetchAvailableConvenios();
+      fetchTelevendasBanks();
       processExpiredFutureContacts();
       if (isAdmin) {
         fetchUsers();
       }
     }
   }, [user, isAdmin]);
+
+  const fetchTelevendasBanks = async () => {
+    try {
+      setLoadingBanks(true);
+      const { data, error } = await supabase
+        .from('televendas_banks')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) throw error;
+      setTelevendasBanks(data || []);
+    } catch (error) {
+      console.error('Error fetching televendas banks:', error);
+      // Fallback to static list if table doesn't exist
+      setTelevendasBanks(BANKS_LIST.map((name, i) => ({ id: String(i), name })));
+    } finally {
+      setLoadingBanks(false);
+    }
+  };
 
   const fetchAvailableConvenios = async () => {
     try {
@@ -851,6 +891,96 @@ export function LeadsManagement() {
     return formatted;
   };
 
+  const handleOpenDigitacaoModal = (lead: Lead) => {
+    setSelectedLead(lead);
+    setDigitacaoForm({
+      banco: "",
+      parcela: "",
+      troco: "",
+      saldo_devedor: "",
+      tipo_operacao: "Novo empréstimo",
+      observacao: ""
+    });
+    setShowDigitacaoModal(true);
+  };
+
+  const handleDigitacaoSubmit = async () => {
+    if (!selectedLead || !user) return;
+    
+    if (!digitacaoForm.banco || !digitacaoForm.parcela) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Selecione o banco e informe o valor da parcela.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSubmittingDigitacao(true);
+
+      // Parse currency values
+      const parseCurrencyValue = (val: string): number | null => {
+        if (!val) return null;
+        const numbers = val.replace(/\D/g, "");
+        if (!numbers) return null;
+        return parseInt(numbers) / 100;
+      };
+
+      const parcelaValue = parseCurrencyValue(digitacaoForm.parcela) || 0;
+      const trocoValue = parseCurrencyValue(digitacaoForm.troco);
+      const saldoDevedorValue = parseCurrencyValue(digitacaoForm.saldo_devedor);
+
+      // Get user's company_id
+      const { data: userCompany } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      // Insert into televendas with status 'solicitado_digitacao'
+      const { error: insertError } = await (supabase as any).from("televendas").insert({
+        user_id: user.id,
+        company_id: userCompany?.company_id || null,
+        nome: selectedLead.name,
+        cpf: selectedLead.cpf.replace(/\D/g, ""),
+        data_venda: new Date().toISOString().split('T')[0],
+        telefone: selectedLead.phone.replace(/\D/g, ""),
+        banco: digitacaoForm.banco,
+        parcela: parcelaValue,
+        troco: trocoValue,
+        saldo_devedor: saldoDevedorValue,
+        tipo_operacao: digitacaoForm.tipo_operacao,
+        observacao: digitacaoForm.observacao || `Lead ID: ${selectedLead.id}`,
+        status: 'solicitado_digitacao',
+      });
+
+      if (insertError) throw insertError;
+
+      // Update lead status to indicate digitação was requested
+      await updateLeadStatus(selectedLead.id, 'cliente_fechado');
+
+      toast({
+        title: "Digitação solicitada!",
+        description: "O cliente foi enviado para a Gestão Televendas com sucesso.",
+      });
+
+      setShowDigitacaoModal(false);
+      setSelectedLead(null);
+      fetchLeads();
+    } catch (error) {
+      console.error('Error submitting digitação:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao solicitar digitação. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingDigitacao(false);
+    }
+  };
+
   const filteredLeads = useMemo(() => {
     return leads.filter(lead => {
       const matchesSearch = (lead.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1301,20 +1431,31 @@ export function LeadsManagement() {
                           size="lg"
                           variant="outline"
                           onClick={() => window.open(`tel:${lead.phone}`, '_self')}
-                          className="h-12 px-4 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-300 font-bold"
+                          className="h-10 md:h-12 px-3 md:px-4 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-300 font-bold text-sm md:text-base"
                         >
-                          <Phone className="h-5 w-5 mr-2" />
-                          Ligar
+                          <Phone className="h-4 w-4 md:h-5 md:w-5 md:mr-2" />
+                          <span className="hidden md:inline">Ligar</span>
                         </Button>
                         
                         <Button
                           size="lg"
                           variant="outline"
                           onClick={() => window.open(`https://wa.me/${lead.phone.replace(/\D/g, '')}`, '_blank')}
-                          className="h-12 px-4 hover:bg-green-100 hover:text-green-700 hover:border-green-300 font-bold"
+                          className="h-10 md:h-12 px-3 md:px-4 hover:bg-green-100 hover:text-green-700 hover:border-green-300 font-bold text-sm md:text-base"
                         >
-                          <MessageCircle className="h-5 w-5 mr-2" />
-                          WhatsApp
+                          <MessageCircle className="h-4 w-4 md:h-5 md:w-5 md:mr-2" />
+                          <span className="hidden md:inline">WhatsApp</span>
+                        </Button>
+
+                        {/* Botão Solicitar Digitação - Destaque para mobile */}
+                        <Button
+                          size="lg"
+                          onClick={() => handleOpenDigitacaoModal(lead)}
+                          className="h-10 md:h-12 px-3 md:px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-bold text-sm md:text-base shadow-lg"
+                        >
+                          <FileEdit className="h-4 w-4 md:h-5 md:w-5 md:mr-2" />
+                          <span className="hidden sm:inline">Solicitar Digitação</span>
+                          <span className="sm:hidden">Digitar</span>
                         </Button>
 
                         <Select 
@@ -1322,7 +1463,7 @@ export function LeadsManagement() {
                           onValueChange={(value) => handleStatusChange(lead, value)}
                           disabled={!canEditLead(lead)}
                         >
-                          <SelectTrigger className="w-44 h-12 text-sm font-bold border-2">
+                          <SelectTrigger className="w-32 md:w-44 h-10 md:h-12 text-xs md:text-sm font-bold border-2">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -1630,6 +1771,206 @@ export function LeadsManagement() {
               className="bg-gradient-to-r from-indigo-500 to-violet-500"
             >
               Atribuir Leads
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Solicitar Digitação - Responsivo para Mobile */}
+      <Dialog open={showDigitacaoModal} onOpenChange={setShowDigitacaoModal}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-gradient-to-r from-emerald-500/20 to-teal-500/20">
+                <FileEdit className="h-5 w-5 text-emerald-600" />
+              </div>
+              Solicitar Digitação
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            {/* Info do Lead */}
+            <div className="p-3 sm:p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border border-emerald-200 dark:border-emerald-800">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-full bg-emerald-100 dark:bg-emerald-900">
+                  <User className="h-4 w-4 text-emerald-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-emerald-800 dark:text-emerald-200 truncate">
+                    {selectedLead?.name}
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-1 text-sm text-emerald-600 dark:text-emerald-400">
+                    <span className="font-mono">{selectedLead?.cpf}</span>
+                    <span>•</span>
+                    <span>{selectedLead?.phone}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Banco - Campo obrigatório */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                Banco *
+              </Label>
+              <Select 
+                value={digitacaoForm.banco} 
+                onValueChange={(value) => setDigitacaoForm(prev => ({ ...prev, banco: value }))}
+              >
+                <SelectTrigger className="h-12 border-2 focus:border-emerald-500 text-base">
+                  <SelectValue placeholder="Selecione o banco" />
+                </SelectTrigger>
+                <SelectContent>
+                  {loadingBanks ? (
+                    <SelectItem value="loading" disabled>Carregando...</SelectItem>
+                  ) : televendasBanks.length > 0 ? (
+                    televendasBanks.map(bank => (
+                      <SelectItem key={bank.id} value={bank.name} className="py-3">
+                        {bank.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    BANKS_LIST.map(bank => (
+                      <SelectItem key={bank} value={bank} className="py-3">
+                        {bank}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Tipo de Operação */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Tipo de Operação *</Label>
+              <Select 
+                value={digitacaoForm.tipo_operacao} 
+                onValueChange={(value) => setDigitacaoForm(prev => ({ ...prev, tipo_operacao: value }))}
+              >
+                <SelectTrigger className="h-12 border-2 focus:border-emerald-500 text-base">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Novo empréstimo" className="py-3">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                      Novo Empréstimo
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="Portabilidade" className="py-3">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                      Portabilidade
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="Refinanciamento" className="py-3">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                      Refinanciamento
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="Cartão" className="py-3">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                      Cartão
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Valores - Grid responsivo */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  Parcela *
+                </Label>
+                <Input
+                  placeholder="R$ 0,00"
+                  value={digitacaoForm.parcela}
+                  onChange={(e) => setDigitacaoForm(prev => ({ 
+                    ...prev, 
+                    parcela: formatCurrency(e.target.value) 
+                  }))}
+                  className="h-12 border-2 focus:border-emerald-500 text-base font-medium"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold">Troco/Liberado</Label>
+                <Input
+                  placeholder="R$ 0,00"
+                  value={digitacaoForm.troco}
+                  onChange={(e) => setDigitacaoForm(prev => ({ 
+                    ...prev, 
+                    troco: formatCurrency(e.target.value) 
+                  }))}
+                  className="h-12 border-2 focus:border-emerald-500 text-base"
+                />
+              </div>
+            </div>
+
+            {/* Saldo Devedor */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Saldo Devedor</Label>
+              <Input
+                placeholder="R$ 0,00"
+                value={digitacaoForm.saldo_devedor}
+                onChange={(e) => setDigitacaoForm(prev => ({ 
+                  ...prev, 
+                  saldo_devedor: formatCurrency(e.target.value) 
+                }))}
+                className="h-12 border-2 focus:border-emerald-500 text-base"
+              />
+            </div>
+
+            {/* Observação */}
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Observação</Label>
+              <Textarea
+                placeholder="Informações adicionais sobre a operação..."
+                value={digitacaoForm.observacao}
+                onChange={(e) => setDigitacaoForm(prev => ({ ...prev, observacao: e.target.value }))}
+                className="min-h-[80px] border-2 focus:border-emerald-500 text-base resize-none"
+              />
+            </div>
+
+            {/* Info */}
+            <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+              <p className="text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
+                <Send className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>O cliente será enviado para a <strong>Gestão Televendas</strong> com status <strong>"Solicitado Digitação"</strong>.</span>
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2 pt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDigitacaoModal(false)}
+              className="w-full sm:w-auto h-12 font-semibold"
+              disabled={submittingDigitacao}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleDigitacaoSubmit}
+              disabled={submittingDigitacao || !digitacaoForm.banco || !digitacaoForm.parcela}
+              className="w-full sm:w-auto h-12 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 font-bold"
+            >
+              {submittingDigitacao ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Send className="h-5 w-5 mr-2" />
+                  Solicitar Digitação
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
