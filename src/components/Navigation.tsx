@@ -371,36 +371,26 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
           animate={{ y: 0, opacity: 1 }}
           className="md:hidden fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-md border-t z-50 safe-area-inset-bottom"
         >
-          <div className="flex justify-around items-center px-2 py-2">
+          <div className="flex justify-around items-center px-1 py-1.5">
             {/* Home button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <motion.button
-                  onClick={() => onTabChange("dashboard")}
-                  className={cn(
-                    "flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200",
-                    activeTab === "dashboard"
-                      ? "text-primary bg-primary/15"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  )}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  <Home size={24} strokeWidth={activeTab === "dashboard" ? 2.5 : 2} />
-                  {activeTab === "dashboard" && (
-                    <motion.span 
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-[10px] font-medium mt-0.5"
-                    >
-                      Início
-                    </motion.span>
-                  )}
-                </motion.button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="font-medium">
+            <motion.button
+              onClick={() => onTabChange("dashboard")}
+              className={cn(
+                "flex flex-col items-center justify-center min-w-[56px] h-12 px-2 rounded-xl transition-all duration-200",
+                activeTab === "dashboard"
+                  ? "text-primary bg-primary/15"
+                  : "text-muted-foreground active:bg-muted/50"
+              )}
+              whileTap={{ scale: 0.92 }}
+            >
+              <Home size={22} strokeWidth={activeTab === "dashboard" ? 2.5 : 2} />
+              <span className={cn(
+                "text-[10px] font-medium mt-0.5 leading-tight",
+                activeTab === "dashboard" ? "text-primary" : "text-muted-foreground"
+              )}>
                 Início
-              </TooltipContent>
-            </Tooltip>
+              </span>
+            </motion.button>
 
             {/* Dynamic mobile items */}
             {visibleMobileItems.slice(0, 3).map((item) => {
@@ -408,77 +398,67 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
               const isActive = activeTab === item.id;
               
               return (
-                <Tooltip key={item.id}>
-                  <TooltipTrigger asChild>
-                    <motion.button
-                      onClick={() => onTabChange(item.id)}
-                      className={cn(
-                        "flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200",
-                        isActive
-                          ? "text-primary bg-primary/15"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                      )}
-                      whileTap={{ scale: 0.9 }}
-                    >
-                      <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
-                      {isActive && (
-                        <motion.span 
-                          initial={{ opacity: 0, y: 4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="text-[10px] font-medium mt-0.5 max-w-[50px] truncate"
-                        >
-                          {item.label.split(' ')[0]}
-                        </motion.span>
-                      )}
-                    </motion.button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="font-medium">
-                    {item.label}
-                  </TooltipContent>
-                </Tooltip>
+                <motion.button
+                  key={item.id}
+                  onClick={() => onTabChange(item.id)}
+                  className={cn(
+                    "flex flex-col items-center justify-center min-w-[56px] h-12 px-2 rounded-xl transition-all duration-200",
+                    isActive
+                      ? "text-primary bg-primary/15"
+                      : "text-muted-foreground active:bg-muted/50"
+                  )}
+                  whileTap={{ scale: 0.92 }}
+                >
+                  <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+                  <span className={cn(
+                    "text-[10px] font-medium mt-0.5 leading-tight truncate max-w-[48px]",
+                    isActive ? "text-primary" : "text-muted-foreground"
+                  )}>
+                    {item.label.split(' ')[0]}
+                  </span>
+                </motion.button>
               );
             })}
 
             {/* More menu button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <motion.button
-                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                  className={cn(
-                    "flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200",
-                    isMobileMenuOpen
-                      ? "text-primary bg-primary/15"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  )}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  <AnimatePresence mode="wait">
-                    {isMobileMenuOpen ? (
-                      <motion.div
-                        key="close"
-                        initial={{ rotate: -90, opacity: 0 }}
-                        animate={{ rotate: 0, opacity: 1 }}
-                        exit={{ rotate: 90, opacity: 0 }}
-                      >
-                        <X size={24} strokeWidth={2.5} />
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="menu"
-                        initial={{ rotate: 90, opacity: 0 }}
-                        animate={{ rotate: 0, opacity: 1 }}
-                        exit={{ rotate: -90, opacity: 0 }}
-                      >
-                        <Menu size={24} strokeWidth={2} />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="font-medium">
-                {isMobileMenuOpen ? "Fechar" : "Menu"}
-              </TooltipContent>
-            </Tooltip>
+            <motion.button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className={cn(
+                "flex flex-col items-center justify-center min-w-[56px] h-12 px-2 rounded-xl transition-all duration-200",
+                isMobileMenuOpen
+                  ? "text-primary bg-primary/15"
+                  : "text-muted-foreground active:bg-muted/50"
+              )}
+              whileTap={{ scale: 0.92 }}
+            >
+              <AnimatePresence mode="wait">
+                {isMobileMenuOpen ? (
+                  <motion.div
+                    key="close"
+                    initial={{ rotate: -90, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: 90, opacity: 0 }}
+                  >
+                    <X size={22} strokeWidth={2.5} />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="menu"
+                    initial={{ rotate: 90, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: -90, opacity: 0 }}
+                  >
+                    <Menu size={22} strokeWidth={2} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <span className={cn(
+                "text-[10px] font-medium mt-0.5 leading-tight",
+                isMobileMenuOpen ? "text-primary" : "text-muted-foreground"
+              )}>
+                Menu
+              </span>
+            </motion.button>
           </div>
         </motion.div>
       </TooltipProvider>

@@ -844,14 +844,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </div>
 
       {/* Mobile Header */}
-      <div className="md:hidden px-4 py-3 bg-background/80 backdrop-blur-xl border-b border-border/50">
-        <div className="flex items-center justify-between mb-3">
+      <div className="md:hidden px-3 py-2.5 bg-background/80 backdrop-blur-xl border-b border-border/50">
+        <div className="flex items-center justify-between mb-2">
           <p className="text-sm text-muted-foreground">Olá, <span className="font-semibold text-foreground">{userName}</span> 👋</p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8"
+              className="h-9 w-9"
               onClick={() => fetchAllData()}
               disabled={isRefreshing}
             >
@@ -860,22 +860,22 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8 relative"
+              className="h-9 w-9 relative"
               onClick={() => onNavigate('notifications')}
             >
               <Bell className="h-4 w-4" />
               {notificationsCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center font-medium">
+                <span className="absolute -top-0.5 -right-0.5 h-4 w-4 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center font-medium">
                   {notificationsCount}
                 </span>
               )}
             </Button>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="flex-1 h-9 text-xs bg-muted/50">
-              <Calendar className="h-3 w-3 mr-1" />
+            <SelectTrigger className="h-10 text-xs bg-muted/50">
+              <Calendar className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -887,8 +887,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           
           {(isAdmin || companies.length > 1) && (
             <Select value={selectedCompany} onValueChange={setSelectedCompany}>
-              <SelectTrigger className="flex-1 h-9 text-xs bg-muted/50">
-                <Building2 className="h-3 w-3 mr-1" />
+              <SelectTrigger className="h-10 text-xs bg-muted/50">
+                <Building2 className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -902,7 +902,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       </div>
 
-      <div className="p-4 md:p-6 space-y-6 w-full max-w-full overflow-x-hidden">
+      <div className="p-3 md:p-6 space-y-4 md:space-y-6 w-full max-w-full overflow-x-hidden">
         {/* Alerts Banner */}
         {alerts.length > 0 && (
           <div className="bg-gradient-to-r from-destructive/10 to-warning/10 border border-destructive/20 rounded-2xl p-4">
@@ -922,53 +922,53 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         )}
 
         {/* Main KPIs Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-4">
           {/* Vendas */}
           <Card className="group relative overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 hover:border-primary/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-primary/10" onClick={() => onNavigate('televendas')}>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-16 translate-x-16" />
-            <CardContent className="p-4 md:p-5 relative">
-              <div className="flex items-center justify-between mb-3">
-                <div className="h-11 w-11 bg-primary/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <ShoppingCart className="h-5 w-5 text-primary" />
+            <div className="absolute top-0 right-0 w-20 md:w-32 h-20 md:h-32 bg-primary/5 rounded-full -translate-y-10 md:-translate-y-16 translate-x-10 md:translate-x-16" />
+            <CardContent className="p-3 md:p-5 relative">
+              <div className="flex items-center justify-between mb-2 md:mb-3">
+                <div className="h-9 w-9 md:h-11 md:w-11 bg-primary/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <ShoppingCart className="h-4 w-4 md:h-5 md:w-5 text-primary" />
                 </div>
-                <Badge variant="outline" className={`text-[10px] ${revenueChange >= 0 ? 'bg-success/10 text-success border-success/30' : 'bg-destructive/10 text-destructive border-destructive/30'}`}>
+                <Badge variant="outline" className={`text-[9px] md:text-[10px] ${revenueChange >= 0 ? 'bg-success/10 text-success border-success/30' : 'bg-destructive/10 text-destructive border-destructive/30'}`}>
                   {revenueChange >= 0 ? '+' : ''}{revenueChange.toFixed(1)}%
                 </Badge>
               </div>
-              <p className="text-xs text-muted-foreground mb-1">Vendas Pagas</p>
-              <p className="text-2xl md:text-3xl font-bold text-foreground">{totalSales}</p>
-              <p className="text-xs text-muted-foreground mt-1">este mês</p>
+              <p className="text-[10px] md:text-xs text-muted-foreground mb-0.5">Vendas Pagas</p>
+              <p className="text-xl md:text-3xl font-bold text-foreground">{totalSales}</p>
+              <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">este mês</p>
             </CardContent>
           </Card>
 
           {/* Faturamento */}
           <Card className="group relative overflow-hidden bg-gradient-to-br from-success/5 to-success/10 border-success/20 hover:border-success/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-success/10" onClick={() => onNavigate('televendas')}>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-success/5 rounded-full -translate-y-16 translate-x-16" />
-            <CardContent className="p-4 md:p-5 relative">
-              <div className="flex items-center justify-between mb-3">
-                <div className="h-11 w-11 bg-success/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <DollarSign className="h-5 w-5 text-success" />
+            <div className="absolute top-0 right-0 w-20 md:w-32 h-20 md:h-32 bg-success/5 rounded-full -translate-y-10 md:-translate-y-16 translate-x-10 md:translate-x-16" />
+            <CardContent className="p-3 md:p-5 relative">
+              <div className="flex items-center justify-between mb-2 md:mb-3">
+                <div className="h-9 w-9 md:h-11 md:w-11 bg-success/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-success" />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground mb-1">Faturamento</p>
-              <p className="text-xl md:text-2xl font-bold text-success truncate">{formatCompactCurrency(totalRevenue)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Ticket: {formatCompactCurrency(averageTicket)}</p>
+              <p className="text-[10px] md:text-xs text-muted-foreground mb-0.5">Faturamento</p>
+              <p className="text-lg md:text-2xl font-bold text-success truncate">{formatCompactCurrency(totalRevenue)}</p>
+              <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5 truncate">Ticket: {formatCompactCurrency(averageTicket)}</p>
             </CardContent>
           </Card>
 
           {/* Comissões */}
           <Card className="group relative overflow-hidden bg-gradient-to-br from-warning/5 to-warning/10 border-warning/20 hover:border-warning/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-warning/10" onClick={() => onNavigate('minhas-comissoes')}>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-warning/5 rounded-full -translate-y-16 translate-x-16" />
-            <CardContent className="p-4 md:p-5 relative">
-              <div className="flex items-center justify-between mb-3">
-                <div className="h-11 w-11 bg-warning/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <CreditCard className="h-5 w-5 text-warning" />
+            <div className="absolute top-0 right-0 w-20 md:w-32 h-20 md:h-32 bg-warning/5 rounded-full -translate-y-10 md:-translate-y-16 translate-x-10 md:translate-x-16" />
+            <CardContent className="p-3 md:p-5 relative">
+              <div className="flex items-center justify-between mb-2 md:mb-3">
+                <div className="h-9 w-9 md:h-11 md:w-11 bg-warning/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <CreditCard className="h-4 w-4 md:h-5 md:w-5 text-warning" />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground mb-1">Comissões</p>
-              <p className="text-xl md:text-2xl font-bold text-warning truncate">{formatCompactCurrency(totalCommissions)}</p>
-              <div className="flex gap-2 mt-1">
-                <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/30">
+              <p className="text-[10px] md:text-xs text-muted-foreground mb-0.5">Comissões</p>
+              <p className="text-lg md:text-2xl font-bold text-warning truncate">{formatCompactCurrency(totalCommissions)}</p>
+              <div className="flex gap-1 mt-0.5">
+                <Badge variant="outline" className="text-[8px] md:text-[10px] bg-success/10 text-success border-success/30 px-1 md:px-1.5">
                   Pago: {formatCompactCurrency(commissionsPaid)}
                 </Badge>
               </div>
@@ -978,25 +978,25 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           {/* Performance / Conversão */}
           {(isAdmin || isGestor) && vendorStats.length > 0 ? (
             <Card className="group relative overflow-hidden bg-gradient-to-br from-purple-500/5 to-purple-500/10 border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-purple-500/10" onClick={() => onNavigate('performance-report')}>
-              <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full -translate-y-16 translate-x-16" />
-              <CardContent className="p-4 md:p-5 relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="h-11 w-11 bg-purple-500/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Trophy className="h-5 w-5 text-purple-500" />
+              <div className="absolute top-0 right-0 w-20 md:w-32 h-20 md:h-32 bg-purple-500/5 rounded-full -translate-y-10 md:-translate-y-16 translate-x-10 md:translate-x-16" />
+              <CardContent className="p-3 md:p-5 relative">
+                <div className="flex items-center justify-between mb-2 md:mb-3">
+                  <div className="h-9 w-9 md:h-11 md:w-11 bg-purple-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Trophy className="h-4 w-4 md:h-5 md:w-5 text-purple-500" />
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mb-1">Top Vendedor</p>
+                <p className="text-[10px] md:text-xs text-muted-foreground mb-0.5">Top Vendedor</p>
                 <p className="text-sm md:text-base font-bold text-foreground truncate">{vendorStats[0]?.name}</p>
-                <p className="text-xs text-purple-500 truncate mt-1">{formatCompactCurrency(vendorStats[0]?.totalValue || 0)}</p>
+                <p className="text-[10px] md:text-xs text-purple-500 truncate mt-0.5">{formatCompactCurrency(vendorStats[0]?.totalValue || 0)}</p>
               </CardContent>
             </Card>
           ) : (
             <Card className="group relative overflow-hidden bg-gradient-to-br from-purple-500/5 to-purple-500/10 border-purple-500/20">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full -translate-y-16 translate-x-16" />
-              <CardContent className="p-4 md:p-5 relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="h-11 w-11 bg-purple-500/20 rounded-2xl flex items-center justify-center">
-                    <Percent className="h-5 w-5 text-purple-500" />
+              <div className="absolute top-0 right-0 w-20 md:w-32 h-20 md:h-32 bg-purple-500/5 rounded-full -translate-y-10 md:-translate-y-16 translate-x-10 md:translate-x-16" />
+              <CardContent className="p-3 md:p-5 relative">
+                <div className="flex items-center justify-between mb-2 md:mb-3">
+                  <div className="h-9 w-9 md:h-11 md:w-11 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                    <Percent className="h-4 w-4 md:h-5 md:w-5 text-purple-500" />
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mb-1">Conversão</p>
