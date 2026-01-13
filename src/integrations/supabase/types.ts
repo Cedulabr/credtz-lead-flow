@@ -2115,6 +2115,7 @@ export type Database = {
           rework_date: string | null
           stage: string | null
           status: string | null
+          tag: string | null
           updated_at: string | null
           valor_operacao: number | null
         }
@@ -2144,6 +2145,7 @@ export type Database = {
           rework_date?: string | null
           stage?: string | null
           status?: string | null
+          tag?: string | null
           updated_at?: string | null
           valor_operacao?: number | null
         }
@@ -2173,6 +2175,7 @@ export type Database = {
           rework_date?: string | null
           stage?: string | null
           status?: string | null
+          tag?: string | null
           updated_at?: string | null
           valor_operacao?: number | null
         }
@@ -2229,6 +2232,7 @@ export type Database = {
           parcelas_pagas: number | null
           phone: string
           phone2: string | null
+          tag: string | null
           tipo_beneficio: string | null
           updated_at: string
         }
@@ -2247,6 +2251,7 @@ export type Database = {
           parcelas_pagas?: number | null
           phone: string
           phone2?: string | null
+          tag?: string | null
           tipo_beneficio?: string | null
           updated_at?: string
         }
@@ -2265,6 +2270,7 @@ export type Database = {
           parcelas_pagas?: number | null
           phone?: string
           phone2?: string | null
+          tag?: string | null
           tipo_beneficio?: string | null
           updated_at?: string
         }
@@ -3824,6 +3830,13 @@ export type Database = {
           ddd: string
         }[]
       }
+      get_available_tags: {
+        Args: never
+        Returns: {
+          available_count: number
+          tag: string
+        }[]
+      }
       get_available_ufs: {
         Args: never
         Returns: {
@@ -3938,6 +3951,26 @@ export type Database = {
               name: string
               phone: string
               phone2: string
+            }[]
+          }
+        | {
+            Args: {
+              banco_filter?: string
+              convenio_filter?: string
+              ddd_filter?: string[]
+              leads_requested?: number
+              produto_filter?: string
+              tag_filter?: string[]
+            }
+            Returns: {
+              banco: string
+              convenio: string
+              cpf: string
+              id: string
+              name: string
+              phone: string
+              phone2: string
+              tag: string
             }[]
           }
       secure_baseoff_access: {
