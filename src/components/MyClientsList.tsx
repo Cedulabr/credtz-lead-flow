@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { AnimatedContainer, StaggerContainer, StaggerItem } from "@/components/ui/animated-container";
+import { SkeletonCard } from "@/components/ui/skeleton-card";
 import { 
   Users,
   Phone,
@@ -808,14 +810,25 @@ export function MyClientsList() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-48">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <AnimatedContainer animation="fade" className="p-4 md:p-6 space-y-6">
+        <div className="flex flex-col md:flex-row justify-between gap-4">
+          <div className="space-y-2">
+            <div className="h-8 w-48 bg-muted rounded animate-pulse" />
+            <div className="h-4 w-64 bg-muted rounded animate-pulse" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <SkeletonCard key={i} variant="stat" />
+          ))}
+        </div>
+        <SkeletonCard variant="list" count={5} />
+      </AnimatedContainer>
     );
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6 pb-20 md:pb-6 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen">
+    <AnimatedContainer animation="slide-up" className="p-4 md:p-6 space-y-6 pb-20 md:pb-6 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen">
       {/* Modern Header */}
       <div className="flex flex-col space-y-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -1672,6 +1685,6 @@ export function MyClientsList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AnimatedContainer>
   );
 }

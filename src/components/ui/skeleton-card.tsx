@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 interface SkeletonCardProps {
-  variant?: "card" | "list" | "form" | "table" | "stat";
+  variant?: "card" | "list" | "form" | "table" | "stat" | "kanban" | "chart";
   count?: number;
   className?: string;
 }
@@ -14,6 +14,55 @@ function ShimmerOverlay() {
 
 export function SkeletonCard({ variant = "card", count = 1, className }: SkeletonCardProps) {
   const items = Array.from({ length: count }, (_, i) => i);
+
+  if (variant === "kanban") {
+    return (
+      <div className={cn("rounded-xl bg-card border p-4 space-y-3", className)}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className="h-3 w-3 rounded-full bg-muted animate-pulse" />
+            <div className="h-4 w-20 rounded bg-muted animate-pulse" />
+          </div>
+          <div className="h-5 w-8 rounded-full bg-muted animate-pulse" />
+        </div>
+        <div className="h-4 w-24 rounded bg-muted animate-pulse" />
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="relative overflow-hidden rounded-lg bg-muted/50 border p-3">
+              <ShimmerOverlay />
+              <div className="h-4 w-3/4 rounded bg-muted animate-pulse mb-2" />
+              <div className="h-5 w-20 rounded bg-muted animate-pulse mb-2" />
+              <div className="flex gap-2">
+                <div className="h-4 w-16 rounded bg-muted animate-pulse" />
+                <div className="h-4 w-14 rounded bg-muted animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (variant === "chart") {
+    return (
+      <div className={cn("relative overflow-hidden rounded-xl bg-card border p-4 md:p-6 h-[300px]", className)}>
+        <ShimmerOverlay />
+        <div className="h-4 w-32 rounded bg-muted animate-pulse mb-4" />
+        <div className="flex items-end gap-2 h-[220px]">
+          {[40, 65, 45, 80, 55, 70, 50, 85, 60, 75, 45, 90].map((height, i) => (
+            <div
+              key={i}
+              className="flex-1 rounded-t bg-muted animate-pulse"
+              style={{ 
+                height: `${height}%`,
+                animationDelay: `${i * 0.05}s`
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (variant === "stat") {
     return (

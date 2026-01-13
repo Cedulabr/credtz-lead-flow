@@ -12,6 +12,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ImportBase } from "./ImportBase";
 import { DistributedLeadsManager } from "./DistributedLeadsManager";
+import { AnimatedContainer, StaggerContainer, StaggerItem } from "./ui/animated-container";
+import { SkeletonCard } from "./ui/skeleton-card";
 import { 
   Search, 
   Filter, 
@@ -1023,7 +1025,7 @@ export function LeadsManagement() {
   }
 
   return (
-    <div className="p-4 md:p-8 space-y-8 pb-24 md:pb-8 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen">
+    <AnimatedContainer animation="slide-up" className="p-4 md:p-8 space-y-8 pb-24 md:pb-8 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen">
       {/* Header Simplificado */}
       <div className="flex flex-col space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -1975,6 +1977,6 @@ export function LeadsManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AnimatedContainer>
   );
 }

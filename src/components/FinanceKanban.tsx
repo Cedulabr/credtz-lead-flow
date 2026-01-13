@@ -15,6 +15,8 @@ import { ptBR } from "date-fns/locale";
 import { FinanceTransactionForm } from "./FinanceTransactionForm";
 import { FinanceReceipts } from "./FinanceReceipts";
 import { FinanceAlerts } from "./FinanceAlerts";
+import { AnimatedContainer, StaggerContainer, StaggerItem } from "./ui/animated-container";
+import { SkeletonCard } from "./ui/skeleton-card";
 
 interface Transaction {
   id: string;
@@ -422,7 +424,7 @@ export const FinanceKanban = () => {
   }
 
   return (
-    <div className="space-y-4 p-4">
+    <AnimatedContainer animation="slide-up" className="space-y-4 p-4">
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
@@ -518,9 +520,13 @@ export const FinanceKanban = () => {
 
       {/* Kanban Board */}
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
+        <AnimatedContainer animation="fade">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <SkeletonCard key={i} variant="kanban" />
+            ))}
+          </div>
+        </AnimatedContainer>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {statusColumns.map((column) => {
@@ -738,6 +744,6 @@ export const FinanceKanban = () => {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </AnimatedContainer>
   );
 };
