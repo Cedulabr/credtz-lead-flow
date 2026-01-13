@@ -2106,6 +2106,7 @@ export type Database = {
           origem_lead: string | null
           original_status: string | null
           phone: string
+          phone2: string | null
           priority: string | null
           rejection_bank: string | null
           rejection_description: string | null
@@ -2134,6 +2135,7 @@ export type Database = {
           origem_lead?: string | null
           original_status?: string | null
           phone: string
+          phone2?: string | null
           priority?: string | null
           rejection_bank?: string | null
           rejection_description?: string | null
@@ -2162,6 +2164,7 @@ export type Database = {
           origem_lead?: string | null
           original_status?: string | null
           phone?: string
+          phone2?: string | null
           priority?: string | null
           rejection_bank?: string | null
           rejection_description?: string | null
@@ -2225,6 +2228,7 @@ export type Database = {
           parcelas_em_aberto: number | null
           parcelas_pagas: number | null
           phone: string
+          phone2: string | null
           tipo_beneficio: string | null
           updated_at: string
         }
@@ -2242,6 +2246,7 @@ export type Database = {
           parcelas_em_aberto?: number | null
           parcelas_pagas?: number | null
           phone: string
+          phone2?: string | null
           tipo_beneficio?: string | null
           updated_at?: string
         }
@@ -2259,6 +2264,7 @@ export type Database = {
           parcelas_em_aberto?: number | null
           parcelas_pagas?: number | null
           phone?: string
+          phone2?: string | null
           tipo_beneficio?: string | null
           updated_at?: string
         }
@@ -3811,6 +3817,13 @@ export type Database = {
           convenio: string
         }[]
       }
+      get_available_ddds: {
+        Args: never
+        Returns: {
+          available_count: number
+          ddd: string
+        }[]
+      }
       get_available_ufs: {
         Args: never
         Returns: {
@@ -3891,23 +3904,42 @@ export type Database = {
           tipo_beneficio: string
         }[]
       }
-      request_leads_with_credits: {
-        Args: {
-          banco_filter?: string
-          convenio_filter?: string
-          leads_requested?: number
-          produto_filter?: string
-        }
-        Returns: {
-          banco: string
-          convenio: string
-          cpf: string
-          lead_id: string
-          name: string
-          phone: string
-          tipo_beneficio: string
-        }[]
-      }
+      request_leads_with_credits:
+        | {
+            Args: {
+              banco_filter?: string
+              convenio_filter?: string
+              leads_requested?: number
+              produto_filter?: string
+            }
+            Returns: {
+              banco: string
+              convenio: string
+              cpf: string
+              lead_id: string
+              name: string
+              phone: string
+              tipo_beneficio: string
+            }[]
+          }
+        | {
+            Args: {
+              banco_filter?: string
+              convenio_filter?: string
+              ddd_filter?: string[]
+              leads_requested?: number
+              produto_filter?: string
+            }
+            Returns: {
+              banco: string
+              convenio: string
+              cpf: string
+              id: string
+              name: string
+              phone: string
+              phone2: string
+            }[]
+          }
       secure_baseoff_access: {
         Args: {
           codigo_banco_filter?: string

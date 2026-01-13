@@ -57,6 +57,7 @@ interface Lead {
   name: string;
   cpf: string;
   phone: string;
+  phone2?: string;
   convenio: string;
   status: string;
   created_at: string;
@@ -86,6 +87,7 @@ interface UserProfile {
 interface LeadRequest {
   convenio: string;
   count: number;
+  ddds: string[];
 }
 
 // Modern status configuration with vibrant colors
@@ -213,7 +215,8 @@ export function LeadsManagement() {
   const [targetUserId, setTargetUserId] = useState("");
   const [leadRequest, setLeadRequest] = useState<LeadRequest>({
     convenio: "",
-    count: 10
+    count: 10,
+    ddds: []
   });
 
   // Modal states
@@ -240,6 +243,10 @@ export function LeadsManagement() {
   const [availableConvenios, setAvailableConvenios] = useState<{convenio: string, available_count: number}[]>([]);
   const [loadingConvenios, setLoadingConvenios] = useState(false);
   const [totalAvailableLeads, setTotalAvailableLeads] = useState(0);
+  
+  // Available DDDs for filtering
+  const [availableDdds, setAvailableDdds] = useState<{ddd: string, available_count: number}[]>([]);
+  const [loadingDdds, setLoadingDdds] = useState(false);
 
   // Solicitar Digitação states
   const [showDigitacaoModal, setShowDigitacaoModal] = useState(false);
@@ -262,6 +269,7 @@ export function LeadsManagement() {
       fetchLeads();
       fetchUserCredits();
       fetchAvailableConvenios();
+      fetchAvailableDdds();
       fetchTelevendasBanks();
       processExpiredFutureContacts();
       if (isAdmin) {
@@ -307,6 +315,32 @@ export function LeadsManagement() {
     } finally {
       setLoadingConvenios(false);
     }
+  };
+
+  const fetchAvailableDdds = async () => {
+    try {
+      setLoadingDdds(true);
+      const { data, error } = await supabase.rpc('get_available_ddds');
+      
+      if (error) throw error;
+      setAvailableDdds(data || []);
+    } catch (error) {
+      console.error('Error fetching available DDDs:', error);
+      setAvailableDdds([]);
+    } finally {
+      setLoadingDdds(false);
+    }
+  };
+
+  const toggleDddSelection = (ddd: string) => {
+    setLeadRequest(prev => {
+      const isSelected = prev.ddds.includes(ddd);
+      if (isSelected) {
+        return { ...prev, ddds: prev.ddds.filter(d => d !== ddd) };
+      } else {
+        return { ...prev, ddds: [...prev.ddds, ddd] };
+      }
+    });
   };
 
   const fetchUsers = async () => {
@@ -407,13 +441,14 @@ export function LeadsManagement() {
 
     setIsLoading(true);
     try {
-      // Use the new credits-based function
+      // Use the new credits-based function with DDD filter
       const { data, error } = await supabase
         .rpc('request_leads_with_credits', {
           convenio_filter: leadRequest.convenio || null,
           banco_filter: null,
           produto_filter: null,
-          leads_requested: leadRequest.count
+          leads_requested: leadRequest.count,
+          ddd_filter: leadRequest.ddds.length > 0 ? leadRequest.ddds : null
         });
 
       if (error) throw error;
@@ -423,6 +458,7 @@ export function LeadsManagement() {
           name: lead.name,
           cpf: lead.cpf,
           phone: lead.phone,
+          phone2: lead.phone2 || null,
           convenio: lead.convenio,
           status: 'new_lead',
           created_by: user.id,
@@ -452,7 +488,7 @@ export function LeadsManagement() {
         setShowRequestDialog(false);
         fetchLeads();
         fetchUserCredits();
-        setLeadRequest({ convenio: "", count: 10 });
+        setLeadRequest({ convenio: "", count: 10, ddds: [] });
       } else {
         toast({
           title: "Nenhum lead encontrado",
@@ -1142,6 +1178,56 @@ export function LeadsManagement() {
                     )}
                   </div>
 
+                  {/* Filtro por DDD */}
+                  <div className="space-y-3">
+                    <label className="text-base font-semibold flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Filtrar por DDD (Região)
+                    </label>
+                    {loadingDdds ? (
+                      <div className="h-12 flex items-center justify-center text-muted-foreground">
+                        Carregando DDDs...
+                      </div>
+                    ) : availableDdds.length === 0 ? (
+                      <div className="p-3 rounded-xl bg-muted/30 border border-muted text-center">
+                        <p className="text-muted-foreground text-sm">
+                          Nenhum DDD disponível
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 rounded-lg border bg-background">
+                          {availableDdds.map(({ ddd, available_count }) => (
+                            <Button
+                              key={ddd}
+                              type="button"
+                              size="sm"
+                              variant={leadRequest.ddds.includes(ddd) ? "default" : "outline"}
+                              className={`h-8 px-3 text-sm font-medium ${
+                                leadRequest.ddds.includes(ddd) 
+                                  ? 'bg-primary text-primary-foreground' 
+                                  : 'hover:bg-primary/10'
+                              }`}
+                              onClick={() => toggleDddSelection(ddd)}
+                            >
+                              {ddd} ({available_count})
+                            </Button>
+                          ))}
+                        </div>
+                        {leadRequest.ddds.length > 0 && (
+                          <p className="text-sm text-muted-foreground">
+                            DDDs selecionados: <strong>{leadRequest.ddds.join(', ')}</strong>
+                          </p>
+                        )}
+                        {leadRequest.ddds.length === 0 && (
+                          <p className="text-sm text-muted-foreground">
+                            Nenhum DDD selecionado = todos os DDDs disponíveis
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="space-y-3">
                     <label className="text-base font-semibold">Quantidade</label>
                     <Input
@@ -1391,10 +1477,18 @@ export function LeadsManagement() {
                         
                         <div className="flex flex-wrap items-center gap-4 text-base text-muted-foreground">
                           <span className="font-mono font-semibold">{lead.cpf}</span>
-                          <span className="flex items-center gap-1 font-semibold">
-                            <Phone className="h-4 w-4" />
-                            {lead.phone}
-                          </span>
+                          <div className="flex flex-col sm:flex-row gap-1 sm:gap-3">
+                            <span className="flex items-center gap-1 font-semibold">
+                              <Phone className="h-4 w-4" />
+                              📱1: {lead.phone}
+                            </span>
+                            {lead.phone2 && (
+                              <span className="flex items-center gap-1 font-semibold text-muted-foreground">
+                                <Phone className="h-4 w-4" />
+                                📱2: {lead.phone2}
+                              </span>
+                            )}
+                          </div>
                           <Badge variant="outline" className="font-bold text-sm px-3 py-1">
                             {lead.convenio}
                           </Badge>
@@ -1429,25 +1523,43 @@ export function LeadsManagement() {
 
                       {/* Ações Grandes e Claras */}
                       <div className="flex items-center gap-2 flex-wrap">
+                        {/* Botão Ligar Tel 1 */}
                         <Button
                           size="lg"
                           variant="outline"
                           onClick={() => window.open(`tel:${lead.phone}`, '_self')}
                           className="h-10 md:h-12 px-3 md:px-4 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-300 font-bold text-sm md:text-base"
+                          title="Ligar Telefone 1"
                         >
                           <Phone className="h-4 w-4 md:h-5 md:w-5 md:mr-2" />
-                          <span className="hidden md:inline">Ligar</span>
+                          <span className="hidden md:inline">Ligar 1</span>
                         </Button>
                         
+                        {/* Botão WhatsApp Tel 1 */}
                         <Button
                           size="lg"
                           variant="outline"
-                          onClick={() => window.open(`https://wa.me/${lead.phone.replace(/\D/g, '')}`, '_blank')}
-                          className="h-10 md:h-12 px-3 md:px-4 hover:bg-green-100 hover:text-green-700 hover:border-green-300 font-bold text-sm md:text-base"
+                          onClick={() => window.open(`https://wa.me/55${lead.phone.replace(/\D/g, '')}`, '_blank')}
+                          className="h-10 md:h-12 px-3 md:px-4 bg-green-50 hover:bg-green-100 text-green-700 hover:text-green-800 border-green-300 hover:border-green-400 font-bold text-sm md:text-base"
+                          title="WhatsApp Telefone 1"
                         >
-                          <MessageCircle className="h-4 w-4 md:h-5 md:w-5 md:mr-2" />
-                          <span className="hidden md:inline">WhatsApp</span>
+                          <MessageCircle className="h-4 w-4 md:h-5 md:w-5 md:mr-1" />
+                          <span className="hidden md:inline">Zap 1</span>
                         </Button>
+
+                        {/* Botão WhatsApp Tel 2 - apenas se tiver telefone 2 */}
+                        {lead.phone2 && (
+                          <Button
+                            size="lg"
+                            variant="outline"
+                            onClick={() => window.open(`https://wa.me/55${lead.phone2!.replace(/\D/g, '')}`, '_blank')}
+                            className="h-10 md:h-12 px-3 md:px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 border-emerald-300 hover:border-emerald-400 font-bold text-sm md:text-base"
+                            title="WhatsApp Telefone 2"
+                          >
+                            <MessageCircle className="h-4 w-4 md:h-5 md:w-5 md:mr-1" />
+                            <span className="hidden md:inline">Zap 2</span>
+                          </Button>
+                        )}
 
                         {/* Botão Solicitar Digitação - Destaque para mobile */}
                         <Button
