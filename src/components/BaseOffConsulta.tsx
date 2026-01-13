@@ -965,58 +965,60 @@ export function BaseOffConsulta() {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-3 md:p-4 space-y-4 pb-20 md:pb-4">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FileText className="h-6 w-6 text-primary" />
+          <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+            <FileText className="h-5 w-5 md:h-6 md:w-6 text-primary" />
             Consulta Base OFF
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Consulte dados cadastrais e contratos de clientes
+          <p className="text-xs md:text-sm text-muted-foreground">
+            Consulte dados cadastrais e contratos
           </p>
         </div>
-        <div className="flex gap-2">
-          {isAdmin && (
-            <>
-              <Button onClick={() => setShowOptimizedImport(true)} variant="default">
-                <Upload className="h-4 w-4 mr-2" />
-                Importar (Arquivos Grandes)
-              </Button>
-              <Button onClick={() => setShowImport(true)} variant="outline">
-                <Upload className="h-4 w-4 mr-2" />
-                Importar Base
-              </Button>
-              <ImportHistory module="baseoff_clients" title="Base Off" />
-            </>
-          )}
-        </div>
+        {isAdmin && (
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => setShowOptimizedImport(true)} variant="default" size="sm" className="text-xs">
+              <Upload className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Importar</span> Grandes
+            </Button>
+            <Button onClick={() => setShowImport(true)} variant="outline" size="sm" className="text-xs">
+              <Upload className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Importar</span> Base
+            </Button>
+            <ImportHistory module="baseoff_clients" title="Base Off" />
+          </div>
+        )}
       </div>
 
       {/* Search */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="flex flex-wrap gap-2">
+        <CardContent className="p-3 md:p-4">
+          <div className="flex flex-col gap-3">
+            {/* Search type buttons */}
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
               {(["cpf", "telefone", "nome", "nb"] as const).map((type) => (
                 <Button
                   key={type}
                   variant={searchType === type ? "default" : "outline"}
                   size="sm"
+                  className="flex-shrink-0 text-xs"
                   onClick={() => setSearchType(type)}
                 >
-                  {type === "cpf" ? "CPF" : type === "telefone" ? "Telefone" : type === "nome" ? "Nome" : "NB"}
+                  {type === "cpf" ? "CPF" : type === "telefone" ? "Tel" : type === "nome" ? "Nome" : "NB"}
                 </Button>
               ))}
             </div>
-            <div className="flex-1 flex gap-2">
+            
+            {/* Search input and buttons */}
+            <div className="flex flex-col sm:flex-row gap-2">
               <Input
                 placeholder={
                   searchType === "cpf"
-                    ? "Digite o CPF (apenas números)..."
+                    ? "Digite o CPF..."
                     : searchType === "telefone"
-                    ? "Digite o telefone (DDD + número)..."
+                    ? "Digite o telefone..."
                     : searchType === "nome"
                     ? "Digite o nome..."
                     : "Digite o NB..."
@@ -1024,23 +1026,29 @@ export function BaseOffConsulta() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                className="flex-1"
               />
-              <Button onClick={handleSearch} disabled={isSearching}>
-                <Search className="h-4 w-4 mr-2" />
-                {isSearching ? "Buscando..." : "Buscar"}
-              </Button>
-              <Button 
-                onClick={handleAtivoClick} 
-                variant="secondary"
-                disabled={isLoadingAtivo}
-              >
-                {isLoadingAtivo ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Play className="h-4 w-4 mr-2" />
-                )}
-                Ativo
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={handleSearch} disabled={isSearching} className="flex-1 sm:flex-initial" size="sm">
+                  <Search className="h-4 w-4 mr-1 sm:mr-2" />
+                  {isSearching ? "..." : "Buscar"}
+                </Button>
+                <Button 
+                  onClick={handleAtivoClick} 
+                  variant="secondary"
+                  disabled={isLoadingAtivo}
+                  size="sm"
+                >
+                  {isLoadingAtivo ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-1" />
+                      Ativo
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -1048,7 +1056,7 @@ export function BaseOffConsulta() {
           {searchResults.length > 1 && (
             <div className="mt-4 border rounded-lg">
               <div className="p-2 bg-muted/50 border-b">
-                <span className="text-sm font-medium">
+                <span className="text-xs md:text-sm font-medium">
                   {searchResults.length} resultados encontrados
                 </span>
               </div>
@@ -1059,13 +1067,13 @@ export function BaseOffConsulta() {
                     className="p-3 border-b last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors flex items-center justify-between"
                     onClick={() => selectClient(client)}
                   >
-                    <div>
-                      <p className="font-medium">{client.nome}</p>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{client.nome}</p>
+                      <p className="text-xs text-muted-foreground">
                         CPF: {formatCpf(client.cpf)} | NB: {client.nb}
                       </p>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   </div>
                 ))}
               </ScrollArea>
