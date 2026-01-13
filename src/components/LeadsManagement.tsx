@@ -46,7 +46,8 @@ import {
   FileEdit,
   Building2,
   Loader2,
-  Send
+  Send,
+  Tag
 } from "lucide-react";
 import { Label } from "./ui/label";
 import { format, addDays } from "date-fns";
@@ -59,6 +60,7 @@ interface Lead {
   phone: string;
   phone2?: string;
   convenio: string;
+  tag?: string;
   status: string;
   created_at: string;
   updated_at?: string;
@@ -88,6 +90,7 @@ interface LeadRequest {
   convenio: string;
   count: number;
   ddds: string[];
+  tags: string[];
 }
 
 // Modern status configuration with vibrant colors
@@ -216,7 +219,8 @@ export function LeadsManagement() {
   const [leadRequest, setLeadRequest] = useState<LeadRequest>({
     convenio: "",
     count: 10,
-    ddds: []
+    ddds: [],
+    tags: []
   });
 
   // Modal states
@@ -248,6 +252,10 @@ export function LeadsManagement() {
   const [availableDdds, setAvailableDdds] = useState<{ddd: string, available_count: number}[]>([]);
   const [loadingDdds, setLoadingDdds] = useState(false);
 
+  // Available Tags for filtering
+  const [availableTags, setAvailableTags] = useState<{tag: string, available_count: number}[]>([]);
+  const [loadingTags, setLoadingTags] = useState(false);
+
   // Solicitar Digitação states
   const [showDigitacaoModal, setShowDigitacaoModal] = useState(false);
   const [digitacaoForm, setDigitacaoForm] = useState({
@@ -270,6 +278,7 @@ export function LeadsManagement() {
       fetchUserCredits();
       fetchAvailableConvenios();
       fetchAvailableDdds();
+      fetchAvailableTags();
       fetchTelevendasBanks();
       processExpiredFutureContacts();
       if (isAdmin) {
@@ -341,6 +350,32 @@ export function LeadsManagement() {
         return { ...prev, ddds: [...prev.ddds, ddd] };
       }
     });
+  };
+
+  const toggleTagSelection = (tag: string) => {
+    setLeadRequest(prev => {
+      const isSelected = prev.tags.includes(tag);
+      if (isSelected) {
+        return { ...prev, tags: prev.tags.filter(t => t !== tag) };
+      } else {
+        return { ...prev, tags: [...prev.tags, tag] };
+      }
+    });
+  };
+
+  const fetchAvailableTags = async () => {
+    try {
+      setLoadingTags(true);
+      const { data, error } = await supabase.rpc('get_available_tags');
+      
+      if (error) throw error;
+      setAvailableTags(data || []);
+    } catch (error) {
+      console.error('Error fetching available tags:', error);
+      setAvailableTags([]);
+    } finally {
+      setLoadingTags(false);
+    }
   };
 
   const fetchUsers = async () => {
@@ -441,14 +476,15 @@ export function LeadsManagement() {
 
     setIsLoading(true);
     try {
-      // Use the new credits-based function with DDD filter
+      // Use the new credits-based function with DDD and Tag filters
       const { data, error } = await supabase
         .rpc('request_leads_with_credits', {
           convenio_filter: leadRequest.convenio || null,
           banco_filter: null,
           produto_filter: null,
           leads_requested: leadRequest.count,
-          ddd_filter: leadRequest.ddds.length > 0 ? leadRequest.ddds : null
+          ddd_filter: leadRequest.ddds.length > 0 ? leadRequest.ddds : null,
+          tag_filter: leadRequest.tags.length > 0 ? leadRequest.tags : null
         });
 
       if (error) throw error;
@@ -460,6 +496,7 @@ export function LeadsManagement() {
           phone: lead.phone,
           phone2: lead.phone2 || null,
           convenio: lead.convenio,
+          tag: lead.tag || null,
           status: 'new_lead',
           created_by: user.id,
           assigned_to: user.id,
@@ -488,7 +525,7 @@ export function LeadsManagement() {
         setShowRequestDialog(false);
         fetchLeads();
         fetchUserCredits();
-        setLeadRequest({ convenio: "", count: 10, ddds: [] });
+        setLeadRequest({ convenio: "", count: 10, ddds: [], tags: [] });
       } else {
         toast({
           title: "Nenhum lead encontrado",
@@ -1279,6 +1316,112 @@ export function LeadsManagement() {
                     )}
                   </div>
 
+                  {/* Filtro por Tag/Perfil - Visual moderno */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-base font-semibold flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                          <Tag className="h-4 w-4 text-white" />
+                        </div>
+                        <span>Filtrar por Perfil</span>
+                      </label>
+                      {leadRequest.tags.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setLeadRequest(prev => ({ ...prev, tags: [] }))}
+                          className="text-xs text-muted-foreground hover:text-destructive"
+                        >
+                          Limpar seleção
+                        </Button>
+                      )}
+                    </div>
+                    
+                    {loadingTags ? (
+                      <div className="h-20 flex items-center justify-center text-muted-foreground bg-gradient-to-br from-muted/30 to-muted/10 rounded-xl border-2 border-dashed border-muted">
+                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                        Carregando perfis...
+                      </div>
+                    ) : availableTags.length === 0 ? (
+                      <div className="p-4 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-2 border-slate-200 dark:border-slate-700 text-center">
+                        <Tag className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-muted-foreground font-medium text-sm">
+                          Nenhum perfil/tag cadastrado ainda
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-3 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-2 border-slate-200 dark:border-slate-700">
+                          {availableTags.map(({ tag, available_count }) => {
+                            const isSelected = leadRequest.tags.includes(tag);
+                            return (
+                              <button
+                                key={tag}
+                                type="button"
+                                onClick={() => toggleTagSelection(tag)}
+                                className={`
+                                  relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 
+                                  ${isSelected 
+                                    ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30 scale-105 ring-2 ring-emerald-400/50' 
+                                    : 'bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border border-slate-200 dark:border-slate-600 hover:border-emerald-400/50 hover:scale-102'
+                                  }
+                                `}
+                              >
+                                {isSelected && (
+                                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white flex items-center justify-center shadow-md">
+                                    <CheckCircle className="h-3 w-3 text-emerald-600" />
+                                  </div>
+                                )}
+                                <Tag className={`h-3.5 w-3.5 ${isSelected ? 'text-white' : 'text-emerald-600'}`} />
+                                <span className={`text-sm font-semibold ${isSelected ? '' : 'text-foreground'}`}>
+                                  {tag}
+                                </span>
+                                <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
+                                  isSelected 
+                                    ? 'bg-white/20 text-white' 
+                                    : 'bg-slate-100 dark:bg-slate-700 text-muted-foreground'
+                                }`}>
+                                  {available_count}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        
+                        {/* Info de seleção de tags */}
+                        <div className={`p-3 rounded-xl transition-all duration-300 ${
+                          leadRequest.tags.length > 0 
+                            ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 border border-emerald-400/20' 
+                            : 'bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700'
+                        }`}>
+                          {leadRequest.tags.length > 0 ? (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <CheckCircle className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                                {leadRequest.tags.length} {leadRequest.tags.length === 1 ? 'perfil selecionado' : 'perfis selecionados'}:
+                              </span>
+                              <div className="flex gap-1 flex-wrap">
+                                {leadRequest.tags.map(t => (
+                                  <span key={t} className="px-2 py-0.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-full text-xs font-bold">
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Target className="h-4 w-4 flex-shrink-0" />
+                              <span className="text-sm">
+                                Selecione perfis ou deixe em branco para receber todos os tipos
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="space-y-3">
                     <label className="text-base font-semibold">Quantidade</label>
                     <Input
@@ -1543,6 +1686,12 @@ export function LeadsManagement() {
                           <Badge variant="outline" className="font-bold text-sm px-3 py-1">
                             {lead.convenio}
                           </Badge>
+                          {lead.tag && (
+                            <Badge className="bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 border-violet-200 font-semibold text-sm px-3 py-1">
+                              <Tag className="h-3 w-3 mr-1" />
+                              {lead.tag}
+                            </Badge>
+                          )}
                           {isAdmin && lead.assigned_to && (
                             <Badge variant="secondary" className="font-semibold text-sm px-3 py-1">
                               <User className="h-3 w-3 mr-1" />
