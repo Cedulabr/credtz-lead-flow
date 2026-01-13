@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { useWhitelabel } from "@/hooks/useWhitelabel";
 import { useTelevendasNotifications } from "@/hooks/useTelevendasNotifications";
 import { useUserDataNotifications } from "@/hooks/useUserDataNotifications";
+import { AnimatedContainer, StaggerContainer, StaggerItem } from "./ui/animated-container";
+import { SkeletonCard } from "./ui/skeleton-card";
 import { SalesRanking } from "./SalesRanking";
 import { 
   Users, 
@@ -768,7 +770,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 w-full max-w-full overflow-x-hidden">
+    <AnimatedContainer animation="fade" className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 w-full max-w-full overflow-x-hidden">
       {/* Top Bar Desktop */}
       <div className="hidden md:block sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="flex items-center justify-between px-6 py-4">
@@ -1356,6 +1358,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </Card>
         )}
       </div>
-    </div>
+    </AnimatedContainer>
   );
 }

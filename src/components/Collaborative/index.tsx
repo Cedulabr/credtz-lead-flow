@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { BlockedAccess } from "@/components/BlockedAccess";
+import { AnimatedContainer } from "@/components/ui/animated-container";
+import { SkeletonCard } from "@/components/ui/skeleton-card";
 import { Key, Link2, Server, FileText, FolderOpen, Users } from "lucide-react";
 import { PasswordsManager } from "./PasswordsManager";
 import { LinksManager } from "./LinksManager";
@@ -41,9 +43,14 @@ export function Collaborative() {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="text-center py-8 text-muted-foreground">Carregando...</div>
-      </div>
+      <AnimatedContainer animation="fade" className="p-6 space-y-6">
+        <div className="space-y-2">
+          <div className="h-8 w-48 bg-muted rounded animate-pulse" />
+          <div className="h-4 w-72 bg-muted rounded animate-pulse" />
+        </div>
+        <div className="h-12 bg-muted rounded animate-pulse" />
+        <SkeletonCard variant="card" count={3} />
+      </AnimatedContainer>
     );
   }
 
@@ -53,7 +60,7 @@ export function Collaborative() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6 pb-20 md:pb-6">
+    <AnimatedContainer animation="slide-up" className="p-4 md:p-6 space-y-6 pb-20 md:pb-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
@@ -115,6 +122,6 @@ export function Collaborative() {
           <DocumentsManager />
         </TabsContent>
       </Tabs>
-    </div>
+    </AnimatedContainer>
   );
 }

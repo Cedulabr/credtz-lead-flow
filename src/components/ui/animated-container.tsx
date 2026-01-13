@@ -128,6 +128,29 @@ export function StaggerContainer({
   );
 }
 
+interface StaggerItemProps {
+  children: React.ReactNode;
+  className?: string;
+  index?: number;
+}
+
+export function StaggerItem({ children, className, index = 0 }: StaggerItemProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ 
+        duration: 0.3, 
+        delay: index * 0.05,
+        ease: [0.4, 0, 0.2, 1] 
+      }}
+      className={cn(className)}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 interface PageTransitionProps {
   children: React.ReactNode;
   className?: string;
