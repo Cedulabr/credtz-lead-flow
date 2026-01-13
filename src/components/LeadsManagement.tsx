@@ -1178,52 +1178,103 @@ export function LeadsManagement() {
                     )}
                   </div>
 
-                  {/* Filtro por DDD */}
+                  {/* Filtro por DDD - Visual moderno */}
                   <div className="space-y-3">
-                    <label className="text-base font-semibold flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      Filtrar por DDD (Região)
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-base font-semibold flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
+                          <MapPin className="h-4 w-4 text-white" />
+                        </div>
+                        <span>Filtrar por DDD</span>
+                      </label>
+                      {leadRequest.ddds.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setLeadRequest(prev => ({ ...prev, ddds: [] }))}
+                          className="text-xs text-muted-foreground hover:text-destructive"
+                        >
+                          Limpar seleção
+                        </Button>
+                      )}
+                    </div>
+                    
                     {loadingDdds ? (
-                      <div className="h-12 flex items-center justify-center text-muted-foreground">
-                        Carregando DDDs...
+                      <div className="h-20 flex items-center justify-center text-muted-foreground bg-gradient-to-br from-muted/30 to-muted/10 rounded-xl border-2 border-dashed border-muted">
+                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                        Carregando regiões...
                       </div>
                     ) : availableDdds.length === 0 ? (
-                      <div className="p-3 rounded-xl bg-muted/30 border border-muted text-center">
-                        <p className="text-muted-foreground text-sm">
-                          Nenhum DDD disponível
+                      <div className="p-4 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-2 border-amber-200 dark:border-amber-800 text-center">
+                        <MapPin className="h-6 w-6 mx-auto mb-2 text-amber-500" />
+                        <p className="text-amber-700 dark:text-amber-400 font-medium text-sm">
+                          Nenhum DDD disponível no momento
                         </p>
                       </div>
                     ) : (
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 rounded-lg border bg-background">
-                          {availableDdds.map(({ ddd, available_count }) => (
-                            <Button
-                              key={ddd}
-                              type="button"
-                              size="sm"
-                              variant={leadRequest.ddds.includes(ddd) ? "default" : "outline"}
-                              className={`h-8 px-3 text-sm font-medium ${
-                                leadRequest.ddds.includes(ddd) 
-                                  ? 'bg-primary text-primary-foreground' 
-                                  : 'hover:bg-primary/10'
-                              }`}
-                              onClick={() => toggleDddSelection(ddd)}
-                            >
-                              {ddd} ({available_count})
-                            </Button>
-                          ))}
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto p-3 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-2 border-slate-200 dark:border-slate-700">
+                          {availableDdds.map(({ ddd, available_count }) => {
+                            const isSelected = leadRequest.ddds.includes(ddd);
+                            return (
+                              <button
+                                key={ddd}
+                                type="button"
+                                onClick={() => toggleDddSelection(ddd)}
+                                className={`
+                                  relative flex flex-col items-center justify-center p-2.5 rounded-xl transition-all duration-200 
+                                  ${isSelected 
+                                    ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg shadow-primary/30 scale-105 ring-2 ring-primary/50' 
+                                    : 'bg-white dark:bg-slate-800 hover:bg-primary/10 dark:hover:bg-primary/20 border border-slate-200 dark:border-slate-600 hover:border-primary/50 hover:scale-102'
+                                  }
+                                `}
+                              >
+                                {isSelected && (
+                                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shadow-md">
+                                    <CheckCircle className="h-3 w-3 text-white" />
+                                  </div>
+                                )}
+                                <span className={`text-lg font-black ${isSelected ? '' : 'text-foreground'}`}>
+                                  {ddd}
+                                </span>
+                                <span className={`text-[10px] font-medium ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                                  {available_count} leads
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
-                        {leadRequest.ddds.length > 0 && (
-                          <p className="text-sm text-muted-foreground">
-                            DDDs selecionados: <strong>{leadRequest.ddds.join(', ')}</strong>
-                          </p>
-                        )}
-                        {leadRequest.ddds.length === 0 && (
-                          <p className="text-sm text-muted-foreground">
-                            Nenhum DDD selecionado = todos os DDDs disponíveis
-                          </p>
-                        )}
+                        
+                        {/* Info de seleção */}
+                        <div className={`p-3 rounded-xl transition-all duration-300 ${
+                          leadRequest.ddds.length > 0 
+                            ? 'bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20' 
+                            : 'bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700'
+                        }`}>
+                          {leadRequest.ddds.length > 0 ? (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
+                              <span className="text-sm font-medium text-primary">
+                                {leadRequest.ddds.length} {leadRequest.ddds.length === 1 ? 'região selecionada' : 'regiões selecionadas'}:
+                              </span>
+                              <div className="flex gap-1 flex-wrap">
+                                {leadRequest.ddds.map(d => (
+                                  <span key={d} className="px-2 py-0.5 bg-primary text-primary-foreground rounded-full text-xs font-bold">
+                                    {d}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Target className="h-4 w-4 flex-shrink-0" />
+                              <span className="text-sm">
+                                Selecione DDDs ou deixe em branco para receber de todas as regiões
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
