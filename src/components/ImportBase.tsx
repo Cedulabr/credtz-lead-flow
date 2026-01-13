@@ -33,6 +33,7 @@ interface ParsedLead {
   nome: string;
   convenio: string;
   telefone: string;
+  telefone2?: string;
   valid: boolean;
   error?: string;
 }
@@ -109,12 +110,13 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       
       const nomeIndex = headers.findIndex(h => h.includes('nome'));
       const convenioIndex = headers.findIndex(h => h.includes('convenio') || h.includes('convênio'));
-      const telefoneIndex = headers.findIndex(h => h.includes('telefone') || h.includes('phone') || h.includes('fone'));
+      const telefoneIndex = headers.findIndex(h => h.includes('telefone 1') || h.includes('telefone1') || (h.includes('telefone') && !h.includes('2')));
+      const telefone2Index = headers.findIndex(h => h.includes('telefone 2') || h.includes('telefone2'));
 
       if (nomeIndex === -1 || convenioIndex === -1 || telefoneIndex === -1) {
         toast({
           title: "Colunas obrigatórias não encontradas",
-          description: "O arquivo deve conter as colunas: Nome, Convênio, Telefone",
+          description: "O arquivo deve conter as colunas: Nome, Convênio, Telefone 1 (Telefone 2 é opcional)",
           variant: "destructive",
         });
         setIsParsing(false);
@@ -129,6 +131,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         const nome = values[nomeIndex]?.trim() || '';
         const convenio = values[convenioIndex]?.trim() || '';
         const telefone = values[telefoneIndex]?.replace(/\D/g, '') || '';
+        const telefone2 = telefone2Index !== -1 ? values[telefone2Index]?.replace(/\D/g, '') || '' : '';
 
         let valid = true;
         let error = '';
@@ -141,10 +144,13 @@ export function ImportBase({ onBack }: ImportBaseProps) {
           error = 'Convênio vazio';
         } else if (!telefone || telefone.length < 10) {
           valid = false;
-          error = 'Telefone inválido';
+          error = 'Telefone 1 inválido';
+        } else if (telefone2 && telefone2.length < 10) {
+          valid = false;
+          error = 'Telefone 2 inválido';
         }
 
-        leads.push({ nome, convenio, telefone, valid, error });
+        leads.push({ nome, convenio, telefone, telefone2: telefone2 || undefined, valid, error });
       }
 
       setParsedLeads(leads);
@@ -217,7 +223,8 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       const leadsData = validLeads.map(lead => ({
         nome: lead.nome,
         convenio: lead.convenio,
-        telefone: lead.telefone
+        telefone: lead.telefone,
+        telefone2: lead.telefone2 || null
       }));
 
       const { data, error } = await supabase.rpc('import_leads_from_csv', {
@@ -334,7 +341,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   };
 
   const downloadTemplate = () => {
-    const template = 'Nome,Convênio,Telefone\nJoão Silva,INSS,11999998888\nMaria Santos,SIAPE,21988887777';
+    const template = 'Nome,Telefone 1,Telefone 2,Convênio\nJoão Silva,11999998888,11988887776,INSS\nMaria Santos,21988887777,,SIAPE';
     const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -424,11 +431,12 @@ export function ImportBase({ onBack }: ImportBaseProps) {
               </ul>
             </div>
             <div>
-              <h4 className="font-medium mb-2">Colunas Obrigatórias</h4>
+              <h4 className="font-medium mb-2">Colunas</h4>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• <strong>Nome</strong> - Nome completo do lead</li>
-                <li>• <strong>Convênio</strong> - Ex: INSS, SIAPE, etc</li>
-                <li>• <strong>Telefone</strong> - 10 ou 11 dígitos</li>
+                <li>• <strong>Nome</strong> - Nome completo do lead (obrigatório)</li>
+                <li>• <strong>Telefone 1</strong> - 10 ou 11 dígitos (obrigatório)</li>
+                <li>• <strong>Telefone 2</strong> - 10 ou 11 dígitos (opcional)</li>
+                <li>• <strong>Convênio</strong> - Ex: INSS, SIAPE, etc (obrigatório)</li>
               </ul>
             </div>
           </div>
