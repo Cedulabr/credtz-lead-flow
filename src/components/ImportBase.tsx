@@ -34,6 +34,7 @@ interface ParsedLead {
   convenio: string;
   telefone: string;
   telefone2?: string;
+  tag?: string;
   valid: boolean;
   error?: string;
 }
@@ -112,11 +113,12 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       const convenioIndex = headers.findIndex(h => h.includes('convenio') || h.includes('convênio'));
       const telefoneIndex = headers.findIndex(h => h.includes('telefone 1') || h.includes('telefone1') || (h.includes('telefone') && !h.includes('2')));
       const telefone2Index = headers.findIndex(h => h.includes('telefone 2') || h.includes('telefone2'));
+      const tagIndex = headers.findIndex(h => h.includes('tag') || h.includes('perfil') || h.includes('classificação') || h.includes('classificacao'));
 
       if (nomeIndex === -1 || convenioIndex === -1 || telefoneIndex === -1) {
         toast({
           title: "Colunas obrigatórias não encontradas",
-          description: "O arquivo deve conter as colunas: Nome, Convênio, Telefone 1 (Telefone 2 é opcional)",
+          description: "O arquivo deve conter as colunas: Nome, Convênio, Telefone 1 (Telefone 2 e Tag são opcionais)",
           variant: "destructive",
         });
         setIsParsing(false);
@@ -132,6 +134,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         const convenio = values[convenioIndex]?.trim() || '';
         const telefone = values[telefoneIndex]?.replace(/\D/g, '') || '';
         const telefone2 = telefone2Index !== -1 ? values[telefone2Index]?.replace(/\D/g, '') || '' : '';
+        const tag = tagIndex !== -1 ? values[tagIndex]?.trim() || '' : '';
 
         let valid = true;
         let error = '';
@@ -150,7 +153,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
           error = 'Telefone 2 inválido';
         }
 
-        leads.push({ nome, convenio, telefone, telefone2: telefone2 || undefined, valid, error });
+        leads.push({ nome, convenio, telefone, telefone2: telefone2 || undefined, tag: tag || undefined, valid, error });
       }
 
       setParsedLeads(leads);
@@ -224,7 +227,8 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         nome: lead.nome,
         convenio: lead.convenio,
         telefone: lead.telefone,
-        telefone2: lead.telefone2 || null
+        telefone2: lead.telefone2 || null,
+        tag: lead.tag || null
       }));
 
       const { data, error } = await supabase.rpc('import_leads_from_csv', {
@@ -341,7 +345,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   };
 
   const downloadTemplate = () => {
-    const template = 'Nome,Telefone 1,Telefone 2,Convênio\nJoão Silva,11999998888,11988887776,INSS\nMaria Santos,21988887777,,SIAPE';
+    const template = 'Nome,Telefone 1,Telefone 2,Convênio,Tag\nJoão Silva,11999998888,11988887776,INSS,Tomador\nMaria Santos,21988887777,,SIAPE,Com margem para empréstimo\nCarlos Lima,71977776666,71966665555,INSS,Redução de parcela';
     const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -566,7 +570,9 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                     <TableHead>Status</TableHead>
                     <TableHead>Nome</TableHead>
                     <TableHead>Convênio</TableHead>
-                    <TableHead>Telefone</TableHead>
+                    <TableHead>Tag/Perfil</TableHead>
+                    <TableHead>Telefone 1</TableHead>
+                    <TableHead>Telefone 2</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -588,7 +594,17 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                       </TableCell>
                       <TableCell className="font-medium">{lead.nome || '-'}</TableCell>
                       <TableCell>{lead.convenio || '-'}</TableCell>
+                      <TableCell>
+                        {lead.tag ? (
+                          <Badge variant="secondary" className="bg-violet-100 text-violet-700 border-violet-200">
+                            {lead.tag}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell className="font-mono text-sm">{formatPhone(lead.telefone) || '-'}</TableCell>
+                      <TableCell className="font-mono text-sm">{lead.telefone2 ? formatPhone(lead.telefone2) : '-'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
