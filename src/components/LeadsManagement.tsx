@@ -1098,51 +1098,52 @@ export function LeadsManagement() {
   }
 
   return (
-    <AnimatedContainer animation="slide-up" className="p-4 md:p-8 space-y-8 pb-24 md:pb-8 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen">
+    <AnimatedContainer animation="slide-up" className="p-3 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen">
       {/* Header Simplificado */}
-      <div className="flex flex-col space-y-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="space-y-2">
-            <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent tracking-tight">
+      <div className="flex flex-col space-y-4 md:space-y-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
+          <div className="space-y-1 md:space-y-2">
+            <h1 className="text-2xl md:text-5xl font-black bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent tracking-tight">
               Leads Premium
             </h1>
-            <p className="text-lg md:text-xl text-muted-foreground font-medium">
+            <p className="text-sm md:text-xl text-muted-foreground font-medium">
               🚀 Trabalhe seus leads e feche negócios!
             </p>
           </div>
           
-          <div className="flex gap-3 flex-wrap">
+          <div className="flex gap-2 md:gap-3 flex-wrap w-full md:w-auto">
             <Button 
               variant="outline" 
-              size="lg"
+              size="default"
               onClick={fetchLeads}
               disabled={isLoading}
-              className="hover:bg-primary/10 text-base font-semibold h-12"
+              className="hover:bg-primary/10 text-sm md:text-base font-semibold h-10 md:h-12 flex-1 md:flex-none"
             >
-              <RefreshCcw className={`h-5 w-5 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Atualizar
+              <RefreshCcw className={`h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Atualizar</span>
             </Button>
             
             {isAdmin && (
               <>
                 <Button 
                   variant="outline" 
-                  size="lg"
-                  className="flex items-center gap-2 hover:bg-primary/10 text-base font-semibold h-12"
+                  size="default"
+                  className="flex items-center gap-1.5 hover:bg-primary/10 text-sm md:text-base font-semibold h-10 md:h-12"
                   onClick={() => setShowImportBase(true)}
                 >
-                  <Upload className="h-5 w-5" />
-                  Importar
+                  <Upload className="h-4 w-4 md:h-5 md:w-5" />
+                  <span className="hidden sm:inline">Importar</span>
                 </Button>
                 
                 <Button 
                   variant="outline" 
-                  size="lg"
-                  className="flex items-center gap-2 hover:bg-orange-500/10 text-orange-600 border-orange-200 text-base font-semibold h-12"
+                  size="default"
+                  className="flex items-center gap-1.5 hover:bg-orange-500/10 text-orange-600 border-orange-200 text-sm md:text-base font-semibold h-10 md:h-12"
                   onClick={() => setShowDistributedManager(true)}
                 >
-                  <Settings className="h-5 w-5" />
-                  Gerenciar Distribuídos
+                  <Settings className="h-4 w-4 md:h-5 md:w-5" />
+                  <span className="hidden lg:inline">Gerenciar Distribuídos</span>
+                  <span className="lg:hidden hidden sm:inline">Dist.</span>
                 </Button>
               </>
             )}
@@ -1150,11 +1151,11 @@ export function LeadsManagement() {
             <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
               <DialogTrigger asChild>
                 <Button 
-                  size="lg" 
-                  className="flex items-center gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-xl shadow-primary/30 text-lg font-bold h-12 px-6"
+                  size="default" 
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-xl shadow-primary/30 text-sm md:text-lg font-bold h-10 md:h-12 px-4 md:px-6 flex-1 md:flex-none"
                 >
-                  <Plus className="h-5 w-5" />
-                  Pedir Leads
+                  <Plus className="h-4 w-4 md:h-5 md:w-5" />
+                  <span>Pedir Leads</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
@@ -1451,105 +1452,107 @@ export function LeadsManagement() {
           </div>
         </div>
 
-        {/* Cards de Status Grandes e Vibrantes */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
-          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-2 border-slate-200 dark:border-slate-700 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 hover:scale-105 cursor-pointer">
-            <CardContent className="p-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-slate-500 to-slate-600 flex items-center justify-center mx-auto mb-3 shadow-lg">
-                <Target className="h-7 w-7 text-white" />
-              </div>
-              <p className="text-4xl font-black text-foreground">{stats.total}</p>
-              <p className="text-sm font-semibold text-muted-foreground mt-1">TOTAL</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-2 border-blue-200 dark:border-blue-800 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 hover:scale-105 cursor-pointer">
-            <CardContent className="p-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center mx-auto mb-3 shadow-lg">
-                <Sparkles className="h-7 w-7 text-white" />
-              </div>
-              <p className="text-4xl font-black text-blue-700 dark:text-blue-300">{stats.new}</p>
-              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 mt-1">NOVOS</p>
-            </CardContent>
-          </Card>
+        {/* Cards de Status - Mobile Scroll Horizontal */}
+        <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0 pb-2 scrollbar-hide">
+          <div className="flex md:grid md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 min-w-max md:min-w-0">
+            <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-2 border-slate-200 dark:border-slate-700 hover:shadow-xl transition-all duration-200 w-28 md:w-auto flex-shrink-0">
+              <CardContent className="p-4 text-center">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-r from-slate-500 to-slate-600 flex items-center justify-center mx-auto mb-2 shadow-md">
+                  <Target className="h-5 w-5 md:h-6 md:w-6 text-white" />
+                </div>
+                <p className="text-2xl md:text-3xl font-bold text-foreground">{stats.total}</p>
+                <p className="text-xs font-semibold text-muted-foreground mt-0.5">TOTAL</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-2 border-blue-200 dark:border-blue-800 hover:shadow-xl transition-all duration-200 w-28 md:w-auto flex-shrink-0">
+              <CardContent className="p-4 text-center">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center mx-auto mb-2 shadow-md">
+                  <Sparkles className="h-5 w-5 md:h-6 md:w-6 text-white" />
+                </div>
+                <p className="text-2xl md:text-3xl font-bold text-blue-700 dark:text-blue-300">{stats.new}</p>
+                <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-0.5">NOVOS</p>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-gradient-to-br from-amber-50 to-orange-100 dark:from-amber-950 dark:to-orange-900 border-2 border-amber-200 dark:border-amber-800 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 hover:scale-105 cursor-pointer">
-            <CardContent className="p-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center mx-auto mb-3 shadow-lg">
-                <TrendingUp className="h-7 w-7 text-white" />
-              </div>
-              <p className="text-4xl font-black text-amber-700 dark:text-amber-300">{stats.inProgress}</p>
-              <p className="text-sm font-semibold text-amber-600 dark:text-amber-400 mt-1">TRABALHANDO</p>
-            </CardContent>
-          </Card>
+            <Card className="bg-gradient-to-br from-amber-50 to-orange-100 dark:from-amber-950 dark:to-orange-900 border-2 border-amber-200 dark:border-amber-800 hover:shadow-xl transition-all duration-200 w-28 md:w-auto flex-shrink-0">
+              <CardContent className="p-4 text-center">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center mx-auto mb-2 shadow-md">
+                  <TrendingUp className="h-5 w-5 md:h-6 md:w-6 text-white" />
+                </div>
+                <p className="text-2xl md:text-3xl font-bold text-amber-700 dark:text-amber-300">{stats.inProgress}</p>
+                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5">TRAB.</p>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-gradient-to-br from-emerald-50 to-green-100 dark:from-emerald-950 dark:to-green-900 border-2 border-emerald-200 dark:border-emerald-800 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 hover:scale-105 cursor-pointer">
-            <CardContent className="p-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-500 flex items-center justify-center mx-auto mb-3 shadow-lg">
-                <CheckCircle className="h-7 w-7 text-white" />
-              </div>
-              <p className="text-4xl font-black text-emerald-700 dark:text-emerald-300">{stats.completed}</p>
-              <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-1">FECHADOS 🎉</p>
-            </CardContent>
-          </Card>
+            <Card className="bg-gradient-to-br from-emerald-50 to-green-100 dark:from-emerald-950 dark:to-green-900 border-2 border-emerald-200 dark:border-emerald-800 hover:shadow-xl transition-all duration-200 w-28 md:w-auto flex-shrink-0">
+              <CardContent className="p-4 text-center">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 flex items-center justify-center mx-auto mb-2 shadow-md">
+                  <CheckCircle className="h-5 w-5 md:h-6 md:w-6 text-white" />
+                </div>
+                <p className="text-2xl md:text-3xl font-bold text-emerald-700 dark:text-emerald-300">{stats.completed}</p>
+                <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">FECHADOS</p>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-gradient-to-br from-rose-50 to-red-100 dark:from-rose-950 dark:to-red-900 border-2 border-rose-200 dark:border-rose-800 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 hover:scale-105 cursor-pointer">
-            <CardContent className="p-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-rose-500 to-red-500 flex items-center justify-center mx-auto mb-3 shadow-lg">
-                <XCircle className="h-7 w-7 text-white" />
-              </div>
-              <p className="text-4xl font-black text-rose-700 dark:text-rose-300">{stats.rejected}</p>
-              <p className="text-sm font-semibold text-rose-600 dark:text-rose-400 mt-1">RECUSADOS</p>
-            </CardContent>
-          </Card>
+            <Card className="bg-gradient-to-br from-rose-50 to-red-100 dark:from-rose-950 dark:to-red-900 border-2 border-rose-200 dark:border-rose-800 hover:shadow-xl transition-all duration-200 w-28 md:w-auto flex-shrink-0">
+              <CardContent className="p-4 text-center">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-r from-rose-500 to-red-500 flex items-center justify-center mx-auto mb-2 shadow-md">
+                  <XCircle className="h-5 w-5 md:h-6 md:w-6 text-white" />
+                </div>
+                <p className="text-2xl md:text-3xl font-bold text-rose-700 dark:text-rose-300">{stats.rejected}</p>
+                <p className="text-xs font-semibold text-rose-600 dark:text-rose-400 mt-0.5">RECUSADOS</p>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-purple-950 dark:to-indigo-900 border-2 border-purple-200 dark:border-purple-800 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 hover:scale-105 cursor-pointer">
-            <CardContent className="p-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center mx-auto mb-3 shadow-lg">
-                <Users className="h-7 w-7 text-white" />
-              </div>
-              <p className={`text-4xl font-black ${stats.credits === 0 ? 'text-red-500' : 'text-purple-700 dark:text-purple-300'}`}>{stats.credits}</p>
-              <p className="text-sm font-semibold text-purple-600 dark:text-purple-400 mt-1">CRÉDITOS</p>
-            </CardContent>
-          </Card>
+            <Card className="bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-purple-950 dark:to-indigo-900 border-2 border-purple-200 dark:border-purple-800 hover:shadow-xl transition-all duration-200 w-28 md:w-auto flex-shrink-0">
+              <CardContent className="p-4 text-center">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center mx-auto mb-2 shadow-md">
+                  <Users className="h-5 w-5 md:h-6 md:w-6 text-white" />
+                </div>
+                <p className={`text-2xl md:text-3xl font-bold ${stats.credits === 0 ? 'text-red-500' : 'text-purple-700 dark:text-purple-300'}`}>{stats.credits}</p>
+                <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 mt-0.5">CRÉDITOS</p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
 
       {/* Filtros Simplificados */}
       <Card className="border-2 border-muted/50 shadow-lg">
-        <CardContent className="p-6">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col md:flex-row gap-4">
+        <CardContent className="p-3 md:p-6">
+          <div className="flex flex-col gap-3 md:gap-4">
+            <div className="flex flex-col gap-3 md:gap-4">
               <div className="flex-1">
                 <div className="relative">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
                   <Input
                     placeholder="🔍 Buscar nome, CPF, telefone..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-12 border-2 focus:border-primary transition-colors h-14 text-lg font-medium"
+                    className="pl-10 md:pl-12 border-2 focus:border-primary transition-colors h-11 md:h-14 text-sm md:text-lg font-medium"
                   />
                 </div>
               </div>
               
-              <div className="flex gap-3 flex-wrap">
+              <div className="grid grid-cols-2 md:flex gap-2 md:gap-3">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full md:w-60 border-2 focus:border-primary h-14 text-base font-semibold">
-                    <Filter className="h-5 w-5 mr-2" />
-                    <SelectValue placeholder="Filtrar Status" />
+                  <SelectTrigger className="w-full md:w-60 border-2 focus:border-primary h-11 md:h-14 text-sm md:text-base font-semibold">
+                    <Filter className="h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2 flex-shrink-0" />
+                    <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all" className="text-base py-3">
+                    <SelectItem value="all" className="text-sm md:text-base py-2 md:py-3">
                       <span className="flex items-center gap-2 font-semibold">
-                        <span className="w-3 h-3 rounded-full bg-slate-400"></span>
-                        Todos os Status
+                        <span className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-slate-400"></span>
+                        Todos
                       </span>
                     </SelectItem>
                     {Object.entries(STATUS_CONFIG).map(([key, config]) => (
-                      <SelectItem key={key} value={key} className="text-base py-3">
+                      <SelectItem key={key} value={key} className="text-sm md:text-base py-2 md:py-3">
                         <span className="flex items-center gap-2 font-semibold">
-                          <span className={`w-3 h-3 rounded-full ${config.dotColor}`}></span>
-                          {config.label}
+                          <span className={`w-2.5 h-2.5 md:w-3 md:h-3 rounded-full ${config.dotColor}`}></span>
+                          <span className="truncate">{config.label}</span>
                         </span>
                       </SelectItem>
                     ))}
@@ -1558,22 +1561,22 @@ export function LeadsManagement() {
 
                 {isAdmin && (
                   <Select value={userFilter} onValueChange={setUserFilter}>
-                    <SelectTrigger className="w-full md:w-60 border-2 focus:border-primary h-14 text-base font-semibold">
-                      <User className="h-5 w-5 mr-2" />
-                      <SelectValue placeholder="Filtrar Usuário" />
+                    <SelectTrigger className="w-full md:w-60 border-2 focus:border-primary h-11 md:h-14 text-sm md:text-base font-semibold">
+                      <User className="h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2 flex-shrink-0" />
+                      <SelectValue placeholder="Usuário" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all" className="text-base py-3">
+                      <SelectItem value="all" className="text-sm md:text-base py-2 md:py-3">
                         <span className="flex items-center gap-2 font-semibold">
                           <Users className="h-4 w-4" />
-                          Todos os Usuários
+                          Todos
                         </span>
                       </SelectItem>
                       {users.map(u => (
-                        <SelectItem key={u.id} value={u.id} className="text-base py-3">
-                          <span className="flex items-center gap-2 font-semibold">
-                            <User className="h-4 w-4" />
-                            {u.name || u.email || 'Usuário'}
+                        <SelectItem key={u.id} value={u.id} className="text-sm md:text-base py-2 md:py-3">
+                          <span className="flex items-center gap-2 font-semibold truncate">
+                            <User className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{u.name || u.email || 'Usuário'}</span>
                           </span>
                         </SelectItem>
                       ))}
