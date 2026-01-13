@@ -162,16 +162,16 @@ export function CommissionTable() {
   const currentLevelConfig = levelConfig[userLevel] || levelConfig.bronze;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Percent className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                <Percent className="h-4 w-4 md:h-5 md:w-5" />
                 Tabela de Comissões
               </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-xs md:text-sm text-muted-foreground mt-1">
                 {isAdmin 
                   ? "Visualizando todas as comissões (Admin)"
                   : `Comissões disponíveis para seu nível`
@@ -179,28 +179,71 @@ export function CommissionTable() {
               </p>
             </div>
             {!isAdmin && (
-              <Badge className={`${currentLevelConfig.color} flex items-center gap-1`}>
+              <Badge className={`${currentLevelConfig.color} flex items-center gap-1 text-xs`}>
                 <Crown className="h-3 w-3" />
                 {currentLevelConfig.label}
               </Badge>
             )}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 md:p-6 pt-0">
           {Object.keys(groupedByBank).length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
+            <p className="text-center text-muted-foreground py-8 text-sm">
               Nenhuma comissão cadastrada para seu nível
             </p>
           ) : (
-            <div className="space-y-8">
+            <div className="space-y-6 md:space-y-8">
               {Object.entries(groupedByBank).map(([bankName, rules]) => (
-                <div key={bankName} className="space-y-4">
+                <div key={bankName} className="space-y-3 md:space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b">
-                    <Building2 className="h-5 w-5 text-primary" />
-                    <h3 className="text-lg font-semibold">{bankName}</h3>
+                    <Building2 className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+                    <h3 className="text-base md:text-lg font-semibold">{bankName}</h3>
                   </div>
                   
-                  <div className="rounded-lg border overflow-hidden">
+                  {/* Mobile: Card layout */}
+                  <div className="block md:hidden space-y-3">
+                    {rules.map((rule) => (
+                      <div key={rule.id} className="p-3 border rounded-lg bg-card space-y-2">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2">
+                            <Package className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium text-sm">{rule.product_name}</span>
+                          </div>
+                          <Badge variant="default" className="font-semibold text-xs">
+                            {rule.commission_type === 'percentage' 
+                              ? `${rule.commission_value}%`
+                              : `R$ ${rule.commission_value.toFixed(2)}`
+                            }
+                          </Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {rule.operation_type ? (
+                            <Badge variant="outline" className="text-xs">{rule.operation_type}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">Padrão</span>
+                          )}
+                          <Badge variant="secondary" className="text-xs">
+                            {calculationModelLabels[rule.calculation_model] || rule.calculation_model}
+                          </Badge>
+                        </div>
+                        {rule.secondary_commission_value && rule.calculation_model === 'ambos' && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Calculator className="h-3 w-3" />
+                            <span>Adicional:</span>
+                            <Badge variant="outline" className="font-semibold text-xs">
+                              +{rule.commission_type === 'percentage' 
+                                ? `${rule.secondary_commission_value}%`
+                                : `R$ ${rule.secondary_commission_value.toFixed(2)}`
+                              }
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Desktop: Table layout */}
+                  <div className="hidden md:block rounded-lg border overflow-hidden">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -267,8 +310,8 @@ export function CommissionTable() {
       </Card>
       
       <Card className="bg-muted/50">
-        <CardContent className="pt-6">
-          <div className="space-y-2 text-sm text-muted-foreground">
+        <CardContent className="p-4 md:pt-6">
+          <div className="space-y-2 text-xs md:text-sm text-muted-foreground">
             <p className="font-medium text-foreground">ℹ️ Como funciona:</p>
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li><strong>Saldo Devedor:</strong> Comissão calculada sobre o saldo devedor da operação</li>

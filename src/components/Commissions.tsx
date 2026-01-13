@@ -477,36 +477,35 @@ export function Commissions() {
   );
 
   return (
-    <div className="p-4 md:p-6 space-y-6 pb-20 md:pb-6">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6 pb-20 md:pb-6">
       {/* Header */}
-      <div className="flex flex-col space-y-4">
+      <div className="flex flex-col space-y-2">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+          <h1 className="text-xl md:text-3xl font-bold text-foreground">
             {isAdmin ? 'Todas as Comissões' : isGestor ? 'Comissões da Equipe' : 'Minhas Comissões'}
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-xs md:text-base text-muted-foreground">
             {isAdmin 
               ? 'Visualize e gerencie comissões de todos os usuários' 
               : isGestor 
                 ? 'Visualize comissões da sua equipe e empresa' 
-                : 'Acompanhe seus ganhos e histórico de pagamentos'}
+                : 'Acompanhe seus ganhos e histórico'}
           </p>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-br from-success/10 to-success/5">
-          <CardContent className="p-4">
+      {/* Summary Cards - Horizontal scroll on mobile */}
+      <div className="flex gap-3 overflow-x-auto pb-2 -mx-3 px-3 md:mx-0 md:px-0 md:grid md:grid-cols-3 md:overflow-visible">
+        <Card className="bg-gradient-to-br from-success/10 to-success/5 min-w-[200px] md:min-w-0 flex-shrink-0">
+          <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total do Mês</p>
-                <p className="text-2xl font-bold text-foreground">
+              <div className="min-w-0">
+                <p className="text-xs md:text-sm text-muted-foreground">Total do Mês</p>
+                <p className="text-lg md:text-2xl font-bold text-foreground truncate">
                   {(() => {
                     const [year, month] = selectedMonth.split('-').map(Number);
                     const paidThisMonth = commissions.filter(c => {
                       if (c.status !== 'paid' || !c.payment_date) return false;
-                      // Parse date directly to avoid timezone issues
                       const dateParts = c.payment_date.split('-');
                       const paymentYear = parseInt(dateParts[0]);
                       const paymentMonth = parseInt(dateParts[1]);
@@ -518,7 +517,7 @@ export function Commissions() {
                   })()}
                 </p>
                 <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="w-40 mt-2">
+                  <SelectTrigger className="w-32 md:w-40 mt-2 h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -528,9 +527,8 @@ export function Commissions() {
                       const currentMonth = now.getMonth();
                       const months = [];
                       
-                      // Start from January 2026, go up to current month only
                       const startYear = 2026;
-                      const startMonth = 0; // January
+                      const startMonth = 0;
                       
                       for (let y = startYear; y <= currentYear; y++) {
                         const monthStart = (y === startYear) ? startMonth : 0;
@@ -544,7 +542,6 @@ export function Commissions() {
                         }
                       }
                       
-                      // Reverse to show most recent first
                       return months.reverse().map(({ value, label }) => (
                         <SelectItem key={value} value={value}>
                           {label}
@@ -553,57 +550,47 @@ export function Commissions() {
                     })()}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {(() => {
-                    const [year, month] = selectedMonth.split('-').map(Number);
-                    return commissions.filter(c => {
-                      if (c.status !== 'paid' || !c.payment_date) return false;
-                      const paymentDate = new Date(c.payment_date);
-                      return paymentDate.getMonth() === (month - 1) && paymentDate.getFullYear() === year && c.commission_amount > 0;
-                    }).length;
-                  })()} comissões pagas no mês
-                </p>
               </div>
-              <div className="p-2 bg-success/10 rounded-lg">
-                <DollarSign className="h-5 w-5 text-success" />
+              <div className="p-2 bg-success/10 rounded-lg flex-shrink-0">
+                <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-success" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-warning/10 to-warning/5">
-          <CardContent className="p-4">
+        <Card className="bg-gradient-to-br from-warning/10 to-warning/5 min-w-[160px] md:min-w-0 flex-shrink-0">
+          <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Prévia de Comissão</p>
-                <p className="text-2xl font-bold text-foreground">
+              <div className="min-w-0">
+                <p className="text-xs md:text-sm text-muted-foreground">Prévia</p>
+                <p className="text-lg md:text-2xl font-bold text-foreground truncate">
                   {formatCurrency(commissionTotals.preview)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {positiveCommissions.filter(c => c.status === 'preview').length} comissões lançadas
+                  {positiveCommissions.filter(c => c.status === 'preview').length} lançadas
                 </p>
               </div>
-              <div className="p-2 bg-muted/20 rounded-lg">
-                <Clock className="h-5 w-5 text-muted-foreground" />
+              <div className="p-2 bg-muted/20 rounded-lg flex-shrink-0">
+                <Clock className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-orange/10 to-orange/5">
-          <CardContent className="p-4">
+        <Card className="bg-gradient-to-br from-orange/10 to-orange/5 min-w-[160px] md:min-w-0 flex-shrink-0">
+          <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Pendente</p>
-                <p className="text-2xl font-bold text-foreground">
+              <div className="min-w-0">
+                <p className="text-xs md:text-sm text-muted-foreground">Pendente</p>
+                <p className="text-lg md:text-2xl font-bold text-foreground truncate">
                   {formatCurrency(commissionTotals.pending)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {positiveCommissions.filter(c => c.status === 'pending').length} comissões e leads
+                  {positiveCommissions.filter(c => c.status === 'pending').length} comissões
                 </p>
               </div>
-              <div className="p-2 bg-warning/10 rounded-lg">
-                <Clock className="h-5 w-5 text-warning" />
+              <div className="p-2 bg-warning/10 rounded-lg flex-shrink-0">
+                <Clock className="h-4 w-4 md:h-5 md:w-5 text-warning" />
               </div>
             </div>
           </CardContent>
@@ -669,60 +656,62 @@ export function Commissions() {
 
       {/* Commissions History */}
       <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Histórico de Comissões
-            </CardTitle>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                // Gerar PDF das comissões do mês selecionado
-                const [year, month] = selectedMonth.split('-').map(Number);
-                const monthName = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-                
-                // Filtrar comissões pagas do mês
-                const paidCommissions = commissions.filter(c => {
-                  if (c.status !== 'paid' || !c.payment_date) return false;
-                  const dateParts = c.payment_date.split('-');
-                  const paymentYear = parseInt(dateParts[0]);
-                  const paymentMonth = parseInt(dateParts[1]);
-                  return paymentMonth === month && paymentYear === year && c.commission_amount > 0;
-                });
-                
-                if (paidCommissions.length === 0) {
-                  toast({
-                    title: "Sem comissões",
-                    description: `Não há comissões pagas em ${monthName}`,
-                    variant: "destructive",
+        <CardHeader className="p-4 md:p-6">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                <DollarSign className="h-4 w-4 md:h-5 md:w-5" />
+                Histórico de Comissões
+              </CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  // Gerar PDF das comissões do mês selecionado
+                  const [year, month] = selectedMonth.split('-').map(Number);
+                  const monthName = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                  
+                  // Filtrar comissões pagas do mês
+                  const paidCommissions = commissions.filter(c => {
+                    if (c.status !== 'paid' || !c.payment_date) return false;
+                    const dateParts = c.payment_date.split('-');
+                    const paymentYear = parseInt(dateParts[0]);
+                    const paymentMonth = parseInt(dateParts[1]);
+                    return paymentMonth === month && paymentYear === year && c.commission_amount > 0;
                   });
-                  return;
-                }
-                
-                const doc = new jsPDF();
-                const pageWidth = doc.internal.pageSize.getWidth();
-                const pageHeight = doc.internal.pageSize.getHeight();
-                
-                // Cores em tons laranja (RGB)
-                const primaryOrange = [255, 107, 0]; // #FF6B00
-                const lightOrange = [255, 140, 50]; // #FF8C32
-                const darkOrange = [200, 80, 0]; // #C85000
-                
-                // Header com fundo laranja
-                doc.setFillColor(primaryOrange[0], primaryOrange[1], primaryOrange[2]);
-                doc.rect(0, 0, pageWidth, 45, "F");
-                
-                // Logo Credtz (texto estilizado como logo)
-                doc.setFontSize(28);
-                doc.setFont("helvetica", "bold");
-                doc.setTextColor(255, 255, 255);
-                doc.text("CREDTZ", pageWidth / 2, 22, { align: "center" });
-                
-                doc.setFontSize(10);
-                doc.setFont("helvetica", "normal");
-                doc.text("Extrato de Comissões", pageWidth / 2, 32, { align: "center" });
-                doc.text(`Período: ${monthName}`, pageWidth / 2, 40, { align: "center" });
+                  
+                  if (paidCommissions.length === 0) {
+                    toast({
+                      title: "Sem comissões",
+                      description: `Não há comissões pagas em ${monthName}`,
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  
+                  const doc = new jsPDF();
+                  const pageWidth = doc.internal.pageSize.getWidth();
+                  const pageHeight = doc.internal.pageSize.getHeight();
+                  
+                  // Cores em tons laranja (RGB)
+                  const primaryOrange = [255, 107, 0]; // #FF6B00
+                  const lightOrange = [255, 140, 50]; // #FF8C32
+                  const darkOrange = [200, 80, 0]; // #C85000
+                  
+                  // Header com fundo laranja
+                  doc.setFillColor(primaryOrange[0], primaryOrange[1], primaryOrange[2]);
+                  doc.rect(0, 0, pageWidth, 45, "F");
+                  
+                  // Logo Credtz (texto estilizado como logo)
+                  doc.setFontSize(28);
+                  doc.setFont("helvetica", "bold");
+                  doc.setTextColor(255, 255, 255);
+                  doc.text("CREDTZ", pageWidth / 2, 22, { align: "center" });
+                  
+                  doc.setFontSize(10);
+                  doc.setFont("helvetica", "normal");
+                  doc.text("Extrato de Comissões", pageWidth / 2, 32, { align: "center" });
+                  doc.text(`Período: ${monthName}`, pageWidth / 2, 40, { align: "center" });
                 
                 // Informações do relatório
                 doc.setTextColor(80, 80, 80);
@@ -850,26 +839,25 @@ export function Commissions() {
                   description: `Extrato de ${monthName} baixado com sucesso.`,
                 });
               }}
-              className="gap-2"
+              className="gap-1 md:gap-2"
             >
-              <FileDown className="h-4 w-4" />
-              Gerar PDF
+              <FileDown className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Gerar</span> PDF
             </Button>
-          </div>
-          <div className="flex gap-4 mt-4">
-            <div className="relative flex-1">
+            </div>
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Buscar por CPF ou número da proposta..."
+                placeholder="Buscar CPF ou proposta..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 text-sm"
               />
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        <CardContent className="p-4 md:p-6 pt-0">
+          <div className="space-y-3 md:space-y-4">
             {(() => {
               // Filtrar comissões do mês selecionado se o status for 'paid'
                const [year, month] = selectedMonth.split('-').map(Number);
@@ -903,8 +891,8 @@ export function Commissions() {
               }
 
               return filteredCommissions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  {searchTerm ? 'Nenhuma comissão encontrada para o termo pesquisado' : 'Nenhuma comissão registrada ainda'}
+                <p className="text-center text-muted-foreground py-8 text-sm">
+                  {searchTerm ? 'Nenhuma comissão encontrada' : 'Nenhuma comissão registrada ainda'}
                 </p>
               ) : (
                 filteredCommissions.map((commission) => {
@@ -912,16 +900,16 @@ export function Commissions() {
                   const Icon = statusInfo?.icon || Clock;
                   
                   return (
-                    <div key={commission.id} className="p-4 border rounded-lg bg-card hover:bg-muted/20 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-3 rounded-lg ${statusInfo?.color || 'bg-muted/20'}`}>
-                          <Icon className="h-5 w-5" />
+                    <div key={commission.id} className="p-3 md:p-4 border rounded-lg bg-card hover:bg-muted/20 transition-colors">
+                      <div className="flex items-start gap-2 md:gap-3">
+                        <div className={`p-2 md:p-3 rounded-lg ${statusInfo?.color || 'bg-muted/20'} flex-shrink-0`}>
+                          <Icon className="h-4 w-4 md:h-5 md:w-5" />
                         </div>
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-semibold text-lg">{commission.client_name}</h4>
-                            <div className="text-right">
-                              <p className={`font-bold text-lg ${Number(commission.commission_amount) < 0 ? 'text-destructive' : 'text-green-600'}`}>
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                            <h4 className="font-semibold text-sm md:text-lg truncate">{commission.client_name}</h4>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <p className={`font-bold text-sm md:text-lg ${Number(commission.commission_amount) < 0 ? 'text-destructive' : 'text-green-600'}`}>
                                 {formatCurrency(Number(commission.commission_amount))}
                               </p>
                               <Badge variant="outline" className={`${statusInfo?.color} text-xs`}>
@@ -930,42 +918,30 @@ export function Commissions() {
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-                            <div>
-                              <span className="text-muted-foreground">Usuário:</span>
-                              <span className="ml-2 font-medium">{commission.user?.name || 'N/A'}</span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Proposta:</span>
-                              <span className="ml-2 font-medium">{commission.proposal_number || 'N/A'}</span>
-                            </div>
-                            <div>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs md:text-sm">
+                            <div className="truncate">
                               <span className="text-muted-foreground">CPF:</span>
-                              <span className="ml-2 font-medium">{commission.cpf || 'N/A'}</span>
+                              <span className="ml-1 font-medium">{commission.cpf || 'N/A'}</span>
                             </div>
-                            <div>
+                            <div className="truncate">
                               <span className="text-muted-foreground">Banco:</span>
-                              <span className="ml-2 font-medium">{commission.bank_name}</span>
+                              <span className="ml-1 font-medium">{commission.bank_name}</span>
                             </div>
-                            <div>
+                            <div className="truncate">
                               <span className="text-muted-foreground">Produto:</span>
-                              <span className="ml-2 font-medium">{commission.product_type}</span>
+                              <span className="ml-1 font-medium">{commission.product_type}</span>
                             </div>
-                            <div>
+                            <div className="truncate">
                               <span className="text-muted-foreground">Data:</span>
-                              <span className="ml-2 font-medium">{formatDate(commission.created_at)}</span>
+                              <span className="ml-1 font-medium">{formatDate(commission.created_at)}</span>
                             </div>
-                            <div>
-                              <span className="text-muted-foreground">Valor Bruto:</span>
-                              <span className="ml-2 font-medium text-blue-600">R$ {commission.credit_value?.toFixed(2) || '0,00'}</span>
+                            <div className="truncate">
+                              <span className="text-muted-foreground">%:</span>
+                              <span className="ml-1 font-medium">{commission.commission_percentage || 0}%</span>
                             </div>
-                            <div>
-                              <span className="text-muted-foreground">Percentual:</span>
-                              <span className="ml-2 font-medium">{commission.commission_percentage || 0}%</span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Comissão:</span>
-                              <span className="ml-2 font-bold text-green-600">{formatCurrency(Number(commission.commission_amount))}</span>
+                            <div className="truncate">
+                              <span className="text-muted-foreground">Bruto:</span>
+                              <span className="ml-1 font-medium text-blue-600">R$ {commission.credit_value?.toFixed(2) || '0,00'}</span>
                             </div>
                           </div>
                         </div>

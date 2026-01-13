@@ -803,60 +803,60 @@ export const TelevendasManagement = () => {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4">
+      <Card className="mb-20 md:mb-0">
+        <CardHeader className="p-4 md:p-6">
+          <div className="flex flex-col gap-3 md:gap-4">
             <div className="flex justify-between items-center">
-              <CardTitle>Gestão de Propostas - Televendas</CardTitle>
+              <CardTitle className="text-base md:text-xl">Gestão de Propostas - Televendas</CardTitle>
             </div>
             
-            {/* Status filter badges */}
-            <div className="flex flex-wrap gap-2">
+            {/* Status filter badges - horizontal scroll on mobile */}
+            <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap md:overflow-visible">
               <Badge 
                 variant={selectedStatus === "all" ? "default" : "outline"}
-                className="cursor-pointer"
+                className="cursor-pointer whitespace-nowrap flex-shrink-0"
                 onClick={() => setSelectedStatus("all")}
               >
                 Todos ({statusCounts.all})
               </Badge>
               <Badge 
                 variant={selectedStatus === "solicitado_digitacao" ? "default" : "outline"}
-                className="cursor-pointer bg-blue-500/10 text-blue-600 hover:bg-blue-500/20"
+                className="cursor-pointer bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 whitespace-nowrap flex-shrink-0"
                 onClick={() => setSelectedStatus("solicitado_digitacao")}
               >
                 📝 Solicitado ({statusCounts.solicitado_digitacao})
               </Badge>
               <Badge 
                 variant={selectedStatus === "proposta_digitada" ? "default" : "outline"}
-                className="cursor-pointer bg-purple-500/10 text-purple-600 hover:bg-purple-500/20"
+                className="cursor-pointer bg-purple-500/10 text-purple-600 hover:bg-purple-500/20 whitespace-nowrap flex-shrink-0"
                 onClick={() => setSelectedStatus("proposta_digitada")}
               >
                 📋 Digitada ({statusCounts.proposta_digitada})
               </Badge>
               <Badge 
                 variant={selectedStatus === "pendente" ? "default" : "outline"}
-                className="cursor-pointer bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20"
+                className="cursor-pointer bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20 whitespace-nowrap flex-shrink-0"
                 onClick={() => setSelectedStatus("pendente")}
               >
                 ⏳ Pendentes ({statusCounts.pendente})
               </Badge>
               <Badge 
                 variant={selectedStatus === "pago" ? "default" : "outline"}
-                className="cursor-pointer bg-green-500/10 text-green-600 hover:bg-green-500/20"
+                className="cursor-pointer bg-green-500/10 text-green-600 hover:bg-green-500/20 whitespace-nowrap flex-shrink-0"
                 onClick={() => setSelectedStatus("pago")}
               >
                 ✓ Pagas ({statusCounts.pago})
               </Badge>
               <Badge 
                 variant={selectedStatus === "cancelado" ? "default" : "outline"}
-                className="cursor-pointer bg-red-500/10 text-red-600 hover:bg-red-500/20"
+                className="cursor-pointer bg-red-500/10 text-red-600 hover:bg-red-500/20 whitespace-nowrap flex-shrink-0"
                 onClick={() => setSelectedStatus("cancelado")}
               >
                 ✕ Canceladas ({statusCounts.cancelado})
               </Badge>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col gap-3">
               {/* Search bar */}
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -868,42 +868,102 @@ export const TelevendasManagement = () => {
                 />
               </div>
               
-              {/* User filter (admin e gestor) */}
-              {(isAdmin || isGestor) && (
-                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                  <SelectTrigger className="w-full sm:w-[200px]">
-                    <SelectValue placeholder="Filtrar por usuário" />
+              {/* Filters row */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                {/* User filter (admin e gestor) */}
+                {(isAdmin || isGestor) && (
+                  <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                      <SelectValue placeholder="Filtrar por usuário" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os usuários</SelectItem>
+                      {users.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.name || 'Sem nome'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                
+                {/* Month filter */}
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="Filtrar por mês" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos os usuários</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.name || 'Sem nome'}
+                    <SelectItem value="all">Todos os meses</SelectItem>
+                    {getMonthOptions().map((month) => (
+                      <SelectItem key={month.value} value={month.value}>
+                        {month.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              )}
-              
-              {/* Month filter */}
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue placeholder="Filtrar por mês" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os meses</SelectItem>
-                  {getMonthOptions().map((month) => (
-                    <SelectItem key={month.value} value={month.value}>
-                      {month.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
+        <CardContent className="p-4 md:p-6 pt-0">
+          {/* Mobile: Card layout */}
+          <div className="block md:hidden space-y-3">
+            {filteredTelevendas.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8 text-sm">
+                {searchTerm ? 'Nenhuma venda encontrada' : 'Nenhuma venda registrada'}
+              </p>
+            ) : (
+              filteredTelevendas.map((tv) => (
+                <div 
+                  key={tv.id} 
+                  className="p-3 border rounded-lg bg-card space-y-2"
+                  onClick={() => handleRowClick(tv)}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{tv.nome}</p>
+                      <p className="text-xs text-muted-foreground">{formatCPF(tv.cpf)}</p>
+                    </div>
+                    {getStatusBadge(tv.status)}
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    <span>{tv.banco}</span>
+                    <span>•</span>
+                    <span>{tv.tipo_operacao}</span>
+                    <span>•</span>
+                    <span>R$ {formatCurrencyDisplay(tv.parcela)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t">
+                    <span className="text-xs text-muted-foreground">
+                      {tv.data_venda ? tv.data_venda.split('-').reverse().join('/') : '-'}
+                    </span>
+                    {canChangeStatus(tv) && (
+                      <Select
+                        value={tv.status}
+                        onValueChange={(value) => updateStatus(tv.id, value, tv)}
+                      >
+                        <SelectTrigger className="w-32 h-8 text-xs" onClick={(e) => e.stopPropagation()}>
+                          <SelectValue>
+                            {getStatusLabel(tv.status)}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getAvailableStatuses(tv).map((status) => (
+                            <SelectItem key={status} value={status}>
+                              {getStatusLabel(status)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop: Table layout */}
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
