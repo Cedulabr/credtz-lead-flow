@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2, UserCircle, Clock } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2, UserCircle, Clock, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -70,6 +71,23 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
     checkGestorAccess();
   }, [user?.id]);
 
+  // Close menu on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [activeTab]);
+
+  // Prevent body scroll when menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileMenuOpen]);
+
   const handleSignOut = async () => {
     await signOut();
     toast.success("Signed out successfully");
@@ -77,26 +95,21 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
 
   // Check if user has access to a specific section
   const hasAccess = (permissionKey: string | null): boolean => {
-    if (!permissionKey) return true; // Dashboard always accessible
-    if (isAdmin) return true; // Admin has full access
+    if (!permissionKey) return true;
+    if (isAdmin) return true;
     
-    // Special permission for admin or gestor
     if (permissionKey === "admin_or_gestor") {
       return isAdmin || isGestor;
     }
     
-    // Check the specific permission in profile
     const profileData = profile as any;
     return profileData?.[permissionKey] !== false;
   };
 
   // Filter visible items based on permissions
   const visibleNavItems = navItems.filter(item => {
-    // Always show dashboard
     if (!item.permissionKey) return true;
-    // Admin sees everything
     if (isAdmin) return true;
-    // Check permission
     return hasAccess(item.permissionKey);
   });
 
@@ -106,88 +119,169 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
     return hasAccess(item.permissionKey);
   });
 
+  // Get current page title
+  const currentPageTitle = navItems.find(item => item.id === activeTab)?.label || "Dashboard";
+
   return (
     <>
-      {/* Mobile Header - Minimal with menu toggle */}
-      <div className="md:hidden fixed top-0 left-0 right-0 bg-card border-b z-50 h-14 flex items-center justify-between px-4">
-        <div className="flex items-center gap-2">
-          <img 
+      {/* Mobile Header */}
+      <motion.div 
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="md:hidden fixed top-0 left-0 right-0 bg-card/95 backdrop-blur-md border-b z-50 h-14 flex items-center justify-between px-4 safe-area-inset-top"
+      >
+        <div className="flex items-center gap-3">
+          <motion.img 
             src={logoUrl || credtzLogo} 
             alt={`${companyName} Logo`} 
             className="w-8 h-8 rounded-lg object-contain"
+            whileTap={{ scale: 0.95 }}
           />
-          <span className="font-semibold text-foreground">{companyName}</span>
+          <div className="flex flex-col">
+            <span className="font-semibold text-foreground text-sm leading-tight">{companyName}</span>
+            <span className="text-xs text-muted-foreground leading-tight">{currentPageTitle}</span>
+          </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
+        <motion.button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="h-10 w-10"
+          className="h-10 w-10 flex items-center justify-center rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
+          whileTap={{ scale: 0.9 }}
         >
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </Button>
-      </div>
+          <AnimatePresence mode="wait">
+            {isMobileMenuOpen ? (
+              <motion.div
+                key="close"
+                initial={{ rotate: -90, opacity: 0 }}
+                animate={{ rotate: 0, opacity: 1 }}
+                exit={{ rotate: 90, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                <X size={22} />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="menu"
+                initial={{ rotate: 90, opacity: 0 }}
+                animate={{ rotate: 0, opacity: 1 }}
+                exit={{ rotate: -90, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                <Menu size={22} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.button>
+      </motion.div>
 
       {/* Mobile Full Menu Overlay */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 bg-background z-40 pt-14 pb-20 overflow-y-auto">
-          <nav className="p-4 space-y-2">
-            {visibleNavItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Button
-                  key={item.id}
-                  variant={activeTab === item.id ? "default" : "ghost"}
-                  onClick={() => {
-                    onTabChange(item.id);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="w-full justify-start gap-3 h-12"
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="md:hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-40"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+            
+            {/* Menu Panel */}
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="md:hidden fixed top-14 right-0 bottom-0 w-[85%] max-w-sm bg-card z-40 shadow-xl overflow-y-auto"
+            >
+              <nav className="p-4 space-y-1.5">
+                {visibleNavItems.map((item, index) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  
+                  return (
+                    <motion.button
+                      key={item.id}
+                      initial={{ x: 20, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      transition={{ delay: index * 0.03 }}
+                      onClick={() => {
+                        onTabChange(item.id);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all",
+                        isActive
+                          ? "bg-primary text-primary-foreground shadow-md"
+                          : "hover:bg-secondary/70 active:bg-secondary"
+                      )}
+                    >
+                      <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                      <span className="flex-1 text-left font-medium">{item.label}</span>
+                      {isActive && (
+                        <motion.div layoutId="activeIndicator">
+                          <ChevronRight size={18} />
+                        </motion.div>
+                      )}
+                    </motion.button>
+                  );
+                })}
+                
+                {isAdmin && (
+                  <motion.button
+                    initial={{ x: 20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: visibleNavItems.length * 0.03 }}
+                    onClick={() => window.location.href = '/admin'}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl hover:bg-secondary/70 active:bg-secondary transition-all"
+                  >
+                    <Settings size={20} />
+                    <span className="flex-1 text-left font-medium">Admin</span>
+                  </motion.button>
+                )}
+              </nav>
+              
+              {/* User Section */}
+              {user && (
+                <motion.div 
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                  className="p-4 border-t mt-4 mx-4 rounded-xl bg-secondary/30"
                 >
-                  <Icon size={20} />
-                  <span>{item.label}</span>
-                </Button>
-              );
-            })}
-            {isAdmin && (
-              <Button
-                variant="ghost"
-                onClick={() => window.location.href = '/admin'}
-                className="w-full justify-start gap-3 h-12"
-              >
-                <Settings size={20} />
-                <span>Admin</span>
-              </Button>
-            )}
-          </nav>
-          
-          {user && (
-            <div className="p-4 border-t mt-4">
-              <div className="flex items-center gap-2 mb-3">
-                <User className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="font-medium text-sm">{profile?.name || user.email}</p>
-                  {profile?.role && (
-                    <p className="text-xs text-muted-foreground capitalize">{profile.role}</p>
-                  )}
-                </div>
-              </div>
-              <ConnectionStatus />
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleSignOut}
-                className="w-full mt-3"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Sair
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{profile?.name || user.email}</p>
+                      {profile?.role && (
+                        <p className="text-xs text-muted-foreground capitalize">{profile.role}</p>
+                      )}
+                    </div>
+                  </div>
+                  <ConnectionStatus />
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleSignOut}
+                    className="w-full mt-4"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sair
+                  </Button>
+                </motion.div>
+              )}
+              
+              {/* Bottom spacing for safe area */}
+              <div className="h-24" />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
-      {/* Desktop Sidebar - Hidden on Mobile */}
+      {/* Desktop Sidebar */}
       <div className="hidden md:flex md:flex-col md:w-64 md:bg-card md:border-r md:h-screen md:sticky md:top-0">
         <div className="p-6 border-b">
           <div className="flex items-center space-x-3">
@@ -203,16 +297,20 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {visibleNavItems.map((item) => {
             const Icon = item.icon;
+            const isActive = activeTab === item.id;
             
             return (
               <Button
                 key={item.id}
-                variant={activeTab === item.id ? "default" : "ghost"}
+                variant={isActive ? "default" : "ghost"}
                 onClick={() => onTabChange(item.id)}
-                className="w-full justify-start space-x-3"
+                className={cn(
+                  "w-full justify-start space-x-3 transition-all",
+                  isActive && "shadow-md"
+                )}
               >
                 <Icon size={20} />
                 <span>{item.label}</span>
@@ -220,16 +318,14 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
             );
           })}
           {isAdmin && (
-            <>
-              <Button
-                variant="ghost"
-                onClick={() => window.location.href = '/admin'}
-                className="w-full justify-start space-x-3"
-              >
-                <Settings size={20} />
-                <span>Admin</span>
-              </Button>
-            </>
+            <Button
+              variant="ghost"
+              onClick={() => window.location.href = '/admin'}
+              className="w-full justify-start space-x-3"
+            >
+              <Settings size={20} />
+              <span>Admin</span>
+            </Button>
           )}
         </nav>
 
@@ -250,7 +346,6 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                 </div>
               </div>
               
-              {/* Connection Status */}
               <div className="flex justify-center">
                 <ConnectionStatus />
               </div>
@@ -269,47 +364,73 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         </div>
       </div>
 
-      {/* Bottom Navigation for Mobile - Icons only with tooltips */}
+      {/* Bottom Navigation for Mobile */}
       <TooltipProvider delayDuration={0}>
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t z-50 safe-area-inset-bottom">
+        <motion.div 
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="md:hidden fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-md border-t z-50 safe-area-inset-bottom"
+        >
           <div className="flex justify-around items-center px-2 py-2">
             {/* Home button */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <button
+                <motion.button
                   onClick={() => onTabChange("dashboard")}
                   className={cn(
-                    "flex items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200",
+                    "flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200",
                     activeTab === "dashboard"
-                      ? "text-primary bg-primary/15 shadow-sm"
+                      ? "text-primary bg-primary/15"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
+                  whileTap={{ scale: 0.9 }}
                 >
-                  <Home size={26} strokeWidth={activeTab === "dashboard" ? 2.5 : 2} />
-                </button>
+                  <Home size={24} strokeWidth={activeTab === "dashboard" ? 2.5 : 2} />
+                  {activeTab === "dashboard" && (
+                    <motion.span 
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-[10px] font-medium mt-0.5"
+                    >
+                      Início
+                    </motion.span>
+                  )}
+                </motion.button>
               </TooltipTrigger>
               <TooltipContent side="top" className="font-medium">
                 Início
               </TooltipContent>
             </Tooltip>
 
-            {/* Dynamic mobile items - icons only */}
+            {/* Dynamic mobile items */}
             {visibleMobileItems.slice(0, 3).map((item) => {
               const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              
               return (
                 <Tooltip key={item.id}>
                   <TooltipTrigger asChild>
-                    <button
+                    <motion.button
                       onClick={() => onTabChange(item.id)}
                       className={cn(
-                        "flex items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200",
-                        activeTab === item.id
-                          ? "text-primary bg-primary/15 shadow-sm"
+                        "flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200",
+                        isActive
+                          ? "text-primary bg-primary/15"
                           : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                       )}
+                      whileTap={{ scale: 0.9 }}
                     >
-                      <Icon size={26} strokeWidth={activeTab === item.id ? 2.5 : 2} />
-                    </button>
+                      <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
+                      {isActive && (
+                        <motion.span 
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-[10px] font-medium mt-0.5 max-w-[50px] truncate"
+                        >
+                          {item.label.split(' ')[0]}
+                        </motion.span>
+                      )}
+                    </motion.button>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="font-medium">
                     {item.label}
@@ -318,27 +439,48 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
               );
             })}
 
-            {/* More menu button - toggles open/close */}
+            {/* More menu button */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <button
+                <motion.button
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                   className={cn(
-                    "flex items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200",
+                    "flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200",
                     isMobileMenuOpen
-                      ? "text-primary bg-primary/15 shadow-sm"
+                      ? "text-primary bg-primary/15"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
+                  whileTap={{ scale: 0.9 }}
                 >
-                  {isMobileMenuOpen ? <X size={26} strokeWidth={2.5} /> : <Menu size={26} strokeWidth={2} />}
-                </button>
+                  <AnimatePresence mode="wait">
+                    {isMobileMenuOpen ? (
+                      <motion.div
+                        key="close"
+                        initial={{ rotate: -90, opacity: 0 }}
+                        animate={{ rotate: 0, opacity: 1 }}
+                        exit={{ rotate: 90, opacity: 0 }}
+                      >
+                        <X size={24} strokeWidth={2.5} />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="menu"
+                        initial={{ rotate: 90, opacity: 0 }}
+                        animate={{ rotate: 0, opacity: 1 }}
+                        exit={{ rotate: -90, opacity: 0 }}
+                      >
+                        <Menu size={24} strokeWidth={2} />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.button>
               </TooltipTrigger>
               <TooltipContent side="top" className="font-medium">
                 {isMobileMenuOpen ? "Fechar" : "Menu"}
               </TooltipContent>
             </Tooltip>
           </div>
-        </div>
+        </motion.div>
       </TooltipProvider>
     </>
   );
