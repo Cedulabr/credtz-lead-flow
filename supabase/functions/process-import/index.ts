@@ -50,14 +50,14 @@ serve(async (req) => {
     const { data: fileData, error: downloadError } = await supabase
       .storage
       .from('imports')
-      .download(job.storage_path);
+      .download(job.file_path);
 
     if (downloadError || !fileData) {
       throw new Error(`Erro ao baixar arquivo: ${downloadError?.message}`);
     }
 
     const fileText = await fileData.text();
-    const isCSV = job.filename.toLowerCase().endsWith('.csv');
+    const isCSV = job.file_name.toLowerCase().endsWith('.csv');
     
     let rows: string[][] = [];
     let headers: string[] = [];
