@@ -77,17 +77,22 @@ export function ImportBase({ onBack }: ImportBaseProps) {
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
 
-    if (!selectedFile.name.endsWith('.csv')) {
+    const extension = selectedFile.name.toLowerCase();
+    if (!extension.endsWith('.csv') && !extension.endsWith('.xlsx') && !extension.endsWith('.xls')) {
       toast({
         title: "Formato inválido",
-        description: "Por favor, selecione um arquivo CSV",
+        description: "Por favor, selecione um arquivo CSV ou Excel (XLSX/XLS)",
         variant: "destructive",
       });
       return;
     }
 
     setFile(selectedFile);
-    await parseCSV(selectedFile);
+    if (extension.endsWith('.csv')) {
+      await parseCSV(selectedFile);
+    } else {
+      await parseXLSX(selectedFile);
+    }
   };
 
   const parseCSV = async (csvFile: File) => {
@@ -201,6 +206,100 @@ export function ImportBase({ onBack }: ImportBaseProps) {
     
     result.push(current.trim());
     return result;
+  };
+
+  const parseXLSX = async (xlsxFile: File) => {
+    setIsParsing(true);
+    try {
+      const XLSX = await import('xlsx');
+      const buffer = await xlsxFile.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array', raw: false });
+      
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json<string[]>(firstSheet, { header: 1, raw: false, defval: '' });
+      
+      if (data.length < 2) {
+        toast({
+          title: "Arquivo vazio",
+          description: "O arquivo Excel não contém dados para importar",
+          variant: "destructive",
+        });
+        setIsParsing(false);
+        return;
+      }
+
+      // Parse header to find column indexes
+      const headers = (data[0] as string[]).map(h => String(h || '').toLowerCase().trim());
+      
+      const nomeIndex = headers.findIndex(h => h.includes('nome'));
+      const convenioIndex = headers.findIndex(h => h.includes('convenio') || h.includes('convênio'));
+      const telefoneIndex = headers.findIndex(h => h.includes('telefone 1') || h.includes('telefone1') || (h.includes('telefone') && !h.includes('2')));
+      const telefone2Index = headers.findIndex(h => h.includes('telefone 2') || h.includes('telefone2'));
+      const cpfIndex = headers.findIndex(h => h.includes('cpf'));
+      const tagIndex = headers.findIndex(h => h.includes('tag') || h.includes('perfil') || h.includes('classificação') || h.includes('classificacao'));
+
+      if (nomeIndex === -1 || convenioIndex === -1 || telefoneIndex === -1) {
+        toast({
+          title: "Colunas obrigatórias não encontradas",
+          description: "O arquivo deve conter as colunas: Nome, Convênio, Telefone 1 (Telefone 2, CPF e Tag são opcionais)",
+          variant: "destructive",
+        });
+        setIsParsing(false);
+        return;
+      }
+
+      const leads: ParsedLead[] = [];
+      
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i] as string[];
+        
+        const nome = String(row[nomeIndex] || '').trim();
+        const convenio = String(row[convenioIndex] || '').trim();
+        const telefone = String(row[telefoneIndex] || '').replace(/\D/g, '');
+        const telefone2 = telefone2Index !== -1 ? String(row[telefone2Index] || '').replace(/\D/g, '') : '';
+        const cpf = cpfIndex !== -1 ? String(row[cpfIndex] || '').replace(/\D/g, '') : '';
+        const tag = tagIndex !== -1 ? String(row[tagIndex] || '').trim() : '';
+
+        let valid = true;
+        let error = '';
+
+        if (!nome) {
+          valid = false;
+          error = 'Nome vazio';
+        } else if (!convenio) {
+          valid = false;
+          error = 'Convênio vazio';
+        } else if (!telefone || telefone.length < 10) {
+          valid = false;
+          error = 'Telefone 1 inválido';
+        } else if (telefone2 && telefone2.length < 10) {
+          valid = false;
+          error = 'Telefone 2 inválido';
+        }
+
+        leads.push({ nome, convenio, telefone, telefone2: telefone2 || undefined, cpf: cpf || undefined, tag: tag || undefined, valid, error });
+      }
+
+      setParsedLeads(leads);
+      setShowPreview(true);
+      
+      const validCount = leads.filter(l => l.valid).length;
+      const invalidCount = leads.filter(l => !l.valid).length;
+      
+      toast({
+        title: "Arquivo processado",
+        description: `${validCount} leads válidos, ${invalidCount} com erros`,
+      });
+    } catch (error) {
+      console.error('Error parsing XLSX:', error);
+      toast({
+        title: "Erro ao processar arquivo",
+        description: "Não foi possível ler o arquivo Excel",
+        variant: "destructive",
+      });
+    } finally {
+      setIsParsing(false);
+    }
   };
 
   const handleImport = async () => {
@@ -433,7 +532,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
             <div>
               <h4 className="font-medium mb-2">Formato do Arquivo</h4>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Arquivo CSV (separado por vírgula ou ponto-vírgula)</li>
+                <li>• Arquivo CSV ou Excel (XLSX/XLS)</li>
                 <li>• Primeira linha deve conter os cabeçalhos</li>
                 <li>• Codificação UTF-8 recomendada</li>
               </ul>
@@ -467,7 +566,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                 <Upload className="h-10 w-10 text-primary" />
               </div>
               <div className="text-center">
-                <h3 className="text-lg font-semibold">Selecione o arquivo CSV</h3>
+                <h3 className="text-lg font-semibold">Selecione o arquivo CSV ou Excel</h3>
                 <p className="text-sm text-muted-foreground">
                   Arraste e solte ou clique para selecionar
                 </p>
@@ -478,7 +577,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                     id="file-upload"
                     ref={fileInputRef}
                     type="file"
-                    accept=".csv"
+                    accept=".csv,.xlsx,.xls"
                     className="hidden"
                     onChange={handleFileChange}
                     disabled={isParsing}

@@ -2298,7 +2298,9 @@ export type Database = {
         Row: {
           banco: string | null
           convenio: string
-          cpf: string
+          cpf: string | null
+          cpf_added_at: string | null
+          cpf_added_by: string | null
           created_at: string
           data_nascimento: string | null
           id: string
@@ -2317,7 +2319,9 @@ export type Database = {
         Insert: {
           banco?: string | null
           convenio: string
-          cpf: string
+          cpf?: string | null
+          cpf_added_at?: string | null
+          cpf_added_by?: string | null
           created_at?: string
           data_nascimento?: string | null
           id?: string
@@ -2336,7 +2340,9 @@ export type Database = {
         Update: {
           banco?: string | null
           convenio?: string
-          cpf?: string
+          cpf?: string | null
+          cpf_added_at?: string | null
+          cpf_added_by?: string | null
           created_at?: string
           data_nascimento?: string | null
           id?: string
@@ -4073,6 +4079,10 @@ export type Database = {
       update_daily_baseoff_usage: {
         Args: { leads_count_param: number; user_id_param: string }
         Returns: undefined
+      }
+      update_lead_cpf: {
+        Args: { lead_id: string; new_cpf: string }
+        Returns: Json
       }
       user_belongs_to_company: {
         Args: { _company_id: string; _user_id: string }
