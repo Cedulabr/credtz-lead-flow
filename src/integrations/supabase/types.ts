@@ -1927,6 +1927,7 @@ export type Database = {
       }
       import_jobs: {
         Row: {
+          chunk_metadata: Json | null
           completed_at: string | null
           created_at: string
           current_chunk: number | null
@@ -1937,9 +1938,12 @@ export type Database = {
           file_path: string | null
           file_size_bytes: number
           id: string
+          last_processed_offset: number | null
           metadata: Json | null
           module: string
           processed_rows: number | null
+          processing_ended_at: string | null
+          processing_started_at: string | null
           started_at: string | null
           status: string
           success_count: number | null
@@ -1948,6 +1952,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          chunk_metadata?: Json | null
           completed_at?: string | null
           created_at?: string
           current_chunk?: number | null
@@ -1958,9 +1963,12 @@ export type Database = {
           file_path?: string | null
           file_size_bytes?: number
           id?: string
+          last_processed_offset?: number | null
           metadata?: Json | null
           module?: string
           processed_rows?: number | null
+          processing_ended_at?: string | null
+          processing_started_at?: string | null
           started_at?: string | null
           status?: string
           success_count?: number | null
@@ -1969,6 +1977,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          chunk_metadata?: Json | null
           completed_at?: string | null
           created_at?: string
           current_chunk?: number | null
@@ -1979,9 +1988,12 @@ export type Database = {
           file_path?: string | null
           file_size_bytes?: number
           id?: string
+          last_processed_offset?: number | null
           metadata?: Json | null
           module?: string
           processed_rows?: number | null
+          processing_ended_at?: string | null
+          processing_started_at?: string | null
           started_at?: string | null
           status?: string
           success_count?: number | null

@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.send-reuse-alerts]
 verify_jwt = false
+
+[functions.process-import]
+verify_jwt = false
