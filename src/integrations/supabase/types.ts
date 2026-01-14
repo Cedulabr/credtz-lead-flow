@@ -27,6 +27,9 @@ export type Database = {
           origem: string
           produto: string | null
           proxima_acao: string | null
+          segunda_tentativa: boolean | null
+          segunda_tentativa_at: string | null
+          segunda_tentativa_by: string | null
           status: string
           telefone: string
           ultima_interacao: string | null
@@ -44,6 +47,9 @@ export type Database = {
           origem?: string
           produto?: string | null
           proxima_acao?: string | null
+          segunda_tentativa?: boolean | null
+          segunda_tentativa_at?: string | null
+          segunda_tentativa_by?: string | null
           status?: string
           telefone: string
           ultima_interacao?: string | null
@@ -61,6 +67,9 @@ export type Database = {
           origem?: string
           produto?: string | null
           proxima_acao?: string | null
+          segunda_tentativa?: boolean | null
+          segunda_tentativa_at?: string | null
+          segunda_tentativa_by?: string | null
           status?: string
           telefone?: string
           ultima_interacao?: string | null
@@ -72,6 +81,50 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activate_leads_contact_proofs: {
+        Row: {
+          attempt_number: number
+          created_at: string
+          file_name: string
+          id: string
+          lead_id: string
+          notes: string | null
+          proof_type: string
+          proof_url: string
+          user_id: string
+        }
+        Insert: {
+          attempt_number?: number
+          created_at?: string
+          file_name: string
+          id?: string
+          lead_id: string
+          notes?: string | null
+          proof_type: string
+          proof_url: string
+          user_id: string
+        }
+        Update: {
+          attempt_number?: number
+          created_at?: string
+          file_name?: string
+          id?: string
+          lead_id?: string
+          notes?: string | null
+          proof_type?: string
+          proof_url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activate_leads_contact_proofs_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "activate_leads"
             referencedColumns: ["id"]
           },
         ]
