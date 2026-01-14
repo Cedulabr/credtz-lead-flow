@@ -32,13 +32,15 @@ import {
   Play,
   ChevronLeft,
   Loader2,
-  Filter
+  Filter,
+  Cloud
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { BaseOffImport } from "./BaseOffImport";
 import { BaseOffImportEngine } from "./BaseOffImportEngine";
+import { BaseOffStorageImport } from "./BaseOffStorageImport";
 
 interface BaseOffClient {
   id: string;
@@ -183,6 +185,7 @@ export function BaseOffConsulta() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [showOptimizedImport, setShowOptimizedImport] = useState(false);
+  const [showStorageImport, setShowStorageImport] = useState(false);
   const [activeTab, setActiveTab] = useState("dados");
   
   // Simulação
@@ -802,6 +805,10 @@ export function BaseOffConsulta() {
     );
   };
 
+  if (showStorageImport && isAdmin) {
+    return <BaseOffStorageImport onBack={() => setShowStorageImport(false)} />;
+  }
+
   if (showOptimizedImport && isAdmin) {
     return <BaseOffImportEngine onBack={() => setShowOptimizedImport(false)} />;
   }
@@ -979,13 +986,17 @@ export function BaseOffConsulta() {
         </div>
         {isAdmin && (
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => setShowOptimizedImport(true)} variant="default" size="sm" className="text-xs">
+            <Button onClick={() => setShowStorageImport(true)} variant="default" size="sm" className="text-xs">
+              <Cloud className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Importar</span> 600MB+
+            </Button>
+            <Button onClick={() => setShowOptimizedImport(true)} variant="secondary" size="sm" className="text-xs">
               <Upload className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-              <span className="hidden sm:inline">Importar</span> Grandes
+              <span className="hidden sm:inline">Importar</span> Streaming
             </Button>
             <Button onClick={() => setShowImport(true)} variant="outline" size="sm" className="text-xs">
               <Upload className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-              <span className="hidden sm:inline">Importar</span> Base
+              <span className="hidden sm:inline">Importar</span> Padrão
             </Button>
             <ImportHistory module="baseoff_clients" title="Base Off" />
           </div>
