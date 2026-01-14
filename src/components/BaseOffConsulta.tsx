@@ -33,7 +33,9 @@ import {
   ChevronLeft,
   Loader2,
   Filter,
-  Cloud
+  Cloud,
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -214,6 +216,12 @@ export function BaseOffConsulta() {
   const [representanteFilter, setRepresentanteFilter] = useState("todos");
   const [idadeMinima, setIdadeMinima] = useState("");
   const [idadeMaxima, setIdadeMaxima] = useState("");
+  
+  // Remoção de duplicatas
+  const [isRemovingDuplicates, setIsRemovingDuplicates] = useState(false);
+  const [showRemoveDuplicatesDialog, setShowRemoveDuplicatesDialog] = useState(false);
+  const [duplicatesCount, setDuplicatesCount] = useState<number | null>(null);
+  const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
 
   // Buscar cidades quando UF é selecionado
   useEffect(() => {
@@ -641,6 +649,69 @@ export function BaseOffConsulta() {
     }
   };
 
+  // Verificar duplicatas na base
+  const checkDuplicates = async () => {
+    setIsCheckingDuplicates(true);
+    try {
+      // Buscar total de registros e CPFs únicos
+      const { count: totalCount, error: countError } = await supabase
+        .from('baseoff_clients')
+        .select('*', { count: 'exact', head: true });
+      
+      if (countError) throw countError;
+      
+      // Buscar amostra para estimar duplicatas
+      const { data: sampleData, error: sampleError } = await supabase
+        .from('baseoff_clients')
+        .select('cpf')
+        .limit(10000);
+      
+      if (sampleError) throw sampleError;
+      
+      if (sampleData && totalCount) {
+        const sampleUnique = new Set(sampleData.map(d => d.cpf)).size;
+        const sampleTotal = sampleData.length;
+        const duplicateRate = sampleTotal > 0 ? (sampleTotal - sampleUnique) / sampleTotal : 0;
+        const estimatedDuplicates = Math.round(totalCount * duplicateRate);
+        setDuplicatesCount(estimatedDuplicates);
+      } else {
+        setDuplicatesCount(0);
+      }
+      
+      setShowRemoveDuplicatesDialog(true);
+    } catch (error) {
+      console.error("Erro ao verificar duplicatas:", error);
+      toast.error("Erro ao verificar duplicatas");
+    } finally {
+      setIsCheckingDuplicates(false);
+    }
+  };
+
+  // Remover duplicatas da base - deleta registros mais antigos mantendo o mais recente
+  const removeDuplicates = async () => {
+    setIsRemovingDuplicates(true);
+    try {
+      // Chamar função RPC para remover duplicatas mantendo o registro mais recente
+      const { data, error } = await (supabase.rpc as any)('remove_baseoff_duplicates');
+      
+      if (error) {
+        // Se a função RPC não existir, informar o usuário
+        toast.error("Função de remoção não disponível. Entre em contato com o administrador.");
+        return;
+      }
+      
+      const removedCount = typeof data === 'number' ? data : 0;
+      toast.success(`${removedCount} registros duplicados removidos com sucesso!`);
+      setShowRemoveDuplicatesDialog(false);
+      setDuplicatesCount(null);
+    } catch (error) {
+      console.error("Erro ao remover duplicatas:", error);
+      toast.error("Erro ao remover duplicatas");
+    } finally {
+      setIsRemovingDuplicates(false);
+    }
+  };
+
   const formatCpf = (cpf: string) => {
     return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
   };
@@ -998,6 +1069,20 @@ export function BaseOffConsulta() {
               <Upload className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
               <span className="hidden sm:inline">Importar</span> Padrão
             </Button>
+            <Button 
+              onClick={checkDuplicates} 
+              variant="destructive" 
+              size="sm" 
+              className="text-xs"
+              disabled={isCheckingDuplicates}
+            >
+              {isCheckingDuplicates ? (
+                <Loader2 className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
+              )}
+              <span className="hidden sm:inline">Remover</span> Duplicatas
+            </Button>
             <ImportHistory module="baseoff_clients" title="Base Off" />
           </div>
         )}
@@ -1092,6 +1177,63 @@ export function BaseOffConsulta() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de Remoção de Duplicatas */}
+      <Dialog open={showRemoveDuplicatesDialog} onOpenChange={setShowRemoveDuplicatesDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Remover Duplicatas
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+              <p className="text-sm">
+                <strong>Atenção:</strong> Esta ação irá remover registros duplicados da base de dados, 
+                mantendo apenas o registro mais recente de cada CPF.
+              </p>
+            </div>
+            
+            {duplicatesCount !== null && (
+              <div className="text-center py-4">
+                <p className="text-3xl font-bold text-destructive">{duplicatesCount.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground">
+                  {duplicatesCount === 0 
+                    ? "Nenhuma duplicata encontrada" 
+                    : "registros duplicados estimados"}
+                </p>
+              </div>
+            )}
+            
+            <p className="text-sm text-muted-foreground">
+              Esta operação não pode ser desfeita. Certifique-se de que deseja continuar.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRemoveDuplicatesDialog(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={removeDuplicates}
+              disabled={isRemovingDuplicates || duplicatesCount === 0}
+            >
+              {isRemovingDuplicates ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Removendo...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Remover Duplicatas
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Filtro Regional */}
       <Dialog open={showFilterModal} onOpenChange={setShowFilterModal}>
