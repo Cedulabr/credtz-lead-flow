@@ -59,7 +59,8 @@ const STATUS_LABELS: Record<string, string> = {
   agendamento: "Agendamento",
   nao_e_cliente: "Não é o cliente",
   sem_interesse: "Sem Interesse",
-  sem_retorno: "Sem retorno"
+  sem_retorno: "Sem retorno",
+  nao_e_whatsapp: "Não é WhatsApp"
 };
 
 const ACTION_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
