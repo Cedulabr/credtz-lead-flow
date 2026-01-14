@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ImportBase } from "./ImportBase";
 import { DistributedLeadsManager } from "./DistributedLeadsManager";
+import { LeadHistoryModal } from "./LeadHistoryModal";
 import { AnimatedContainer, StaggerContainer, StaggerItem } from "./ui/animated-container";
 import { SkeletonCard } from "./ui/skeleton-card";
 import { 
@@ -270,6 +271,10 @@ export function LeadsManagement() {
   const [loadingBanks, setLoadingBanks] = useState(false);
   const [submittingDigitacao, setSubmittingDigitacao] = useState(false);
 
+  // History modal state
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [selectedLeadForHistory, setSelectedLeadForHistory] = useState<Lead | null>(null);
+
   const isAdmin = profile?.role === 'admin';
 
   useEffect(() => {
@@ -507,6 +512,7 @@ export function LeadsManagement() {
             action: 'created',
             timestamp: new Date().toISOString(),
             user_id: user.id,
+            user_name: profile?.name || user?.email,
             note: 'Lead solicitado do sistema'
           }])
         }));
@@ -689,6 +695,7 @@ export function LeadsManagement() {
         to_status: 'recusou_oferta',
         timestamp: new Date().toISOString(),
         user_id: user?.id,
+        user_name: profile?.name || user?.email,
         note: `Recusado: ${selectedReason?.label}`,
         rejection_data: {
           reason: rejectionForm.reason,
@@ -755,6 +762,7 @@ export function LeadsManagement() {
         to_status: 'contato_futuro',
         timestamp: new Date().toISOString(),
         user_id: user?.id,
+        user_name: profile?.name || user?.email,
         note: `Contato agendado para ${format(new Date(futureContactDate), 'dd/MM/yyyy', { locale: ptBR })}`,
         future_contact_date: futureContactDate
       };
@@ -819,6 +827,7 @@ export function LeadsManagement() {
         to_status: 'agendamento',
         timestamp: new Date().toISOString(),
         user_id: user?.id,
+        user_name: profile?.name || user?.email,
         note: `Agendamento marcado para ${format(new Date(scheduledDateTime), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`,
         scheduled_date: scheduleDate,
         scheduled_time: scheduleTime
@@ -869,19 +878,42 @@ export function LeadsManagement() {
     }
 
     try {
-      const { error } = await supabase
-        .from('leads')
-        .update({ 
-          assigned_to: targetUserId,
-          updated_at: new Date().toISOString()
-        })
-        .in('id', selectedLeadsForAssign);
+      const targetUserName = getUserName(targetUserId);
+      
+      // Update each lead with history entry
+      for (const leadId of selectedLeadsForAssign) {
+        const lead = leads.find(l => l.id === leadId);
+        if (!lead) continue;
 
-      if (error) throw error;
+        const previousAssignedTo = lead.assigned_to;
+        const previousAssignedToName = getUserName(previousAssignedTo);
+        const currentHistory = lead.history || [];
+
+        const historyEntry = {
+          action: 'assigned',
+          timestamp: new Date().toISOString(),
+          user_id: user?.id,
+          user_name: profile?.name || user?.email,
+          previous_assigned_to: previousAssignedTo,
+          previous_assigned_to_name: previousAssignedToName !== 'Não atribuído' ? previousAssignedToName : null,
+          assigned_to: targetUserId,
+          assigned_to_name: targetUserName,
+          note: `Lead atribuído para ${targetUserName}`
+        };
+
+        await supabase
+          .from('leads')
+          .update({ 
+            assigned_to: targetUserId,
+            updated_at: new Date().toISOString(),
+            history: [...currentHistory, historyEntry]
+          })
+          .eq('id', leadId);
+      }
 
       toast({
         title: "Leads Atribuídos",
-        description: `${selectedLeadsForAssign.length} lead(s) atribuídos com sucesso.`,
+        description: `${selectedLeadsForAssign.length} lead(s) atribuídos para ${targetUserName}.`,
       });
 
       setShowAssignModal(false);
@@ -896,6 +928,11 @@ export function LeadsManagement() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleOpenHistoryModal = (lead: Lead) => {
+    setSelectedLeadForHistory(lead);
+    setShowHistoryModal(true);
   };
 
   const toggleLeadSelection = (leadId: string) => {
@@ -917,12 +954,17 @@ export function LeadsManagement() {
       const lead = leads.find(l => l.id === leadId);
       if (!lead) return;
 
+      const statusLabel = STATUS_CONFIG[newStatus as keyof typeof STATUS_CONFIG]?.label || newStatus;
+      const previousStatusLabel = STATUS_CONFIG[lead.status as keyof typeof STATUS_CONFIG]?.label || lead.status;
+
       const historyEntry = {
         action: 'status_change',
         from_status: lead.status,
         to_status: newStatus,
         timestamp: new Date().toISOString(),
-        user_id: user?.id
+        user_id: user?.id,
+        user_name: profile?.name || user?.email,
+        note: `Status alterado de "${previousStatusLabel}" para "${statusLabel}"`
       };
 
       const currentHistory = lead.history || [];
@@ -942,7 +984,6 @@ export function LeadsManagement() {
         l.id === leadId ? { ...l, status: newStatus, updated_at: new Date().toISOString() } : l
       ));
 
-      const statusLabel = STATUS_CONFIG[newStatus as keyof typeof STATUS_CONFIG]?.label || newStatus;
       toast({
         title: "Status atualizado!",
         description: `Lead atualizado para: ${statusLabel}`,
@@ -1033,8 +1074,34 @@ export function LeadsManagement() {
 
       if (insertError) throw insertError;
 
-      // Update lead status to indicate digitação was requested
-      await updateLeadStatus(selectedLead.id, 'cliente_fechado');
+      // Add specific history entry for digitação request
+      const currentHistory = selectedLead.history || [];
+      const digitacaoHistoryEntry = {
+        action: 'digitacao_requested',
+        from_status: selectedLead.status,
+        to_status: 'cliente_fechado',
+        timestamp: new Date().toISOString(),
+        user_id: user.id,
+        user_name: profile?.name || user?.email,
+        note: `Digitação solicitada - Banco: ${digitacaoForm.banco}, Operação: ${digitacaoForm.tipo_operacao}`,
+        digitacao_data: {
+          banco: digitacaoForm.banco,
+          tipo_operacao: digitacaoForm.tipo_operacao,
+          parcela: parcelaValue,
+          troco: trocoValue,
+          saldo_devedor: saldoDevedorValue
+        }
+      };
+
+      // Update lead status with specific digitação history
+      await supabase
+        .from('leads')
+        .update({ 
+          status: 'cliente_fechado',
+          history: [...currentHistory, digitacaoHistoryEntry],
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedLead.id);
 
       toast({
         title: "Digitação solicitada!",
@@ -1756,6 +1823,18 @@ export function LeadsManagement() {
                           </Button>
                         )}
 
+                        {/* Botão Histórico */}
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          onClick={() => handleOpenHistoryModal(lead)}
+                          className="h-10 md:h-12 px-3 md:px-4 hover:bg-purple-100 hover:text-purple-700 hover:border-purple-300 font-bold text-sm md:text-base"
+                          title="Ver Histórico"
+                        >
+                          <History className="h-4 w-4 md:h-5 md:w-5 md:mr-2" />
+                          <span className="hidden md:inline">Histórico</span>
+                        </Button>
+
                         {/* Botão Solicitar Digitação - Destaque para mobile */}
                         <Button
                           size="lg"
@@ -2284,6 +2363,18 @@ export function LeadsManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Lead History Modal */}
+      <LeadHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => {
+          setShowHistoryModal(false);
+          setSelectedLeadForHistory(null);
+        }}
+        leadName={selectedLeadForHistory?.name || ''}
+        history={selectedLeadForHistory?.history || []}
+        users={users}
+      />
     </AnimatedContainer>
   );
 }
