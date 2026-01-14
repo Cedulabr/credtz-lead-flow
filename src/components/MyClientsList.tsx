@@ -39,7 +39,9 @@ import {
   TrendingUp,
   Target,
   Sparkles,
-  RefreshCw
+  RefreshCw,
+  FileText,
+  Upload
 } from "lucide-react";
 import {
   AlertDialog,
@@ -210,6 +212,12 @@ export function MyClientsList() {
     convenio: "",
     observacao: "",
   });
+  
+  // Document upload states
+  const [rgFrenteFile, setRgFrenteFile] = useState<File | null>(null);
+  const [rgVersoFile, setRgVersoFile] = useState<File | null>(null);
+  const [extratoFile, setExtratoFile] = useState<File | null>(null);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
 
   // Filters
   const [users, setUsers] = useState<Profile[]>([]);
@@ -633,6 +641,38 @@ export function MyClientsList() {
     }
   };
 
+  // Helper function to upload document
+  const uploadDocument = async (file: File, documentType: string, clientName: string, clientCpf: string): Promise<string | null> => {
+    const cleanCpf = clientCpf.replace(/\D/g, "");
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${user?.id}/${cleanCpf || 'sem-cpf'}/${documentType}_${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("client-documents")
+      .upload(fileName, file);
+
+    if (uploadError) {
+      console.error("Upload error:", uploadError);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("client-documents")
+      .getPublicUrl(fileName);
+
+    // Save document record
+    await supabase.from("client_documents").insert({
+      client_cpf: cleanCpf || "000000000",
+      client_name: clientName,
+      document_type: documentType,
+      file_url: urlData.publicUrl,
+      file_name: file.name,
+      uploaded_by: user?.id,
+    });
+
+    return urlData.publicUrl;
+  };
+
   const handleNewClientSubmit = async () => {
     if (!newClientForm.nome.trim() || !newClientForm.telefone.trim()) {
       toast({ title: "Erro", description: "Preencha nome e telefone", variant: "destructive" });
@@ -668,8 +708,33 @@ export function MyClientsList() {
         });
       }
 
+      // Upload documents if provided
+      if (rgFrenteFile || rgVersoFile || extratoFile) {
+        setUploadingDocs(true);
+        try {
+          if (rgFrenteFile) {
+            await uploadDocument(rgFrenteFile, "rg_frente", newClientForm.nome, newClientForm.cpf);
+          }
+          if (rgVersoFile) {
+            await uploadDocument(rgVersoFile, "rg_verso", newClientForm.nome, newClientForm.cpf);
+          }
+          if (extratoFile) {
+            await uploadDocument(extratoFile, "extrato_emprestimo", newClientForm.nome, newClientForm.cpf);
+          }
+          toast({ title: "Documentos salvos", description: "Documentos enviados com sucesso!" });
+        } catch (docError) {
+          console.error("Error uploading documents:", docError);
+          toast({ title: "Aviso", description: "Cliente cadastrado, mas houve erro ao salvar documentos", variant: "destructive" });
+        } finally {
+          setUploadingDocs(false);
+        }
+      }
+
       toast({ title: "Sucesso", description: "Cliente cadastrado!" });
       setNewClientForm({ nome: "", cpf: "", telefone: "", convenio: "", observacao: "" });
+      setRgFrenteFile(null);
+      setRgVersoFile(null);
+      setExtratoFile(null);
       setIsNewClientDialogOpen(false);
       fetchClients();
     } catch (error) {
@@ -1378,6 +1443,55 @@ export function MyClientsList() {
                   placeholder="Notas sobre o cliente..."
                   className="border-2 focus:border-primary"
                 />
+              </div>
+              
+              {/* Document Upload Section */}
+              <div className="col-span-2 space-y-4 pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-base font-medium">Documentos (opcional)</Label>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-sm text-muted-foreground">📄 RG Frente</Label>
+                    <Input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={(e) => setRgFrenteFile(e.target.files?.[0] || null)}
+                      className="border-2 focus:border-primary text-sm"
+                    />
+                    {rgFrenteFile && (
+                      <p className="text-xs text-green-600">✓ {rgFrenteFile.name}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label className="text-sm text-muted-foreground">📄 RG Verso</Label>
+                    <Input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={(e) => setRgVersoFile(e.target.files?.[0] || null)}
+                      className="border-2 focus:border-primary text-sm"
+                    />
+                    {rgVersoFile && (
+                      <p className="text-xs text-green-600">✓ {rgVersoFile.name}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label className="text-sm text-muted-foreground">📋 Extrato de Empréstimo</Label>
+                    <Input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={(e) => setExtratoFile(e.target.files?.[0] || null)}
+                      className="border-2 focus:border-primary text-sm"
+                    />
+                    {extratoFile && (
+                      <p className="text-xs text-green-600">✓ {extratoFile.name}</p>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

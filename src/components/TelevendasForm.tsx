@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Form,
   FormControl,
@@ -38,7 +39,8 @@ import {
   Sparkles,
   CheckCircle2,
   Loader2,
-  Lock
+  Lock,
+  Upload
 } from "lucide-react";
 
 interface TelevendasBank {
@@ -73,6 +75,12 @@ export const TelevendasForm = () => {
   const [clientFound, setClientFound] = useState(false);
   const [canEditClientData, setCanEditClientData] = useState(true);
   const [isGestor, setIsGestor] = useState(false);
+  
+  // Document upload states
+  const [rgFrenteFile, setRgFrenteFile] = useState<File | null>(null);
+  const [rgVersoFile, setRgVersoFile] = useState<File | null>(null);
+  const [extratoFile, setExtratoFile] = useState<File | null>(null);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
 
   // Verificar se usuário é admin ou gestor
   const isAdminOrGestor = profile?.role === 'admin' || isGestor;
@@ -212,6 +220,41 @@ export const TelevendasForm = () => {
     return amount.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
+  // Helper function to upload document
+  const uploadDocument = async (file: File, documentType: string, clientName: string, clientCpf: string): Promise<string | null> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    
+    const cleanCpf = clientCpf.replace(/\D/g, "");
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${user.id}/${cleanCpf || 'sem-cpf'}/${documentType}_${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("client-documents")
+      .upload(fileName, file);
+
+    if (uploadError) {
+      console.error("Upload error:", uploadError);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("client-documents")
+      .getPublicUrl(fileName);
+
+    // Save document record
+    await supabase.from("client_documents").insert({
+      client_cpf: cleanCpf || "000000000",
+      client_name: clientName,
+      document_type: documentType,
+      file_url: urlData.publicUrl,
+      file_name: file.name,
+      uploaded_by: user.id,
+    });
+
+    return urlData.publicUrl;
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
@@ -269,6 +312,28 @@ export const TelevendasForm = () => {
 
       if (error) throw error;
 
+      // Upload documents if provided
+      if (rgFrenteFile || rgVersoFile || extratoFile) {
+        setUploadingDocs(true);
+        try {
+          if (rgFrenteFile) {
+            await uploadDocument(rgFrenteFile, "rg_frente", values.nome, values.cpf);
+          }
+          if (rgVersoFile) {
+            await uploadDocument(rgVersoFile, "rg_verso", values.nome, values.cpf);
+          }
+          if (extratoFile) {
+            await uploadDocument(extratoFile, "extrato_emprestimo", values.nome, values.cpf);
+          }
+          toast({ title: "Documentos salvos", description: "Documentos enviados com sucesso!" });
+        } catch (docError) {
+          console.error("Error uploading documents:", docError);
+          toast({ title: "Aviso", description: "Venda cadastrada, mas houve erro ao salvar documentos", variant: "destructive" });
+        } finally {
+          setUploadingDocs(false);
+        }
+      }
+
       setSuccessMessage(true);
       setTimeout(() => setSuccessMessage(false), 3000);
 
@@ -289,6 +354,11 @@ export const TelevendasForm = () => {
         tipo_operacao: "Novo empréstimo",
         observacao: "",
       });
+      
+      // Reset document files
+      setRgFrenteFile(null);
+      setRgVersoFile(null);
+      setExtratoFile(null);
       
       // Resetar estados de busca de cliente
       setClientFound(false);
@@ -692,6 +762,65 @@ export const TelevendasForm = () => {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <Separator />
+
+              {/* Document Upload Section */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Upload className="h-5 w-5 text-muted-foreground" />
+                  <h3 className="text-lg font-semibold">Documentos (opcional)</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground flex items-center gap-2">
+                      📄 RG Frente
+                    </Label>
+                    <Input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={(e) => setRgFrenteFile(e.target.files?.[0] || null)}
+                      className="h-12 text-base"
+                    />
+                    {rgFrenteFile && (
+                      <p className="text-xs text-green-600">✓ {rgFrenteFile.name}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground flex items-center gap-2">
+                      📄 RG Verso
+                    </Label>
+                    <Input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={(e) => setRgVersoFile(e.target.files?.[0] || null)}
+                      className="h-12 text-base"
+                    />
+                    {rgVersoFile && (
+                      <p className="text-xs text-green-600">✓ {rgVersoFile.name}</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground flex items-center gap-2">
+                      📋 Extrato de Empréstimo
+                    </Label>
+                    <Input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={(e) => setExtratoFile(e.target.files?.[0] || null)}
+                      className="h-12 text-base"
+                    />
+                    {extratoFile && (
+                      <p className="text-xs text-green-600">✓ {extratoFile.name}</p>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  Os documentos ficam registrados no módulo Documentos
+                </p>
               </div>
 
               {/* Submit Button */}
