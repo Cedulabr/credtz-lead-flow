@@ -1925,6 +1925,72 @@ export type Database = {
         }
         Relationships: []
       }
+      import_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          current_chunk: number | null
+          duplicate_count: number | null
+          error_count: number | null
+          error_log: Json | null
+          file_name: string
+          file_path: string | null
+          file_size_bytes: number
+          id: string
+          metadata: Json | null
+          module: string
+          processed_rows: number | null
+          started_at: string | null
+          status: string
+          success_count: number | null
+          total_rows: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          current_chunk?: number | null
+          duplicate_count?: number | null
+          error_count?: number | null
+          error_log?: Json | null
+          file_name: string
+          file_path?: string | null
+          file_size_bytes?: number
+          id?: string
+          metadata?: Json | null
+          module?: string
+          processed_rows?: number | null
+          started_at?: string | null
+          status?: string
+          success_count?: number | null
+          total_rows?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          current_chunk?: number | null
+          duplicate_count?: number | null
+          error_count?: number | null
+          error_log?: Json | null
+          file_name?: string
+          file_path?: string | null
+          file_size_bytes?: number
+          id?: string
+          metadata?: Json | null
+          module?: string
+          processed_rows?: number | null
+          started_at?: string | null
+          status?: string
+          success_count?: number | null
+          total_rows?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       import_logs: {
         Row: {
           company_id: string | null
