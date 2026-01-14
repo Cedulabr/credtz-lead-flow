@@ -16,7 +16,7 @@ interface NavigationProps {
   onTabChange: (tab: string) => void;
 }
 
-// Navigation items with permission keys
+// Navigation items with permission keys - MANTENHA SINCRONIZADO COM PERMISSION_MODULES em UsersList.tsx
 const navItems = [
   { id: "dashboard", label: "Início", icon: Home, permissionKey: null },
   { id: "my-data", label: "Meus Dados", icon: UserCircle, permissionKey: null },
@@ -24,7 +24,7 @@ const navItems = [
   { id: "proposal-generator", label: "Gerador de Propostas", icon: FileText, permissionKey: "can_access_gerador_propostas" },
   { id: "activate-leads", label: "Activate Leads", icon: Zap, permissionKey: "can_access_activate_leads" },
   { id: "leads", label: "Leads Premium", icon: TrendingUp, permissionKey: "can_access_premium_leads" },
-  { id: "baseoff-consulta", label: "Consulta Base OFF", icon: Database, permissionKey: null },
+  { id: "baseoff-consulta", label: "Consulta Base OFF", icon: Database, permissionKey: "can_access_baseoff_consulta" },
   { id: "my-clients", label: "Meus Clientes", icon: Users, permissionKey: "can_access_meus_clientes" },
   { id: "televendas", label: "Televendas", icon: Phone, permissionKey: "can_access_televendas" },
   { id: "televendas-manage", label: "Gestão Televendas", icon: Settings, permissionKey: "can_access_gestao_televendas" },
@@ -33,9 +33,9 @@ const navItems = [
   { id: "reuse-alerts", label: "Alertas", icon: Bell, permissionKey: "can_access_alertas" },
   { id: "commission-table", label: "Tabela de Comissões", icon: DollarSign, permissionKey: "can_access_tabela_comissoes" },
   { id: "commissions", label: "Minhas Comissões", icon: DollarSign, permissionKey: "can_access_minhas_comissoes" },
-  { id: "performance-report", label: "Relatório de Desempenho", icon: BarChart3, permissionKey: "admin_or_gestor" },
-  { id: "collaborative", label: "Colaborativo", icon: Users2, permissionKey: null },
-  { id: "time-clock", label: "Controle de Ponto", icon: Clock, permissionKey: null },
+  { id: "performance-report", label: "Relatório de Desempenho", icon: BarChart3, permissionKey: "can_access_relatorio_desempenho" },
+  { id: "collaborative", label: "Colaborativo", icon: Users2, permissionKey: "can_access_colaborativo" },
+  { id: "time-clock", label: "Controle de Ponto", icon: Clock, permissionKey: "can_access_controle_ponto" },
 ];
 
 // Mobile priority items - only icons
