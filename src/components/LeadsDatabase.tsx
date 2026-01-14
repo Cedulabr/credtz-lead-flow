@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Search, 
@@ -19,7 +20,9 @@ import {
   RefreshCw,
   CheckCircle,
   Calendar,
-  CheckSquare
+  CheckSquare,
+  Edit3,
+  Save
 } from "lucide-react";
 
 interface Lead {
@@ -27,9 +30,12 @@ interface Lead {
   name: string;
   phone: string;
   convenio: string;
-  cpf: string;
+  cpf: string | null;
+  tag: string | null;
   is_available: boolean;
   created_at: string;
+  cpf_added_by: string | null;
+  cpf_added_at: string | null;
 }
 
 export function LeadsDatabase() {
@@ -45,6 +51,11 @@ export function LeadsDatabase() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string>("all");
+  
+  // CPF editing state
+  const [editingCpfLead, setEditingCpfLead] = useState<Lead | null>(null);
+  const [cpfValue, setCpfValue] = useState("");
+  const [isSavingCpf, setIsSavingCpf] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
 
@@ -89,7 +100,7 @@ export function LeadsDatabase() {
       // Fetch leads with limit for performance
       const { data, error } = await supabase
         .from('leads_database')
-        .select('id, name, phone, convenio, cpf, is_available, created_at')
+        .select('id, name, phone, convenio, cpf, tag, is_available, created_at, cpf_added_by, cpf_added_at')
         .order('created_at', { ascending: false })
         .limit(1000);
 
@@ -218,6 +229,51 @@ export function LeadsDatabase() {
     });
   };
 
+  const formatCpf = (cpf: string | null) => {
+    if (!cpf) return '-';
+    if (cpf.length === 11) {
+      return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    }
+    return cpf;
+  };
+
+  const handleEditCpf = (lead: Lead) => {
+    setEditingCpfLead(lead);
+    setCpfValue(lead.cpf || '');
+  };
+
+  const handleSaveCpf = async () => {
+    if (!editingCpfLead) return;
+    
+    setIsSavingCpf(true);
+    try {
+      const { data, error } = await supabase.rpc('update_lead_cpf', {
+        lead_id: editingCpfLead.id,
+        new_cpf: cpfValue || null
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "CPF atualizado",
+        description: cpfValue ? `CPF salvo com sucesso` : "CPF removido com sucesso",
+      });
+
+      setEditingCpfLead(null);
+      setCpfValue("");
+      fetchLeads();
+    } catch (error: any) {
+      console.error('Error updating CPF:', error);
+      toast({
+        title: "Erro ao atualizar CPF",
+        description: error.message || "Não foi possível salvar o CPF",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingCpf(false);
+    }
+  };
+
   if (!isAdmin) {
     return null;
   }
@@ -337,6 +393,8 @@ export function LeadsDatabase() {
                     <TableHead>Nome</TableHead>
                     <TableHead>Telefone</TableHead>
                     <TableHead>Convênio</TableHead>
+                    <TableHead>CPF</TableHead>
+                    <TableHead>Tag</TableHead>
                     <TableHead>Disponível</TableHead>
                     <TableHead>Importado em</TableHead>
                   </TableRow>
@@ -357,6 +415,29 @@ export function LeadsDatabase() {
                       <TableCell className="font-mono text-sm">{formatPhone(lead.phone)}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{lead.convenio}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm">{formatCpf(lead.cpf)}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleEditCpf(lead)}
+                            title="Editar CPF"
+                          >
+                            <Edit3 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {lead.tag ? (
+                          <Badge variant="secondary" className="bg-violet-100 text-violet-700 border-violet-200">
+                            {lead.tag}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {lead.is_available ? (
@@ -431,6 +512,71 @@ export function LeadsDatabase() {
                 <>
                   <Trash2 className="h-4 w-4 mr-2" />
                   Excluir {selectedLeads.size} Lead(s)
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit CPF Dialog */}
+      <Dialog open={!!editingCpfLead} onOpenChange={(open) => !open && setEditingCpfLead(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit3 className="h-5 w-5 text-primary" />
+              Editar CPF
+            </DialogTitle>
+            <DialogDescription>
+              Lead: <strong>{editingCpfLead?.name}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="cpf">CPF (opcional)</Label>
+              <Input
+                id="cpf"
+                placeholder="000.000.000-00"
+                value={cpfValue}
+                onChange={(e) => setCpfValue(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                className="font-mono"
+              />
+              <p className="text-xs text-muted-foreground">
+                Digite apenas números. O CPF será salvo com registro de quem editou.
+              </p>
+            </div>
+
+            {editingCpfLead?.cpf_added_at && (
+              <div className="p-3 bg-muted/50 rounded-lg text-sm">
+                <p className="text-muted-foreground">
+                  Última edição: {formatDate(editingCpfLead.cpf_added_at)}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setEditingCpfLead(null)}
+              disabled={isSavingCpf}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSaveCpf}
+              disabled={isSavingCpf}
+            >
+              {isSavingCpf ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Salvar CPF
                 </>
               )}
             </Button>
