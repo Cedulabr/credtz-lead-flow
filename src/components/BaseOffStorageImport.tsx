@@ -28,9 +28,9 @@ import { useImportJobPolling } from '@/hooks/useImportJobPolling';
 interface ImportJob {
   id: string;
   user_id: string;
-  filename: string;
-  storage_path: string;
-  size_mb: number;
+  file_name: string;
+  file_path: string | null;
+  file_size_bytes: number;
   status: string;
   total_rows: number | null;
   processed_rows: number | null;
@@ -163,12 +163,14 @@ const BaseOffStorageImport: React.FC<BaseOffStorageImportProps> = ({ onBack, onC
       // Create import job record
       const { data: jobData, error: jobError } = await supabase
         .from('import_jobs')
-        .insert({
+        .insert([{
+          user_id: user.id,
           file_name: selectedFile.name,
           file_path: storagePath,
           file_size_bytes: selectedFile.size,
-          status: 'uploaded'
-        })
+          status: 'uploaded',
+          module: 'baseoff'
+        }])
         .select()
         .single();
       
@@ -289,12 +291,12 @@ const BaseOffStorageImport: React.FC<BaseOffStorageImportProps> = ({ onBack, onC
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-medium truncate max-w-[300px]">{job.filename}</span>
+                        <span className="font-medium truncate max-w-[300px]">{job.file_name}</span>
                       </div>
                       {getStatusBadge(job.status)}
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>{formatFileSize(job.size_mb)}</span>
+                      <span>{formatFileSize(job.file_size_bytes / (1024 * 1024))}</span>
                       <span>{formatDate(job.created_at)}</span>
                       {job.processed_rows !== null && job.total_rows !== null && (
                         <span>{job.processed_rows.toLocaleString()} / {job.total_rows.toLocaleString()} linhas</span>
@@ -364,7 +366,7 @@ const BaseOffStorageImport: React.FC<BaseOffStorageImportProps> = ({ onBack, onC
           {currentJob && (
             <>
               <div className="flex items-center justify-between">
-                <span className="font-medium">{currentJob.filename}</span>
+                <span className="font-medium">{currentJob.file_name}</span>
                 {getStatusBadge(currentJob.status)}
               </div>
               
@@ -423,7 +425,7 @@ const BaseOffStorageImport: React.FC<BaseOffStorageImportProps> = ({ onBack, onC
         <CardContent className="space-y-4">
           {currentJob && (
             <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 space-y-2">
-              <p className="font-medium">{currentJob.filename}</p>
+              <p className="font-medium">{currentJob.file_name}</p>
               <p className="text-sm">
                 <span className="font-semibold">{(currentJob.processed_rows || 0).toLocaleString()}</span> linhas processadas
               </p>

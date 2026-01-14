@@ -40,7 +40,7 @@ import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { BaseOffImport } from "./BaseOffImport";
 import { BaseOffImportEngine } from "./BaseOffImportEngine";
-import { BaseOffStorageImport } from "./BaseOffStorageImport";
+import BaseOffStorageImport from "./BaseOffStorageImport";
 
 interface BaseOffClient {
   id: string;

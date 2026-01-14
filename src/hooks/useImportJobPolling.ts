@@ -4,9 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 interface ImportJob {
   id: string;
   user_id: string;
-  filename: string;
-  storage_path: string;
-  size_mb: number;
+  file_name: string;
+  file_path: string | null;
+  file_size_bytes: number;
   status: string;
   total_rows: number | null;
   processed_rows: number | null;
