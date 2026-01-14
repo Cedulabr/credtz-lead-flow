@@ -1612,7 +1612,11 @@ export const ActivateLeads = () => {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => window.open(`https://wa.me/${lead.telefone.replace(/\D/g, '')}`, '_blank')}
+                            onClick={() => {
+                              const primeiroNome = lead.nome.split(' ')[0];
+                              const mensagem = encodeURIComponent(`Olá ${primeiroNome}, tudo bem?`);
+                              window.open(`https://wa.me/${lead.telefone.replace(/\D/g, '')}?text=${mensagem}`, '_blank');
+                            }}
                             className="h-8 w-8 p-0 hover:bg-green-100 hover:text-green-700"
                           >
                             <MessageCircle className="h-4 w-4" />
