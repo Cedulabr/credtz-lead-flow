@@ -302,6 +302,10 @@ export function ImportBase({ onBack }: ImportBaseProps) {
     }
   };
 
+  const [importProgress, setImportProgress] = useState(0);
+  const [currentBatch, setCurrentBatch] = useState(0);
+  const [totalBatches, setTotalBatches] = useState(0);
+
   const handleImport = async () => {
     if (!isAdmin) {
       toast({
@@ -324,23 +328,65 @@ export function ImportBase({ onBack }: ImportBaseProps) {
     }
 
     setIsLoading(true);
+    setImportProgress(0);
+    
     try {
-    const leadsData = validLeads.map(lead => ({
-        nome: lead.nome,
-        cpf: lead.cpf || '',
-        convenio: lead.convenio,
-        telefone: lead.telefone,
-        telefone2: lead.telefone2 || null,
-        tag: lead.tag || null
-      }));
+      // Process in batches of 100 to avoid timeout
+      const BATCH_SIZE = 100;
+      const batches: typeof validLeads[] = [];
+      
+      for (let i = 0; i < validLeads.length; i += BATCH_SIZE) {
+        batches.push(validLeads.slice(i, i + BATCH_SIZE));
+      }
+      
+      setTotalBatches(batches.length);
+      
+      let totalImported = 0;
+      let totalDuplicates = 0;
+      let totalInvalid = 0;
+      const allDuplicateDetails: ImportResult['duplicate_details'] = [];
+      
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        setCurrentBatch(batchIndex + 1);
+        const batch = batches[batchIndex];
+        
+        const leadsData = batch.map(lead => ({
+          nome: lead.nome,
+          cpf: lead.cpf || '',
+          convenio: lead.convenio,
+          telefone: lead.telefone,
+          telefone2: lead.telefone2 || null,
+          tag: lead.tag || null
+        }));
 
-      const { data, error } = await supabase.rpc('import_leads_from_csv', {
-        leads_data: leadsData
-      });
+        const { data, error } = await supabase.rpc('import_leads_from_csv', {
+          leads_data: leadsData
+        });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      const result = data as unknown as ImportResult;
+        const batchResult = data as unknown as ImportResult;
+        totalImported += batchResult.imported;
+        totalDuplicates += batchResult.duplicates;
+        totalInvalid += batchResult.invalid || 0;
+        
+        if (batchResult.duplicate_details) {
+          allDuplicateDetails.push(...batchResult.duplicate_details);
+        }
+        
+        // Update progress
+        const progress = Math.round(((batchIndex + 1) / batches.length) * 100);
+        setImportProgress(progress);
+      }
+      
+      const result: ImportResult = {
+        success: totalImported > 0,
+        imported: totalImported,
+        duplicates: totalDuplicates,
+        invalid: totalInvalid,
+        duplicate_details: allDuplicateDetails
+      };
+      
       setImportResult(result);
       setShowResultDialog(true);
 
@@ -636,7 +682,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                   {isLoading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Importando...
+                      Lote {currentBatch}/{totalBatches} ({importProgress}%)
                     </>
                   ) : (
                     <>
@@ -649,6 +695,25 @@ export function ImportBase({ onBack }: ImportBaseProps) {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Import Progress */}
+            {isLoading && (
+              <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    Importando em lotes para evitar timeout...
+                  </span>
+                  <span className="text-muted-foreground">
+                    Lote {currentBatch} de {totalBatches}
+                  </span>
+                </div>
+                <Progress value={importProgress} className="h-2" />
+                <p className="text-xs text-muted-foreground text-center">
+                  {importProgress}% concluído - Por favor, aguarde...
+                </p>
+              </div>
+            )}
+            
             {/* Summary */}
             <div className="grid grid-cols-3 gap-4">
               <div className="p-4 bg-muted/50 rounded-lg text-center">
