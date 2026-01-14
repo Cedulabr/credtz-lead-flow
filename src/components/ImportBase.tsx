@@ -145,9 +145,6 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         if (!nome) {
           valid = false;
           error = 'Nome vazio';
-        } else if (cpf && cpf.length !== 11) {
-          valid = false;
-          error = 'CPF inválido (deve ter 11 dígitos)';
         } else if (!convenio) {
           valid = false;
           error = 'Convênio vazio';
