@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ImportHistory } from '@/components/ImportHistory';
+import { ActivateLeadHistoryModal } from '@/components/ActivateLeadHistoryModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
@@ -49,7 +50,8 @@ import {
   RotateCcw,
   ImageIcon,
   Camera,
-  FileImage
+  FileImage,
+  History
 } from 'lucide-react';
 import { format, addDays, parseISO, isToday, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -285,6 +287,12 @@ export const ActivateLeads = () => {
   const [selectedBulkUsers, setSelectedBulkUsers] = useState<string[]>([]);
   const [maxLeadsPerUser, setMaxLeadsPerUser] = useState<number>(10);
   const [bulkAssigning, setBulkAssigning] = useState(false);
+
+  // History modal states
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [historyLead, setHistoryLead] = useState<ActivateLead | null>(null);
+  const [leadHistory, setLeadHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const isGestor = gestorId !== null;
   const canImport = isAdmin || isGestor;
@@ -649,6 +657,32 @@ export const ActivateLeads = () => {
     setLeadToAssign(lead);
     setSelectedUserId(lead.assigned_to || '');
     setIsAssignModalOpen(true);
+  };
+
+  const openHistoryModal = async (lead: ActivateLead) => {
+    setHistoryLead(lead);
+    setIsHistoryModalOpen(true);
+    setLoadingHistory(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('activate_leads_history')
+        .select('*')
+        .eq('lead_id', lead.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setLeadHistory(data || []);
+    } catch (error: any) {
+      console.error('Error fetching lead history:', error);
+      toast({
+        title: '❌ Erro ao carregar histórico',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingHistory(false);
+    }
   };
 
   const handleAssignLead = async () => {
@@ -1722,6 +1756,16 @@ export const ActivateLeads = () => {
                               <MessageCircle className="h-4 w-4" />
                             </Button>
 
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => openHistoryModal(lead)}
+                              className="h-9 w-9 p-0 hover:bg-amber-100 hover:text-amber-700 transition-all duration-300"
+                              title="📜 Ver histórico do lead"
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+
                             {canEditLead(lead) && (
                               <>
                                 <Button
@@ -2595,6 +2639,19 @@ export const ActivateLeads = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* History Modal */}
+      <ActivateLeadHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => {
+          setIsHistoryModalOpen(false);
+          setHistoryLead(null);
+          setLeadHistory([]);
+        }}
+        leadName={historyLead?.nome || ''}
+        history={leadHistory}
+        users={availableUsers}
+      />
     </motion.div>
   );
 };
