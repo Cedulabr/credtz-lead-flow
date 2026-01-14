@@ -34,7 +34,7 @@ interface ParsedLead {
   convenio: string;
   telefone: string;
   telefone2?: string;
-  cpf: string;
+  cpf?: string;
   tag?: string;
   valid: boolean;
   error?: string;
@@ -117,10 +117,10 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       const cpfIndex = headers.findIndex(h => h.includes('cpf'));
       const tagIndex = headers.findIndex(h => h.includes('tag') || h.includes('perfil') || h.includes('classificação') || h.includes('classificacao'));
 
-      if (nomeIndex === -1 || convenioIndex === -1 || telefoneIndex === -1 || cpfIndex === -1) {
+      if (nomeIndex === -1 || convenioIndex === -1 || telefoneIndex === -1) {
         toast({
           title: "Colunas obrigatórias não encontradas",
-          description: "O arquivo deve conter as colunas: Nome, CPF, Convênio, Telefone 1 (Telefone 2 e Tag são opcionais)",
+          description: "O arquivo deve conter as colunas: Nome, Convênio, Telefone 1 (Telefone 2, CPF e Tag são opcionais)",
           variant: "destructive",
         });
         setIsParsing(false);
@@ -136,7 +136,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         const convenio = values[convenioIndex]?.trim() || '';
         const telefone = values[telefoneIndex]?.replace(/\D/g, '') || '';
         const telefone2 = telefone2Index !== -1 ? values[telefone2Index]?.replace(/\D/g, '') || '' : '';
-        const cpf = values[cpfIndex]?.replace(/\D/g, '') || '';
+        const cpf = cpfIndex !== -1 ? values[cpfIndex]?.replace(/\D/g, '') || '' : '';
         const tag = tagIndex !== -1 ? values[tagIndex]?.trim() || '' : '';
 
         let valid = true;
@@ -145,7 +145,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         if (!nome) {
           valid = false;
           error = 'Nome vazio';
-        } else if (!cpf || cpf.length !== 11) {
+        } else if (cpf && cpf.length !== 11) {
           valid = false;
           error = 'CPF inválido (deve ter 11 dígitos)';
         } else if (!convenio) {
@@ -159,7 +159,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
           error = 'Telefone 2 inválido';
         }
 
-        leads.push({ nome, convenio, telefone, telefone2: telefone2 || undefined, cpf, tag: tag || undefined, valid, error });
+        leads.push({ nome, convenio, telefone, telefone2: telefone2 || undefined, cpf: cpf || undefined, tag: tag || undefined, valid, error });
       }
 
       setParsedLeads(leads);
@@ -229,9 +229,9 @@ export function ImportBase({ onBack }: ImportBaseProps) {
 
     setIsLoading(true);
     try {
-      const leadsData = validLeads.map(lead => ({
+    const leadsData = validLeads.map(lead => ({
         nome: lead.nome,
-        cpf: lead.cpf,
+        cpf: lead.cpf || '',
         convenio: lead.convenio,
         telefone: lead.telefone,
         telefone2: lead.telefone2 || null,
@@ -352,7 +352,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   };
 
   const downloadTemplate = () => {
-    const template = 'Nome,CPF,Telefone 1,Telefone 2,Convênio,Tag\nJoão Silva,12345678901,11999998888,11988887776,INSS,Tomador\nMaria Santos,98765432109,21988887777,,SIAPE,Com margem para empréstimo\nCarlos Lima,11122233344,71977776666,71966665555,INSS,Redução de parcela';
+    const template = 'Nome,Telefone 1,Telefone 2,Convênio,Tag\nJoão Silva,11999998888,11988887776,INSS,Tomador\nMaria Santos,21988887777,,SIAPE,Com margem para empréstimo\nCarlos Lima,71977776666,71966665555,INSS,Redução de parcela';
     const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -445,10 +445,10 @@ export function ImportBase({ onBack }: ImportBaseProps) {
               <h4 className="font-medium mb-2">Colunas</h4>
               <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• <strong>Nome</strong> - Nome completo do lead (obrigatório)</li>
-                <li>• <strong>CPF</strong> - 11 dígitos (obrigatório)</li>
                 <li>• <strong>Telefone 1</strong> - 10 ou 11 dígitos (obrigatório)</li>
                 <li>• <strong>Telefone 2</strong> - 10 ou 11 dígitos (opcional)</li>
                 <li>• <strong>Convênio</strong> - Ex: INSS, SIAPE, etc (obrigatório)</li>
+                <li>• <strong>CPF</strong> - 11 dígitos (opcional)</li>
               </ul>
             </div>
           </div>
