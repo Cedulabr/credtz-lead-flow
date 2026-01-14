@@ -1158,57 +1158,57 @@ export function LeadsManagement() {
                   <span>Pedir Leads</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold">🎯 Solicitar Leads</DialogTitle>
+              <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+                <DialogHeader className="pb-2">
+                  <DialogTitle className="text-xl sm:text-2xl font-bold">🎯 Solicitar Leads</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-6 py-4">
-                  <div className={`p-4 rounded-xl border-2 ${userCredits === 0 ? 'bg-gradient-to-r from-red-500/10 to-red-500/5 border-red-500/30' : 'bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20'}`}>
-                    <p className="text-lg text-muted-foreground">
-                      Créditos disponíveis: <span className={`font-black text-2xl ${userCredits === 0 ? 'text-red-500' : 'text-primary'}`}>{userCredits}</span>
+                <div className="space-y-4 sm:space-y-6 py-2 sm:py-4">
+                  <div className={`p-3 sm:p-4 rounded-xl border-2 ${userCredits === 0 ? 'bg-gradient-to-r from-red-500/10 to-red-500/5 border-red-500/30' : 'bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20'}`}>
+                    <p className="text-sm sm:text-lg text-muted-foreground">
+                      Créditos disponíveis: <span className={`font-black text-xl sm:text-2xl ${userCredits === 0 ? 'text-red-500' : 'text-primary'}`}>{userCredits}</span>
                     </p>
                     {userCredits === 0 && (
-                      <p className="text-sm text-red-500 mt-2 font-medium">
-                        ⚠️ Seus créditos de leads acabaram. Solicite liberação ao administrador.
+                      <p className="text-xs sm:text-sm text-red-500 mt-1 sm:mt-2 font-medium">
+                        ⚠️ Créditos acabaram. Solicite ao admin.
                       </p>
                     )}
                   </div>
                   
                   {/* Disponibilidade de Leads */}
-                  <div className={`p-4 rounded-xl border-2 ${totalAvailableLeads === 0 ? 'bg-gradient-to-r from-amber-500/10 to-amber-500/5 border-amber-500/30' : 'bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 border-emerald-500/20'}`}>
-                    <p className="text-lg text-muted-foreground">
-                      Leads disponíveis no sistema: <span className={`font-black text-2xl ${totalAvailableLeads === 0 ? 'text-amber-500' : 'text-emerald-600'}`}>{totalAvailableLeads}</span>
+                  <div className={`p-3 sm:p-4 rounded-xl border-2 ${totalAvailableLeads === 0 ? 'bg-gradient-to-r from-amber-500/10 to-amber-500/5 border-amber-500/30' : 'bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 border-emerald-500/20'}`}>
+                    <p className="text-sm sm:text-lg text-muted-foreground">
+                      Leads disponíveis: <span className={`font-black text-xl sm:text-2xl ${totalAvailableLeads === 0 ? 'text-amber-500' : 'text-emerald-600'}`}>{totalAvailableLeads}</span>
                     </p>
                     {totalAvailableLeads === 0 && (
-                      <p className="text-sm text-amber-600 mt-2 font-medium">
-                        ⚠️ Não há leads disponíveis no momento. Aguarde novas importações.
+                      <p className="text-xs sm:text-sm text-amber-600 mt-1 sm:mt-2 font-medium">
+                        ⚠️ Sem leads disponíveis no momento.
                       </p>
                     )}
                   </div>
 
-                  <div className="space-y-3">
-                    <label className="text-base font-semibold">Convênio</label>
+                  <div className="space-y-2">
+                    <label className="text-sm sm:text-base font-semibold">Convênio</label>
                     {loadingConvenios ? (
-                      <div className="h-12 flex items-center justify-center text-muted-foreground">
+                      <div className="h-10 sm:h-12 flex items-center justify-center text-muted-foreground text-sm">
                         Carregando convênios...
                       </div>
                     ) : availableConvenios.length === 0 ? (
-                      <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-center">
-                        <p className="text-amber-700 dark:text-amber-400 font-medium">
-                          Nenhum convênio disponível no momento
+                      <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-center">
+                        <p className="text-amber-700 dark:text-amber-400 font-medium text-sm">
+                          Nenhum convênio disponível
                         </p>
                       </div>
                     ) : (
                       <Select value={leadRequest.convenio} onValueChange={(value) => 
                         setLeadRequest(prev => ({ ...prev, convenio: value }))
                       }>
-                        <SelectTrigger className="border-2 focus:border-primary h-12 text-base">
+                        <SelectTrigger className="border-2 focus:border-primary h-10 sm:h-12 text-sm sm:text-base">
                           <SelectValue placeholder="Selecione o convênio" />
                         </SelectTrigger>
                         <SelectContent>
                           {availableConvenios.map(option => (
-                            <SelectItem key={option.convenio} value={option.convenio} className="text-base py-3">
-                              {option.convenio} ({option.available_count} disponíveis)
+                            <SelectItem key={option.convenio} value={option.convenio} className="text-sm sm:text-base py-2 sm:py-3">
+                              {option.convenio} ({option.available_count})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1217,11 +1217,11 @@ export function LeadsManagement() {
                   </div>
 
                   {/* Filtro por DDD - Visual moderno */}
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-base font-semibold flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
-                          <MapPin className="h-4 w-4 text-white" />
+                      <label className="text-sm sm:text-base font-semibold flex items-center gap-1.5 sm:gap-2">
+                        <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
+                          <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
                         </div>
                         <span>Filtrar por DDD</span>
                       </label>
@@ -1231,28 +1231,28 @@ export function LeadsManagement() {
                           variant="ghost"
                           size="sm"
                           onClick={() => setLeadRequest(prev => ({ ...prev, ddds: [] }))}
-                          className="text-xs text-muted-foreground hover:text-destructive"
+                          className="text-xs text-muted-foreground hover:text-destructive h-7 px-2"
                         >
-                          Limpar seleção
+                          Limpar
                         </Button>
                       )}
                     </div>
                     
                     {loadingDdds ? (
-                      <div className="h-20 flex items-center justify-center text-muted-foreground bg-gradient-to-br from-muted/30 to-muted/10 rounded-xl border-2 border-dashed border-muted">
-                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                        Carregando regiões...
+                      <div className="h-16 flex items-center justify-center text-muted-foreground bg-gradient-to-br from-muted/30 to-muted/10 rounded-xl border-2 border-dashed border-muted text-sm">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Carregando...
                       </div>
                     ) : availableDdds.length === 0 ? (
-                      <div className="p-4 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-2 border-amber-200 dark:border-amber-800 text-center">
-                        <MapPin className="h-6 w-6 mx-auto mb-2 text-amber-500" />
-                        <p className="text-amber-700 dark:text-amber-400 font-medium text-sm">
-                          Nenhum DDD disponível no momento
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-2 border-amber-200 dark:border-amber-800 text-center">
+                        <MapPin className="h-5 w-5 mx-auto mb-1 text-amber-500" />
+                        <p className="text-amber-700 dark:text-amber-400 font-medium text-xs sm:text-sm">
+                          Nenhum DDD disponível
                         </p>
                       </div>
                     ) : (
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto p-3 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-2 border-slate-200 dark:border-slate-700">
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 sm:gap-2 max-h-28 sm:max-h-36 overflow-y-auto p-2 sm:p-3 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-2 border-slate-200 dark:border-slate-700">
                           {availableDdds.map(({ ddd, available_count }) => {
                             const isSelected = leadRequest.ddds.includes(ddd);
                             return (
@@ -1261,23 +1261,23 @@ export function LeadsManagement() {
                                 type="button"
                                 onClick={() => toggleDddSelection(ddd)}
                                 className={`
-                                  relative flex flex-col items-center justify-center p-2.5 rounded-xl transition-all duration-200 
+                                  relative flex flex-col items-center justify-center p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-all duration-200 
                                   ${isSelected 
-                                    ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg shadow-primary/30 scale-105 ring-2 ring-primary/50' 
-                                    : 'bg-white dark:bg-slate-800 hover:bg-primary/10 dark:hover:bg-primary/20 border border-slate-200 dark:border-slate-600 hover:border-primary/50 hover:scale-102'
+                                    ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-md shadow-primary/30 ring-1 ring-primary/50' 
+                                    : 'bg-white dark:bg-slate-800 hover:bg-primary/10 dark:hover:bg-primary/20 border border-slate-200 dark:border-slate-600'
                                   }
                                 `}
                               >
                                 {isSelected && (
-                                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shadow-md">
-                                    <CheckCircle className="h-3 w-3 text-white" />
+                                  <div className="absolute -top-0.5 -right-0.5 w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm">
+                                    <CheckCircle className="h-2 w-2 sm:h-3 sm:w-3 text-white" />
                                   </div>
                                 )}
-                                <span className={`text-lg font-black ${isSelected ? '' : 'text-foreground'}`}>
+                                <span className={`text-sm sm:text-base font-bold ${isSelected ? '' : 'text-foreground'}`}>
                                   {ddd}
                                 </span>
-                                <span className={`text-[10px] font-medium ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
-                                  {available_count} leads
+                                <span className={`text-[8px] sm:text-[10px] font-medium ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                                  {available_count}
                                 </span>
                               </button>
                             );
@@ -1285,44 +1285,36 @@ export function LeadsManagement() {
                         </div>
                         
                         {/* Info de seleção */}
-                        <div className={`p-3 rounded-xl transition-all duration-300 ${
-                          leadRequest.ddds.length > 0 
-                            ? 'bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20' 
-                            : 'bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700'
-                        }`}>
-                          {leadRequest.ddds.length > 0 ? (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
-                              <span className="text-sm font-medium text-primary">
-                                {leadRequest.ddds.length} {leadRequest.ddds.length === 1 ? 'região selecionada' : 'regiões selecionadas'}:
-                              </span>
-                              <div className="flex gap-1 flex-wrap">
-                                {leadRequest.ddds.map(d => (
-                                  <span key={d} className="px-2 py-0.5 bg-primary text-primary-foreground rounded-full text-xs font-bold">
-                                    {d}
-                                  </span>
-                                ))}
-                              </div>
+                        {leadRequest.ddds.length > 0 && (
+                          <div className="flex items-center gap-1 flex-wrap p-2 rounded-lg bg-primary/10 border border-primary/20">
+                            <CheckCircle className="h-3 w-3 text-primary flex-shrink-0" />
+                            <span className="text-xs font-medium text-primary">
+                              {leadRequest.ddds.length} selecionado(s):
+                            </span>
+                            <div className="flex gap-0.5 flex-wrap">
+                              {leadRequest.ddds.slice(0, 6).map(d => (
+                                <span key={d} className="px-1.5 py-0.5 bg-primary text-primary-foreground rounded-full text-[10px] font-bold">
+                                  {d}
+                                </span>
+                              ))}
+                              {leadRequest.ddds.length > 6 && (
+                                <span className="px-1.5 py-0.5 bg-primary/50 text-primary-foreground rounded-full text-[10px] font-bold">
+                                  +{leadRequest.ddds.length - 6}
+                                </span>
+                              )}
                             </div>
-                          ) : (
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Target className="h-4 w-4 flex-shrink-0" />
-                              <span className="text-sm">
-                                Selecione DDDs ou deixe em branco para receber de todas as regiões
-                              </span>
-                            </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
 
                   {/* Filtro por Tag/Perfil - Visual moderno */}
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-base font-semibold flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
-                          <Tag className="h-4 w-4 text-white" />
+                      <label className="text-sm sm:text-base font-semibold flex items-center gap-1.5 sm:gap-2">
+                        <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                          <Tag className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
                         </div>
                         <span>Filtrar por Perfil</span>
                       </label>
@@ -1332,28 +1324,28 @@ export function LeadsManagement() {
                           variant="ghost"
                           size="sm"
                           onClick={() => setLeadRequest(prev => ({ ...prev, tags: [] }))}
-                          className="text-xs text-muted-foreground hover:text-destructive"
+                          className="text-xs text-muted-foreground hover:text-destructive h-7 px-2"
                         >
-                          Limpar seleção
+                          Limpar
                         </Button>
                       )}
                     </div>
                     
                     {loadingTags ? (
-                      <div className="h-20 flex items-center justify-center text-muted-foreground bg-gradient-to-br from-muted/30 to-muted/10 rounded-xl border-2 border-dashed border-muted">
-                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                        Carregando perfis...
+                      <div className="h-16 flex items-center justify-center text-muted-foreground bg-gradient-to-br from-muted/30 to-muted/10 rounded-xl border-2 border-dashed border-muted text-sm">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Carregando...
                       </div>
                     ) : availableTags.length === 0 ? (
-                      <div className="p-4 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-2 border-slate-200 dark:border-slate-700 text-center">
-                        <Tag className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
-                        <p className="text-muted-foreground font-medium text-sm">
-                          Nenhum perfil/tag cadastrado ainda
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-2 border-slate-200 dark:border-slate-700 text-center">
+                        <Tag className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                        <p className="text-muted-foreground font-medium text-xs sm:text-sm">
+                          Nenhum perfil cadastrado
                         </p>
                       </div>
                     ) : (
-                      <div className="space-y-3">
-                        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-3 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-2 border-slate-200 dark:border-slate-700">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-1.5 sm:gap-2 max-h-24 sm:max-h-28 overflow-y-auto p-2 sm:p-3 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-2 border-slate-200 dark:border-slate-700">
                           {availableTags.map(({ tag, available_count }) => {
                             const isSelected = leadRequest.tags.includes(tag);
                             return (
@@ -1362,23 +1354,23 @@ export function LeadsManagement() {
                                 type="button"
                                 onClick={() => toggleTagSelection(tag)}
                                 className={`
-                                  relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 
+                                  relative flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition-all duration-200 
                                   ${isSelected 
-                                    ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30 scale-105 ring-2 ring-emerald-400/50' 
-                                    : 'bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border border-slate-200 dark:border-slate-600 hover:border-emerald-400/50 hover:scale-102'
+                                    ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/30 ring-1 ring-emerald-400/50' 
+                                    : 'bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border border-slate-200 dark:border-slate-600'
                                   }
                                 `}
                               >
                                 {isSelected && (
-                                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white flex items-center justify-center shadow-md">
-                                    <CheckCircle className="h-3 w-3 text-emerald-600" />
+                                  <div className="absolute -top-0.5 -right-0.5 w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-white flex items-center justify-center shadow-sm">
+                                    <CheckCircle className="h-2 w-2 sm:h-3 sm:w-3 text-emerald-600" />
                                   </div>
                                 )}
-                                <Tag className={`h-3.5 w-3.5 ${isSelected ? 'text-white' : 'text-emerald-600'}`} />
-                                <span className={`text-sm font-semibold ${isSelected ? '' : 'text-foreground'}`}>
+                                <Tag className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${isSelected ? 'text-white' : 'text-emerald-600'}`} />
+                                <span className={`text-xs sm:text-sm font-semibold ${isSelected ? '' : 'text-foreground'}`}>
                                   {tag}
                                 </span>
-                                <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
+                                <span className={`text-[10px] sm:text-xs font-medium px-1 sm:px-1.5 py-0.5 rounded-full ${
                                   isSelected 
                                     ? 'bg-white/20 text-white' 
                                     : 'bg-slate-100 dark:bg-slate-700 text-muted-foreground'
@@ -1391,40 +1383,32 @@ export function LeadsManagement() {
                         </div>
                         
                         {/* Info de seleção de tags */}
-                        <div className={`p-3 rounded-xl transition-all duration-300 ${
-                          leadRequest.tags.length > 0 
-                            ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 border border-emerald-400/20' 
-                            : 'bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700'
-                        }`}>
-                          {leadRequest.tags.length > 0 ? (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <CheckCircle className="h-4 w-4 text-emerald-600 flex-shrink-0" />
-                              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                                {leadRequest.tags.length} {leadRequest.tags.length === 1 ? 'perfil selecionado' : 'perfis selecionados'}:
-                              </span>
-                              <div className="flex gap-1 flex-wrap">
-                                {leadRequest.tags.map(t => (
-                                  <span key={t} className="px-2 py-0.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-full text-xs font-bold">
-                                    {t}
-                                  </span>
-                                ))}
-                              </div>
+                        {leadRequest.tags.length > 0 && (
+                          <div className="flex items-center gap-1 flex-wrap p-2 rounded-lg bg-emerald-500/10 border border-emerald-400/20">
+                            <CheckCircle className="h-3 w-3 text-emerald-600 flex-shrink-0" />
+                            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                              {leadRequest.tags.length} selecionado(s):
+                            </span>
+                            <div className="flex gap-0.5 flex-wrap">
+                              {leadRequest.tags.slice(0, 4).map(t => (
+                                <span key={t} className="px-1.5 py-0.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-full text-[10px] font-bold">
+                                  {t}
+                                </span>
+                              ))}
+                              {leadRequest.tags.length > 4 && (
+                                <span className="px-1.5 py-0.5 bg-emerald-500/50 text-white rounded-full text-[10px] font-bold">
+                                  +{leadRequest.tags.length - 4}
+                                </span>
+                              )}
                             </div>
-                          ) : (
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Target className="h-4 w-4 flex-shrink-0" />
-                              <span className="text-sm">
-                                Selecione perfis ou deixe em branco para receber todos os tipos
-                              </span>
-                            </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
 
-                  <div className="space-y-3">
-                    <label className="text-base font-semibold">Quantidade</label>
+                  <div className="space-y-2">
+                    <label className="text-sm sm:text-base font-semibold">Quantidade</label>
                     <Input
                       type="number"
                       min="1"
@@ -1434,17 +1418,17 @@ export function LeadsManagement() {
                         ...prev, 
                         count: Math.min(Number(e.target.value), 80, userCredits) 
                       }))}
-                      placeholder="Número de leads (máx. 80)"
-                      className="border-2 focus:border-primary h-12 text-lg font-semibold"
+                      placeholder="Nº de leads (máx. 80)"
+                      className="border-2 focus:border-primary h-10 sm:h-12 text-base sm:text-lg font-semibold"
                     />
                   </div>
 
                   <Button 
                     onClick={requestLeads} 
                     disabled={isLoading || userCredits === 0 || totalAvailableLeads === 0 || availableConvenios.length === 0}
-                    className="w-full bg-gradient-to-r from-primary to-primary/80 h-14 text-lg font-bold"
+                    className="w-full bg-gradient-to-r from-primary to-primary/80 h-11 sm:h-14 text-sm sm:text-lg font-bold mt-2"
                   >
-                    {isLoading ? "Solicitando..." : userCredits === 0 ? "❌ Sem Créditos" : totalAvailableLeads === 0 ? "⚠️ Sem Leads Disponíveis" : "🚀 Pedir Leads Agora!"}
+                    {isLoading ? "Solicitando..." : userCredits === 0 ? "❌ Sem Créditos" : totalAvailableLeads === 0 ? "⚠️ Sem Leads" : "🚀 Pedir Leads"}
                   </Button>
                 </div>
               </DialogContent>
