@@ -3939,6 +3939,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      count_baseoff_duplicates: { Args: never; Returns: number }
       create_admin_profile: {
         Args: { user_email: string; user_name?: string }
         Returns: string
@@ -4037,6 +4038,7 @@ export type Database = {
       is_global_admin: { Args: { _user_id: string }; Returns: boolean }
       normalize_cpf: { Args: { input_cpf: string }; Returns: string }
       process_expired_future_contacts: { Args: never; Returns: number }
+      remove_baseoff_duplicates: { Args: never; Returns: number }
       request_leads: {
         Args: {
           banco_filter?: string
