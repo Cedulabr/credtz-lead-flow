@@ -1726,7 +1726,11 @@ export function LeadsManagement() {
                         <Button
                           size="lg"
                           variant="outline"
-                          onClick={() => window.open(`https://wa.me/55${lead.phone.replace(/\D/g, '')}`, '_blank')}
+                          onClick={() => {
+                            const firstName = lead.name.split(' ')[0];
+                            const message = encodeURIComponent(`Olá, ${firstName} tudo bem?`);
+                            window.open(`https://wa.me/55${lead.phone.replace(/\D/g, '')}?text=${message}`, '_blank');
+                          }}
                           className="h-10 md:h-12 px-3 md:px-4 bg-green-50 hover:bg-green-100 text-green-700 hover:text-green-800 border-green-300 hover:border-green-400 font-bold text-sm md:text-base"
                           title="WhatsApp Telefone 1"
                         >
@@ -1739,7 +1743,11 @@ export function LeadsManagement() {
                           <Button
                             size="lg"
                             variant="outline"
-                            onClick={() => window.open(`https://wa.me/55${lead.phone2!.replace(/\D/g, '')}`, '_blank')}
+                            onClick={() => {
+                              const firstName = lead.name.split(' ')[0];
+                              const message = encodeURIComponent(`Olá, ${firstName} tudo bem?`);
+                              window.open(`https://wa.me/55${lead.phone2!.replace(/\D/g, '')}?text=${message}`, '_blank');
+                            }}
                             className="h-10 md:h-12 px-3 md:px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 border-emerald-300 hover:border-emerald-400 font-bold text-sm md:text-base"
                             title="WhatsApp Telefone 2"
                           >
