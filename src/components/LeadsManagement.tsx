@@ -185,6 +185,15 @@ const STATUS_CONFIG = {
     borderColor: "border-zinc-200",
     icon: PhoneOff,
     dotColor: "bg-zinc-500"
+  },
+  nao_e_whatsapp: {
+    label: "Não é WhatsApp",
+    color: "from-orange-500 to-red-500",
+    textColor: "text-orange-700",
+    bgColor: "bg-gradient-to-r from-orange-50 to-red-100",
+    borderColor: "border-orange-200",
+    icon: MessageCircle,
+    dotColor: "bg-orange-500"
   }
 };
 
