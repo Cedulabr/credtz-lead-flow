@@ -2415,7 +2415,7 @@ export type Database = {
       }
       leads_distribution: {
         Row: {
-          cpf: string
+          cpf: string | null
           created_at: string
           distributed_at: string
           expires_at: string
@@ -2424,7 +2424,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          cpf: string
+          cpf?: string | null
           created_at?: string
           distributed_at?: string
           expires_at?: string
@@ -2433,7 +2433,7 @@ export type Database = {
           user_id: string
         }
         Update: {
-          cpf?: string
+          cpf?: string | null
           created_at?: string
           distributed_at?: string
           expires_at?: string
