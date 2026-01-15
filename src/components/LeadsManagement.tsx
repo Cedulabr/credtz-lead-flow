@@ -506,7 +506,7 @@ export function LeadsManagement() {
       if (data && data.length > 0) {
         const leadsToInsert = data.map((lead: any) => ({
           name: lead.name,
-          cpf: lead.cpf,
+          cpf: lead.cpf ?? '',
           phone: lead.phone,
           phone2: lead.phone2 || null,
           convenio: lead.convenio,
