@@ -91,7 +91,14 @@ export function LeadHistoryModal({ isOpen, onClose, leadName, history, users }: 
     });
   };
 
-  const getActionConfig = (action: string) => {
+  const getActionConfig = (action?: string) => {
+    if (!action) {
+      return { 
+        label: "Ação", 
+        icon: Clock, 
+        color: "bg-gray-100 text-gray-700 border-gray-200" 
+      };
+    }
     return ACTION_CONFIG[action] || { 
       label: action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), 
       icon: Clock, 
