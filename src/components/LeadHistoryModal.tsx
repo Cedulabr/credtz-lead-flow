@@ -91,6 +91,23 @@ export function LeadHistoryModal({ isOpen, onClose, leadName, history, users }: 
     });
   };
 
+  const isValidDate = (dateString?: string | null): boolean => {
+    if (!dateString) return false;
+    const date = new Date(dateString);
+    return !isNaN(date.getTime());
+  };
+
+  const formatDate = (dateString?: string | null, formatStr: string = "dd/MM/yyyy 'às' HH:mm"): string => {
+    if (!dateString) return "Data não disponível";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "Data inválida";
+      return format(date, formatStr, { locale: ptBR });
+    } catch {
+      return "Data inválida";
+    }
+  };
+
   const getActionConfig = (action?: string) => {
     if (!action) {
       return { 
@@ -106,10 +123,12 @@ export function LeadHistoryModal({ isOpen, onClose, leadName, history, users }: 
     };
   };
 
-  // Sort history by timestamp (most recent first)
-  const sortedHistory = [...(history || [])].sort((a, b) => 
-    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  );
+  // Filter entries with valid timestamps, then sort (most recent first)
+  const sortedHistory = [...(history || [])]
+    .filter(entry => isValidDate(entry.timestamp))
+    .sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -155,7 +174,7 @@ export function LeadHistoryModal({ isOpen, onClose, leadName, history, users }: 
                           </Badge>
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {format(new Date(entry.timestamp), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                            {formatDate(entry.timestamp)}
                           </span>
                         </div>
                         
@@ -225,18 +244,17 @@ export function LeadHistoryModal({ isOpen, onClose, leadName, history, users }: 
                         )}
                         
                         {/* Scheduled date info */}
-                        {(entry.future_contact_date || entry.scheduled_date) && (
+                        {isValidDate(entry.future_contact_date) || isValidDate(entry.scheduled_date) ? (
                           <div className="mt-2 flex items-center gap-2 text-sm text-purple-700 dark:text-purple-300">
                             <Calendar className="h-4 w-4" />
                             <span>
-                              Agendado para: {format(
-                                new Date(entry.scheduled_date || entry.future_contact_date!), 
-                                entry.scheduled_time ? 'dd/MM/yyyy HH:mm' : 'dd/MM/yyyy', 
-                                { locale: ptBR }
+                              Agendado para: {formatDate(
+                                entry.scheduled_date || entry.future_contact_date, 
+                                entry.scheduled_time ? 'dd/MM/yyyy HH:mm' : 'dd/MM/yyyy'
                               )}
                             </span>
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   );
