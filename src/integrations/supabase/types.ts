@@ -2243,6 +2243,8 @@ export type Database = {
           rejection_description: string | null
           rejection_offered_value: number | null
           rejection_reason: string | null
+          requested_at: string | null
+          requested_by: string | null
           rework_date: string | null
           stage: string | null
           status: string | null
@@ -2273,6 +2275,8 @@ export type Database = {
           rejection_description?: string | null
           rejection_offered_value?: number | null
           rejection_reason?: string | null
+          requested_at?: string | null
+          requested_by?: string | null
           rework_date?: string | null
           stage?: string | null
           status?: string | null
@@ -2303,6 +2307,8 @@ export type Database = {
           rejection_description?: string | null
           rejection_offered_value?: number | null
           rejection_reason?: string | null
+          requested_at?: string | null
+          requested_by?: string | null
           rework_date?: string | null
           stage?: string | null
           status?: string | null
@@ -3919,7 +3925,20 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      daily_lead_requests: {
+        Row: {
+          clientes_fechados: number | null
+          em_andamento: number | null
+          leads_novos: number | null
+          recusados: number | null
+          request_date: string | null
+          requested_by: string | null
+          total_leads: number | null
+          user_email: string | null
+          user_name: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       add_lead_to_blacklist: {
