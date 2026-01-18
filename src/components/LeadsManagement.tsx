@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ImportBase } from "./ImportBase";
 import { DistributedLeadsManager } from "./DistributedLeadsManager";
 import { LeadHistoryModal } from "./LeadHistoryModal";
+import { DailyLeadsTracking } from "./DailyLeadsTracking";
 import { AnimatedContainer, StaggerContainer, StaggerItem } from "./ui/animated-container";
 import { SkeletonCard } from "./ui/skeleton-card";
 import { 
@@ -284,6 +285,9 @@ export function LeadsManagement() {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedLeadForHistory, setSelectedLeadForHistory] = useState<Lead | null>(null);
 
+  // Daily tracking state
+  const [showDailyTracking, setShowDailyTracking] = useState(false);
+
   const isAdmin = profile?.role === 'admin';
 
   useEffect(() => {
@@ -504,6 +508,7 @@ export function LeadsManagement() {
       if (error) throw error;
 
       if (data && data.length > 0) {
+        const requestedAt = new Date().toISOString();
         const leadsToInsert = data.map((lead: any) => ({
           name: lead.name,
           cpf: lead.cpf ?? '',
@@ -517,9 +522,11 @@ export function LeadsManagement() {
           origem_lead: 'Sistema - Solicitação',
           banco_operacao: lead.banco,
           valor_operacao: null,
+          requested_at: requestedAt,
+          requested_by: user.id,
           history: JSON.stringify([{
             action: 'created',
-            timestamp: new Date().toISOString(),
+            timestamp: requestedAt,
             user_id: user.id,
             user_name: profile?.name || user?.email,
             note: 'Lead solicitado do sistema'
@@ -1173,6 +1180,14 @@ export function LeadsManagement() {
     );
   }
 
+  if (showDailyTracking) {
+    return (
+      <div className="p-4 md:p-6 pb-20 md:pb-6">
+        <DailyLeadsTracking onBack={() => setShowDailyTracking(false)} />
+      </div>
+    );
+  }
+
   return (
     <AnimatedContainer animation="slide-up" className="p-3 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen">
       {/* Header Simplificado */}
@@ -1220,6 +1235,17 @@ export function LeadsManagement() {
                   <Settings className="h-4 w-4 md:h-5 md:w-5" />
                   <span className="hidden lg:inline">Gerenciar Distribuídos</span>
                   <span className="lg:hidden hidden sm:inline">Dist.</span>
+                </Button>
+
+                <Button 
+                  variant="outline" 
+                  size="default"
+                  className="flex items-center gap-1.5 hover:bg-purple-500/10 text-purple-600 border-purple-200 text-sm md:text-base font-semibold h-10 md:h-12"
+                  onClick={() => setShowDailyTracking(true)}
+                >
+                  <Calendar className="h-4 w-4 md:h-5 md:w-5" />
+                  <span className="hidden lg:inline">Leads do Dia</span>
+                  <span className="lg:hidden hidden sm:inline">Dia</span>
                 </Button>
               </>
             )}
