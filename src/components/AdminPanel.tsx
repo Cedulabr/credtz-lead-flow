@@ -30,6 +30,7 @@ import { AdminTelevendasBanks } from "./AdminTelevendasBanks";
 import { AdminCommissionRules } from "./AdminCommissionRules";
 import { AdminBankReuseSettings } from "./AdminBankReuseSettings";
 import { AdminCreditsManagement } from "./AdminCreditsManagement";
+import { AdminInactivitySettings } from "./AdminInactivitySettings";
 
 interface Announcement {
   id: number;
@@ -340,13 +341,14 @@ export function AdminPanel() {
       </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-10' : 'grid-cols-1'}`}>
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-11' : 'grid-cols-1'}`}>
             <TabsTrigger value="announcements">Avisos</TabsTrigger>
             {isAdmin && <TabsTrigger value="credits">💰 Créditos</TabsTrigger>}
             {isAdmin && <TabsTrigger value="commission-rules">Regras Flexíveis</TabsTrigger>}
             {isAdmin && <TabsTrigger value="companies">Empresas</TabsTrigger>}
             {isAdmin && <TabsTrigger value="televendas-banks">Banco Televendas</TabsTrigger>}
             {isAdmin && <TabsTrigger value="bank-reuse">Alertas por Banco</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="inactivity">⚠️ Inatividade</TabsTrigger>}
             {isAdmin && <TabsTrigger value="indications">Indicações</TabsTrigger>}
             {isAdmin && <TabsTrigger value="conta-corrente">Conta Corrente</TabsTrigger>}
             {isAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
@@ -493,6 +495,10 @@ export function AdminPanel() {
 
             <TabsContent value="bank-reuse">
               <AdminBankReuseSettings />
+            </TabsContent>
+
+            <TabsContent value="inactivity">
+              <AdminInactivitySettings />
             </TabsContent>
 
             <TabsContent value="users">

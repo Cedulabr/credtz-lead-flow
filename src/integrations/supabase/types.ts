@@ -1978,6 +1978,56 @@ export type Database = {
         }
         Relationships: []
       }
+      gestor_inactivity_notifications: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          days_inactive: number
+          gestor_id: string
+          id: string
+          is_dismissed: boolean | null
+          is_read: boolean | null
+          last_lead_request: string | null
+          user_email: string | null
+          user_id: string
+          user_name: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          days_inactive: number
+          gestor_id: string
+          id?: string
+          is_dismissed?: boolean | null
+          is_read?: boolean | null
+          last_lead_request?: string | null
+          user_email?: string | null
+          user_id: string
+          user_name?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          days_inactive?: number
+          gestor_id?: string
+          id?: string
+          is_dismissed?: boolean | null
+          is_read?: boolean | null
+          last_lead_request?: string | null
+          user_email?: string | null
+          user_id?: string
+          user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gestor_inactivity_notifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_jobs: {
         Row: {
           chunk_metadata: Json | null
@@ -2182,6 +2232,44 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_inactivity_settings: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          inactivity_days: number
+          is_active: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          inactivity_days?: number
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          inactivity_days?: number
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_inactivity_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -3969,6 +4057,18 @@ export type Database = {
           window_minutes?: number
         }
         Returns: boolean
+      }
+      check_user_lead_inactivity: {
+        Args: never
+        Returns: {
+          company_id: string
+          days_inactive: number
+          gestor_id: string
+          last_lead_request: string
+          user_email: string
+          user_id: string
+          user_name: string
+        }[]
       }
       count_baseoff_duplicates: { Args: never; Returns: number }
       create_admin_profile: {

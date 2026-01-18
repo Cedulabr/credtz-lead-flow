@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useTelevendasNotifications } from "@/hooks/useTelevendasNotifications";
 import { useUserDataNotifications } from "@/hooks/useUserDataNotifications";
+import { useGestorInactivityNotifications } from "@/hooks/useGestorInactivityNotifications";
 import { 
   Bell, 
   CheckCircle, 
@@ -23,7 +24,8 @@ import {
   AlertTriangle,
   FileText,
   UserCheck,
-  UserX
+  UserX,
+  UserMinus
 } from "lucide-react";
 
 interface Announcement {
@@ -52,6 +54,15 @@ export function Notifications() {
     markAsRead: markUserDataAsRead,
     markAllAsRead: markAllUserDataAsRead
   } = useUserDataNotifications();
+
+  const {
+    notifications: inactivityNotifications,
+    unreadCount: inactivityUnreadCount,
+    isGestorOrAdmin,
+    markAsRead: markInactivityAsRead,
+    dismissNotification: dismissInactivityNotification,
+    markAllAsRead: markAllInactivityAsRead
+  } = useGestorInactivityNotifications();
   
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -171,9 +182,10 @@ export function Notifications() {
     setNotifications(prev => 
       prev.map(notif => ({ ...notif, read: true }))
     );
-    // Também marcar notificações de televendas e user data
+    // Também marcar notificações de televendas, user data e inatividade
     await markAllTelevendasAsRead();
     await markAllUserDataAsRead();
+    await markAllInactivityAsRead();
   };
 
   const deleteNotification = (id: number) => {
@@ -181,7 +193,7 @@ export function Notifications() {
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
-  const totalUnreadCount = unreadCount + televendasUnreadCount + userDataUnreadCount;
+  const totalUnreadCount = unreadCount + televendasUnreadCount + userDataUnreadCount + inactivityUnreadCount;
 
   const typeConfig = {
     approval: { label: "Aprovação", bgColor: "bg-success/10", icon: CheckCircle },
@@ -197,7 +209,8 @@ export function Notifications() {
     user_data_approval: { label: "Cadastro Aprovado", bgColor: "bg-green-500/10", icon: UserCheck },
     user_data_rejection: { label: "Cadastro Reprovado", bgColor: "bg-red-500/10", icon: UserX },
     document_approval: { label: "Documento Aprovado", bgColor: "bg-green-500/10", icon: FileText },
-    document_rejection: { label: "Documento Reprovado", bgColor: "bg-red-500/10", icon: FileText }
+    document_rejection: { label: "Documento Reprovado", bgColor: "bg-red-500/10", icon: FileText },
+    user_inactivity: { label: "Inatividade", bgColor: "bg-amber-500/10", icon: UserMinus }
   };
 
   const getTimeAgo = (date: string) => {
@@ -508,7 +521,90 @@ export function Notifications() {
         </Card>
       )}
 
-      {/* Regular Notifications List */}
+      {/* Inactivity Notifications for Gestors */}
+      {isGestorOrAdmin && inactivityNotifications.length > 0 && (
+        <Card className="border-amber-500/20 bg-gradient-to-r from-amber-500/5 to-orange-500/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UserMinus className="h-5 w-5 text-amber-600" />
+              Alertas de Inatividade de Usuários
+              {inactivityUnreadCount > 0 && (
+                <Badge variant="destructive" className="ml-2">
+                  {inactivityUnreadCount} nova{inactivityUnreadCount > 1 ? 's' : ''}
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {inactivityNotifications.map((notification) => (
+                <div 
+                  key={notification.id} 
+                  className={`p-4 rounded-lg border transition-all ${
+                    !notification.is_read 
+                      ? "bg-amber-500/10 border-amber-500/30" 
+                      : "bg-background/50"
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="p-2 rounded-lg bg-amber-500/10 flex-shrink-0">
+                      <UserMinus className="h-5 w-5 text-amber-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className={`font-semibold text-foreground ${!notification.is_read ? "font-bold" : ""}`}>
+                            ⚠️ Usuário sem retirar leads há {notification.days_inactive} dias
+                          </h3>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            <strong>{notification.user_name || 'Usuário'}</strong> 
+                            {notification.user_email && ` (${notification.user_email})`} 
+                            {notification.last_lead_request 
+                              ? ` - Última retirada: ${new Date(notification.last_lead_request).toLocaleDateString('pt-BR')}`
+                              : ' - Nunca retirou leads'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Badge variant="outline" className="border-amber-500 text-amber-600">
+                            {notification.days_inactive}+ dias
+                          </Badge>
+                          {!notification.is_read && (
+                            <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-3">
+                        <span className="text-xs text-muted-foreground">
+                          {getTimeAgo(notification.created_at)}
+                        </span>
+                        <div className="flex gap-2">
+                          {!notification.is_read && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => markInactivityAsRead(notification.id)}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => dismissInactivityNotification(notification.id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
       <div className="space-y-3">
         {notifications.map((notification) => {
           const Icon = notification.icon;
@@ -596,7 +692,7 @@ export function Notifications() {
         })}
       </div>
 
-      {notifications.length === 0 && televendasNotifications.length === 0 && userDataNotifications.length === 0 && (
+      {notifications.length === 0 && televendasNotifications.length === 0 && userDataNotifications.length === 0 && inactivityNotifications.length === 0 && (
         <Card>
           <CardContent className="p-8 text-center">
             <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
