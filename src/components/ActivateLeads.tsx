@@ -18,6 +18,7 @@ import { ImportHistory } from '@/components/ImportHistory';
 import { ActivateLeadHistoryModal } from '@/components/ActivateLeadHistoryModal';
 import { DuplicateManager } from '@/components/ActivateLeads/DuplicateManager';
 import { ActivateSimulationManager } from '@/components/ActivateLeads/SimulationManager';
+import { ActivateSimulationRequestButton } from '@/components/ActivateLeads/SimulationRequestButton';
 import { useActivateLeadSimulations } from '@/hooks/useActivateLeadSimulations';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -1898,35 +1899,12 @@ export const ActivateLeads = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {lead.simulation_status ? (
-                            <Badge 
-                              variant="outline" 
-                              className={cn(
-                                "text-sm font-medium",
-                                lead.simulation_status === 'pending' && "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800",
-                                lead.simulation_status === 'completed' && "bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800",
-                                lead.simulation_status === 'confirmed' && "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800"
-                              )}
-                            >
-                              {lead.simulation_status === 'pending' && '⏳ Solicitada'}
-                              {lead.simulation_status === 'completed' && '✅ Disponível'}
-                              {lead.simulation_status === 'confirmed' && '🎯 Confirmada'}
-                            </Badge>
-                          ) : (
-                            !(isAdmin || isGestor) && lead.assigned_to === user?.id ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleRequestSimulation(lead)}
-                                className="h-8 text-xs bg-gradient-to-r from-purple-50 to-violet-50 hover:from-purple-100 hover:to-violet-100 border-purple-200 text-purple-700 dark:from-purple-950 dark:to-violet-950 dark:border-purple-800 dark:text-purple-300"
-                              >
-                                <BarChart3 className="h-3.5 w-3.5 mr-1" />
-                                Solicitar
-                              </Button>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )
-                          )}
+                          <ActivateSimulationRequestButton
+                            leadId={lead.id}
+                            leadName={lead.nome}
+                            currentSimulationStatus={lead.simulation_status}
+                            onSuccess={fetchLeads}
+                          />
                         </TableCell>
                         <TableCell>
                           {assignedUser ? (
