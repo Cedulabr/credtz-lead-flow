@@ -416,7 +416,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         companyId = company?.id || null;
       }
       
-      await supabase.from('import_logs').insert({
+      const { data: importLogData } = await supabase.from('import_logs').insert({
         module: 'leads_database',
         file_name: file?.name || 'unknown.csv',
         total_records: parsedLeads.length,
@@ -426,7 +426,20 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         status: 'completed',
         imported_by: user!.id,
         company_id: companyId,
-      });
+      }).select('id').single();
+
+      // Executa varredura automática de duplicatas após importação (Leads Premium)
+      if (result.imported > 0) {
+        try {
+          const { data: scanResult } = await supabase.rpc('trigger_duplicate_scan_after_import', {
+            p_module: 'leads',
+            p_import_log_id: importLogData?.id || null
+          });
+          console.log('Auto-scan de duplicatas executado (leads):', scanResult);
+        } catch (scanError) {
+          console.warn('Auto-scan de duplicatas falhou (não crítico):', scanError);
+        }
+      }
 
       toast({
         title: "Importação concluída",
