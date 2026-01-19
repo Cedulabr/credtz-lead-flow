@@ -7,7 +7,7 @@ import { Notifications } from "@/components/Notifications";
 import { BlockedAccess } from "@/components/BlockedAccess";
 import { SystemStatus } from "@/components/SystemStatus";
 import { TelevendasForm } from "@/components/TelevendasForm";
-import { TelevendasManagement } from "@/components/TelevendasManagement";
+import { TelevendasPremium } from "@/components/TelevendasPremium";
 import { CommissionTable } from "@/components/CommissionTable";
 import { ClientDocuments } from "@/components/ClientDocuments";
 import { MyClientsList } from "@/components/MyClientsList";
@@ -163,11 +163,7 @@ const Index = () => {
         if (!hasPermission('can_access_gestao_televendas')) {
           return <BlockedAccess message="Acesso à Gestão de Televendas bloqueado pelo administrador" />;
         }
-        return (
-          <div className="p-4">
-            <TelevendasManagement />
-          </div>
-        );
+        return <TelevendasPremium />;
       
       case "finances":
         if (!hasPermission('can_access_financas')) {
