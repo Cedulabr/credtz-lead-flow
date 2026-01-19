@@ -51,6 +51,8 @@ import {
   TelevendasClientView,
   TelevendasProposalList,
   TelevendasUserStats,
+  TelevendasApprovals,
+  TelevendasMetricsDashboard,
   STATUS_CONFIG
 } from "./televendas";
 
@@ -171,7 +173,7 @@ export const TelevendasPremium = () => {
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("all");
   const [selectedProduct, setSelectedProduct] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"propostas" | "clientes" | "estatisticas">("propostas");
+  const [viewMode, setViewMode] = useState<"propostas" | "clientes" | "estatisticas" | "aprovacoes">("propostas");
   
   // Dialog states
   const [selectedTv, setSelectedTv] = useState<Televenda | null>(null);
@@ -913,15 +915,10 @@ export const TelevendasPremium = () => {
         </Button>
       </div>
 
-      {/* Summary Cards */}
-      {!selectedClientCpf && (
-        <TelevendasSummaryCards
-          totalPropostas={summaryStats.totalPropostas}
-          clientesUnicos={summaryStats.clientesUnicos}
-          aguardandoGestao={summaryStats.aguardandoGestao}
-          pendentes={summaryStats.pendentes}
-          pagosAprovados={summaryStats.pagosAprovados}
-          cancelados={summaryStats.cancelados}
+      {/* Metrics Dashboard - replaces old summary cards */}
+      {!selectedClientCpf && viewMode !== "aprovacoes" && (
+        <TelevendasMetricsDashboard
+          televendas={televendas}
           isGestorOrAdmin={isGestorOrAdmin}
         />
       )}
@@ -950,6 +947,7 @@ export const TelevendasPremium = () => {
               productCounts={productCounts}
               isGestorOrAdmin={isGestorOrAdmin}
               monthOptions={monthOptions}
+              pendingApprovals={summaryStats.aguardandoGestao}
             />
           </CardContent>
         </Card>
@@ -959,7 +957,24 @@ export const TelevendasPremium = () => {
       <Card>
         <CardContent className="pt-6">
           <AnimatePresence mode="wait">
-            {viewMode === "estatisticas" && !selectedClientCpf ? (
+            {viewMode === "aprovacoes" && !selectedClientCpf ? (
+              <motion.div
+                key="aprovacoes"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+              >
+                <TelevendasApprovals
+                  televendas={televendas}
+                  onApprove={(id, tv) => updateStatus(id, "pago_aprovado", tv)}
+                  onReject={(id, tv) => updateStatus(id, "cancelado_confirmado", tv)}
+                  onReturn={(id, tv) => updateStatus(id, "devolvido", tv)}
+                  onRowClick={handleRowClick}
+                  formatCPF={formatCPF}
+                  formatCurrency={formatCurrencyDisplay}
+                />
+              </motion.div>
+            ) : viewMode === "estatisticas" && !selectedClientCpf ? (
               <motion.div
                 key="estatisticas"
                 initial={{ opacity: 0, x: -20 }}

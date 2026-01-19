@@ -21,7 +21,8 @@ import {
   List,
   BarChart3,
   X,
-  Users
+  Users,
+  ClipboardCheck
 } from "lucide-react";
 
 interface User {
@@ -42,13 +43,14 @@ interface FiltersProps {
   setSelectedPeriod: (value: string) => void;
   selectedProduct: string;
   setSelectedProduct: (value: string) => void;
-  viewMode: "propostas" | "clientes" | "estatisticas";
-  setViewMode: (value: "propostas" | "clientes" | "estatisticas") => void;
+  viewMode: "propostas" | "clientes" | "estatisticas" | "aprovacoes";
+  setViewMode: (value: "propostas" | "clientes" | "estatisticas" | "aprovacoes") => void;
   users: User[];
   statusCounts: Record<string, number>;
   productCounts: Record<string, number>;
   isGestorOrAdmin: boolean;
   monthOptions: { value: string; label: string }[];
+  pendingApprovals?: number;
 }
 
 // Product options for filter
@@ -142,7 +144,8 @@ export const TelevendasFilters = ({
   statusCounts,
   productCounts,
   isGestorOrAdmin,
-  monthOptions
+  monthOptions,
+  pendingApprovals = 0
 }: FiltersProps) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -167,14 +170,15 @@ export const TelevendasFilters = ({
 
   return (
     <div className="space-y-5">
-      {/* Toggle Propostas / Clientes / Estatísticas - Bigger on mobile */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-        <div className="flex items-center justify-center sm:justify-start gap-1 p-1.5 bg-muted rounded-xl w-full sm:w-auto">
+      {/* Toggle Propostas / Clientes / Aprovações / Estatísticas - Bigger on mobile */}
+      <div className="flex flex-col gap-4">
+        {/* Main view toggle - scrollable on mobile */}
+        <div className="flex gap-1.5 p-1.5 bg-muted rounded-xl overflow-x-auto snap-x snap-mandatory -mx-4 px-4 sm:mx-0 sm:px-0">
           <Button
             variant={viewMode === "propostas" ? "default" : "ghost"}
             size="lg"
             onClick={() => setViewMode("propostas")}
-            className="flex-1 sm:flex-initial gap-2 h-12 sm:h-10 text-base sm:text-sm font-semibold"
+            className="flex-shrink-0 snap-start gap-2 h-12 sm:h-10 px-4 text-base sm:text-sm font-semibold"
           >
             <List className="h-5 w-5 sm:h-4 sm:w-4" />
             Propostas
@@ -183,21 +187,43 @@ export const TelevendasFilters = ({
             variant={viewMode === "clientes" ? "default" : "ghost"}
             size="lg"
             onClick={() => setViewMode("clientes")}
-            className="flex-1 sm:flex-initial gap-2 h-12 sm:h-10 text-base sm:text-sm font-semibold"
+            className="flex-shrink-0 snap-start gap-2 h-12 sm:h-10 px-4 text-base sm:text-sm font-semibold"
           >
             <Users className="h-5 w-5 sm:h-4 sm:w-4" />
             Clientes
           </Button>
           {isGestorOrAdmin && (
-            <Button
-              variant={viewMode === "estatisticas" ? "default" : "ghost"}
-              size="lg"
-              onClick={() => setViewMode("estatisticas")}
-              className="flex-1 sm:flex-initial gap-2 h-12 sm:h-10 text-base sm:text-sm font-semibold"
-            >
-              <BarChart3 className="h-5 w-5 sm:h-4 sm:w-4" />
-              Stats
-            </Button>
+            <>
+              <Button
+                variant={viewMode === "aprovacoes" ? "default" : "ghost"}
+                size="lg"
+                onClick={() => setViewMode("aprovacoes")}
+                className={`
+                  flex-shrink-0 snap-start gap-2 h-12 sm:h-10 px-4 text-base sm:text-sm font-semibold
+                  ${pendingApprovals > 0 ? 'relative' : ''}
+                `}
+              >
+                <ClipboardCheck className="h-5 w-5 sm:h-4 sm:w-4" />
+                Aprovações
+                {pendingApprovals > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-5 w-5 bg-destructive text-destructive-foreground text-xs font-bold items-center justify-center">
+                      {pendingApprovals}
+                    </span>
+                  </span>
+                )}
+              </Button>
+              <Button
+                variant={viewMode === "estatisticas" ? "default" : "ghost"}
+                size="lg"
+                onClick={() => setViewMode("estatisticas")}
+                className="flex-shrink-0 snap-start gap-2 h-12 sm:h-10 px-4 text-base sm:text-sm font-semibold"
+              >
+                <BarChart3 className="h-5 w-5 sm:h-4 sm:w-4" />
+                Stats
+              </Button>
+            </>
           )}
         </div>
 
