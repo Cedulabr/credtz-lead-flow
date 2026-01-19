@@ -29,6 +29,18 @@ export interface LeadSimulation {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  // New fields for simulation form
+  produto: string | null;
+  parcela: number | null;
+  valor_liberado: number | null;
+  banco: string | null;
+}
+
+export interface SimulationFormData {
+  produto: string;
+  parcela: string;
+  valor_liberado: string;
+  banco: string;
 }
 
 export interface SimulationWithDetails extends LeadSimulation {
@@ -248,26 +260,38 @@ export function useSimulationNotifications() {
     }
   };
 
-  // Complete simulation (gestor)
+  // Complete simulation (gestor) - using form data instead of file
   const completeSimulation = async (
     simulationId: string,
     leadId: string,
-    fileUrl: string,
-    fileName: string,
+    formData: SimulationFormData,
     requestedBy: string,
     leadName: string
   ) => {
     if (!user) throw new Error('User not authenticated');
 
+    // Validate form data
+    if (!formData.produto?.trim()) throw new Error('Produto é obrigatório');
+    if (!formData.parcela?.trim()) throw new Error('Parcela é obrigatória');
+    if (!formData.valor_liberado?.trim()) throw new Error('Valor liberado é obrigatório');
+
+    const parcelaNum = parseFloat(formData.parcela.replace(/\D/g, '')) / 100;
+    const valorNum = parseFloat(formData.valor_liberado.replace(/\D/g, '')) / 100;
+
+    if (isNaN(parcelaNum) || parcelaNum <= 0) throw new Error('Parcela inválida');
+    if (isNaN(valorNum) || valorNum <= 0) throw new Error('Valor liberado inválido');
+
     try {
-      // Update simulation
+      // Update simulation with form data
       const { error: simError } = await supabase
         .from('lead_simulations')
         .update({
           completed_by: user.id,
           completed_at: new Date().toISOString(),
-          simulation_file_url: fileUrl,
-          simulation_file_name: fileName,
+          produto: formData.produto,
+          parcela: parcelaNum,
+          valor_liberado: valorNum,
+          banco: formData.banco || null,
           status: 'enviada'
         })
         .eq('id', simulationId);
@@ -283,6 +307,7 @@ export function useSimulationNotifications() {
       if (leadError) throw leadError;
 
       // Notify the requester
+      const valorFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorNum);
       await supabase
         .from('simulation_notifications')
         .insert({
@@ -291,7 +316,7 @@ export function useSimulationNotifications() {
           simulation_id: simulationId,
           type: 'simulation_completed',
           title: '✅ Simulação Concluída',
-          message: `A simulação para ${leadName} foi concluída e está pronta para visualização`
+          message: `Simulação para ${leadName}: ${formData.produto} - ${valorFormatted}`
         });
 
       return true;

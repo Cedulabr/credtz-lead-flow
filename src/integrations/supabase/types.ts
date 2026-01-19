@@ -2309,6 +2309,7 @@ export type Database = {
       }
       lead_simulations: {
         Row: {
+          banco: string | null
           completed_at: string | null
           completed_by: string | null
           confirmed_at: string | null
@@ -2317,14 +2318,18 @@ export type Database = {
           id: string
           lead_id: string
           notes: string | null
+          parcela: number | null
+          produto: string | null
           requested_at: string
           requested_by: string
           simulation_file_name: string | null
           simulation_file_url: string | null
           status: string
           updated_at: string
+          valor_liberado: number | null
         }
         Insert: {
+          banco?: string | null
           completed_at?: string | null
           completed_by?: string | null
           confirmed_at?: string | null
@@ -2333,14 +2338,18 @@ export type Database = {
           id?: string
           lead_id: string
           notes?: string | null
+          parcela?: number | null
+          produto?: string | null
           requested_at?: string
           requested_by: string
           simulation_file_name?: string | null
           simulation_file_url?: string | null
           status?: string
           updated_at?: string
+          valor_liberado?: number | null
         }
         Update: {
+          banco?: string | null
           completed_at?: string | null
           completed_by?: string | null
           confirmed_at?: string | null
@@ -2349,12 +2358,15 @@ export type Database = {
           id?: string
           lead_id?: string
           notes?: string | null
+          parcela?: number | null
+          produto?: string | null
           requested_at?: string
           requested_by?: string
           simulation_file_name?: string | null
           simulation_file_url?: string | null
           status?: string
           updated_at?: string
+          valor_liberado?: number | null
         }
         Relationships: [
           {
