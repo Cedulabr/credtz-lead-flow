@@ -42,7 +42,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useSimulationNotifications, SimulationWithDetails, SimulationStats, SimulationFormData } from "@/hooks/useSimulationNotifications";
+import { useSimulationNotifications, SimulationWithDetails, SimulationStats, SimulationFormData, SimulationContractItem } from "@/hooks/useSimulationNotifications";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -55,7 +55,18 @@ const PRODUCTS = [
   { id: "refinanciamento", label: "Refinanciamento", emoji: "💰", color: "bg-amber-500" },
   { id: "portabilidade", label: "Portabilidade", emoji: "🔄", color: "bg-blue-500" },
   { id: "cartao", label: "Cartão", emoji: "💳", color: "bg-purple-500" },
+  { id: "margem", label: "Margem", emoji: "📈", color: "bg-cyan-500" },
 ];
+
+const generateId = () => Math.random().toString(36).substr(2, 9);
+
+const createEmptyContract = (): SimulationContractItem => ({
+  id: generateId(),
+  produto: "",
+  parcela: "",
+  valor_liberado: "",
+  banco: "",
+});
 
 const formatCurrency = (value: string): string => {
   const numbers = value.replace(/\D/g, "");
@@ -100,13 +111,8 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
   const [isRequestingDigitacao, setIsRequestingDigitacao] = useState(false);
   const [confirmFollowSimulation, setConfirmFollowSimulation] = useState(false);
   
-  // Form state
-  const [formData, setFormData] = useState<SimulationFormData>({
-    produto: "",
-    parcela: "",
-    valor_liberado: "",
-    banco: "",
-  });
+  // Multiple contracts state
+  const [contracts, setContracts] = useState<SimulationContractItem[]>([createEmptyContract()]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -131,20 +137,31 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
     fetchData();
   }, [isGestorOrAdmin]);
 
+  const addContract = () => {
+    setContracts(prev => [...prev, createEmptyContract()]);
+  };
+
+  const removeContract = (id: string) => {
+    if (contracts.length === 1) {
+      toast({ title: "Pelo menos um contrato é necessário", variant: "destructive" });
+      return;
+    }
+    setContracts(prev => prev.filter(c => c.id !== id));
+  };
+
+  const updateContract = (id: string, field: keyof SimulationContractItem, value: string) => {
+    setContracts(prev => prev.map(c => 
+      c.id === id ? { ...c, [field]: value } : c
+    ));
+  };
+
   const handleCompleteSimulation = async () => {
     if (!selectedSimulation || !user) return;
 
-    // Validate form
-    if (!formData.produto) {
-      toast({ title: "Selecione o produto", variant: "destructive" });
-      return;
-    }
-    if (!formData.parcela) {
-      toast({ title: "Informe a parcela", variant: "destructive" });
-      return;
-    }
-    if (!formData.valor_liberado) {
-      toast({ title: "Informe o valor liberado", variant: "destructive" });
+    // Validate contracts
+    const invalidContract = contracts.find(c => !c.produto || !c.parcela || !c.valor_liberado);
+    if (invalidContract) {
+      toast({ title: "Preencha todos os campos obrigatórios em cada contrato", variant: "destructive" });
       return;
     }
 
@@ -153,18 +170,18 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
       await completeSimulation(
         selectedSimulation.id,
         selectedSimulation.lead_id,
-        formData,
+        contracts,
         selectedSimulation.requested_by,
         selectedSimulation.lead?.name || 'Cliente'
       );
 
       toast({
         title: "✅ Simulação Enviada!",
-        description: "O usuário foi notificado e pode visualizar os valores.",
+        description: `${contracts.length} contrato(s) enviado(s) com sucesso.`,
       });
 
       setIsCompleteModalOpen(false);
-      setFormData({ produto: "", parcela: "", valor_liberado: "", banco: "" });
+      setContracts([createEmptyContract()]);
       setSelectedSimulation(null);
       fetchData();
       onUpdate?.();
@@ -405,7 +422,7 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
                         size="sm"
                         onClick={() => {
                           setSelectedSimulation(sim);
-                          setFormData({ produto: "", parcela: "", valor_liberado: "", banco: "" });
+                          setContracts([createEmptyContract()]);
                           setIsCompleteModalOpen(true);
                         }}
                         className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"

@@ -34,10 +34,12 @@ import {
   DollarSign,
   CreditCard,
   Building2,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { useActivateLeadSimulations, SimulationWithDetails, SimulationStats, SimulationFormData } from "@/hooks/useActivateLeadSimulations";
+import { useActivateLeadSimulations, SimulationWithDetails, SimulationStats, SimulationContractItem } from "@/hooks/useActivateLeadSimulations";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -50,6 +52,7 @@ const PRODUCTS = [
   { id: "refinanciamento", label: "Refinanciamento", emoji: "💰", color: "bg-amber-500" },
   { id: "portabilidade", label: "Portabilidade", emoji: "🔄", color: "bg-blue-500" },
   { id: "cartao", label: "Cartão", emoji: "💳", color: "bg-purple-500" },
+  { id: "margem", label: "Margem", emoji: "📈", color: "bg-cyan-500" },
 ];
 
 const formatCurrency = (value: string): string => {
@@ -68,6 +71,16 @@ const formatCurrencyDisplay = (value: number | null): string => {
     currency: "BRL",
   }).format(value);
 };
+
+const generateId = () => Math.random().toString(36).substr(2, 9);
+
+const createEmptyContract = (): SimulationContractItem => ({
+  id: generateId(),
+  produto: "",
+  parcela: "",
+  valor_liberado: "",
+  banco: "",
+});
 
 export function ActivateSimulationManager({ onUpdate }: ActivateSimulationManagerProps) {
   const { toast } = useToast();
@@ -91,12 +104,7 @@ export function ActivateSimulationManager({ onUpdate }: ActivateSimulationManage
   const [isSending, setIsSending] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   
-  const [formData, setFormData] = useState<SimulationFormData>({
-    produto: "",
-    parcela: "",
-    valor_liberado: "",
-    banco: "",
-  });
+  const [contracts, setContracts] = useState<SimulationContractItem[]>([createEmptyContract()]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -121,19 +129,31 @@ export function ActivateSimulationManager({ onUpdate }: ActivateSimulationManage
     fetchData();
   }, [isGestorOrAdmin]);
 
+  const addContract = () => {
+    setContracts(prev => [...prev, createEmptyContract()]);
+  };
+
+  const removeContract = (id: string) => {
+    if (contracts.length === 1) {
+      toast({ title: "Pelo menos um contrato é necessário", variant: "destructive" });
+      return;
+    }
+    setContracts(prev => prev.filter(c => c.id !== id));
+  };
+
+  const updateContract = (id: string, field: keyof SimulationContractItem, value: string) => {
+    setContracts(prev => prev.map(c => 
+      c.id === id ? { ...c, [field]: value } : c
+    ));
+  };
+
   const handleCompleteSimulation = async () => {
     if (!selectedSimulation || !user) return;
 
-    if (!formData.produto) {
-      toast({ title: "Selecione o produto", variant: "destructive" });
-      return;
-    }
-    if (!formData.parcela) {
-      toast({ title: "Informe a parcela", variant: "destructive" });
-      return;
-    }
-    if (!formData.valor_liberado) {
-      toast({ title: "Informe o valor liberado", variant: "destructive" });
+    // Validate contracts
+    const invalidContract = contracts.find(c => !c.produto || !c.parcela || !c.valor_liberado);
+    if (invalidContract) {
+      toast({ title: "Preencha todos os campos obrigatórios em cada contrato", variant: "destructive" });
       return;
     }
 
@@ -142,18 +162,18 @@ export function ActivateSimulationManager({ onUpdate }: ActivateSimulationManage
       await completeSimulation(
         selectedSimulation.id,
         selectedSimulation.lead_id,
-        formData,
+        contracts,
         selectedSimulation.requested_by,
         selectedSimulation.lead?.nome || 'Cliente'
       );
 
       toast({
         title: "✅ Simulação Enviada!",
-        description: "O usuário foi notificado e pode visualizar os valores.",
+        description: `${contracts.length} contrato(s) enviado(s) com sucesso.`,
       });
 
       setIsCompleteModalOpen(false);
-      setFormData({ produto: "", parcela: "", valor_liberado: "", banco: "" });
+      setContracts([createEmptyContract()]);
       setSelectedSimulation(null);
       fetchData();
       onUpdate?.();
@@ -357,7 +377,7 @@ export function ActivateSimulationManager({ onUpdate }: ActivateSimulationManage
                         size="sm"
                         onClick={() => {
                           setSelectedSimulation(sim);
-                          setFormData({ produto: "", parcela: "", valor_liberado: "", banco: "" });
+                          setContracts([createEmptyContract()]);
                           setIsCompleteModalOpen(true);
                         }}
                         className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
@@ -460,77 +480,137 @@ export function ActivateSimulationManager({ onUpdate }: ActivateSimulationManage
         )}
       </div>
 
-      {/* Complete Simulation Modal */}
+      {/* Complete Simulation Modal - Multiple Contracts */}
       <Dialog open={isCompleteModalOpen} onOpenChange={setIsCompleteModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-amber-500" />
               📊 Responder Simulação
             </DialogTitle>
             <DialogDescription>
-              Cliente: {selectedSimulation?.lead?.nome}
+              Cliente: {selectedSimulation?.lead?.nome} • Adicione um ou mais contratos
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Produto *</Label>
-              <Select
-                value={formData.produto}
-                onValueChange={(value) => setFormData({ ...formData, produto: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o produto" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRODUCTS.map((prod) => (
-                    <SelectItem key={prod.id} value={prod.id}>
-                      <span className="flex items-center gap-2">
-                        {prod.emoji} {prod.label}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Contracts List */}
+            <div className="space-y-4">
+              {contracts.map((contract, index) => (
+                <motion.div
+                  key={contract.id}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="border rounded-lg p-4 bg-muted/30 relative"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <Badge variant="outline" className="text-sm">
+                      Contrato {index + 1}
+                    </Badge>
+                    {contracts.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeContract(contract.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Produto *</Label>
+                      <Select
+                        value={contract.produto}
+                        onValueChange={(value) => updateContract(contract.id, 'produto', value)}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PRODUCTS.map((prod) => (
+                            <SelectItem key={prod.id} value={prod.id}>
+                              <span className="flex items-center gap-2">
+                                {prod.emoji} {prod.label}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-xs">Banco</Label>
+                      <Input
+                        placeholder="Nome do banco"
+                        value={contract.banco}
+                        onChange={(e) => updateContract(contract.id, 'banco', e.target.value)}
+                        className="h-9"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-xs">Parcela *</Label>
+                      <Input
+                        placeholder="R$ 0,00"
+                        value={contract.parcela}
+                        onChange={(e) => updateContract(contract.id, 'parcela', formatCurrency(e.target.value))}
+                        className="h-9"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-xs">Valor Liberado *</Label>
+                      <Input
+                        placeholder="R$ 0,00"
+                        value={contract.valor_liberado}
+                        onChange={(e) => updateContract(contract.id, 'valor_liberado', formatCurrency(e.target.value))}
+                        className="h-9"
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
             </div>
-
-            <div className="space-y-2">
-              <Label>Banco</Label>
-              <Input
-                placeholder="Nome do banco"
-                value={formData.banco}
-                onChange={(e) => setFormData({ ...formData, banco: e.target.value })}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Parcela *</Label>
-                <Input
-                  placeholder="R$ 0,00"
-                  value={formData.parcela}
-                  onChange={(e) => setFormData({ ...formData, parcela: formatCurrency(e.target.value) })}
-                />
+            
+            {/* Add Contract Button */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={addContract}
+              className="w-full border-dashed border-2 hover:border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar Contrato
+            </Button>
+            
+            {/* Summary */}
+            {contracts.length > 0 && contracts.some(c => c.valor_liberado) && (
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950 dark:to-orange-950 rounded-lg p-3 border border-amber-200 dark:border-amber-800">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Total ({contracts.length} contrato{contracts.length > 1 ? 's' : ''}):</span>
+                  <span className="font-bold text-lg text-amber-700 dark:text-amber-400">
+                    {formatCurrency(
+                      contracts.reduce((sum, c) => {
+                        const val = parseFloat(c.valor_liberado.replace(/\D/g, '') || '0');
+                        return sum + val;
+                      }, 0).toString()
+                    )}
+                  </span>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Valor Liberado *</Label>
-                <Input
-                  placeholder="R$ 0,00"
-                  value={formData.valor_liberado}
-                  onChange={(e) => setFormData({ ...formData, valor_liberado: formatCurrency(e.target.value) })}
-                />
-              </div>
-            </div>
+            )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setIsCompleteModalOpen(false)}>
               Cancelar
             </Button>
             <Button 
               onClick={handleCompleteSimulation}
-              disabled={isSending}
+              disabled={isSending || contracts.some(c => !c.produto || !c.parcela || !c.valor_liberado)}
               className="bg-gradient-to-r from-amber-500 to-orange-500"
             >
               {isSending ? (
@@ -538,7 +618,7 @@ export function ActivateSimulationManager({ onUpdate }: ActivateSimulationManage
               ) : (
                 <Send className="h-4 w-4 mr-2" />
               )}
-              Enviar Simulação
+              Enviar {contracts.length > 1 ? `${contracts.length} Contratos` : 'Simulação'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -21,6 +21,14 @@ export interface ActivateLeadSimulation {
   updated_at: string;
 }
 
+export interface SimulationContractItem {
+  id: string;
+  produto: string;
+  parcela: string;
+  valor_liberado: string;
+  banco: string;
+}
+
 export interface SimulationFormData {
   produto: string;
   parcela: string;
@@ -148,21 +156,35 @@ export function useActivateLeadSimulations() {
   const completeSimulation = async (
     simulationId: string,
     leadId: string,
-    formData: SimulationFormData,
+    contracts: SimulationContractItem[],
     requestedBy: string,
     leadNome: string
   ) => {
     if (!user) throw new Error('User not authenticated');
 
-    if (!formData.produto?.trim()) throw new Error('Produto é obrigatório');
-    if (!formData.parcela?.trim()) throw new Error('Parcela é obrigatória');
-    if (!formData.valor_liberado?.trim()) throw new Error('Valor liberado é obrigatório');
+    if (!contracts || contracts.length === 0) {
+      throw new Error('Adicione pelo menos um contrato');
+    }
 
-    const parcelaNum = parseFloat(formData.parcela.replace(/\D/g, '')) / 100;
-    const valorNum = parseFloat(formData.valor_liberado.replace(/\D/g, '')) / 100;
+    // Validate all contracts
+    for (const contract of contracts) {
+      if (!contract.produto?.trim()) throw new Error('Produto é obrigatório em todos os contratos');
+      if (!contract.parcela?.trim()) throw new Error('Parcela é obrigatória em todos os contratos');
+      if (!contract.valor_liberado?.trim()) throw new Error('Valor liberado é obrigatório em todos os contratos');
+    }
 
-    if (isNaN(parcelaNum) || parcelaNum <= 0) throw new Error('Parcela inválida');
-    if (isNaN(valorNum) || valorNum <= 0) throw new Error('Valor liberado inválido');
+    // Parse contracts for storage
+    const parsedContracts = contracts.map(c => ({
+      produto: c.produto,
+      parcela: parseFloat(c.parcela.replace(/\D/g, '')) / 100,
+      valor_liberado: parseFloat(c.valor_liberado.replace(/\D/g, '')) / 100,
+      banco: c.banco || null
+    }));
+
+    // Calculate totals
+    const totalValor = parsedContracts.reduce((sum, c) => sum + c.valor_liberado, 0);
+    const totalParcela = parsedContracts.reduce((sum, c) => sum + c.parcela, 0);
+    const primaryContract = parsedContracts[0];
 
     try {
       const { error: simError } = await supabase
@@ -170,10 +192,11 @@ export function useActivateLeadSimulations() {
         .update({
           completed_by: user.id,
           completed_at: new Date().toISOString(),
-          produto: formData.produto,
-          parcela: parcelaNum,
-          valor_liberado: valorNum,
-          banco: formData.banco || null,
+          produto: primaryContract.produto,
+          parcela: totalParcela,
+          valor_liberado: totalValor,
+          banco: primaryContract.banco,
+          notes: contracts.length > 1 ? JSON.stringify(parsedContracts) : null,
           status: 'enviada'
         })
         .eq('id', simulationId);
@@ -186,7 +209,8 @@ export function useActivateLeadSimulations() {
         .eq('id', leadId);
 
       // Notify the requester
-      const valorFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorNum);
+      const valorFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValor);
+      const contractCount = contracts.length > 1 ? ` (${contracts.length} contratos)` : '';
       await supabase
         .from('activate_leads_simulation_notifications')
         .insert({
@@ -195,7 +219,7 @@ export function useActivateLeadSimulations() {
           simulation_id: simulationId,
           type: 'simulation_completed',
           title: '✅ Simulação Concluída',
-          message: `Simulação para ${leadNome}: ${formData.produto} - ${valorFormatted}`
+          message: `Simulação para ${leadNome}: ${valorFormatted}${contractCount}`
         });
 
       return true;
