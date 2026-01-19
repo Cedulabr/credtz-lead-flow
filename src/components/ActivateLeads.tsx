@@ -1780,8 +1780,10 @@ export const ActivateLeads = () => {
                   )}
                   <TableHead className="font-bold text-base">👤 Nome</TableHead>
                   <TableHead className="font-bold text-base">📞 Telefone</TableHead>
+                  <TableHead className="font-bold text-base">🆔 CPF</TableHead>
                   <TableHead className="font-bold text-base">📍 Origem</TableHead>
                   <TableHead className="font-bold text-base">📊 Status</TableHead>
+                  <TableHead className="font-bold text-base">📈 Simulação</TableHead>
                   <TableHead className="font-bold text-base">🎯 Atribuído</TableHead>
                   <TableHead className="font-bold text-base">📅 Próxima Ação</TableHead>
                   <TableHead className="font-bold text-base text-center">⚡ Ações</TableHead>
@@ -1790,7 +1792,7 @@ export const ActivateLeads = () => {
               <TableBody>
                 {paginatedLeads.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canAssignLead ? 8 : 7} className="h-40">
+                    <TableCell colSpan={canAssignLead ? 10 : 9} className="h-40">
                       <motion.div 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -1846,6 +1848,26 @@ export const ActivateLeads = () => {
                           <span className="font-mono text-base">{formatPhone(lead.telefone)}</span>
                         </TableCell>
                         <TableCell>
+                          <div className="flex items-center gap-2">
+                            {lead.cpf ? (
+                              <span className="font-mono text-sm">{lead.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}</span>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                            {(isAdmin || isGestor) && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => openCpfModal(lead)}
+                                className="h-7 w-7 p-0 hover:bg-primary/10 transition-all duration-300"
+                                title="Editar CPF"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
                           <Badge variant="outline" className="font-medium capitalize text-sm">
                             {lead.origem}
                           </Badge>
@@ -1861,6 +1883,37 @@ export const ActivateLeads = () => {
                             {statusConfig.icon}
                             {statusConfig.label}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {lead.simulation_status ? (
+                            <Badge 
+                              variant="outline" 
+                              className={cn(
+                                "text-sm font-medium",
+                                lead.simulation_status === 'pending' && "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800",
+                                lead.simulation_status === 'completed' && "bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800",
+                                lead.simulation_status === 'confirmed' && "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800"
+                              )}
+                            >
+                              {lead.simulation_status === 'pending' && '⏳ Solicitada'}
+                              {lead.simulation_status === 'completed' && '✅ Disponível'}
+                              {lead.simulation_status === 'confirmed' && '🎯 Confirmada'}
+                            </Badge>
+                          ) : (
+                            !(isAdmin || isGestor) && lead.assigned_to === user?.id ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleRequestSimulation(lead)}
+                                className="h-8 text-xs bg-gradient-to-r from-purple-50 to-violet-50 hover:from-purple-100 hover:to-violet-100 border-purple-200 text-purple-700 dark:from-purple-950 dark:to-violet-950 dark:border-purple-800 dark:text-purple-300"
+                              >
+                                <BarChart3 className="h-3.5 w-3.5 mr-1" />
+                                Solicitar
+                              </Button>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )
+                          )}
                         </TableCell>
                         <TableCell>
                           {assignedUser ? (
@@ -2805,6 +2858,85 @@ export const ActivateLeads = () => {
         history={leadHistory}
         users={availableUsers}
       />
+
+      {/* CPF Edit Modal */}
+      <Dialog open={isCpfModalOpen} onOpenChange={setIsCpfModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-primary/20 to-primary/10 flex items-center justify-center">
+                <Edit className="h-6 w-6 text-primary" />
+              </div>
+              🆔 Editar CPF
+            </DialogTitle>
+          </DialogHeader>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-4 py-4"
+          >
+            {cpfEditLead && (
+              <div className="p-4 bg-muted/50 rounded-xl border">
+                <p className="text-lg font-semibold">👤 {cpfEditLead.nome}</p>
+                <p className="text-muted-foreground">📞 {formatPhone(cpfEditLead.telefone)}</p>
+              </div>
+            )}
+            
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">🆔 CPF do Cliente</Label>
+              <Input
+                placeholder="000.000.000-00"
+                value={newCpf}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '');
+                  if (value.length <= 11) {
+                    const formatted = value
+                      .replace(/(\d{3})(\d)/, '$1.$2')
+                      .replace(/(\d{3})(\d)/, '$1.$2')
+                      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+                    setNewCpf(formatted);
+                  }
+                }}
+                className="border-2 focus:border-primary h-12 text-base font-mono"
+                maxLength={14}
+              />
+              <p className="text-sm text-muted-foreground">
+                O CPF é importante para facilitar a venda e realizar simulações.
+              </p>
+            </div>
+          </motion.div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsCpfModalOpen(false);
+                setCpfEditLead(null);
+                setNewCpf('');
+              }} 
+              className="transition-all duration-300"
+            >
+              ❌ Cancelar
+            </Button>
+            <Button 
+              onClick={handleSaveCpf}
+              disabled={savingCpf}
+              className="bg-gradient-to-r from-primary to-primary/80 transition-all duration-300"
+            >
+              {savingCpf ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  ✅ Salvar CPF
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 };
