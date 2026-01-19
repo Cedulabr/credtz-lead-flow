@@ -1328,7 +1328,7 @@ export const ActivateLeads = () => {
         companyId = company?.id || null;
       }
       
-      await supabase.from('import_logs').insert({
+      const { data: importLogData } = await supabase.from('import_logs').insert({
         module: 'activate_leads',
         file_name: csvFile.name,
         total_records: parsedLeads.length,
@@ -1339,7 +1339,20 @@ export const ActivateLeads = () => {
         imported_by: user.id,
         company_id: companyId,
         error_details: duplicates.length > 0 ? { duplicates: duplicates.slice(0, 100) } : null,
-      });
+      }).select('id').single();
+
+      // Executa varredura automática de duplicatas após importação
+      if (successCount > 0) {
+        try {
+          const { data: scanResult } = await supabase.rpc('trigger_duplicate_scan_after_import', {
+            p_module: 'activate_leads',
+            p_import_log_id: importLogData?.id || null
+          });
+          console.log('Auto-scan de duplicatas executado:', scanResult);
+        } catch (scanError) {
+          console.warn('Auto-scan de duplicatas falhou (não crítico):', scanError);
+        }
+      }
 
       if (duplicates.length > 0) {
         const duplicateList = duplicates.slice(0, 5).map(d => 

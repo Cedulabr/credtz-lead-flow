@@ -4670,6 +4670,10 @@ export type Database = {
         }[]
       }
       text_contains_numbers: { Args: { input_text: string }; Returns: boolean }
+      trigger_duplicate_scan_after_import: {
+        Args: { p_import_log_id?: string; p_module?: string }
+        Returns: Json
+      }
       update_daily_baseoff_usage: {
         Args: { leads_count_param: number; user_id_param: string }
         Returns: undefined
