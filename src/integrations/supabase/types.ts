@@ -2307,6 +2307,65 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_simulations: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          id: string
+          lead_id: string
+          notes: string | null
+          requested_at: string
+          requested_by: string
+          simulation_file_name: string | null
+          simulation_file_url: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          lead_id: string
+          notes?: string | null
+          requested_at?: string
+          requested_by: string
+          simulation_file_name?: string | null
+          simulation_file_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          lead_id?: string
+          notes?: string | null
+          requested_at?: string
+          requested_by?: string
+          simulation_file_name?: string | null
+          simulation_file_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_simulations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           assigned_to: string | null
@@ -2334,6 +2393,8 @@ export type Database = {
           requested_at: string | null
           requested_by: string | null
           rework_date: string | null
+          simulation_id: string | null
+          simulation_status: string | null
           stage: string | null
           status: string | null
           tag: string | null
@@ -2366,6 +2427,8 @@ export type Database = {
           requested_at?: string | null
           requested_by?: string | null
           rework_date?: string | null
+          simulation_id?: string | null
+          simulation_status?: string | null
           stage?: string | null
           status?: string | null
           tag?: string | null
@@ -2398,6 +2461,8 @@ export type Database = {
           requested_at?: string | null
           requested_by?: string | null
           rework_date?: string | null
+          simulation_id?: string | null
+          simulation_status?: string | null
           stage?: string | null
           status?: string | null
           tag?: string | null
@@ -2410,6 +2475,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_simulation_id_fkey"
+            columns: ["simulation_id"]
+            isOneToOne: false
+            referencedRelation: "lead_simulations"
             referencedColumns: ["id"]
           },
         ]
@@ -3056,6 +3128,57 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      simulation_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          lead_id: string
+          message: string
+          simulation_id: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          lead_id: string
+          message: string
+          simulation_id: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          lead_id?: string
+          message?: string
+          simulation_id?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "simulation_notifications_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "simulation_notifications_simulation_id_fkey"
+            columns: ["simulation_id"]
+            isOneToOne: false
+            referencedRelation: "lead_simulations"
             referencedColumns: ["id"]
           },
         ]
@@ -4166,6 +4289,7 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      is_gestor_or_admin: { Args: { _user_id: string }; Returns: boolean }
       is_global_admin: { Args: { _user_id: string }; Returns: boolean }
       normalize_cpf: { Args: { input_cpf: string }; Returns: string }
       process_expired_future_contacts: { Args: never; Returns: number }
