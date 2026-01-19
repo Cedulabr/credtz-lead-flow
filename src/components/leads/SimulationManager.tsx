@@ -107,30 +107,6 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
     valor_liberado: "",
     banco: "",
   });
-  const [banks, setBanks] = useState<string[]>([]);
-
-  // Fetch banks
-  useEffect(() => {
-    const fetchBanks = async () => {
-      try {
-        // Use any to avoid type recursion issues
-        const query = supabase.from("televendas_banks").select("name");
-        const result = await (query as any).eq("active", true);
-        if (result.data && Array.isArray(result.data)) {
-          const bankNames: string[] = [];
-          for (const item of result.data) {
-            if (item && typeof item === 'object' && 'name' in item && item.name) {
-              bankNames.push(String(item.name));
-            }
-          }
-          setBanks(bankNames);
-        }
-      } catch {
-        setBanks(["Banrisul", "BMG", "Bradesco", "C6 Bank", "Caixa", "Daycoval", "Facta", "Itaú", "Master", "Pan", "Safra", "Santander"]);
-      }
-    };
-    fetchBanks();
-  }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -635,21 +611,12 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
                 <Building2 className="h-4 w-4 text-gray-500" />
                 Banco (opcional)
               </Label>
-              <Select
+              <Input
+                id="banco"
+                placeholder="Digite o nome do banco"
                 value={formData.banco}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, banco: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o banco" />
-                </SelectTrigger>
-                <SelectContent>
-                  {banks.map((bank) => (
-                    <SelectItem key={bank} value={bank}>
-                      {bank}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(e) => setFormData(prev => ({ ...prev, banco: e.target.value }))}
+              />
             </div>
           </div>
 
