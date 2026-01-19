@@ -50,6 +50,7 @@ import {
   TelevendasFilters,
   TelevendasClientView,
   TelevendasProposalList,
+  TelevendasUserStats,
   STATUS_CONFIG
 } from "./televendas";
 
@@ -169,7 +170,7 @@ export const TelevendasPremium = () => {
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"propostas" | "clientes">("propostas");
+  const [viewMode, setViewMode] = useState<"propostas" | "clientes" | "estatisticas">("propostas");
   
   // Dialog states
   const [selectedTv, setSelectedTv] = useState<Televenda | null>(null);
@@ -942,7 +943,23 @@ export const TelevendasPremium = () => {
       <Card>
         <CardContent className="pt-6">
           <AnimatePresence mode="wait">
-            {viewMode === "clientes" && !selectedClientCpf ? (
+            {viewMode === "estatisticas" && !selectedClientCpf ? (
+              <motion.div
+                key="estatisticas"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+              >
+                <TelevendasUserStats
+                  televendas={filteredTelevendas}
+                  onUserClick={(userId) => {
+                    setSelectedUserId(userId);
+                    setViewMode("propostas");
+                  }}
+                  isGestorOrAdmin={isGestorOrAdmin}
+                />
+              </motion.div>
+            ) : viewMode === "clientes" && !selectedClientCpf ? (
               <motion.div
                 key="clientes"
                 initial={{ opacity: 0, x: -20 }}
@@ -954,6 +971,7 @@ export const TelevendasPremium = () => {
                   onClientClick={handleClientClick}
                   formatCPF={formatCPF}
                   formatCurrency={formatCurrencyDisplay}
+                  isGestorOrAdmin={isGestorOrAdmin}
                 />
               </motion.div>
             ) : (
