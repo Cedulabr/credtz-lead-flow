@@ -31,6 +31,31 @@ export interface LeadSimulation {
   updated_at: string;
 }
 
+export interface SimulationWithDetails extends LeadSimulation {
+  lead?: {
+    id: string;
+    name: string;
+    cpf: string;
+    phone: string;
+    convenio: string;
+  };
+  requester?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+export interface SimulationStats {
+  pending: number;
+  inProgress: number;
+  completed: number;
+  received: number;
+  todayRequested: number;
+  todayCompleted: number;
+  conversionRate: number;
+}
+
 export function useSimulationNotifications() {
   const { user, profile } = useAuth();
   const [notifications, setNotifications] = useState<SimulationNotification[]>([]);
@@ -327,58 +352,85 @@ export function useSimulationNotifications() {
     }
   };
 
-  // Get simulation stats
-  const getSimulationStats = async () => {
-    if (!user) return { pending: 0, completed: 0, awaiting: 0 };
+  // Get simulation stats with detailed metrics
+  const getSimulationStats = async (): Promise<SimulationStats> => {
+    if (!user) return { pending: 0, inProgress: 0, completed: 0, received: 0, todayRequested: 0, todayCompleted: 0, conversionRate: 0 };
 
     try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
       const { data, error } = await supabase
         .from('lead_simulations')
-        .select('status');
+        .select('status, requested_at, completed_at');
 
       if (error) throw error;
 
-      const stats = {
+      const todayStr = today.toISOString();
+      
+      const stats: SimulationStats = {
         pending: data?.filter(s => s.status === 'solicitada').length || 0,
+        inProgress: data?.filter(s => s.status === 'em_andamento').length || 0,
         completed: data?.filter(s => s.status === 'enviada').length || 0,
-        awaiting: data?.filter(s => s.status === 'recebida').length || 0
+        received: data?.filter(s => s.status === 'recebida').length || 0,
+        todayRequested: data?.filter(s => s.requested_at && s.requested_at >= todayStr).length || 0,
+        todayCompleted: data?.filter(s => s.completed_at && s.completed_at >= todayStr).length || 0,
+        conversionRate: 0
       };
+
+      // Calculate conversion rate (received / total completed * 100)
+      const totalProcessed = stats.completed + stats.received;
+      if (totalProcessed > 0) {
+        stats.conversionRate = Math.round((stats.received / totalProcessed) * 100);
+      }
 
       return stats;
     } catch (error) {
       console.error('Error fetching simulation stats:', error);
-      return { pending: 0, completed: 0, awaiting: 0 };
+      return { pending: 0, inProgress: 0, completed: 0, received: 0, todayRequested: 0, todayCompleted: 0, conversionRate: 0 };
     }
   };
 
-  // Get pending simulations for gestor
-  const getPendingSimulations = async () => {
+  // Get pending simulations for gestor (using manual joins)
+  const getPendingSimulations = async (): Promise<SimulationWithDetails[]> => {
     if (!user || !isGestorOrAdmin) return [];
 
     try {
-      const { data, error } = await supabase
+      // First get simulations
+      const { data: simulations, error: simError } = await supabase
         .from('lead_simulations')
-        .select(`
-          *,
-          leads:lead_id (
-            id,
-            name,
-            cpf,
-            phone,
-            convenio
-          ),
-          requester:requested_by (
-            id,
-            name,
-            email
-          )
-        `)
+        .select('*')
         .eq('status', 'solicitada')
         .order('requested_at', { ascending: true });
 
-      if (error) throw error;
+      if (simError) throw simError;
+      if (!simulations || simulations.length === 0) return [];
 
-      return data || [];
+      // Get unique lead IDs and user IDs
+      const leadIds = [...new Set(simulations.map(s => s.lead_id).filter(Boolean))];
+      const requesterIds = [...new Set(simulations.map(s => s.requested_by).filter(Boolean))];
+
+      // Fetch leads
+      const { data: leads } = await supabase
+        .from('leads')
+        .select('id, name, cpf, phone, convenio')
+        .in('id', leadIds);
+
+      // Fetch profiles (requesters)
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .in('id', requesterIds);
+
+      // Map data
+      const leadsMap = new Map(leads?.map(l => [l.id, l]) || []);
+      const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      return simulations.map(sim => ({
+        ...sim,
+        lead: leadsMap.get(sim.lead_id) || undefined,
+        requester: profilesMap.get(sim.requested_by) || undefined
+      })) as SimulationWithDetails[];
     } catch (error) {
       console.error('Error fetching pending simulations:', error);
       return [];
@@ -386,32 +438,134 @@ export function useSimulationNotifications() {
   };
 
   // Get simulations awaiting confirmation (for user)
-  const getAwaitingConfirmation = async () => {
+  const getAwaitingConfirmation = async (): Promise<SimulationWithDetails[]> => {
     if (!user) return [];
 
     try {
-      const { data, error } = await supabase
+      // First get simulations
+      const { data: simulations, error: simError } = await supabase
         .from('lead_simulations')
-        .select(`
-          *,
-          leads:lead_id (
-            id,
-            name,
-            cpf,
-            phone,
-            convenio
-          )
-        `)
+        .select('*')
         .eq('requested_by', user.id)
         .eq('status', 'enviada')
         .order('completed_at', { ascending: false });
 
-      if (error) throw error;
+      if (simError) throw simError;
+      if (!simulations || simulations.length === 0) return [];
 
-      return data || [];
+      // Get unique lead IDs
+      const leadIds = [...new Set(simulations.map(s => s.lead_id).filter(Boolean))];
+
+      // Fetch leads
+      const { data: leads } = await supabase
+        .from('leads')
+        .select('id, name, cpf, phone, convenio')
+        .in('id', leadIds);
+
+      // Map data
+      const leadsMap = new Map(leads?.map(l => [l.id, l]) || []);
+
+      return simulations.map(sim => ({
+        ...sim,
+        lead: leadsMap.get(sim.lead_id) || undefined
+      })) as SimulationWithDetails[];
     } catch (error) {
       console.error('Error fetching awaiting simulations:', error);
       return [];
+    }
+  };
+
+  // Request digitação (send to Televendas)
+  const requestDigitacao = async (
+    leadId: string,
+    simulationId: string,
+    leadData: {
+      name: string;
+      cpf: string;
+      phone: string;
+      convenio: string;
+    },
+    simulationFileUrl?: string
+  ) => {
+    if (!user) throw new Error('User not authenticated');
+
+    try {
+      // Get user's company
+      const { data: userCompany } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+
+      // Get simulation data
+      const { data: simulation } = await supabase
+        .from('lead_simulations')
+        .select('*')
+        .eq('id', simulationId)
+        .single();
+
+      // Create televenda entry with simulation data
+      const { error: tvError } = await supabase
+        .from('televendas')
+        .insert({
+          user_id: user.id,
+          company_id: userCompany?.company_id || null,
+          lead_id: leadId,
+          nome: leadData.name,
+          cpf: leadData.cpf?.replace(/\D/g, '') || '',
+          telefone: leadData.phone?.replace(/\D/g, '') || '',
+          banco: leadData.convenio || '',
+          data_venda: new Date().toISOString().split('T')[0],
+          parcela: 0,
+          tipo_operacao: 'Portabilidade',
+          status: 'solicitado_digitacao',
+          simulation_file_url: simulationFileUrl || simulation?.simulation_file_url || null,
+          simulation_data: simulation ? {
+            simulation_id: simulationId,
+            requested_at: simulation.requested_at,
+            completed_at: simulation.completed_at,
+            file_url: simulation.simulation_file_url,
+            file_name: simulation.simulation_file_name
+          } : null
+        });
+
+      if (tvError) throw tvError;
+
+      // Update lead status
+      await supabase
+        .from('leads')
+        .update({ 
+          status: 'digitacao_solicitada',
+          simulation_status: 'digitacao_solicitada'
+        })
+        .eq('id', leadId);
+
+      // Notify gestors
+      const { data: gestors } = await supabase
+        .from('user_companies')
+        .select('user_id')
+        .eq('company_role', 'gestor')
+        .eq('is_active', true);
+
+      if (gestors && gestors.length > 0) {
+        const notifications = gestors.map(g => ({
+          user_id: g.user_id,
+          lead_id: leadId,
+          simulation_id: simulationId,
+          type: 'simulation_confirmed',
+          title: '📝 Digitação Solicitada',
+          message: `${profile?.name || 'Usuário'} solicitou digitação para ${leadData.name}`
+        }));
+
+        await supabase.from('simulation_notifications').insert(notifications);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error requesting digitação:', error);
+      throw error;
     }
   };
 
@@ -428,6 +582,7 @@ export function useSimulationNotifications() {
     getSimulationStats,
     getPendingSimulations,
     getAwaitingConfirmation,
+    requestDigitacao,
     refetch: fetchNotifications,
   };
 }

@@ -3221,10 +3221,13 @@ export type Database = {
           created_at: string
           data_venda: string
           id: string
+          lead_id: string | null
           nome: string
           observacao: string | null
           parcela: number
           saldo_devedor: number | null
+          simulation_data: Json | null
+          simulation_file_url: string | null
           status: string
           status_updated_at: string | null
           status_updated_by: string | null
@@ -3241,10 +3244,13 @@ export type Database = {
           created_at?: string
           data_venda: string
           id?: string
+          lead_id?: string | null
           nome: string
           observacao?: string | null
           parcela: number
           saldo_devedor?: number | null
+          simulation_data?: Json | null
+          simulation_file_url?: string | null
           status?: string
           status_updated_at?: string | null
           status_updated_by?: string | null
@@ -3261,10 +3267,13 @@ export type Database = {
           created_at?: string
           data_venda?: string
           id?: string
+          lead_id?: string | null
           nome?: string
           observacao?: string | null
           parcela?: number
           saldo_devedor?: number | null
+          simulation_data?: Json | null
+          simulation_file_url?: string | null
           status?: string
           status_updated_at?: string | null
           status_updated_by?: string | null
@@ -3280,6 +3289,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "televendas_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
         ]
