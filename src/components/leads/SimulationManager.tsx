@@ -538,16 +538,16 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
         )}
       </div>
 
-      {/* Complete Simulation Modal - Interactive Form */}
+      {/* Complete Simulation Modal - Multiple Contracts */}
       <Dialog open={isCompleteModalOpen} onOpenChange={setIsCompleteModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-amber-600" />
               Responder Simulação
             </DialogTitle>
             <DialogDescription>
-              Preencha os dados da simulação para o cliente
+              Adicione os contratos da simulação para o cliente
             </DialogDescription>
           </DialogHeader>
 
@@ -562,79 +562,128 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
               </p>
             </div>
 
-            {/* Product Selection */}
-            <div className="space-y-2">
-              <Label>Produto *</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {PRODUCTS.map((product) => (
-                  <button
-                    key={product.id}
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, produto: product.id }))}
-                    className={`
-                      p-3 rounded-lg border-2 text-left transition-all
-                      ${formData.produto === product.id
-                        ? 'border-amber-500 bg-amber-50 shadow-md'
-                        : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'
-                      }
-                    `}
-                  >
-                    <span className="text-lg">{product.emoji}</span>
-                    <p className="text-sm font-medium mt-1">{product.label}</p>
-                  </button>
-                ))}
+            {/* Contracts List */}
+            <div className="space-y-4">
+              {contracts.map((contract, index) => (
+                <div key={contract.id} className="border border-amber-200 rounded-lg p-4 bg-white relative">
+                  <div className="flex items-center justify-between mb-3">
+                    <Badge variant="outline" className="text-amber-700">
+                      Contrato {index + 1}
+                    </Badge>
+                    {contracts.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeContract(contract.id)}
+                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      >
+                        ✕
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Product Selection */}
+                  <div className="space-y-2 mb-3">
+                    <Label className="text-xs">Produto *</Label>
+                    <div className="grid grid-cols-5 gap-1">
+                      {PRODUCTS.map((product) => (
+                        <button
+                          key={product.id}
+                          type="button"
+                          onClick={() => updateContract(contract.id, 'produto', product.id)}
+                          className={`
+                            p-2 rounded-lg border text-center transition-all text-xs
+                            ${contract.produto === product.id
+                              ? 'border-amber-500 bg-amber-50 shadow-md'
+                              : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/50'
+                            }
+                          `}
+                        >
+                          <span className="text-lg">{product.emoji}</span>
+                          <p className="text-[10px] font-medium mt-0.5">{product.label}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    {/* Banco */}
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1">
+                        <Building2 className="h-3 w-3" />
+                        Banco
+                      </Label>
+                      <Input
+                        placeholder="Nome do banco"
+                        value={contract.banco}
+                        onChange={(e) => updateContract(contract.id, 'banco', e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+
+                    {/* Parcela */}
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1">
+                        <CreditCard className="h-3 w-3" />
+                        Parcela *
+                      </Label>
+                      <Input
+                        placeholder="R$ 0,00"
+                        value={contract.parcela}
+                        onChange={(e) => updateContract(contract.id, 'parcela', formatCurrency(e.target.value))}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+
+                    {/* Valor Liberado */}
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1">
+                        <DollarSign className="h-3 w-3 text-green-600" />
+                        Valor Lib. *
+                      </Label>
+                      <Input
+                        placeholder="R$ 0,00"
+                        value={contract.valor_liberado}
+                        onChange={(e) => updateContract(contract.id, 'valor_liberado', formatCurrency(e.target.value))}
+                        className="h-8 text-sm text-green-700"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Add Contract Button */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={addContract}
+              className="w-full border-dashed border-amber-400 text-amber-600 hover:bg-amber-50"
+            >
+              + Adicionar Contrato
+            </Button>
+
+            {/* Summary */}
+            {contracts.length > 0 && contracts.some(c => c.valor_liberado) && (
+              <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-green-800">
+                    Total ({contracts.length} contrato{contracts.length > 1 ? 's' : ''}):
+                  </span>
+                  <span className="text-lg font-bold text-green-700">
+                    {formatCurrency(
+                      String(
+                        contracts.reduce((sum, c) => {
+                          const val = parseFloat(c.valor_liberado.replace(/\D/g, '')) || 0;
+                          return sum + val;
+                        }, 0)
+                      )
+                    )}
+                  </span>
+                </div>
               </div>
-            </div>
-
-            {/* Parcela */}
-            <div className="space-y-2">
-              <Label htmlFor="parcela" className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-gray-500" />
-                Parcela *
-              </Label>
-              <Input
-                id="parcela"
-                placeholder="R$ 0,00"
-                value={formData.parcela}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  parcela: formatCurrency(e.target.value) 
-                }))}
-                className="text-lg font-medium"
-              />
-            </div>
-
-            {/* Valor Liberado */}
-            <div className="space-y-2">
-              <Label htmlFor="valor_liberado" className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-green-600" />
-                Valor Liberado *
-              </Label>
-              <Input
-                id="valor_liberado"
-                placeholder="R$ 0,00"
-                value={formData.valor_liberado}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  valor_liberado: formatCurrency(e.target.value) 
-                }))}
-                className="text-lg font-medium text-green-700"
-              />
-            </div>
-
-            {/* Banco (Optional) */}
-            <div className="space-y-2">
-              <Label htmlFor="banco" className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-gray-500" />
-                Banco (opcional)
-              </Label>
-              <Input
-                id="banco"
-                placeholder="Digite o nome do banco"
-                value={formData.banco}
-                onChange={(e) => setFormData(prev => ({ ...prev, banco: e.target.value }))}
-              />
-            </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2">
@@ -642,7 +691,7 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
               variant="outline"
               onClick={() => {
                 setIsCompleteModalOpen(false);
-                setFormData({ produto: "", parcela: "", valor_liberado: "", banco: "" });
+                setContracts([createEmptyContract()]);
               }}
               disabled={isSending}
             >
@@ -650,7 +699,7 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
             </Button>
             <Button
               onClick={handleCompleteSimulation}
-              disabled={!formData.produto || !formData.parcela || !formData.valor_liberado || isSending}
+              disabled={contracts.some(c => !c.produto || !c.parcela || !c.valor_liberado) || isSending}
               className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
             >
               {isSending ? (
@@ -661,7 +710,7 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
               ) : (
                 <>
                   <Send className="h-4 w-4 mr-2" />
-                  Enviar Simulação
+                  Enviar {contracts.length} Contrato{contracts.length > 1 ? 's' : ''}
                 </>
               )}
             </Button>
