@@ -170,6 +170,7 @@ export const TelevendasPremium = () => {
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("all");
+  const [selectedProduct, setSelectedProduct] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"propostas" | "clientes" | "estatisticas">("propostas");
   
   // Dialog states
@@ -433,9 +434,11 @@ export const TelevendasPremium = () => {
       
       const matchesStatus = selectedStatus === "all" || tv.status === selectedStatus;
       
-      return matchesSearch && matchesStatus;
+      const matchesProduct = selectedProduct === "all" || tv.tipo_operacao === selectedProduct;
+      
+      return matchesSearch && matchesStatus && matchesProduct;
     });
-  }, [televendas, searchTerm, selectedStatus]);
+  }, [televendas, searchTerm, selectedStatus, selectedProduct]);
 
   // Client view: filter by selected CPF
   const clientPropostas = useMemo(() => {
@@ -454,6 +457,16 @@ export const TelevendasPremium = () => {
     // Include legacy statuses mapped
     counts.pago_aprovado = (counts.pago_aprovado || 0) + televendas.filter(tv => tv.status === "pago").length;
     counts.cancelado_confirmado = (counts.cancelado_confirmado || 0) + televendas.filter(tv => tv.status === "cancelado").length;
+    return counts;
+  }, [televendas]);
+
+  // Product counts
+  const productCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: televendas.length };
+    const products = ["Portabilidade", "Novo empréstimo", "Refinanciamento", "Cartão"];
+    products.forEach(product => {
+      counts[product] = televendas.filter(tv => tv.tipo_operacao === product).length;
+    });
     return counts;
   }, [televendas]);
 
@@ -928,10 +941,13 @@ export const TelevendasPremium = () => {
               setSelectedMonth={setSelectedMonth}
               selectedPeriod={selectedPeriod}
               setSelectedPeriod={setSelectedPeriod}
+              selectedProduct={selectedProduct}
+              setSelectedProduct={setSelectedProduct}
               viewMode={viewMode}
               setViewMode={setViewMode}
               users={users}
               statusCounts={statusCounts}
+              productCounts={productCounts}
               isGestorOrAdmin={isGestorOrAdmin}
               monthOptions={monthOptions}
             />

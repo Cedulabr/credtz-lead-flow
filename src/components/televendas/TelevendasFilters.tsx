@@ -40,13 +40,25 @@ interface FiltersProps {
   setSelectedMonth: (value: string) => void;
   selectedPeriod: string;
   setSelectedPeriod: (value: string) => void;
+  selectedProduct: string;
+  setSelectedProduct: (value: string) => void;
   viewMode: "propostas" | "clientes" | "estatisticas";
   setViewMode: (value: "propostas" | "clientes" | "estatisticas") => void;
   users: User[];
   statusCounts: Record<string, number>;
+  productCounts: Record<string, number>;
   isGestorOrAdmin: boolean;
   monthOptions: { value: string; label: string }[];
 }
+
+// Product options for filter
+export const PRODUCT_OPTIONS = [
+  { value: "all", label: "Todos os Produtos", icon: "📦" },
+  { value: "Portabilidade", label: "Portabilidade", icon: "🔄" },
+  { value: "Novo empréstimo", label: "Novo Empréstimo", icon: "💰" },
+  { value: "Refinanciamento", label: "Refinanciamento", icon: "🔁" },
+  { value: "Cartão", label: "Cartão", icon: "💳" }
+];
 
 // Status configuration with new workflow
 export const STATUS_CONFIG = {
@@ -122,10 +134,13 @@ export const TelevendasFilters = ({
   setSelectedMonth,
   selectedPeriod,
   setSelectedPeriod,
+  selectedProduct,
+  setSelectedProduct,
   viewMode,
   setViewMode,
   users,
   statusCounts,
+  productCounts,
   isGestorOrAdmin,
   monthOptions
 }: FiltersProps) => {
@@ -136,6 +151,7 @@ export const TelevendasFilters = ({
     selectedStatus !== "all",
     selectedUserId !== "all",
     selectedPeriod !== "all",
+    selectedProduct !== "all",
     searchTerm.length > 0
   ].filter(Boolean).length;
 
@@ -146,6 +162,7 @@ export const TelevendasFilters = ({
     setSelectedUserId("all");
     setSelectedPeriod("all");
     setSelectedMonth("all");
+    setSelectedProduct("all");
   };
 
   return (
@@ -197,6 +214,31 @@ export const TelevendasFilters = ({
             </Badge>
           ))}
         </div>
+      </div>
+
+      {/* Product filter badges */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap md:overflow-visible">
+        {PRODUCT_OPTIONS.map((product) => {
+          const count = product.value === "all" 
+            ? productCounts.all || 0 
+            : productCounts[product.value] || 0;
+          
+          return (
+            <Badge
+              key={product.value}
+              variant={selectedProduct === product.value ? "default" : "outline"}
+              className={`cursor-pointer whitespace-nowrap flex-shrink-0 transition-all hover:scale-105 ${
+                selectedProduct === product.value 
+                  ? '' 
+                  : 'bg-background hover:bg-muted'
+              }`}
+              onClick={() => setSelectedProduct(product.value)}
+            >
+              <span className="mr-1">{product.icon}</span>
+              {product.label} ({count})
+            </Badge>
+          );
+        })}
       </div>
 
       {/* Search + Advanced toggle */}
