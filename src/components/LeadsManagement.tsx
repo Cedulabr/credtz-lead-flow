@@ -1194,6 +1194,9 @@ export function LeadsManagement() {
 
   return (
     <AnimatedContainer animation="slide-up" className="p-3 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen">
+      {/* Simulation Manager Cards - Mostra simulações pendentes e prontas */}
+      <SimulationManager onUpdate={fetchLeads} />
+
       {/* Header Simplificado */}
       <div className="flex flex-col space-y-4 md:space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-4">
