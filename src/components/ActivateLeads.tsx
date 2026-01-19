@@ -17,6 +17,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ImportHistory } from '@/components/ImportHistory';
 import { ActivateLeadHistoryModal } from '@/components/ActivateLeadHistoryModal';
 import { DuplicateManager } from '@/components/ActivateLeads/DuplicateManager';
+import { ActivateSimulationManager } from '@/components/ActivateLeads/SimulationManager';
+import { useActivateLeadSimulations } from '@/hooks/useActivateLeadSimulations';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
@@ -52,10 +54,22 @@ import {
   ImageIcon,
   Camera,
   FileImage,
-  History
+  History,
+  BarChart3,
+  Edit,
+  Save
 } from 'lucide-react';
-import { format, addDays, parseISO, isToday, isBefore } from 'date-fns';
+import { format, addDays, parseISO, isToday, isBefore, subDays, subWeeks, subMonths, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+// Time filter options
+const TIME_FILTER_OPTIONS = [
+  { value: 'all', label: 'Todos', emoji: '📋' },
+  { value: 'today', label: 'Hoje', emoji: '📅' },
+  { value: '3days', label: 'Últimos 3 dias', emoji: '🗓️' },
+  { value: 'week', label: 'Última semana', emoji: '📆' },
+  { value: 'month', label: 'Último mês', emoji: '🗓️' },
+];
 import { cn } from '@/lib/utils';
 
 interface ActivateLead {
@@ -77,6 +91,9 @@ interface ActivateLead {
   segunda_tentativa?: boolean;
   segunda_tentativa_at?: string;
   segunda_tentativa_by?: string;
+  cpf?: string | null;
+  simulation_status?: string | null;
+  simulation_id?: string | null;
 }
 
 // Modern status configuration with vibrant colors and emojis
@@ -240,8 +257,18 @@ export const ActivateLeads = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [origemFilter, setOrigemFilter] = useState<string>('all');
   const [userFilter, setUserFilter] = useState<string>('all');
+  const [timeFilter, setTimeFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [gestorId, setGestorId] = useState<string | null>(null);
+  
+  // CPF Edit states
+  const [isCpfModalOpen, setIsCpfModalOpen] = useState(false);
+  const [cpfEditLead, setCpfEditLead] = useState<ActivateLead | null>(null);
+  const [newCpf, setNewCpf] = useState('');
+  const [savingCpf, setSavingCpf] = useState(false);
+  
+  // Simulation hook
+  const { requestSimulation, isGestorOrAdmin: canManageSimulations } = useActivateLeadSimulations();
 
   // Modal states
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -1386,18 +1413,97 @@ export const ActivateLeads = () => {
     return leads.filter(lead => {
       const matchesSearch = 
         lead.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.telefone.includes(searchTerm);
+        lead.telefone.includes(searchTerm) ||
+        (lead.cpf && lead.cpf.includes(searchTerm));
       const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
       const matchesOrigem = origemFilter === 'all' || lead.origem === origemFilter;
       
       const matchesUserFilter = userFilter === 'all' || 
         (userFilter === 'unassigned' ? lead.assigned_to === null : lead.assigned_to === userFilter);
       
+      // Time filter logic
+      let matchesTime = true;
+      if (timeFilter !== 'all') {
+        const leadDate = new Date(lead.created_at);
+        const now = new Date();
+        const todayStart = startOfDay(now);
+        
+        switch (timeFilter) {
+          case 'today':
+            matchesTime = leadDate >= todayStart;
+            break;
+          case '3days':
+            matchesTime = leadDate >= subDays(todayStart, 3);
+            break;
+          case 'week':
+            matchesTime = leadDate >= subWeeks(todayStart, 1);
+            break;
+          case 'month':
+            matchesTime = leadDate >= subMonths(todayStart, 1);
+            break;
+        }
+      }
+      
       const matchesUser = isAdmin || isGestor || lead.assigned_to === user?.id;
       
-      return matchesSearch && matchesStatus && matchesOrigem && matchesUser && matchesUserFilter;
+      return matchesSearch && matchesStatus && matchesOrigem && matchesUser && matchesUserFilter && matchesTime;
     });
-  }, [leads, searchTerm, statusFilter, origemFilter, userFilter, isAdmin, isGestor, user?.id]);
+  }, [leads, searchTerm, statusFilter, origemFilter, userFilter, timeFilter, isAdmin, isGestor, user?.id]);
+
+  // CPF edit handlers
+  const openCpfModal = (lead: ActivateLead) => {
+    setCpfEditLead(lead);
+    setNewCpf(lead.cpf || '');
+    setIsCpfModalOpen(true);
+  };
+
+  const handleSaveCpf = async () => {
+    if (!cpfEditLead || !user?.id) return;
+    
+    setSavingCpf(true);
+    try {
+      const cleanedCpf = newCpf.replace(/\D/g, '');
+      
+      if (cleanedCpf && cleanedCpf.length !== 11) {
+        toast({ title: '❌ CPF deve ter 11 dígitos', variant: 'destructive' });
+        return;
+      }
+      
+      const { error } = await supabase
+        .from('activate_leads')
+        .update({ cpf: cleanedCpf || null })
+        .eq('id', cpfEditLead.id);
+      
+      if (error) throw error;
+      
+      await supabase.from('activate_leads_history').insert({
+        lead_id: cpfEditLead.id,
+        user_id: user.id,
+        action_type: 'cpf_update',
+        notes: cleanedCpf ? `CPF atualizado para ${cleanedCpf}` : 'CPF removido',
+        metadata: { cpf: cleanedCpf }
+      });
+      
+      toast({ title: '✅ CPF atualizado!' });
+      setIsCpfModalOpen(false);
+      setCpfEditLead(null);
+      fetchLeads();
+    } catch (error: any) {
+      toast({ title: '❌ Erro ao salvar CPF', description: error.message, variant: 'destructive' });
+    } finally {
+      setSavingCpf(false);
+    }
+  };
+
+  const handleRequestSimulation = async (lead: ActivateLead) => {
+    try {
+      await requestSimulation(lead.id, lead.nome);
+      toast({ title: '📊 Simulação solicitada!', description: 'O gestor será notificado.' });
+      fetchLeads();
+    } catch (error: any) {
+      toast({ title: '❌ Erro', description: error.message, variant: 'destructive' });
+    }
+  };
 
   const totalPages = Math.ceil(filteredLeads.length / ITEMS_PER_PAGE);
   const paginatedLeads = filteredLeads.slice(
@@ -1554,6 +1660,23 @@ export const ActivateLeads = () => {
               </div>
               
               <div className="flex gap-2 flex-wrap">
+                {/* Time Filter */}
+                <Select value={timeFilter} onValueChange={setTimeFilter}>
+                  <SelectTrigger className="w-full md:w-44 border-2 focus:border-primary transition-all duration-300">
+                    <CalendarIcon className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Período" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIME_FILTER_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        <span className="flex items-center gap-2 text-base">
+                          {option.emoji} {option.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-full md:w-52 border-2 focus:border-primary transition-all duration-300">
                     <Filter className="h-4 w-4 mr-2" />
@@ -1597,6 +1720,9 @@ export const ActivateLeads = () => {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Simulation Manager */}
+      <ActivateSimulationManager onUpdate={fetchLeads} />
 
       {/* Bulk Actions */}
       <AnimatePresence>

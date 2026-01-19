@@ -35,6 +35,8 @@ export type Database = {
           segunda_tentativa: boolean | null
           segunda_tentativa_at: string | null
           segunda_tentativa_by: string | null
+          simulation_id: string | null
+          simulation_status: string | null
           status: string
           telefone: string
           ultima_interacao: string | null
@@ -60,6 +62,8 @@ export type Database = {
           segunda_tentativa?: boolean | null
           segunda_tentativa_at?: string | null
           segunda_tentativa_by?: string | null
+          simulation_id?: string | null
+          simulation_status?: string | null
           status?: string
           telefone: string
           ultima_interacao?: string | null
@@ -85,6 +89,8 @@ export type Database = {
           segunda_tentativa?: boolean | null
           segunda_tentativa_at?: string | null
           segunda_tentativa_by?: string | null
+          simulation_id?: string | null
+          simulation_status?: string | null
           status?: string
           telefone?: string
           ultima_interacao?: string | null
@@ -96,6 +102,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activate_leads_simulation_id_fkey"
+            columns: ["simulation_id"]
+            isOneToOne: false
+            referencedRelation: "activate_leads_simulations"
             referencedColumns: ["id"]
           },
         ]
@@ -349,6 +362,122 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "activate_leads_notifications_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "activate_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activate_leads_simulation_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          lead_id: string
+          message: string
+          simulation_id: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          lead_id: string
+          message: string
+          simulation_id: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          lead_id?: string
+          message?: string
+          simulation_id?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activate_leads_simulation_notifications_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "activate_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activate_leads_simulation_notifications_simulation_id_fkey"
+            columns: ["simulation_id"]
+            isOneToOne: false
+            referencedRelation: "activate_leads_simulations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activate_leads_simulations: {
+        Row: {
+          banco: string | null
+          completed_at: string | null
+          completed_by: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          id: string
+          lead_id: string
+          notes: string | null
+          parcela: number | null
+          produto: string | null
+          requested_at: string
+          requested_by: string
+          status: string
+          updated_at: string
+          valor_liberado: number | null
+        }
+        Insert: {
+          banco?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          lead_id: string
+          notes?: string | null
+          parcela?: number | null
+          produto?: string | null
+          requested_at?: string
+          requested_by: string
+          status?: string
+          updated_at?: string
+          valor_liberado?: number | null
+        }
+        Update: {
+          banco?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          lead_id?: string
+          notes?: string | null
+          parcela?: number | null
+          produto?: string | null
+          requested_at?: string
+          requested_by?: string
+          status?: string
+          updated_at?: string
+          valor_liberado?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activate_leads_simulations_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "activate_leads"
