@@ -102,7 +102,7 @@ export const TelevendasProposalList = ({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {televendas.map((tv, index) => {
         const statusConfig = getStatusConfig(tv.status);
         const isAguardando = tv.status === 'pago_aguardando' || tv.status === 'cancelado_aguardando';
@@ -116,60 +116,66 @@ export const TelevendasProposalList = ({
             onClick={() => onRowClick(tv)}
             className={`
               group relative overflow-hidden
-              p-4 rounded-xl border bg-card
+              p-5 sm:p-4 rounded-2xl border-2 bg-card
               cursor-pointer transition-all duration-300
-              hover:shadow-lg hover:border-primary/30 hover:scale-[1.005]
-              ${isAguardando && isGestorOrAdmin ? 'ring-2 ring-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20' : ''}
+              hover:shadow-xl hover:border-primary/40 hover:scale-[1.01]
+              active:scale-[0.99]
+              ${isAguardando && isGestorOrAdmin ? 'ring-2 ring-amber-500/40 bg-amber-50/50 dark:bg-amber-950/20 border-amber-300' : ''}
             `}
           >
             {/* Mobile Layout */}
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
               {/* Header: Name + Status */}
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-semibold text-base truncate">{tv.nome}</h3>
-                  <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                  <h3 className="font-bold text-lg sm:text-base truncate">{tv.nome}</h3>
+                  <p className="text-sm sm:text-xs text-muted-foreground font-mono mt-1">
                     {formatCPF(tv.cpf)}
                   </p>
                 </div>
-                <Badge variant="outline" className={`flex-shrink-0 ${statusConfig.color}`}>
+                <Badge 
+                  variant="outline" 
+                  className={`flex-shrink-0 py-2 px-3 text-sm sm:text-xs font-semibold ${statusConfig.color}`}
+                >
                   {statusConfig.shortLabel}
                 </Badge>
               </div>
 
-              {/* Info Row */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Building2 className="h-3.5 w-3.5" />
-                  {tv.banco}
+              {/* Info Row - Larger text on mobile */}
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-base sm:text-sm">
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Building2 className="h-4 w-4" />
+                  <span className="font-medium text-foreground">{tv.banco}</span>
                 </span>
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5" />
-                  {formatDate(tv.data_venda)}
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  <span className="font-medium text-foreground">{formatDate(tv.data_venda)}</span>
                 </span>
-                <span className="font-semibold text-foreground">
+                <span className="font-bold text-lg sm:text-base text-primary">
                   {formatCurrency(tv.parcela)}
                 </span>
               </div>
 
               {/* Meta Row: Type + User + Time */}
-              <div className="flex items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Badge variant="secondary" className="text-xs px-2 py-0">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Badge variant="secondary" className="text-sm sm:text-xs px-3 py-1.5 font-medium">
                     {tv.tipo_operacao}
                   </Badge>
                   {tv.user?.name && (
-                    <span className="truncate max-w-[100px]">{tv.user.name}</span>
+                    <span className="text-sm sm:text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-[100px]">
+                      {tv.user.name}
+                    </span>
                   )}
                 </div>
-                <span className="flex items-center gap-1 text-muted-foreground">
-                  <Clock className="h-3 w-3" />
+                <span className="flex items-center gap-1.5 text-sm sm:text-xs text-muted-foreground">
+                  <Clock className="h-4 w-4 sm:h-3 sm:w-3" />
                   {formatTimeAgo(tv.created_at)}
                 </span>
               </div>
 
-              {/* Actions Row */}
-              <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50">
+              {/* Actions Row - Larger buttons for mobile */}
+              <div className="flex items-center justify-between gap-3 pt-3 border-t-2 border-border/50">
                 {/* Status changer */}
                 {canChangeStatus(tv) && (
                   <Select
@@ -177,7 +183,7 @@ export const TelevendasProposalList = ({
                     onValueChange={(value) => onStatusChange(tv.id, value, tv)}
                   >
                     <SelectTrigger 
-                      className="w-auto min-w-[140px] h-8 text-xs"
+                      className="w-auto min-w-[160px] sm:min-w-[140px] h-12 sm:h-10 text-base sm:text-sm rounded-xl border-2 font-medium"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <SelectValue />
@@ -186,7 +192,7 @@ export const TelevendasProposalList = ({
                       {getAvailableStatuses(tv).map((status) => {
                         const config = getStatusConfig(status);
                         return (
-                          <SelectItem key={status} value={status}>
+                          <SelectItem key={status} value={status} className="text-base sm:text-sm py-3 sm:py-2">
                             {config.label}
                           </SelectItem>
                         );
@@ -195,24 +201,24 @@ export const TelevendasProposalList = ({
                   </Select>
                 )}
 
-                {/* Edit/Delete buttons */}
+                {/* Edit/Delete buttons - Larger touch targets */}
                 {canEdit(tv) && (
-                  <div className="flex gap-1.5 ml-auto">
+                  <div className="flex gap-2 ml-auto">
                     <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
+                      size="lg"
+                      variant="outline"
+                      className="h-12 w-12 sm:h-10 sm:w-10 p-0 rounded-xl border-2 hover:bg-primary/10 hover:border-primary"
                       onClick={(e) => onEdit(tv, e)}
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Pencil className="h-5 w-5 sm:h-4 sm:w-4" />
                     </Button>
                     <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      size="lg"
+                      variant="outline"
+                      className="h-12 w-12 sm:h-10 sm:w-10 p-0 rounded-xl border-2 text-destructive hover:bg-destructive/10 hover:border-destructive"
                       onClick={(e) => onDelete(tv.id, tv, e)}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-5 w-5 sm:h-4 sm:w-4" />
                     </Button>
                   </div>
                 )}
@@ -221,8 +227,8 @@ export const TelevendasProposalList = ({
 
             {/* Aguardando indicator for gestors */}
             {isAguardando && isGestorOrAdmin && (
-              <div className="absolute top-0 right-0 w-16 h-16 overflow-hidden">
-                <div className="absolute transform rotate-45 bg-amber-500 text-white text-[8px] font-bold py-0.5 right-[-20px] top-[12px] w-[70px] text-center">
+              <div className="absolute top-0 right-0 w-20 h-20 sm:w-16 sm:h-16 overflow-hidden">
+                <div className="absolute transform rotate-45 bg-amber-500 text-white text-[10px] sm:text-[8px] font-bold py-1 right-[-22px] sm:right-[-20px] top-[16px] sm:top-[12px] w-[80px] sm:w-[70px] text-center shadow-md">
                   REVISAR
                 </div>
               </div>
