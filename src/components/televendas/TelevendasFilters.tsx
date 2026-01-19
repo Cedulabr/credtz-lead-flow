@@ -18,7 +18,10 @@ import {
   ChevronDown,
   ChevronUp,
   LayoutGrid,
-  List
+  List,
+  BarChart3,
+  X,
+  Users
 } from "lucide-react";
 
 interface User {
@@ -37,8 +40,8 @@ interface FiltersProps {
   setSelectedMonth: (value: string) => void;
   selectedPeriod: string;
   setSelectedPeriod: (value: string) => void;
-  viewMode: "propostas" | "clientes";
-  setViewMode: (value: "propostas" | "clientes") => void;
+  viewMode: "propostas" | "clientes" | "estatisticas";
+  setViewMode: (value: "propostas" | "clientes" | "estatisticas") => void;
   users: User[];
   statusCounts: Record<string, number>;
   isGestorOrAdmin: boolean;
@@ -128,11 +131,28 @@ export const TelevendasFilters = ({
 }: FiltersProps) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // Count active filters
+  const activeFiltersCount = [
+    selectedStatus !== "all",
+    selectedUserId !== "all",
+    selectedPeriod !== "all",
+    searchTerm.length > 0
+  ].filter(Boolean).length;
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setSearchTerm("");
+    setSelectedStatus("all");
+    setSelectedUserId("all");
+    setSelectedPeriod("all");
+    setSelectedMonth("all");
+  };
+
   return (
     <div className="space-y-4">
-      {/* Toggle Propostas / Clientes */}
+      {/* Toggle Propostas / Clientes / Estatísticas */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2 p-1 bg-muted rounded-lg">
+        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
           <Button
             variant={viewMode === "propostas" ? "default" : "ghost"}
             size="sm"
@@ -148,9 +168,20 @@ export const TelevendasFilters = ({
             onClick={() => setViewMode("clientes")}
             className="gap-2"
           >
-            <LayoutGrid className="h-4 w-4" />
+            <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Clientes</span>
           </Button>
+          {isGestorOrAdmin && (
+            <Button
+              variant={viewMode === "estatisticas" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("estatisticas")}
+              className="gap-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Estatísticas</span>
+            </Button>
+          )}
         </div>
 
         {/* Quick period filters */}
@@ -178,14 +209,29 @@ export const TelevendasFilters = ({
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 h-11 text-base"
           />
+          {searchTerm && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+              onClick={() => setSearchTerm("")}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
         <Button
-          variant="outline"
+          variant={showAdvanced || activeFiltersCount > 0 ? "default" : "outline"}
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="gap-2"
         >
           <Filter className="h-4 w-4" />
           <span className="hidden sm:inline">Filtros</span>
+          {activeFiltersCount > 0 && (
+            <Badge variant="secondary" className="h-5 w-5 p-0 flex items-center justify-center text-xs">
+              {activeFiltersCount}
+            </Badge>
+          )}
           {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </Button>
       </div>
@@ -199,102 +245,121 @@ export const TelevendasFilters = ({
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-muted/50 rounded-lg border">
-              {/* User filter (admin/gestor) */}
-              {isGestorOrAdmin && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <User className="h-3 w-3" /> Usuário
-                  </label>
-                  <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Todos os usuários" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os usuários</SelectItem>
-                      {users.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.name || 'Sem nome'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Period filter */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <Calendar className="h-3 w-3" /> Período
-                </label>
-                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                  <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Selecionar período" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PERIOD_OPTIONS.map((period) => (
-                      <SelectItem key={period.value} value={period.value}>
-                        {period.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="p-4 bg-muted/50 rounded-lg border space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">Filtros avançados</span>
+                {activeFiltersCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAllFilters}
+                    className="h-8 text-xs gap-1"
+                  >
+                    <X className="h-3 w-3" />
+                    Limpar filtros
+                  </Button>
+                )}
               </div>
 
-              {/* Month filter (when period is "month") */}
-              {selectedPeriod === "month" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* User filter (admin/gestor) */}
+                {isGestorOrAdmin && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <User className="h-3 w-3" /> Usuário
+                    </label>
+                    <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Todos os usuários" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os usuários</SelectItem>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name || 'Sem nome'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Period filter */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Mês específico</label>
-                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <Calendar className="h-3 w-3" /> Período
+                  </label>
+                  <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
                     <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Selecionar mês" />
+                      <SelectValue placeholder="Selecionar período" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todos os meses</SelectItem>
-                      {monthOptions.map((month) => (
-                        <SelectItem key={month.value} value={month.value}>
-                          {month.label}
+                      {PERIOD_OPTIONS.map((period) => (
+                        <SelectItem key={period.value} value={period.value}>
+                          {period.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              )}
+
+                {/* Month filter (when period is "month") */}
+                {selectedPeriod === "month" && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Mês específico</label>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Selecionar mês" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os meses</SelectItem>
+                        {monthOptions.map((month) => (
+                          <SelectItem key={month.value} value={month.value}>
+                            {month.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Status filter badges */}
-      <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap md:overflow-visible">
-        <Badge 
-          variant={selectedStatus === "all" ? "default" : "outline"}
-          className="cursor-pointer whitespace-nowrap flex-shrink-0 transition-all hover:scale-105"
-          onClick={() => setSelectedStatus("all")}
-        >
-          Todos ({statusCounts.all || 0})
-        </Badge>
-        {Object.entries(STATUS_CONFIG).map(([status, config]) => {
-          // Show manager-only statuses only for gestor/admin
-          if (!config.userAllowed && !isGestorOrAdmin) return null;
-          
-          const count = statusCounts[status] || 0;
-          if (count === 0 && selectedStatus !== status) return null;
-          
-          return (
-            <Badge 
-              key={status}
-              variant={selectedStatus === status ? "default" : "outline"}
-              className={`cursor-pointer whitespace-nowrap flex-shrink-0 transition-all hover:scale-105 ${
-                selectedStatus !== status ? config.color : ''
-              }`}
-              onClick={() => setSelectedStatus(status)}
-            >
-              {config.shortLabel} ({count})
-            </Badge>
-          );
-        })}
-      </div>
+      {/* Status filter badges - Only show when not in statistics view */}
+      {viewMode !== "estatisticas" && (
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap md:overflow-visible">
+          <Badge 
+            variant={selectedStatus === "all" ? "default" : "outline"}
+            className="cursor-pointer whitespace-nowrap flex-shrink-0 transition-all hover:scale-105"
+            onClick={() => setSelectedStatus("all")}
+          >
+            Todos ({statusCounts.all || 0})
+          </Badge>
+          {Object.entries(STATUS_CONFIG).map(([status, config]) => {
+            // Show manager-only statuses only for gestor/admin
+            if (!config.userAllowed && !isGestorOrAdmin) return null;
+            
+            const count = statusCounts[status] || 0;
+            if (count === 0 && selectedStatus !== status) return null;
+            
+            return (
+              <Badge 
+                key={status}
+                variant={selectedStatus === status ? "default" : "outline"}
+                className={`cursor-pointer whitespace-nowrap flex-shrink-0 transition-all hover:scale-105 ${
+                  selectedStatus !== status ? config.color : ''
+                }`}
+                onClick={() => setSelectedStatus(status)}
+              >
+                {config.shortLabel} ({count})
+              </Badge>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
