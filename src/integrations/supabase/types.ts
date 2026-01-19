@@ -18,15 +18,20 @@ export type Database = {
         Row: {
           assigned_to: string | null
           company_id: string | null
+          cpf: string | null
           created_at: string
           created_by: string | null
           data_proxima_operacao: string | null
+          has_quality_issues: boolean | null
           id: string
           motivo_recusa: string | null
           nome: string
           origem: string
           produto: string | null
           proxima_acao: string | null
+          quality_issues: Json | null
+          sanitized: boolean | null
+          sanitized_at: string | null
           segunda_tentativa: boolean | null
           segunda_tentativa_at: string | null
           segunda_tentativa_by: string | null
@@ -38,15 +43,20 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           company_id?: string | null
+          cpf?: string | null
           created_at?: string
           created_by?: string | null
           data_proxima_operacao?: string | null
+          has_quality_issues?: boolean | null
           id?: string
           motivo_recusa?: string | null
           nome: string
           origem?: string
           produto?: string | null
           proxima_acao?: string | null
+          quality_issues?: Json | null
+          sanitized?: boolean | null
+          sanitized_at?: string | null
           segunda_tentativa?: boolean | null
           segunda_tentativa_at?: string | null
           segunda_tentativa_by?: string | null
@@ -58,15 +68,20 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           company_id?: string | null
+          cpf?: string | null
           created_at?: string
           created_by?: string | null
           data_proxima_operacao?: string | null
+          has_quality_issues?: boolean | null
           id?: string
           motivo_recusa?: string | null
           nome?: string
           origem?: string
           produto?: string | null
           proxima_acao?: string | null
+          quality_issues?: Json | null
+          sanitized?: boolean | null
+          sanitized_at?: string | null
           segunda_tentativa?: boolean | null
           segunda_tentativa_at?: string | null
           segunda_tentativa_by?: string | null
@@ -155,6 +170,98 @@ export type Database = {
           {
             foreignKeyName: "activate_leads_distribution_lead_id_fkey"
             columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "activate_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activate_leads_duplicate_logs: {
+        Row: {
+          action: string
+          action_details: Json | null
+          duplicate_id: string | null
+          duplicate_lead_id: string | null
+          id: string
+          original_lead_id: string | null
+          performed_at: string
+          performed_by: string
+        }
+        Insert: {
+          action: string
+          action_details?: Json | null
+          duplicate_id?: string | null
+          duplicate_lead_id?: string | null
+          id?: string
+          original_lead_id?: string | null
+          performed_at?: string
+          performed_by: string
+        }
+        Update: {
+          action?: string
+          action_details?: Json | null
+          duplicate_id?: string | null
+          duplicate_lead_id?: string | null
+          id?: string
+          original_lead_id?: string | null
+          performed_at?: string
+          performed_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activate_leads_duplicate_logs_duplicate_id_fkey"
+            columns: ["duplicate_id"]
+            isOneToOne: false
+            referencedRelation: "activate_leads_duplicates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activate_leads_duplicates: {
+        Row: {
+          created_at: string
+          duplicate_lead_id: string
+          id: string
+          match_type: string
+          original_lead_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          similarity_score: number
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          duplicate_lead_id: string
+          id?: string
+          match_type: string
+          original_lead_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          similarity_score?: number
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          duplicate_lead_id?: string
+          id?: string
+          match_type?: string
+          original_lead_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          similarity_score?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activate_leads_duplicates_duplicate_lead_id_fkey"
+            columns: ["duplicate_lead_id"]
+            isOneToOne: false
+            referencedRelation: "activate_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activate_leads_duplicates_original_lead_id_fkey"
+            columns: ["original_lead_id"]
             isOneToOne: false
             referencedRelation: "activate_leads"
             referencedColumns: ["id"]
@@ -4230,6 +4337,8 @@ export type Database = {
         Args: { time_window_minutes?: number; user_id_param: string }
         Returns: Json
       }
+      extract_phone_from_text: { Args: { input_text: string }; Returns: string }
+      get_activate_leads_quality_stats: { Args: never; Returns: Json }
       get_available_banks: {
         Args: never
         Returns: {
@@ -4319,6 +4428,14 @@ export type Database = {
       }
       is_gestor_or_admin: { Args: { _user_id: string }; Returns: boolean }
       is_global_admin: { Args: { _user_id: string }; Returns: boolean }
+      merge_activate_leads: {
+        Args: {
+          keep_lead_id: string
+          performed_by_user: string
+          remove_lead_id: string
+        }
+        Returns: Json
+      }
       normalize_cpf: { Args: { input_cpf: string }; Returns: string }
       process_expired_future_contacts: { Args: never; Returns: number }
       remove_baseoff_duplicates: { Args: never; Returns: number }
@@ -4395,6 +4512,15 @@ export type Database = {
               tag: string
             }[]
           }
+      sanitize_activate_lead: { Args: { lead_id: string }; Returns: Json }
+      scan_activate_leads_duplicates: {
+        Args: never
+        Returns: {
+          duplicates_found: number
+          leads_with_issues: number
+          total_scanned: number
+        }[]
+      }
       secure_baseoff_access: {
         Args: {
           codigo_banco_filter?: string
@@ -4414,6 +4540,7 @@ export type Database = {
           valor_beneficio: string
         }[]
       }
+      text_contains_numbers: { Args: { input_text: string }; Returns: boolean }
       update_daily_baseoff_usage: {
         Args: { leads_count_param: number; user_id_param: string }
         Returns: undefined

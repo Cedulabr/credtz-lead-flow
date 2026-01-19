@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { ImportHistory } from '@/components/ImportHistory';
 import { ActivateLeadHistoryModal } from '@/components/ActivateLeadHistoryModal';
+import { DuplicateManager } from '@/components/ActivateLeads/DuplicateManager';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
@@ -293,6 +294,9 @@ export const ActivateLeads = () => {
   const [historyLead, setHistoryLead] = useState<ActivateLead | null>(null);
   const [leadHistory, setLeadHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  
+  // Duplicate Manager state
+  const [showDuplicateManager, setShowDuplicateManager] = useState(false);
 
   const isGestor = gestorId !== null;
   const canImport = isAdmin || isGestor;
@@ -1185,10 +1189,17 @@ export const ActivateLeads = () => {
 
       const parsed = lines.slice(1).map(line => {
         const values = line.split(/[,;]/).map(v => v.trim().replace(/^["']|["']$/g, ''));
-        return {
-          nome: values[nomeIndex] || '',
-          telefone: normalizePhone(values[telefoneIndex] || ''),
-        };
+        let nome = values[nomeIndex] || '';
+        let telefone = normalizePhone(values[telefoneIndex] || '');
+        
+        // Sanitize: extract phone from name if present
+        const phoneInName = nome.match(/\d{8,11}/);
+        if (phoneInName) {
+          if (!telefone) telefone = phoneInName[0];
+          nome = nome.replace(/\d+/g, '').replace(/\s+/g, ' ').trim();
+        }
+        
+        return { nome, telefone };
       }).filter(l => l.nome && l.telefone);
 
       setParsedLeads(parsed);
@@ -1421,6 +1432,11 @@ export const ActivateLeads = () => {
     );
   }
 
+  // Show DuplicateManager if active
+  if (showDuplicateManager) {
+    return <DuplicateManager onBack={() => setShowDuplicateManager(false)} />;
+  }
+
   return (
     <motion.div 
       initial="hidden"
@@ -1438,6 +1454,17 @@ export const ActivateLeads = () => {
             <p className="text-muted-foreground text-base md:text-lg">
               Gerencie e ative seus leads de múltiplas fontes
             </p>
+            {canImport && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowDuplicateManager(true)}
+                className="gap-2"
+              >
+                <Users className="h-4 w-4" />
+                Saneamento de Base
+              </Button>
+            )}
           </div>
           
           <div className="flex flex-wrap gap-2">
