@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   BarChart3,
   Upload,
@@ -26,11 +27,14 @@ import {
   Send,
   Download,
   AlertCircle,
+  TrendingUp,
+  FileCheck,
+  ArrowRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useSimulationNotifications } from "@/hooks/useSimulationNotifications";
+import { useSimulationNotifications, SimulationWithDetails, SimulationStats } from "@/hooks/useSimulationNotifications";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -45,30 +49,39 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
     isGestorOrAdmin,
     getPendingSimulations,
     getAwaitingConfirmation,
+    getSimulationStats,
     completeSimulation,
     confirmSimulation,
+    requestDigitacao,
   } = useSimulationNotifications();
 
-  const [pendingSimulations, setPendingSimulations] = useState<any[]>([]);
-  const [awaitingConfirmation, setAwaitingConfirmation] = useState<any[]>([]);
+  const [pendingSimulations, setPendingSimulations] = useState<SimulationWithDetails[]>([]);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState<SimulationWithDetails[]>([]);
+  const [stats, setStats] = useState<SimulationStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedSimulation, setSelectedSimulation] = useState<any>(null);
+  const [selectedSimulation, setSelectedSimulation] = useState<SimulationWithDetails | null>(null);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isDigitacaoModalOpen, setIsDigitacaoModalOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [isRequestingDigitacao, setIsRequestingDigitacao] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [confirmFollowSimulation, setConfirmFollowSimulation] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      if (isGestorOrAdmin) {
-        const pending = await getPendingSimulations();
-        setPendingSimulations(pending);
-      }
-      const awaiting = await getAwaitingConfirmation();
+      const [pending, awaiting, statsData] = await Promise.all([
+        isGestorOrAdmin ? getPendingSimulations() : Promise.resolve([]),
+        getAwaitingConfirmation(),
+        isGestorOrAdmin ? getSimulationStats() : Promise.resolve(null)
+      ]);
+      
+      setPendingSimulations(pending);
       setAwaitingConfirmation(awaiting);
+      setStats(statsData);
     } catch (error) {
       console.error('Error fetching simulations:', error);
     } finally {
@@ -83,7 +96,6 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file type
       const validTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
       if (!validTypes.includes(file.type)) {
         toast({
@@ -93,7 +105,6 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
         });
         return;
       }
-      // Validate file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
         toast({
           title: "Arquivo muito grande",
@@ -111,7 +122,6 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
 
     setIsUploading(true);
     try {
-      // Upload file to storage
       const fileExt = uploadedFile.name.split('.').pop();
       const fileName = `${selectedSimulation.id}/${Date.now()}.${fileExt}`;
 
@@ -121,19 +131,17 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from('simulations')
         .getPublicUrl(fileName);
 
-      // Complete the simulation
       await completeSimulation(
         selectedSimulation.id,
         selectedSimulation.lead_id,
         urlData.publicUrl,
         uploadedFile.name,
         selectedSimulation.requested_by,
-        selectedSimulation.leads?.name || 'Cliente'
+        selectedSimulation.lead?.name || 'Cliente'
       );
 
       toast({
@@ -158,27 +166,26 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
     }
   };
 
-  const handleConfirmReceived = async () => {
+  const handleConfirmAndDigitacao = async () => {
     if (!selectedSimulation || !user) return;
 
     setIsConfirming(true);
     try {
+      // First confirm receipt
       await confirmSimulation(
         selectedSimulation.id,
         selectedSimulation.lead_id,
-        selectedSimulation.completed_by,
-        selectedSimulation.leads?.name || 'Cliente'
+        selectedSimulation.completed_by || '',
+        selectedSimulation.lead?.name || 'Cliente'
       );
 
       toast({
         title: "📬 Recebimento Confirmado!",
-        description: "A simulação foi marcada como recebida.",
+        description: "Agora você pode solicitar a digitação.",
       });
 
       setIsViewModalOpen(false);
-      setSelectedSimulation(null);
-      fetchData();
-      onUpdate?.();
+      setIsDigitacaoModalOpen(true);
     } catch (error: any) {
       console.error('Error confirming simulation:', error);
       toast({
@@ -188,6 +195,45 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
       });
     } finally {
       setIsConfirming(false);
+    }
+  };
+
+  const handleRequestDigitacao = async () => {
+    if (!selectedSimulation || !user || !confirmFollowSimulation) return;
+
+    setIsRequestingDigitacao(true);
+    try {
+      await requestDigitacao(
+        selectedSimulation.lead_id,
+        selectedSimulation.id,
+        {
+          name: selectedSimulation.lead?.name || '',
+          cpf: selectedSimulation.lead?.cpf || '',
+          phone: selectedSimulation.lead?.phone || '',
+          convenio: selectedSimulation.lead?.convenio || ''
+        },
+        selectedSimulation.simulation_file_url || undefined
+      );
+
+      toast({
+        title: "📝 Digitação Solicitada!",
+        description: "O lead foi enviado para Gestão Televendas com o histórico da simulação.",
+      });
+
+      setIsDigitacaoModalOpen(false);
+      setSelectedSimulation(null);
+      setConfirmFollowSimulation(false);
+      fetchData();
+      onUpdate?.();
+    } catch (error: any) {
+      console.error('Error requesting digitação:', error);
+      toast({
+        title: "Erro",
+        description: error?.message || "Erro ao solicitar digitação",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRequestingDigitacao(false);
     }
   };
 
@@ -210,14 +256,81 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
 
   const hasPending = pendingSimulations.length > 0;
   const hasAwaiting = awaitingConfirmation.length > 0;
+  const hasStats = stats && (stats.todayRequested > 0 || stats.todayCompleted > 0 || stats.pending > 0);
 
-  if (!hasPending && !hasAwaiting) {
+  if (!hasPending && !hasAwaiting && !hasStats) {
     return null;
   }
 
   return (
     <>
       <div className="space-y-4">
+        {/* Stats Cards for Gestor */}
+        {isGestorOrAdmin && stats && hasStats && (
+          <Card className="border-violet-200 bg-gradient-to-br from-violet-50 to-purple-50">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <BarChart3 className="h-5 w-5 text-violet-600" />
+                Métricas de Simulações
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                <div className="bg-white rounded-lg p-3 shadow-sm border border-amber-100">
+                  <div className="flex items-center gap-2 text-amber-600 mb-1">
+                    <Clock className="h-4 w-4" />
+                    <span className="text-xs font-medium">Pendentes</span>
+                  </div>
+                  <p className="text-2xl font-bold text-amber-700">{stats.pending}</p>
+                </div>
+                
+                <div className="bg-white rounded-lg p-3 shadow-sm border border-blue-100">
+                  <div className="flex items-center gap-2 text-blue-600 mb-1">
+                    <FileText className="h-4 w-4" />
+                    <span className="text-xs font-medium">Em Andamento</span>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-700">{stats.inProgress}</p>
+                </div>
+                
+                <div className="bg-white rounded-lg p-3 shadow-sm border border-emerald-100">
+                  <div className="flex items-center gap-2 text-emerald-600 mb-1">
+                    <Send className="h-4 w-4" />
+                    <span className="text-xs font-medium">Enviadas</span>
+                  </div>
+                  <p className="text-2xl font-bold text-emerald-700">{stats.completed}</p>
+                </div>
+                
+                <div className="bg-white rounded-lg p-3 shadow-sm border border-green-100">
+                  <div className="flex items-center gap-2 text-green-600 mb-1">
+                    <FileCheck className="h-4 w-4" />
+                    <span className="text-xs font-medium">Recebidas</span>
+                  </div>
+                  <p className="text-2xl font-bold text-green-700">{stats.received}</p>
+                </div>
+                
+                <div className="bg-white rounded-lg p-3 shadow-sm border border-violet-100">
+                  <div className="flex items-center gap-2 text-violet-600 mb-1">
+                    <TrendingUp className="h-4 w-4" />
+                    <span className="text-xs font-medium">Hoje</span>
+                  </div>
+                  <p className="text-2xl font-bold text-violet-700">
+                    {stats.todayRequested}/{stats.todayCompleted}
+                  </p>
+                  <p className="text-xs text-gray-500">Solic./Resp.</p>
+                </div>
+                
+                <div className="bg-white rounded-lg p-3 shadow-sm border border-purple-100">
+                  <div className="flex items-center gap-2 text-purple-600 mb-1">
+                    <CheckCircle className="h-4 w-4" />
+                    <span className="text-xs font-medium">Conversão</span>
+                  </div>
+                  <p className="text-2xl font-bold text-purple-700">{stats.conversionRate}%</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Pending Simulations (Gestor View) */}
         {isGestorOrAdmin && hasPending && (
           <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50">
@@ -252,17 +365,17 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
                         <div className="flex items-center gap-2 mb-1">
                           <User className="h-4 w-4 text-gray-400" />
                           <span className="font-medium text-gray-900 truncate">
-                            {sim.leads?.name || 'Cliente'}
+                            {sim.lead?.name || 'Cliente'}
                           </span>
                         </div>
                         <div className="flex items-center gap-4 text-sm text-gray-500">
                           <span className="flex items-center gap-1">
                             <Phone className="h-3 w-3" />
-                            {formatPhone(sim.leads?.phone)}
+                            {formatPhone(sim.lead?.phone || '')}
                           </span>
-                          {sim.leads?.convenio && (
+                          {sim.lead?.convenio && (
                             <Badge variant="outline" className="text-xs">
-                              {sim.leads.convenio}
+                              {sim.lead.convenio}
                             </Badge>
                           )}
                         </div>
@@ -324,7 +437,7 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
                         <div className="flex items-center gap-2 mb-1">
                           <User className="h-4 w-4 text-gray-400" />
                           <span className="font-medium text-gray-900 truncate">
-                            {sim.leads?.name || 'Cliente'}
+                            {sim.lead?.name || 'Cliente'}
                           </span>
                           <CheckCircle className="h-4 w-4 text-emerald-500" />
                         </div>
@@ -334,7 +447,7 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
                         </div>
                         <p className="text-xs text-gray-400 mt-2">
                           Concluída em{' '}
-                          {format(new Date(sim.completed_at), "dd/MM/yy 'às' HH:mm", { locale: ptBR })}
+                          {sim.completed_at && format(new Date(sim.completed_at), "dd/MM/yy 'às' HH:mm", { locale: ptBR })}
                         </p>
                       </div>
                       <div className="flex gap-2">
@@ -359,8 +472,8 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
                           }}
                           className="bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600"
                         >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Confirmar
+                          <ArrowRight className="h-4 w-4 mr-1" />
+                          Digitar
                         </Button>
                       </div>
                     </div>
@@ -388,7 +501,7 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
           <div className="py-4 space-y-4">
             <div className="bg-amber-50 rounded-lg p-4">
               <p className="text-sm font-medium text-amber-800">
-                Cliente: {selectedSimulation?.leads?.name}
+                Cliente: {selectedSimulation?.lead?.name}
               </p>
               <p className="text-xs text-amber-600 mt-1">
                 Solicitado por: {selectedSimulation?.requester?.name}
@@ -477,52 +590,61 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-emerald-600" />
-              Confirmar Recebimento
+              <FileCheck className="h-5 w-5 text-emerald-600" />
+              Simulação Pronta - Solicitar Digitação
             </DialogTitle>
             <DialogDescription>
-              Visualize e confirme o recebimento da simulação
+              Visualize a simulação e confirme para solicitar digitação
             </DialogDescription>
           </DialogHeader>
 
           <div className="py-4 space-y-4">
-            <div className="bg-emerald-50 rounded-lg p-4">
+            <div className="bg-emerald-50 rounded-lg p-4 space-y-2">
               <p className="text-sm font-medium text-emerald-800">
-                Cliente: {selectedSimulation?.leads?.name}
+                Cliente: {selectedSimulation?.lead?.name}
               </p>
-              <p className="text-xs text-emerald-600 mt-1">
-                Arquivo: {selectedSimulation?.simulation_file_name}
-              </p>
+              {selectedSimulation?.lead?.phone && (
+                <p className="text-xs text-emerald-600">
+                  Telefone: {formatPhone(selectedSimulation.lead.phone)}
+                </p>
+              )}
+              {selectedSimulation?.lead?.convenio && (
+                <Badge variant="outline" className="text-xs">
+                  {selectedSimulation.lead.convenio}
+                </Badge>
+              )}
             </div>
 
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  if (selectedSimulation?.simulation_file_url) {
-                    window.open(selectedSimulation.simulation_file_url, '_blank');
-                  }
-                }}
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                Visualizar
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  if (selectedSimulation?.simulation_file_url) {
-                    const link = document.createElement('a');
-                    link.href = selectedSimulation.simulation_file_url;
-                    link.download = selectedSimulation.simulation_file_name || 'simulacao';
-                    link.click();
-                  }
-                }}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Baixar
-              </Button>
+            {selectedSimulation?.simulation_file_url && (
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-gray-400" />
+                    <span className="text-sm font-medium">
+                      {selectedSimulation.simulation_file_name || 'Simulação'}
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => window.open(selectedSimulation.simulation_file_url!, '_blank')}
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Baixar
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800 font-medium mb-2">
+                Ao solicitar digitação:
+              </p>
+              <ul className="text-xs text-blue-700 space-y-1">
+                <li>• O lead será enviado para Gestão Televendas</li>
+                <li>• O histórico da simulação ficará anexado</li>
+                <li>• O gestor poderá acompanhar a proposta</li>
+              </ul>
             </div>
           </div>
 
@@ -532,10 +654,10 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
               onClick={() => setIsViewModalOpen(false)}
               disabled={isConfirming}
             >
-              Fechar
+              Cancelar
             </Button>
             <Button
-              onClick={handleConfirmReceived}
+              onClick={handleConfirmAndDigitacao}
               disabled={isConfirming}
               className="bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600"
             >
@@ -546,8 +668,93 @@ export function SimulationManager({ onUpdate }: SimulationManagerProps) {
                 </>
               ) : (
                 <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Confirmar Recebimento
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Confirmar e Solicitar Digitação
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Digitação Confirmation Modal */}
+      <Dialog open={isDigitacaoModalOpen} onOpenChange={setIsDigitacaoModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5 text-violet-600" />
+              Confirmar Digitação
+            </DialogTitle>
+            <DialogDescription>
+              Confirme que seguirá as propostas da simulação
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <div className="bg-violet-50 rounded-lg p-4">
+              <p className="text-sm font-medium text-violet-800">
+                Cliente: {selectedSimulation?.lead?.name}
+              </p>
+              <p className="text-xs text-violet-600 mt-1">
+                A proposta será enviada para Gestão Televendas
+              </p>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="confirm-simulation"
+                  checked={confirmFollowSimulation}
+                  onCheckedChange={(checked) => setConfirmFollowSimulation(checked === true)}
+                  className="mt-1"
+                />
+                <div>
+                  <Label 
+                    htmlFor="confirm-simulation" 
+                    className="text-sm font-medium text-amber-800 cursor-pointer"
+                  >
+                    Confirmo que seguirei todas as propostas informadas na simulação
+                  </Label>
+                  <p className="text-xs text-amber-600 mt-1">
+                    Ao marcar, você confirma que as condições apresentadas na simulação serão mantidas na proposta.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {!confirmFollowSimulation && (
+              <div className="flex items-start gap-2 text-xs text-red-700 bg-red-50 rounded-lg p-3">
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <p>Você precisa confirmar que seguirá as propostas da simulação para continuar.</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDigitacaoModalOpen(false);
+                setConfirmFollowSimulation(false);
+              }}
+              disabled={isRequestingDigitacao}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleRequestDigitacao}
+              disabled={!confirmFollowSimulation || isRequestingDigitacao}
+              className="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600"
+            >
+              {isRequestingDigitacao ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Enviar para Televendas
                 </>
               )}
             </Button>
