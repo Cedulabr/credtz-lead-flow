@@ -166,48 +166,56 @@ export const TelevendasFilters = ({
   };
 
   return (
-    <div className="space-y-4">
-      {/* Toggle Propostas / Clientes / Estatísticas */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+    <div className="space-y-5">
+      {/* Toggle Propostas / Clientes / Estatísticas - Bigger on mobile */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        <div className="flex items-center justify-center sm:justify-start gap-1 p-1.5 bg-muted rounded-xl w-full sm:w-auto">
           <Button
             variant={viewMode === "propostas" ? "default" : "ghost"}
-            size="sm"
+            size="lg"
             onClick={() => setViewMode("propostas")}
-            className="gap-2"
+            className="flex-1 sm:flex-initial gap-2 h-12 sm:h-10 text-base sm:text-sm font-semibold"
           >
-            <List className="h-4 w-4" />
-            <span className="hidden sm:inline">Propostas</span>
+            <List className="h-5 w-5 sm:h-4 sm:w-4" />
+            Propostas
           </Button>
           <Button
             variant={viewMode === "clientes" ? "default" : "ghost"}
-            size="sm"
+            size="lg"
             onClick={() => setViewMode("clientes")}
-            className="gap-2"
+            className="flex-1 sm:flex-initial gap-2 h-12 sm:h-10 text-base sm:text-sm font-semibold"
           >
-            <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">Clientes</span>
+            <Users className="h-5 w-5 sm:h-4 sm:w-4" />
+            Clientes
           </Button>
           {isGestorOrAdmin && (
             <Button
               variant={viewMode === "estatisticas" ? "default" : "ghost"}
-              size="sm"
+              size="lg"
               onClick={() => setViewMode("estatisticas")}
-              className="gap-2"
+              className="flex-1 sm:flex-initial gap-2 h-12 sm:h-10 text-base sm:text-sm font-semibold"
             >
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Estatísticas</span>
+              <BarChart3 className="h-5 w-5 sm:h-4 sm:w-4" />
+              Stats
             </Button>
           )}
         </div>
 
-        {/* Quick period filters */}
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-2 px-2 sm:mx-0 sm:px-0">
+        {/* Quick period filters - Now scrollable on mobile with bigger touch targets */}
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 snap-x snap-mandatory">
           {PERIOD_OPTIONS.slice(0, 4).map((period) => (
             <Badge
               key={period.value}
               variant={selectedPeriod === period.value ? "default" : "outline"}
-              className="cursor-pointer whitespace-nowrap flex-shrink-0 transition-all hover:scale-105"
+              className={`
+                cursor-pointer whitespace-nowrap flex-shrink-0 snap-start
+                py-3 px-4 text-sm sm:py-2 sm:px-3 sm:text-xs
+                font-medium transition-all active:scale-95 hover:scale-105
+                ${selectedPeriod === period.value 
+                  ? 'shadow-md ring-2 ring-primary/20' 
+                  : 'hover:bg-muted'
+                }
+              `}
               onClick={() => setSelectedPeriod(period.value)}
             >
               {period.label}
@@ -216,69 +224,101 @@ export const TelevendasFilters = ({
         </div>
       </div>
 
-      {/* Product filter badges */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap md:overflow-visible">
-        {PRODUCT_OPTIONS.map((product) => {
-          const count = product.value === "all" 
-            ? productCounts.all || 0 
-            : productCounts[product.value] || 0;
-          
-          return (
-            <Badge
-              key={product.value}
-              variant={selectedProduct === product.value ? "default" : "outline"}
-              className={`cursor-pointer whitespace-nowrap flex-shrink-0 transition-all hover:scale-105 ${
-                selectedProduct === product.value 
-                  ? '' 
-                  : 'bg-background hover:bg-muted'
-              }`}
-              onClick={() => setSelectedProduct(product.value)}
-            >
-              <span className="mr-1">{product.icon}</span>
-              {product.label} ({count})
-            </Badge>
-          );
-        })}
+      {/* Product filter badges - Larger with clear visual hierarchy */}
+      <div className="space-y-2">
+        <label className="text-sm font-semibold text-foreground flex items-center gap-2 px-1">
+          <LayoutGrid className="h-4 w-4 text-primary" />
+          Filtrar por Produto
+        </label>
+        <div className="grid grid-cols-2 sm:flex gap-2 sm:overflow-x-auto sm:pb-1 sm:-mx-2 sm:px-2">
+          {PRODUCT_OPTIONS.map((product) => {
+            const count = product.value === "all" 
+              ? productCounts.all || 0 
+              : productCounts[product.value] || 0;
+            const isSelected = selectedProduct === product.value;
+            
+            return (
+              <motion.button
+                key={product.value}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setSelectedProduct(product.value)}
+                className={`
+                  flex items-center justify-between gap-2 
+                  py-3 px-4 rounded-xl border-2 
+                  text-left transition-all duration-200
+                  sm:py-2.5 sm:px-3 sm:flex-shrink-0
+                  ${isSelected 
+                    ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/25' 
+                    : 'bg-card border-border hover:border-primary/50 hover:bg-muted/50'
+                  }
+                `}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-lg sm:text-base">{product.icon}</span>
+                  <span className="font-medium text-sm sm:text-xs truncate">{product.label}</span>
+                </div>
+                <Badge 
+                  variant={isSelected ? "secondary" : "outline"}
+                  className={`
+                    text-xs font-bold min-w-[28px] justify-center
+                    ${isSelected ? 'bg-primary-foreground/20 text-primary-foreground border-0' : ''}
+                  `}
+                >
+                  {count}
+                </Badge>
+              </motion.button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Search + Advanced toggle */}
-      <div className="flex gap-2">
+      {/* Search + Advanced toggle - Larger input for mobile */}
+      <div className="flex gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 sm:h-4 sm:w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por nome ou CPF..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-11 text-base"
+            className="pl-12 sm:pl-10 h-14 sm:h-12 text-lg sm:text-base rounded-xl border-2 focus:border-primary"
           />
           {searchTerm && (
             <Button
               variant="ghost"
               size="sm"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 sm:h-8 sm:w-8 p-0 rounded-lg"
               onClick={() => setSearchTerm("")}
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5 sm:h-4 sm:w-4" />
             </Button>
           )}
         </div>
         <Button
           variant={showAdvanced || activeFiltersCount > 0 ? "default" : "outline"}
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="gap-2"
+          className={`
+            gap-2 h-14 sm:h-12 px-4 rounded-xl border-2
+            ${showAdvanced || activeFiltersCount > 0 
+              ? 'shadow-lg shadow-primary/25' 
+              : 'hover:border-primary/50'
+            }
+          `}
         >
-          <Filter className="h-4 w-4" />
-          <span className="hidden sm:inline">Filtros</span>
+          <Filter className="h-5 w-5 sm:h-4 sm:w-4" />
+          <span className="hidden sm:inline font-medium">Filtros</span>
           {activeFiltersCount > 0 && (
-            <Badge variant="secondary" className="h-5 w-5 p-0 flex items-center justify-center text-xs">
+            <Badge 
+              variant="secondary" 
+              className="h-6 w-6 sm:h-5 sm:w-5 p-0 flex items-center justify-center text-xs font-bold"
+            >
               {activeFiltersCount}
             </Badge>
           )}
-          {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {showAdvanced ? <ChevronUp className="h-5 w-5 sm:h-4 sm:w-4" /> : <ChevronDown className="h-5 w-5 sm:h-4 sm:w-4" />}
         </Button>
       </div>
 
-      {/* Advanced Filters */}
+      {/* Advanced Filters - Better mobile layout */}
       <AnimatePresence>
         {showAdvanced && (
           <motion.div
@@ -287,31 +327,31 @@ export const TelevendasFilters = ({
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="p-4 bg-muted/50 rounded-lg border space-y-4">
+            <div className="p-5 sm:p-4 bg-muted/50 rounded-2xl border-2 space-y-5">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Filtros avançados</span>
+                <span className="text-base sm:text-sm font-semibold text-foreground">Filtros avançados</span>
                 {activeFiltersCount > 0 && (
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
                     onClick={clearAllFilters}
-                    className="h-8 text-xs gap-1"
+                    className="h-10 sm:h-8 text-sm sm:text-xs gap-2 px-4 rounded-lg"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-4 w-4 sm:h-3 sm:w-3" />
                     Limpar filtros
                   </Button>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* User filter (admin/gestor) */}
                 {isGestorOrAdmin && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                      <User className="h-3 w-3" /> Usuário
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <User className="h-4 w-4 text-primary" /> Usuário
                     </label>
                     <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                      <SelectTrigger className="h-10">
+                      <SelectTrigger className="h-14 sm:h-12 text-base sm:text-sm rounded-xl border-2">
                         <SelectValue placeholder="Todos os usuários" />
                       </SelectTrigger>
                       <SelectContent>
@@ -327,12 +367,12 @@ export const TelevendasFilters = ({
                 )}
 
                 {/* Period filter */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <Calendar className="h-3 w-3" /> Período
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-primary" /> Período
                   </label>
                   <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                    <SelectTrigger className="h-10">
+                    <SelectTrigger className="h-14 sm:h-12 text-base sm:text-sm rounded-xl border-2">
                       <SelectValue placeholder="Selecionar período" />
                     </SelectTrigger>
                     <SelectContent>
@@ -347,10 +387,10 @@ export const TelevendasFilters = ({
 
                 {/* Month filter (when period is "month") */}
                 {selectedPeriod === "month" && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">Mês específico</label>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-foreground">Mês específico</label>
                     <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                      <SelectTrigger className="h-10">
+                      <SelectTrigger className="h-14 sm:h-12 text-base sm:text-sm rounded-xl border-2">
                         <SelectValue placeholder="Selecionar mês" />
                       </SelectTrigger>
                       <SelectContent>
@@ -370,36 +410,56 @@ export const TelevendasFilters = ({
         )}
       </AnimatePresence>
 
-      {/* Status filter badges - Only show when not in statistics view */}
+      {/* Status filter badges - Larger and more prominent */}
       {viewMode !== "estatisticas" && (
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap md:overflow-visible">
-          <Badge 
-            variant={selectedStatus === "all" ? "default" : "outline"}
-            className="cursor-pointer whitespace-nowrap flex-shrink-0 transition-all hover:scale-105"
-            onClick={() => setSelectedStatus("all")}
-          >
-            Todos ({statusCounts.all || 0})
-          </Badge>
-          {Object.entries(STATUS_CONFIG).map(([status, config]) => {
-            // Show manager-only statuses only for gestor/admin
-            if (!config.userAllowed && !isGestorOrAdmin) return null;
-            
-            const count = statusCounts[status] || 0;
-            if (count === 0 && selectedStatus !== status) return null;
-            
-            return (
-              <Badge 
-                key={status}
-                variant={selectedStatus === status ? "default" : "outline"}
-                className={`cursor-pointer whitespace-nowrap flex-shrink-0 transition-all hover:scale-105 ${
-                  selectedStatus !== status ? config.color : ''
-                }`}
-                onClick={() => setSelectedStatus(status)}
-              >
-                {config.shortLabel} ({count})
-              </Badge>
-            );
-          })}
+        <div className="space-y-2">
+          <label className="text-sm font-semibold text-foreground flex items-center gap-2 px-1">
+            <Filter className="h-4 w-4 text-primary" />
+            Filtrar por Status
+          </label>
+          <div className="flex gap-2 overflow-x-auto pb-3 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap md:overflow-visible snap-x snap-mandatory">
+            <Badge 
+              variant={selectedStatus === "all" ? "default" : "outline"}
+              className={`
+                cursor-pointer whitespace-nowrap flex-shrink-0 snap-start
+                py-3 px-4 text-sm sm:py-2 sm:px-3 sm:text-xs
+                font-semibold transition-all active:scale-95 hover:scale-105
+                ${selectedStatus === "all" 
+                  ? 'shadow-md ring-2 ring-primary/20' 
+                  : 'hover:bg-muted border-2'
+                }
+              `}
+              onClick={() => setSelectedStatus("all")}
+            >
+              📋 Todos ({statusCounts.all || 0})
+            </Badge>
+            {Object.entries(STATUS_CONFIG).map(([status, config]) => {
+              // Show manager-only statuses only for gestor/admin
+              if (!config.userAllowed && !isGestorOrAdmin) return null;
+              
+              const count = statusCounts[status] || 0;
+              if (count === 0 && selectedStatus !== status) return null;
+              
+              return (
+                <Badge 
+                  key={status}
+                  variant={selectedStatus === status ? "default" : "outline"}
+                  className={`
+                    cursor-pointer whitespace-nowrap flex-shrink-0 snap-start
+                    py-3 px-4 text-sm sm:py-2 sm:px-3 sm:text-xs
+                    font-semibold transition-all active:scale-95 hover:scale-105
+                    ${selectedStatus === status 
+                      ? 'shadow-md ring-2 ring-primary/20' 
+                      : `${config.color} border-2`
+                    }
+                  `}
+                  onClick={() => setSelectedStatus(status)}
+                >
+                  {config.shortLabel} ({count})
+                </Badge>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
