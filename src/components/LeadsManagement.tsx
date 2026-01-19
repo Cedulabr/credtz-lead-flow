@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -15,6 +15,8 @@ import { DistributedLeadsManager } from "./DistributedLeadsManager";
 import { LeadHistoryModal } from "./LeadHistoryModal";
 import { DailyLeadsTracking } from "./DailyLeadsTracking";
 import { AnimatedContainer, StaggerContainer, StaggerItem } from "./ui/animated-container";
+import { SimulationSummaryCards, SimulationRequestButton, SimulationManager } from "./leads";
+import { useSimulationNotifications } from "@/hooks/useSimulationNotifications";
 import { SkeletonCard } from "./ui/skeleton-card";
 import { 
   Search, 
@@ -80,6 +82,8 @@ interface Lead {
   banco_operacao?: string;
   valor_operacao?: number;
   history?: any;
+  simulation_status?: string | null;
+  simulation_id?: string | null;
 }
 
 interface UserProfile {
@@ -1869,6 +1873,14 @@ export function LeadsManagement() {
                           <History className="h-4 w-4 md:h-5 md:w-5 md:mr-2" />
                           <span className="hidden md:inline">Histórico</span>
                         </Button>
+
+                        {/* Botão Solicitar Simulação */}
+                        <SimulationRequestButton
+                          leadId={lead.id}
+                          leadName={lead.name}
+                          currentSimulationStatus={lead.simulation_status}
+                          onSuccess={fetchLeads}
+                        />
 
                         {/* Botão Solicitar Digitação - Destaque para mobile */}
                         <Button
