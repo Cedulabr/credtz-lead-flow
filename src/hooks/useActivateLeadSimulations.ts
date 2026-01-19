@@ -63,6 +63,7 @@ export interface SimulationStats {
 export function useActivateLeadSimulations() {
   const { user, profile } = useAuth();
   const [isGestor, setIsGestor] = useState(false);
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
 
   const isGestorOrAdmin = profile?.role === 'admin' || isGestor;
 
@@ -70,18 +71,24 @@ export function useActivateLeadSimulations() {
     const checkGestorRole = async () => {
       if (!user) {
         setIsGestor(false);
+        setUserCompanyId(null);
         return;
       }
       
       const { data } = await supabase
         .from('user_companies')
-        .select('company_role')
+        .select('company_role, company_id')
         .eq('user_id', user.id)
         .eq('is_active', true)
-        .eq('company_role', 'gestor')
         .limit(1);
       
-      setIsGestor(!!data && data.length > 0);
+      if (data && data.length > 0) {
+        setIsGestor(data[0].company_role === 'gestor');
+        setUserCompanyId(data[0].company_id);
+      } else {
+        setIsGestor(false);
+        setUserCompanyId(null);
+      }
     };
     
     checkGestorRole();
@@ -91,6 +98,15 @@ export function useActivateLeadSimulations() {
     if (!user) throw new Error('User not authenticated');
 
     try {
+      // Get the lead's company_id first
+      const { data: leadData } = await supabase
+        .from('activate_leads')
+        .select('company_id')
+        .eq('id', leadId)
+        .single();
+
+      const leadCompanyId = leadData?.company_id;
+
       const { data: simulation, error: simError } = await supabase
         .from('activate_leads_simulations')
         .insert({
@@ -112,14 +128,20 @@ export function useActivateLeadSimulations() {
         })
         .eq('id', leadId);
 
-      // Get gestors to notify
-      const { data: gestors } = await supabase
+      // Get gestors from the SAME company to notify
+      let gestorQuery = supabase
         .from('user_companies')
         .select('user_id')
         .eq('company_role', 'gestor')
         .eq('is_active', true);
+      
+      if (leadCompanyId) {
+        gestorQuery = gestorQuery.eq('company_id', leadCompanyId);
+      }
+      
+      const { data: gestors } = await gestorQuery;
 
-      // Get admins to notify
+      // Get admins to notify (admins see all)
       const { data: admins } = await supabase
         .from('profiles')
         .select('id')
@@ -282,6 +304,51 @@ export function useActivateLeadSimulations() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
+      // For gestors, only count simulations from leads of their company
+      // For admins, count all simulations
+      let simulationIds: string[] = [];
+      
+      if (profile?.role !== 'admin' && userCompanyId) {
+        // First get leads from the gestor's company
+        const { data: companyLeads } = await supabase
+          .from('activate_leads')
+          .select('id')
+          .eq('company_id', userCompanyId);
+        
+        const leadIds = companyLeads?.map(l => l.id) || [];
+        
+        if (leadIds.length === 0) {
+          return { pending: 0, inProgress: 0, completed: 0, received: 0, todayRequested: 0, todayCompleted: 0, conversionRate: 0 };
+        }
+        
+        const { data, error } = await supabase
+          .from('activate_leads_simulations')
+          .select('id, status, requested_at, completed_at')
+          .in('lead_id', leadIds);
+        
+        if (error) throw error;
+        
+        const todayStr = today.toISOString();
+        
+        const stats: SimulationStats = {
+          pending: data?.filter(s => s.status === 'solicitada').length || 0,
+          inProgress: data?.filter(s => s.status === 'em_andamento').length || 0,
+          completed: data?.filter(s => s.status === 'enviada').length || 0,
+          received: data?.filter(s => s.status === 'recebida').length || 0,
+          todayRequested: data?.filter(s => s.requested_at && s.requested_at >= todayStr).length || 0,
+          todayCompleted: data?.filter(s => s.completed_at && s.completed_at >= todayStr).length || 0,
+          conversionRate: 0
+        };
+
+        const totalProcessed = stats.completed + stats.received;
+        if (totalProcessed > 0) {
+          stats.conversionRate = Math.round((stats.received / totalProcessed) * 100);
+        }
+
+        return stats;
+      }
+
+      // Admin: get all simulations
       const { data, error } = await supabase
         .from('activate_leads_simulations')
         .select('status, requested_at, completed_at');
@@ -316,11 +383,34 @@ export function useActivateLeadSimulations() {
     if (!user || !isGestorOrAdmin) return [];
 
     try {
-      const { data: simulations, error: simError } = await supabase
+      // For gestors, only get simulations from leads of their company
+      // For admins, get all pending simulations
+      let leadIdsFilter: string[] | null = null;
+      
+      if (profile?.role !== 'admin' && userCompanyId) {
+        const { data: companyLeads } = await supabase
+          .from('activate_leads')
+          .select('id')
+          .eq('company_id', userCompanyId);
+        
+        leadIdsFilter = companyLeads?.map(l => l.id) || [];
+        
+        if (leadIdsFilter.length === 0) {
+          return [];
+        }
+      }
+
+      let query = supabase
         .from('activate_leads_simulations')
         .select('*')
         .eq('status', 'solicitada')
         .order('requested_at', { ascending: true });
+      
+      if (leadIdsFilter) {
+        query = query.in('lead_id', leadIdsFilter);
+      }
+
+      const { data: simulations, error: simError } = await query;
 
       if (simError) throw simError;
       if (!simulations || simulations.length === 0) return [];
