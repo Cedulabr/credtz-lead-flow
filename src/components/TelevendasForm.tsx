@@ -250,6 +250,7 @@ export const TelevendasForm = () => {
       file_url: urlData.publicUrl,
       file_name: file.name,
       uploaded_by: user.id,
+      origin: "televendas",
     });
 
     return urlData.publicUrl;
