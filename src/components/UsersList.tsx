@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Edit, UserCheck, UserX, Plus, Trash2, RefreshCw, Settings } from "lucide-react";
+import { Edit, UserCheck, UserX, Plus, Trash2, RefreshCw, Settings, Search, Crown, User, Key } from "lucide-react";
 import { CreateUser } from "./CreateUser";
 
 interface User {
@@ -60,6 +60,7 @@ export function UsersList() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [permissionsDialog, setPermissionsDialog] = useState({ open: false, user: null as User | null });
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Centralizar definição de permissões - ADICIONE NOVOS MÓDULOS AQUI
   const PERMISSION_MODULES = [
@@ -169,6 +170,31 @@ export function UsersList() {
     }
   };
 
+  // Função para lidar com promoção de colaborador para gestor
+  const handleRolePromotion = async (userId: string, companyId: string) => {
+    try {
+      // Atualizar permissões específicas de gestão se necessário
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          can_access_gestao_televendas: true,
+          can_access_relatorio_desempenho: true,
+        })
+        .eq('id', userId);
+
+      if (error) {
+        console.error('Erro ao atualizar permissões de gestor:', error);
+      } else {
+        toast({
+          title: "Promoção para Gestor",
+          description: "Permissões de gestão ativadas automaticamente.",
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao processar promoção:', error);
+    }
+  };
+
   const handleEditUser = (user: User) => {
     setEditingUser(user);
     const userCompany = userCompanies[user.id];
@@ -185,6 +211,17 @@ export function UsersList() {
     });
     setIsDialogOpen(true);
   };
+
+  // Filtrar usuários por busca
+  const filteredUsers = users.filter(user => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase().trim();
+    return (
+      (user.name || "").toLowerCase().includes(term) ||
+      (user.email || "").toLowerCase().includes(term) ||
+      (user.cpf || "").includes(term)
+    );
+  });
 
   const handleSaveUser = async () => {
     if (!editingUser) return;
@@ -209,6 +246,8 @@ export function UsersList() {
       // Update company assignment
       if (userForm.company_id && userForm.company_role) {
         const existingUserCompany = userCompanies[editingUser.id];
+        const previousRole = existingUserCompany?.company_role;
+        const newRole = userForm.company_role;
         
         if (existingUserCompany) {
           // Update existing
@@ -221,6 +260,18 @@ export function UsersList() {
             .eq('id', existingUserCompany.id);
           
           if (ucError) throw ucError;
+
+          // Se mudou de colaborador para gestor, transferir leads atribuídos
+          if (previousRole === 'colaborador' && newRole === 'gestor') {
+            await handleRolePromotion(editingUser.id, userForm.company_id);
+          }
+          // Se mudou de gestor para colaborador, notificar
+          if (previousRole === 'gestor' && newRole === 'colaborador') {
+            toast({
+              title: "Cargo alterado",
+              description: "O usuário agora é colaborador e não terá mais acesso às funcionalidades de gestão.",
+            });
+          }
         } else {
           // Insert new
           const { error: ucError } = await supabase
@@ -535,18 +586,37 @@ export function UsersList() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <UserCheck className="h-5 w-5" />
-            Usuários Criados
-          </div>
+    <Card className="border-0 shadow-lg">
+      <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-t-lg">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <UserCheck className="h-6 w-6 text-primary" />
+            Gestão de Usuários
+            <Badge variant="secondary" className="ml-2">{users.length}</Badge>
+          </CardTitle>
           <CreateUser />
-        </CardTitle>
+        </div>
       </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
+      <CardContent className="p-6">
+        {/* Barra de busca */}
+        <div className="mb-6">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, email ou CPF..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          {searchTerm && (
+            <p className="text-sm text-muted-foreground mt-2">
+              {filteredUsers.length} usuário(s) encontrado(s)
+            </p>
+          )}
+        </div>
+
+        <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -563,88 +633,106 @@ export function UsersList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
+              {filteredUsers.map((user) => (
+                <TableRow key={user.id} className="hover:bg-muted/50 transition-colors">
                   <TableCell className="font-medium">
-                    {user.name || "Nome não informado"}
+                    <div className="flex items-center gap-2">
+                      {user.name || "Nome não informado"}
+                      {userCompanies[user.id]?.company_role === 'gestor' && (
+                        <Crown className="h-4 w-4 text-warning" />
+                      )}
+                    </div>
                   </TableCell>
-                  <TableCell>{user.email || "Email não informado"}</TableCell>
-                  <TableCell>{user.cpf || "Não informado"}</TableCell>
-                  <TableCell>{user.phone || "Não informado"}</TableCell>
-                  <TableCell>{user.pix_key || "Não informado"}</TableCell>
+                  <TableCell className="text-muted-foreground">{user.email || "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">{user.cpf || "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">{user.phone || "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">{user.pix_key || "—"}</TableCell>
                   <TableCell>
-                    {userCompanies[user.id]?.companies?.name || user.company || "Não informado"}
-                    {userCompanies[user.id]?.company_role && (
-                      <Badge variant="outline" className="ml-2 text-xs">
-                        {userCompanies[user.id]?.company_role === 'gestor' ? 'Gestor' : 'Colaborador'}
-                      </Badge>
-                    )}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm">{userCompanies[user.id]?.companies?.name || user.company || "—"}</span>
+                      {userCompanies[user.id]?.company_role && (
+                        <Badge 
+                          variant={userCompanies[user.id]?.company_role === 'gestor' ? "default" : "outline"} 
+                          className="w-fit text-xs"
+                        >
+                          {userCompanies[user.id]?.company_role === 'gestor' ? (
+                            <><Crown className="h-3 w-3 mr-1" /> Gestor</>
+                          ) : (
+                            <><User className="h-3 w-3 mr-1" /> Colaborador</>
+                          )}
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">
-                      {user.role === 'admin' ? 'Administrador' : 
+                    <Badge variant={user.role === 'admin' ? "default" : "outline"}>
+                      {user.role === 'admin' ? 'Admin' : 
                        user.role === 'partner' ? 'Parceiro' : 
                        user.role || 'Usuário'}
                     </Badge>
                   </TableCell>
                   <TableCell>{getUserStatusBadge(user)}</TableCell>
                    <TableCell>
-                     <div className="flex flex-wrap gap-1 max-w-[200px]">
+                     <div className="flex flex-wrap gap-1 max-w-[150px]">
                        {user.can_access_premium_leads !== false && <Badge variant="secondary" className="text-xs">Premium</Badge>}
-                       {user.can_access_indicar !== false && <Badge variant="outline" className="text-xs">Indicar</Badge>}
-                       {user.can_access_meus_clientes !== false && <Badge variant="outline" className="text-xs">Clientes</Badge>}
-                       {user.can_access_televendas !== false && <Badge variant="outline" className="text-xs">Televendas</Badge>}
+                       {user.can_access_gestao_televendas !== false && <Badge variant="secondary" className="text-xs">Gestão</Badge>}
                      </div>
                    </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       <Button
-                        size="sm"
-                        variant="outline"
+                        size="icon"
+                        variant="ghost"
                         onClick={() => handleEditUser(user)}
                         title="Editar usuário"
+                        className="h-8 w-8"
                       >
-                        <Edit className="h-3 w-3" />
+                        <Edit className="h-4 w-4" />
                       </Button>
                       <Button
-                        size="sm"
-                        variant={user.is_active !== false ? "secondary" : "default"}
+                        size="icon"
+                        variant="ghost"
                         onClick={() => toggleUserStatus(user)}
-                        title={user.is_active !== false ? "Inativar usuário" : "Ativar usuário"}
+                        title={user.is_active !== false ? "Inativar" : "Ativar"}
+                        className="h-8 w-8"
                       >
-                        {user.is_active !== false ? <UserX className="h-3 w-3" /> : <UserCheck className="h-3 w-3" />}
+                        {user.is_active !== false ? <UserX className="h-4 w-4 text-warning" /> : <UserCheck className="h-4 w-4 text-success" />}
                       </Button>
                       <Button
-                        size="sm"
-                        variant="outline"
+                        size="icon"
+                        variant="ghost"
                         onClick={() => handlePermissionsOpen(user)}
-                        title="Gerenciar permissões"
+                        title="Permissões"
+                        className="h-8 w-8"
                       >
-                        <Settings className="h-3 w-3" />
+                        <Settings className="h-4 w-4" />
                       </Button>
                       <Button
-                        size="sm"
-                        variant="outline"
+                        size="icon"
+                        variant="ghost"
                         onClick={() => handleSetPassword(user)}
                         title="Definir senha"
+                        className="h-8 w-8"
                       >
-                        <Edit className="h-3 w-3" />
+                        <Key className="h-4 w-4" />
                       </Button>
                       <Button
-                        size="sm"
-                        variant="outline"
+                        size="icon"
+                        variant="ghost"
                         onClick={() => resetUserPassword(user)}
                         title="Resetar senha"
+                        className="h-8 w-8"
                       >
-                        <RefreshCw className="h-3 w-3" />
+                        <RefreshCw className="h-4 w-4" />
                       </Button>
                       <Button
-                        size="sm"
-                        variant="destructive"
+                        size="icon"
+                        variant="ghost"
                         onClick={() => deleteUser(user)}
-                        title="Excluir usuário"
+                        title="Excluir"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>
@@ -654,9 +742,12 @@ export function UsersList() {
           </Table>
         </div>
 
-        {users.length === 0 && (
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">Nenhum usuário encontrado.</p>
+        {filteredUsers.length === 0 && (
+          <div className="text-center py-12">
+            <UserX className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+            <p className="text-muted-foreground">
+              {searchTerm ? "Nenhum usuário encontrado com esses critérios." : "Nenhum usuário cadastrado."}
+            </p>
           </div>
         )}
 
