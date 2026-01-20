@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +25,8 @@ import {
   User as UserIcon, 
   Search,
   Package,
-  CheckCircle
+  CheckCircle,
+  CalendarDays
 } from "lucide-react";
 import { 
   User, 
@@ -72,6 +74,19 @@ export const FiltersDrawer = ({
     .filter(([key]) => OPERATOR_STATUSES.includes(key as any))
     .map(([key, config]) => ({ value: key, ...config }));
 
+  // Generate month options (last 12 months)
+  const monthOptions = useMemo(() => {
+    const months = [];
+    const today = new Date();
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      const label = date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+      months.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
+    }
+    return months;
+  }, []);
+
   return (
     <Sheet>
       <SheetTrigger asChild>
@@ -115,21 +130,53 @@ export const FiltersDrawer = ({
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-base font-semibold">
               <Calendar className="h-4 w-4 text-primary" />
-              Período
+              Período Rápido
             </Label>
             <div className="grid grid-cols-3 gap-2">
               {PERIOD_OPTIONS.map((option) => (
                 <Button
                   key={option.value}
-                  variant={filters.period === option.value ? "default" : "outline"}
+                  variant={filters.period === option.value && filters.month === "all" ? "default" : "outline"}
                   size="sm"
-                  onClick={() => updateFilter("period", option.value)}
+                  onClick={() => {
+                    updateFilter("period", option.value);
+                    updateFilter("month", "all");
+                  }}
                   className="h-10 text-sm"
                 >
                   {option.label}
                 </Button>
               ))}
             </div>
+          </div>
+
+          {/* Month Filter */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-base font-semibold">
+              <CalendarDays className="h-4 w-4 text-primary" />
+              Mês Específico
+            </Label>
+            <Select
+              value={filters.month}
+              onValueChange={(value) => {
+                updateFilter("month", value);
+                if (value !== "all") {
+                  updateFilter("period", "all");
+                }
+              }}
+            >
+              <SelectTrigger className="h-12 text-base rounded-xl">
+                <SelectValue placeholder="Selecionar mês" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os meses</SelectItem>
+                {monthOptions.map((month) => (
+                  <SelectItem key={month.value} value={month.value}>
+                    📅 {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Product */}

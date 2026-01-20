@@ -65,6 +65,14 @@ export const getDateRange = (period: string, month?: string) => {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   
+  // If month is selected, use month filter (priority over period)
+  if (month && month !== "all") {
+    const [year, m] = month.split("-");
+    const startDate = new Date(parseInt(year), parseInt(m) - 1, 1);
+    const endDate = new Date(parseInt(year), parseInt(m), 0, 23, 59, 59);
+    return { start: startDate, end: endDate };
+  }
+  
   switch (period) {
     case "today":
       return { start: today, end: now };
@@ -80,15 +88,6 @@ export const getDateRange = (period: string, month?: string) => {
       const thirtyDaysAgo = new Date(today);
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       return { start: thirtyDaysAgo, end: now };
-    case "month":
-      if (month && month !== "all") {
-        const [year, m] = month.split("-");
-        const startDate = new Date(parseInt(year), parseInt(m) - 1, 1);
-        const endDate = new Date(parseInt(year), parseInt(m), 0);
-        return { start: startDate, end: endDate };
-      }
-      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { start: firstOfMonth, end: now };
     default:
       return null;
   }
