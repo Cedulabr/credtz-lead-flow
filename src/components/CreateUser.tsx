@@ -13,7 +13,6 @@ interface CreateUserForm {
   name: string;
   email: string;
   password: string;
-  company: string;
   level: string;
   cpf: string;
   phone: string;
@@ -36,7 +35,6 @@ export function CreateUser() {
     name: "",
     email: "",
     password: "",
-    company: "",
     level: "",
     cpf: "",
     phone: "",
@@ -74,12 +72,15 @@ export function CreateUser() {
     setIsLoading(true);
 
     try {
+      // Buscar o nome da empresa selecionada
+      const selectedCompany = companies.find(c => c.id === formData.company_id);
+      
       const { data, error } = await supabase.functions.invoke('admin-create-user', {
         body: {
           name: formData.name,
           email: formData.email,
           password: formData.password,
-          company: formData.company,
+          company: selectedCompany?.name || "",
           level: formData.level,
           cpf: formData.cpf,
           phone: formData.phone,
@@ -101,7 +102,6 @@ export function CreateUser() {
         name: "",
         email: "",
         password: "",
-        company: "",
         level: "",
         cpf: "",
         phone: "",
@@ -199,13 +199,23 @@ export function CreateUser() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="company">Empresa</Label>
-              <Input
-                id="company"
-                value={formData.company}
-                onChange={(e) => setFormData(prev => ({ ...prev, company: e.target.value }))}
-                placeholder="Nome da empresa"
-              />
+              <Label htmlFor="company_id">Empresa</Label>
+              <Select
+                value={formData.company_id || "none"}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, company_id: value === "none" ? "" : value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a empresa" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem empresa</SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="level">Nível</Label>
@@ -221,25 +231,6 @@ export function CreateUser() {
                   <SelectItem value="prata">Prata</SelectItem>
                   <SelectItem value="ouro">Ouro</SelectItem>
                   <SelectItem value="diamante">Diamante</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="company_id">Empresa</Label>
-              <Select
-                value={formData.company_id}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, company_id: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a empresa" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sem empresa</SelectItem>
-                  {companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
                 </SelectContent>
               </Select>
             </div>
