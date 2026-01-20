@@ -668,6 +668,7 @@ export function MyClientsList() {
       file_url: urlData.publicUrl,
       file_name: file.name,
       uploaded_by: user?.id,
+      origin: "meus_clientes",
     });
 
     return urlData.publicUrl;

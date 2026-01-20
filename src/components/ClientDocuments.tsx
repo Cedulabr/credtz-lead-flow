@@ -27,7 +27,15 @@ interface ClientDocument {
   file_name: string;
   uploaded_by: string;
   created_at: string;
+  origin?: string;
+  uploader_name?: string;
 }
+
+const originLabels: Record<string, { label: string; emoji: string }> = {
+  documentos: { label: "Documentos", emoji: "📁" },
+  televendas: { label: "Televendas", emoji: "📞" },
+  meus_clientes: { label: "Meus Clientes", emoji: "👥" },
+};
 
 interface DocumentGroup {
   cpf: string;
@@ -126,13 +134,39 @@ export function ClientDocuments() {
 
   const fetchDocuments = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch documents
+      const { data: docsData, error: docsError } = await supabase
         .from("client_documents")
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      setDocuments(data || []);
+      if (docsError) throw docsError;
+
+      // Fetch uploader names from profiles
+      const uploaderIds = [...new Set((docsData || []).map(d => d.uploaded_by).filter(Boolean))];
+      
+      let uploaderMap: Record<string, string> = {};
+      if (uploaderIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from("profiles")
+          .select("id, name, email")
+          .in("id", uploaderIds);
+        
+        if (profilesData) {
+          uploaderMap = profilesData.reduce((acc, p) => {
+            acc[p.id] = p.name || p.email?.split("@")[0] || "Usuário";
+            return acc;
+          }, {} as Record<string, string>);
+        }
+      }
+
+      // Enrich documents with uploader name
+      const enrichedDocs = (docsData || []).map(doc => ({
+        ...doc,
+        uploader_name: uploaderMap[doc.uploaded_by] || "Desconhecido",
+      }));
+
+      setDocuments(enrichedDocs);
     } catch (error) {
       console.error("Error fetching documents:", error);
       toast({
@@ -281,6 +315,7 @@ export function ClientDocuments() {
             file_url: fileUrl,
             file_name: file.name,
             uploaded_by: user?.id,
+            origin: "documentos",
           });
 
           if (error) throw error;
@@ -778,10 +813,17 @@ export function ClientDocuments() {
                       )}
                     </div>
 
-                    {/* Date */}
-                    <p className="text-xs text-muted-foreground">
-                      📅 {group.latestDate.toLocaleDateString("pt-BR")}
-                    </p>
+                    {/* Info: Date, Uploader, Origin */}
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span>📅 {group.latestDate.toLocaleDateString("pt-BR")}</span>
+                      <span className="text-muted-foreground/50">•</span>
+                      <span>👤 {group.documents[0]?.uploader_name || "Desconhecido"}</span>
+                      <span className="text-muted-foreground/50">•</span>
+                      <Badge variant="outline" className="text-xs gap-1 py-0">
+                        {originLabels[group.documents[0]?.origin || "documentos"]?.emoji || "📁"} 
+                        {originLabels[group.documents[0]?.origin || "documentos"]?.label || "Documentos"}
+                      </Badge>
+                    </div>
 
                     {/* Actions */}
                     <div className="flex flex-wrap gap-2 pt-2 border-t">
@@ -853,6 +895,8 @@ export function ClientDocuments() {
                   <TableHead className="text-center">📋 RG Frente</TableHead>
                   <TableHead className="text-center">📋 RG Verso</TableHead>
                   <TableHead className="text-center">📊 Extrato</TableHead>
+                  <TableHead className="text-base">👤 Anexado por</TableHead>
+                  <TableHead className="text-base">📍 Origem</TableHead>
                   <TableHead className="text-base">📅 Data</TableHead>
                   <TableHead className="text-center">⚡ Ações</TableHead>
                 </TableRow>
@@ -861,46 +905,62 @@ export function ClientDocuments() {
                 <AnimatePresence mode="popLayout">
                   {paginatedGroups.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                         <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
                         <p className="text-lg">Nenhum documento encontrado</p>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginatedGroups.map((group, index) => (
-                      <motion.tr
-                        key={group.cpf}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 20 }}
-                        transition={{ delay: index * 0.03 }}
-                        className="group hover:bg-muted/50 transition-colors"
-                      >
-                        <TableCell className="font-medium text-base">{group.name}</TableCell>
-                        <TableCell className="font-mono">{formatCPF(group.cpf)}</TableCell>
-                        <TableCell className="text-center">
-                          {group.hasRgFrente ? (
-                            <CheckCircle className="h-6 w-6 text-success mx-auto" />
-                          ) : (
-                            <XCircle className="h-6 w-6 text-destructive mx-auto" />
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {group.hasRgVerso ? (
-                            <CheckCircle className="h-6 w-6 text-success mx-auto" />
-                          ) : (
-                            <XCircle className="h-6 w-6 text-destructive mx-auto" />
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {group.hasExtrato ? (
-                            <CheckCircle className="h-6 w-6 text-success mx-auto" />
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>{group.latestDate.toLocaleDateString("pt-BR")}</TableCell>
-                        <TableCell>
+                    paginatedGroups.map((group, index) => {
+                      // Get the latest document for uploader info
+                      const latestDoc = group.documents[0];
+                      const origin = latestDoc?.origin || "documentos";
+                      const originInfo = originLabels[origin] || { label: origin, emoji: "📁" };
+                      
+                      return (
+                        <motion.tr
+                          key={group.cpf}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 20 }}
+                          transition={{ delay: index * 0.03 }}
+                          className="group hover:bg-muted/50 transition-colors"
+                        >
+                          <TableCell className="font-medium text-base">{group.name}</TableCell>
+                          <TableCell className="font-mono">{formatCPF(group.cpf)}</TableCell>
+                          <TableCell className="text-center">
+                            {group.hasRgFrente ? (
+                              <CheckCircle className="h-6 w-6 text-success mx-auto" />
+                            ) : (
+                              <XCircle className="h-6 w-6 text-destructive mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {group.hasRgVerso ? (
+                              <CheckCircle className="h-6 w-6 text-success mx-auto" />
+                            ) : (
+                              <XCircle className="h-6 w-6 text-destructive mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {group.hasExtrato ? (
+                              <CheckCircle className="h-6 w-6 text-success mx-auto" />
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <span title={latestDoc?.uploader_name || "Desconhecido"}>
+                              👤 {latestDoc?.uploader_name || "Desconhecido"}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="gap-1">
+                              {originInfo.emoji} {originInfo.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{group.latestDate.toLocaleDateString("pt-BR")}</TableCell>
+                          <TableCell>
                           <div className="flex justify-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                             {group.documents.map((doc) => (
                               <Button
@@ -937,7 +997,8 @@ export function ClientDocuments() {
                           </div>
                         </TableCell>
                       </motion.tr>
-                    ))
+                      );
+                    })
                   )}
                 </AnimatePresence>
               </TableBody>
