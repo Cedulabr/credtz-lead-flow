@@ -139,8 +139,7 @@ export const FiltersDrawer = ({
                   variant={filters.period === option.value && filters.month === "all" ? "default" : "outline"}
                   size="sm"
                   onClick={() => {
-                    updateFilter("period", option.value);
-                    updateFilter("month", "all");
+                    onFiltersChange({ ...filters, period: option.value, month: "all" });
                   }}
                   className="h-10 text-sm"
                 >
@@ -159,10 +158,11 @@ export const FiltersDrawer = ({
             <Select
               value={filters.month}
               onValueChange={(value) => {
-                updateFilter("month", value);
-                if (value !== "all") {
-                  updateFilter("period", "all");
-                }
+                onFiltersChange({ 
+                  ...filters, 
+                  month: value, 
+                  period: value !== "all" ? "all" : filters.period 
+                });
               }}
             >
               <SelectTrigger className="h-12 text-base rounded-xl">
