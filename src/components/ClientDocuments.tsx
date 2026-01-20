@@ -423,12 +423,18 @@ export function ClientDocuments() {
   // Advanced filtering
   const filteredGroups = useMemo(() => {
     return groupedDocuments.filter((group) => {
-      // Text search
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = 
-        group.name.toLowerCase().includes(searchLower) ||
-        group.cpf.includes(searchTerm.replace(/\D/g, "")) ||
-        formatCPF(group.cpf).includes(searchTerm);
+      // Text search - handle null/undefined names safely
+      const searchLower = searchTerm.toLowerCase().trim();
+      const groupName = (group.name || "").toLowerCase();
+      const groupCpf = group.cpf || "";
+      const searchDigits = searchTerm.replace(/\D/g, "");
+      
+      // Match by name OR by CPF (digits or formatted)
+      const matchesName = groupName.includes(searchLower);
+      const matchesCpfDigits = searchDigits.length > 0 && groupCpf.includes(searchDigits);
+      const matchesCpfFormatted = formatCPF(groupCpf).includes(searchTerm);
+      
+      const matchesSearch = !searchTerm || matchesName || matchesCpfDigits || matchesCpfFormatted;
 
       // Status filter
       const isComplete = group.hasRgFrente && group.hasRgVerso;
