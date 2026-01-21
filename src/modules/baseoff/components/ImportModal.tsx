@@ -70,9 +70,9 @@ export function ImportModal({ isOpen, onClose, onJobCreated }: ImportModalProps)
       return;
     }
 
-    // 100MB limit for frontend (actual processing handles larger files)
-    if (file.size > 100 * 1024 * 1024) {
-      setError('Arquivo muito grande. Limite: 100MB');
+    // 900MB limit for large file support
+    if (file.size > 900 * 1024 * 1024) {
+      setError('Arquivo muito grande. Limite: 900MB');
       return;
     }
 
@@ -223,7 +223,7 @@ export function ImportModal({ isOpen, onClose, onJobCreated }: ImportModalProps)
                   <div className="space-y-2">
                     <Upload className="w-10 h-10 mx-auto text-muted-foreground" />
                     <p className="text-muted-foreground">Clique ou arraste o arquivo</p>
-                    <p className="text-xs text-muted-foreground">CSV, XLSX ou XLS (até 100MB)</p>
+                    <p className="text-xs text-muted-foreground">CSV, XLSX ou XLS (até 900MB)</p>
                   </div>
                 )}
               </div>

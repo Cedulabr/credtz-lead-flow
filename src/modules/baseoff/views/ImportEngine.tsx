@@ -123,7 +123,7 @@ export function ImportEngine({ onJobComplete }: ImportEngineProps) {
             Motor de Importação
           </h2>
           <p className="text-sm text-muted-foreground">
-            Importe arquivos de até 2 milhões de linhas
+            Motor enterprise para arquivos de até 900MB (2 milhões de linhas)
           </p>
         </div>
         <Button 
