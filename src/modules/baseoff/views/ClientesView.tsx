@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, RefreshCw, AlertCircle, Users } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Search, RefreshCw, AlertCircle, Users, History } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { BaseOffClient, BaseOffFilters, DEFAULT_FILTERS, DashboardStats, ClientStatus } from '../types';
 import { ClienteCard } from '../components/ClienteCard';
@@ -33,9 +34,26 @@ export function ClientesView({ onClientSelect, filters, onFiltersChange }: Clien
     };
   }, [clients]);
 
-  const fetchClients = async () => {
+  // Fetch only clients that have been consulted (have contracts or have been searched)
+  const fetchConsultedClients = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Get clients that have contracts (already consulted/imported)
+      const { data: clientsWithContracts, error: contractsError } = await supabase
+        .from('baseoff_contracts')
+        .select('client_id')
+        .limit(500);
+
+      if (contractsError) throw contractsError;
+
+      const clientIds = [...new Set(clientsWithContracts?.map(c => c.client_id) || [])];
+
+      if (clientIds.length === 0) {
+        setClients([]);
+        setIsLoading(false);
+        return;
+      }
+
       let query = supabase
         .from('baseoff_clients')
         .select(`
@@ -44,21 +62,9 @@ export function ClientesView({ onClientSelect, filters, onFiltersChange }: Clien
           tel_cel_1, tel_cel_2, tel_fixo_1, email_1,
           created_at, updated_at
         `)
+        .in('id', clientIds)
         .order('updated_at', { ascending: false })
-        .limit(500);
-
-      // Apply date filter
-      const { start, end } = getDateRange(filters);
-      if (start && end) {
-        query = query
-          .gte('updated_at', start.toISOString())
-          .lte('updated_at', end.toISOString());
-      }
-
-      // Apply status filter
-      if (filters.status !== 'all') {
-        query = query.eq('status_beneficio', filters.status);
-      }
+        .limit(200);
 
       // Apply UF filter
       if (filters.uf !== 'all') {
@@ -78,12 +84,6 @@ export function ClientesView({ onClientSelect, filters, onFiltersChange }: Clien
         } else {
           query = query.ilike('nome', `%${filters.cliente}%`);
         }
-      }
-
-      // Apply phone filter
-      if (filters.telefone) {
-        const phoneClean = filters.telefone.replace(/\D/g, '');
-        query = query.or(`tel_cel_1.ilike.%${phoneClean}%,tel_cel_2.ilike.%${phoneClean}%,tel_fixo_1.ilike.%${phoneClean}%`);
       }
 
       const { data, error } = await query;
@@ -126,7 +126,7 @@ export function ClientesView({ onClientSelect, filters, onFiltersChange }: Clien
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [filters.uf, filters.banco, filters.cliente]);
 
   const fetchFilterOptions = async () => {
     try {
@@ -155,8 +155,8 @@ export function ClientesView({ onClientSelect, filters, onFiltersChange }: Clien
   };
 
   useEffect(() => {
-    fetchClients();
-  }, [filters]);
+    fetchConsultedClients();
+  }, [fetchConsultedClients]);
 
   useEffect(() => {
     fetchFilterOptions();
@@ -201,11 +201,20 @@ export function ClientesView({ onClientSelect, filters, onFiltersChange }: Clien
           variant="outline" 
           size="icon"
           className="h-12 w-12 rounded-xl shrink-0"
-          onClick={fetchClients}
+          onClick={() => fetchConsultedClients()}
         >
           <RefreshCw className={isLoading ? 'animate-spin' : ''} />
         </Button>
       </div>
+
+      {/* Info Banner */}
+      <Alert className="border-muted">
+        <History className="w-4 h-4" />
+        <AlertDescription>
+          Mostrando apenas clientes já consultados (com contratos importados). 
+          Use a aba <strong>Consulta</strong> para buscar novos clientes.
+        </AlertDescription>
+      </Alert>
 
       {/* Results Count */}
       <div className="flex items-center gap-2 text-muted-foreground">

@@ -2,22 +2,24 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ArrowLeft, 
   FileText, 
   Clock, 
   RefreshCw,
-  AlertCircle
+  Download
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { BaseOffClient, BaseOffContract, TimelineEvent, ClientStatus } from '../types';
+import { BaseOffClient, BaseOffContract, TimelineEvent } from '../types';
 import { ClienteHeader } from '../components/ClienteHeader';
 import { MargemCards } from '../components/MargemCards';
 import { TelefoneHotPanel } from '../components/TelefoneHotPanel';
 import { ContratoCard } from '../components/ContratoCard';
+import { SimulationModal } from '../components/SimulationModal';
+import { ProposalGenerator } from '../components/ProposalGenerator';
 import { formatDate, formatCurrency } from '../utils';
+import { validatePhone } from '../utils/phoneValidation';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +32,9 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
   const [contracts, setContracts] = useState<BaseOffContract[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('contratos');
+  const [selectedContract, setSelectedContract] = useState<BaseOffContract | null>(null);
+  const [showSimulation, setShowSimulation] = useState(false);
+  const [showProposal, setShowProposal] = useState(false);
 
   const fetchContracts = useCallback(async () => {
     setIsLoading(true);
@@ -54,18 +59,25 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
     fetchContracts();
   }, [fetchContracts]);
 
-  // Build phone list
+  // Build phone list with validation
   const telefones = useMemo(() => {
-    const phones: { numero: string; tipo: 'celular' | 'fixo'; principal?: boolean }[] = [];
-    if (client.tel_cel_1) {
-      phones.push({ numero: client.tel_cel_1, tipo: 'celular', principal: true });
-    }
-    if (client.tel_cel_2) {
-      phones.push({ numero: client.tel_cel_2, tipo: 'celular' });
-    }
-    if (client.tel_fixo_1) {
-      phones.push({ numero: client.tel_fixo_1, tipo: 'fixo' });
-    }
+    const phones: { numero: string; tipo: 'celular' | 'fixo'; principal?: boolean; valido?: boolean }[] = [];
+    
+    const addPhone = (phone: string | null, isPrincipal: boolean = false) => {
+      if (!phone) return;
+      const validation = validatePhone(phone);
+      phones.push({
+        numero: phone,
+        tipo: validation.tipo === 'celular' ? 'celular' : 'fixo',
+        principal: isPrincipal,
+        valido: validation.isValid,
+      });
+    };
+
+    addPhone(client.tel_cel_1, true);
+    addPhone(client.tel_cel_2);
+    addPhone(client.tel_fixo_1);
+    
     return phones;
   }, [client]);
 
@@ -93,32 +105,74 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
   }, [contracts]);
 
   const handleSimular = (contract: BaseOffContract) => {
-    toast.info(`Simulação para contrato ${contract.contrato}`);
-    // TODO: Implement simulation
+    setSelectedContract(contract);
+    setShowSimulation(true);
   };
 
   const handleRefinanciar = (contract: BaseOffContract) => {
-    toast.info(`Refinanciamento para contrato ${contract.contrato}`);
-    // TODO: Implement refinancing
+    setSelectedContract(contract);
+    setShowSimulation(true);
   };
 
   const handlePortar = (contract: BaseOffContract) => {
     toast.info(`Portabilidade para contrato ${contract.contrato}`);
-    // TODO: Implement porting
   };
 
-  const handleGerarProposta = (contract: BaseOffContract) => {
-    toast.info(`Gerando proposta para contrato ${contract.contrato}`);
-    // TODO: Implement proposal generation
+  const handleGerarProposta = () => {
+    setShowProposal(true);
+  };
+
+  const handleSimulationConfirm = (simulation: any) => {
+    toast.success(`Simulação salva: ${formatCurrency(simulation.novaParcela)}/mês no ${simulation.banco}`);
+  };
+
+  const handleMarcarPrincipal = async (numero: string) => {
+    try {
+      // Update client with new principal phone
+      const { error } = await supabase
+        .from('baseoff_clients')
+        .update({ tel_cel_1: numero })
+        .eq('id', client.id);
+
+      if (error) throw error;
+      toast.success('Telefone principal atualizado!');
+    } catch (error) {
+      console.error('Error updating principal phone:', error);
+      toast.error('Erro ao atualizar telefone');
+    }
   };
 
   return (
     <div className="space-y-6">
+      {/* Modals */}
+      {selectedContract && (
+        <SimulationModal
+          isOpen={showSimulation}
+          onClose={() => setShowSimulation(false)}
+          client={client}
+          contract={selectedContract}
+          onConfirm={handleSimulationConfirm}
+        />
+      )}
+
+      <ProposalGenerator
+        isOpen={showProposal}
+        onClose={() => setShowProposal(false)}
+        client={client}
+        contracts={contracts}
+      />
+
       {/* Back Button */}
-      <Button variant="ghost" onClick={onBack} className="gap-2 mb-2">
-        <ArrowLeft className="w-4 h-4" />
-        Voltar para lista
-      </Button>
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" onClick={onBack} className="gap-2">
+          <ArrowLeft className="w-4 h-4" />
+          Voltar para lista
+        </Button>
+        <Button variant="outline" onClick={handleGerarProposta} className="gap-2">
+          <Download className="w-4 h-4" />
+          Gerar Proposta PDF
+        </Button>
+      </div>
 
       {/* Main Layout: Content + Sticky Phone Panel */}
       <div className="grid lg:grid-cols-[1fr_320px] gap-6">
@@ -189,7 +243,7 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
                       onSimular={() => handleSimular(contract)}
                       onRefinanciar={() => handleRefinanciar(contract)}
                       onPortar={() => handlePortar(contract)}
-                      onGerarProposta={() => handleGerarProposta(contract)}
+                      onGerarProposta={() => handleGerarProposta()}
                     />
                   ))}
                 </div>
@@ -249,6 +303,7 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
           <TelefoneHotPanel 
             telefones={telefones}
             email={client.email_1}
+            onMarcarPrincipal={handleMarcarPrincipal}
           />
         </div>
       </div>
@@ -258,6 +313,7 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
         <TelefoneHotPanel 
           telefones={telefones}
           email={client.email_1}
+          onMarcarPrincipal={handleMarcarPrincipal}
         />
       </div>
     </div>

@@ -6,21 +6,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { 
   Upload, 
   FileText, 
-  BarChart2, 
   RefreshCw,
-  X,
   Loader2,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Database
 } from 'lucide-react';
-import { ImportType, IMPORT_TYPE_CONFIG, ImportJob } from '../types';
 import { formatFileSize } from '../utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,7 +35,6 @@ export function ImportModal({ isOpen, onClose, onJobCreated }: ImportModalProps)
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [importType, setImportType] = useState<ImportType>('contratos');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [phase, setPhase] = useState<UploadPhase>('select');
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -93,9 +88,9 @@ export function ImportModal({ isOpen, onClose, onJobCreated }: ImportModalProps)
       const safeName = selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
       const filePath = `imports/${user.id}/${timestamp}_${safeName}`;
 
-      // 2. Upload to Supabase Storage
+      // 2. Upload to Supabase Storage (use 'imports' bucket which exists)
       const { error: uploadError } = await supabase.storage
-        .from('import-files')
+        .from('imports')
         .upload(filePath, selectedFile, {
           cacheControl: '3600',
           upsert: false,
@@ -107,7 +102,7 @@ export function ImportModal({ isOpen, onClose, onJobCreated }: ImportModalProps)
 
       setUploadProgress(50);
 
-      // 3. Create import job record
+      // 3. Create import job record (unified - clients + contracts in same file)
       const { data: job, error: jobError } = await supabase
         .from('import_jobs')
         .insert({
@@ -115,9 +110,9 @@ export function ImportModal({ isOpen, onClose, onJobCreated }: ImportModalProps)
           file_name: selectedFile.name,
           file_path: filePath,
           file_size_bytes: selectedFile.size,
-          module: `baseoff_${importType}`,
+          module: 'baseoff',
           status: 'uploaded',
-          metadata: { import_type: importType },
+          metadata: { unified_import: true },
         })
         .select()
         .single();
@@ -168,41 +163,23 @@ export function ImportModal({ isOpen, onClose, onJobCreated }: ImportModalProps)
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Import Type Selection */}
-          <div className="space-y-3">
-            <Label className="text-base">Tipo da Base</Label>
-            <RadioGroup
-              value={importType}
-              onValueChange={(value) => setImportType(value as ImportType)}
-              className="grid grid-cols-3 gap-3"
-              disabled={phase !== 'select'}
-            >
-              {Object.entries(IMPORT_TYPE_CONFIG).map(([key, config]) => (
-                <Label
-                  key={key}
-                  className={cn(
-                    'flex flex-col items-center gap-2 p-4 border-2 rounded-xl cursor-pointer transition-all',
-                    importType === key 
-                      ? 'border-primary bg-primary/5' 
-                      : 'border-border hover:border-primary/50'
-                  )}
-                >
-                  <RadioGroupItem value={key} className="sr-only" />
-                  <span className="text-2xl">{config.emoji}</span>
-                  <span className="text-sm font-medium">{config.label}</span>
-                </Label>
-              ))}
-            </RadioGroup>
-          </div>
+          {/* Info Banner */}
+          <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/30">
+            <Database className="w-4 h-4 text-blue-600" />
+            <AlertDescription className="text-blue-800 dark:text-blue-200">
+              <strong>Importação Unificada:</strong> O arquivo deve conter todos os dados (clientes e contratos) 
+              com as colunas: NB, CPF, NOME, DTNASCIMENTO, ESP, BANCOEMPRESTIMO, CONTRATO, VLPARCELA, etc.
+            </AlertDescription>
+          </Alert>
 
           {/* File Selection */}
           {phase === 'select' && (
             <div className="space-y-3">
-              <Label className="text-base">Arquivo</Label>
+              <p className="text-base font-medium">Arquivo</p>
               <div
                 className={cn(
                   'border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all',
-                  selectedFile ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                  selectedFile ? 'border-primary bg-primary/5' : 'border-muted-foreground/30 hover:border-primary/50'
                 )}
                 onClick={() => fileInputRef.current?.click()}
               >
