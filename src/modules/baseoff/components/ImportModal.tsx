@@ -83,15 +83,16 @@ export function ImportModal({ isOpen, onClose, onJobCreated }: ImportModalProps)
     setError(null);
 
     try {
-      // 1. Generate unique file path
+      // 1. Generate unique file path (folder structure: imports/{user_id}/filename)
       const timestamp = Date.now();
       const safeName = selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const filePath = `imports/${user.id}/${timestamp}_${safeName}`;
+      // Path inside bucket: {user.id}/{timestamp}_{filename}
+      const filePathInBucket = `${user.id}/${timestamp}_${safeName}`;
 
       // 2. Upload to Supabase Storage (use 'imports' bucket which exists)
       const { error: uploadError } = await supabase.storage
         .from('imports')
-        .upload(filePath, selectedFile, {
+        .upload(filePathInBucket, selectedFile, {
           cacheControl: '3600',
           upsert: false,
         });
@@ -108,7 +109,7 @@ export function ImportModal({ isOpen, onClose, onJobCreated }: ImportModalProps)
         .insert({
           user_id: user.id,
           file_name: selectedFile.name,
-          file_path: filePath,
+          file_path: filePathInBucket,
           file_size_bytes: selectedFile.size,
           module: 'baseoff',
           status: 'uploaded',
