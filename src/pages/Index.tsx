@@ -135,7 +135,11 @@ const Index = () => {
         );
       
       case "baseoff-consulta":
-        return <BaseOffConsulta />;
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <BaseOffModule />
+          </Suspense>
+        );
       
       case "my-clients":
         if (!hasPermission('can_access_meus_clientes')) {
