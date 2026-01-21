@@ -8,6 +8,7 @@ import { BlockedAccess } from "@/components/BlockedAccess";
 import { SystemStatus } from "@/components/SystemStatus";
 import { TelevendasForm } from "@/components/TelevendasForm";
 import { TelevendasModule as TelevendasModuleNew } from "@/modules/televendas/TelevendasModule";
+import { BaseOffModule } from "@/modules/baseoff";
 import { CommissionTable } from "@/components/CommissionTable";
 import { ClientDocuments } from "@/components/ClientDocuments";
 import { MyClientsList } from "@/components/MyClientsList";
