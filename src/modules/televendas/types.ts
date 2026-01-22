@@ -42,30 +42,43 @@ export interface TelevendasFilters {
   product: string;
 }
 
-// Status Workflow Configuration
+// ===========================================
+// STATUS WORKFLOW CONFIGURATION
+// ===========================================
+
+// Status que o OPERADOR pode definir
 export const OPERATOR_STATUSES = [
-  "digitada",
-  "enviada",
-  "em_analise",
-  "pendente",
-  "pago_aguardando",
-  "cancelado_aguardando",
+  "solicitar_digitacao",    // Solicitar Digitação
+  "proposta_digitada",      // Proposta Digitada
+  "pago_aguardando",        // Pago Aguardando Gestor
+  "solicitar_exclusao",     // Solicitar Exclusão
+  "proposta_pendente",      // Proposta Pendente (informativo)
 ] as const;
 
+// Status que apenas o GESTOR pode definir (finais)
 export const MANAGER_STATUSES = [
-  "pago_aprovado",
-  "cancelado_confirmado",
-  "devolvido",
+  "proposta_paga",          // Proposta Paga (aprovado pelo gestor)
+  "proposta_cancelada",     // Proposta Cancelada
+  "exclusao_aprovada",      // Exclusão aprovada pelo gestor
+  "exclusao_rejeitada",     // Exclusão rejeitada pelo gestor
+  "devolvido",              // Devolvido para operador revisar
 ] as const;
 
 export const ALL_STATUSES = [...OPERATOR_STATUSES, ...MANAGER_STATUSES] as const;
 
 // Legacy status mapping for backwards compatibility
 export const LEGACY_STATUS_MAP: Record<string, string> = {
-  "proposta_digitada": "digitada",
-  "solicitado_digitacao": "digitada",
-  "pago": "pago_aprovado",
-  "cancelado": "cancelado_confirmado",
+  "proposta_digitada_old": "proposta_digitada",
+  "solicitado_digitacao": "solicitar_digitacao",
+  "pago": "proposta_paga",
+  "pago_aprovado": "proposta_paga",
+  "cancelado": "proposta_cancelada",
+  "cancelado_confirmado": "proposta_cancelada",
+  "cancelado_aguardando": "proposta_cancelada",
+  "digitada": "proposta_digitada",
+  "enviada": "proposta_digitada",
+  "em_analise": "proposta_pendente",
+  "pendente": "proposta_pendente",
 };
 
 // Status display configuration
@@ -78,83 +91,96 @@ export const STATUS_CONFIG: Record<string, {
   isOperational: boolean;
   isFinal: boolean;
 }> = {
-  // Operacionais
-  digitada: {
-    label: "Digitada",
-    shortLabel: "Digitada",
+  // ===========================================
+  // STATUS OPERACIONAIS (Usuário comum)
+  // ===========================================
+  solicitar_digitacao: {
+    label: "Solicitar Digitação",
+    shortLabel: "Sol. Digitação",
     emoji: "📝",
     color: "text-purple-600",
     bgColor: "bg-purple-500/10 border-purple-300",
     isOperational: true,
     isFinal: false,
   },
-  enviada: {
-    label: "Enviada",
-    shortLabel: "Enviada",
-    emoji: "📤",
+  proposta_digitada: {
+    label: "Proposta Digitada",
+    shortLabel: "Digitada",
+    emoji: "✍️",
     color: "text-blue-600",
     bgColor: "bg-blue-500/10 border-blue-300",
     isOperational: true,
     isFinal: false,
   },
-  em_analise: {
-    label: "Em Análise",
-    shortLabel: "Análise",
-    emoji: "⏳",
-    color: "text-cyan-600",
-    bgColor: "bg-cyan-500/10 border-cyan-300",
-    isOperational: true,
-    isFinal: false,
-  },
-  pendente: {
-    label: "Pendente",
-    shortLabel: "Pendente",
-    emoji: "⚠️",
-    color: "text-yellow-600",
-    bgColor: "bg-yellow-500/10 border-yellow-300",
-    isOperational: true,
-    isFinal: false,
-  },
-  // Aguardando Gestão
   pago_aguardando: {
-    label: "Pago (Aguardando)",
-    shortLabel: "Aguardando",
+    label: "Pago Aguardando Gestor",
+    shortLabel: "Aguard. Gestor",
     emoji: "💰",
     color: "text-amber-600",
     bgColor: "bg-amber-500/10 border-amber-300",
     isOperational: true,
     isFinal: false,
   },
-  cancelado_aguardando: {
-    label: "Cancelado (Aguardando)",
-    shortLabel: "Cancel. Aguard.",
-    emoji: "❌",
+  solicitar_exclusao: {
+    label: "Solicitar Exclusão",
+    shortLabel: "Sol. Exclusão",
+    emoji: "🗑️",
     color: "text-orange-600",
     bgColor: "bg-orange-500/10 border-orange-300",
     isOperational: true,
     isFinal: false,
   },
-  // Finais (Gestor only)
-  pago_aprovado: {
-    label: "Pago Aprovado",
-    shortLabel: "Aprovado",
+  proposta_pendente: {
+    label: "Proposta Pendente",
+    shortLabel: "Pendente",
+    emoji: "⏳",
+    color: "text-yellow-600",
+    bgColor: "bg-yellow-500/10 border-yellow-300",
+    isOperational: true,
+    isFinal: false,
+  },
+
+  // ===========================================
+  // STATUS DO GESTOR (Finais)
+  // ===========================================
+  proposta_paga: {
+    label: "Proposta Paga",
+    shortLabel: "Paga",
     emoji: "✅",
     color: "text-green-600",
     bgColor: "bg-green-500/10 border-green-300",
     isOperational: false,
     isFinal: true,
   },
-  cancelado_confirmado: {
-    label: "Cancelamento Confirmado",
-    shortLabel: "Cancelado",
-    emoji: "⛔",
+  proposta_cancelada: {
+    label: "Proposta Cancelada",
+    shortLabel: "Cancelada",
+    emoji: "❌",
     color: "text-red-600",
     bgColor: "bg-red-500/10 border-red-300",
     isOperational: false,
     isFinal: true,
   },
+  exclusao_aprovada: {
+    label: "Exclusão Aprovada",
+    shortLabel: "Excluído",
+    emoji: "🗑️",
+    color: "text-red-700",
+    bgColor: "bg-red-600/10 border-red-400",
+    isOperational: false,
+    isFinal: true,
+  },
+  exclusao_rejeitada: {
+    label: "Exclusão Rejeitada",
+    shortLabel: "Exclusão Neg.",
+    emoji: "🚫",
+    color: "text-gray-600",
+    bgColor: "bg-gray-500/10 border-gray-300",
+    isOperational: false,
+    isFinal: false,
+  },
   devolvido: {
-    label: "Devolvido para Operador",
+    label: "Devolvido para Revisão",
     shortLabel: "Devolvido",
     emoji: "🔄",
     color: "text-sky-600",

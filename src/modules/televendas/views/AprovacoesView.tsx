@@ -8,7 +8,7 @@ import {
   RotateCcw, 
   Clock,
   AlertTriangle,
-  Inbox
+  Trash2
 } from "lucide-react";
 import { Televenda, STATUS_CONFIG } from "../types";
 import { formatCPF, formatCurrency, formatTimeAgo } from "../utils";
@@ -20,6 +20,8 @@ interface AprovacoesViewProps {
   onReject: (tv: Televenda) => void;
   onReturn: (tv: Televenda) => void;
   onView: (tv: Televenda) => void;
+  onApproveExclusion: (tv: Televenda) => void;
+  onRejectExclusion: (tv: Televenda) => void;
 }
 
 export const AprovacoesView = ({
@@ -28,18 +30,26 @@ export const AprovacoesView = ({
   onReject,
   onReturn,
   onView,
+  onApproveExclusion,
+  onRejectExclusion,
 }: AprovacoesViewProps) => {
-  // Filter only items needing approval
+  // Filter items that need manager action
   const approvalItems = useMemo(() => {
     return televendas.filter((tv) =>
-      ["pago_aguardando", "cancelado_aguardando", "devolvido", "pendente"].includes(tv.status)
+      [
+        "pago_aguardando",        // Aguardando aprovação de pagamento
+        "solicitar_exclusao",     // Aguardando aprovação de exclusão
+        "proposta_pendente",      // Propostas pendentes
+        "devolvido",              // Devolvidos pelo gestor
+      ].includes(tv.status)
     );
   }, [televendas]);
 
+  // Group by status
   const pagoAguardando = approvalItems.filter(tv => tv.status === "pago_aguardando");
-  const canceladoAguardando = approvalItems.filter(tv => tv.status === "cancelado_aguardando");
+  const solicitarExclusao = approvalItems.filter(tv => tv.status === "solicitar_exclusao");
+  const pendentes = approvalItems.filter(tv => tv.status === "proposta_pendente");
   const devolvidos = approvalItems.filter(tv => tv.status === "devolvido");
-  const pendentes = approvalItems.filter(tv => tv.status === "pendente");
 
   if (approvalItems.length === 0) {
     return (
@@ -63,14 +73,10 @@ export const AprovacoesView = ({
 
   const ApprovalCard = ({ 
     tv, 
-    showApprove = true, 
-    showReject = false,
-    showReturn = true 
+    type = "payment"
   }: { 
     tv: Televenda; 
-    showApprove?: boolean;
-    showReject?: boolean;
-    showReturn?: boolean;
+    type?: "payment" | "exclusion" | "pending" | "returned";
   }) => (
     <motion.div
       key={tv.id}
@@ -108,38 +114,83 @@ export const AprovacoesView = ({
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Actions based on type */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {showApprove && (
-            <Button
-              size="sm"
-              onClick={(e) => { e.stopPropagation(); onApprove(tv); }}
-              className="gap-1.5 bg-green-600 hover:bg-green-700 text-white h-10 px-4"
-            >
-              <CheckCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Aprovar</span>
-            </Button>
+          {type === "payment" && (
+            <>
+              <Button
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); onApprove(tv); }}
+                className="gap-1.5 bg-green-600 hover:bg-green-700 text-white h-10 px-4"
+              >
+                <CheckCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">Aprovar Pago</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={(e) => { e.stopPropagation(); onReject(tv); }}
+                className="gap-1.5 h-10 px-4"
+              >
+                <XCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">Cancelar</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => { e.stopPropagation(); onReturn(tv); }}
+                className="gap-1.5 h-10 px-4"
+              >
+                <RotateCcw className="h-4 w-4" />
+                <span className="hidden sm:inline">Devolver</span>
+              </Button>
+            </>
           )}
-          {showReject && (
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={(e) => { e.stopPropagation(); onReject(tv); }}
-              className="gap-1.5 h-10 px-4"
-            >
-              <XCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Confirmar</span>
-            </Button>
+          
+          {type === "exclusion" && (
+            <>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={(e) => { e.stopPropagation(); onApproveExclusion(tv); }}
+                className="gap-1.5 h-10 px-4"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Confirmar Exclusão</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => { e.stopPropagation(); onRejectExclusion(tv); }}
+                className="gap-1.5 h-10 px-4"
+              >
+                <XCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">Rejeitar</span>
+              </Button>
+            </>
           )}
-          {showReturn && (
+
+          {type === "pending" && (
             <Button
               size="sm"
               variant="outline"
-              onClick={(e) => { e.stopPropagation(); onReturn(tv); }}
+              onClick={(e) => { e.stopPropagation(); onView(tv); }}
+              className="gap-1.5 h-10 px-4"
+            >
+              <Clock className="h-4 w-4" />
+              <span className="hidden sm:inline">Ver Detalhes</span>
+            </Button>
+          )}
+
+          {type === "returned" && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => { e.stopPropagation(); onView(tv); }}
               className="gap-1.5 h-10 px-4"
             >
               <RotateCcw className="h-4 w-4" />
-              <span className="hidden sm:inline">Devolver</span>
+              <span className="hidden sm:inline">Ver Detalhes</span>
             </Button>
           )}
         </div>
@@ -183,34 +234,35 @@ export const AprovacoesView = ({
       </div>
 
       <AnimatePresence mode="popLayout">
-        {/* Pago Aguardando */}
+        {/* Pago Aguardando Gestor */}
         {pagoAguardando.length > 0 && (
           <div>
             <SectionHeader 
               emoji="💰" 
-              title="Pago Aguardando Gestão" 
+              title="Pago Aguardando Aprovação" 
               count={pagoAguardando.length}
               urgent
             />
             <div className="space-y-2">
               {pagoAguardando.map((tv) => (
-                <ApprovalCard key={tv.id} tv={tv} showApprove showReturn />
+                <ApprovalCard key={tv.id} tv={tv} type="payment" />
               ))}
             </div>
           </div>
         )}
 
-        {/* Cancelado Aguardando */}
-        {canceladoAguardando.length > 0 && (
+        {/* Solicitar Exclusão */}
+        {solicitarExclusao.length > 0 && (
           <div>
             <SectionHeader 
-              emoji="❌" 
-              title="Cancelado Aguardando Confirmação" 
-              count={canceladoAguardando.length}
+              emoji="🗑️" 
+              title="Solicitações de Exclusão" 
+              count={solicitarExclusao.length}
+              urgent
             />
             <div className="space-y-2">
-              {canceladoAguardando.map((tv) => (
-                <ApprovalCard key={tv.id} tv={tv} showApprove={false} showReject showReturn />
+              {solicitarExclusao.map((tv) => (
+                <ApprovalCard key={tv.id} tv={tv} type="exclusion" />
               ))}
             </div>
           </div>
@@ -220,13 +272,13 @@ export const AprovacoesView = ({
         {pendentes.length > 0 && (
           <div>
             <SectionHeader 
-              emoji="⚠️" 
-              title="Pendências" 
+              emoji="⏳" 
+              title="Propostas Pendentes" 
               count={pendentes.length}
             />
             <div className="space-y-2">
               {pendentes.map((tv) => (
-                <ApprovalCard key={tv.id} tv={tv} showApprove={false} showReturn={false} />
+                <ApprovalCard key={tv.id} tv={tv} type="pending" />
               ))}
             </div>
           </div>
@@ -237,12 +289,12 @@ export const AprovacoesView = ({
           <div>
             <SectionHeader 
               emoji="🔄" 
-              title="Devolvidos" 
+              title="Devolvidos para Revisão" 
               count={devolvidos.length}
             />
             <div className="space-y-2">
               {devolvidos.map((tv) => (
-                <ApprovalCard key={tv.id} tv={tv} showApprove={false} showReturn={false} />
+                <ApprovalCard key={tv.id} tv={tv} type="returned" />
               ))}
             </div>
           </div>

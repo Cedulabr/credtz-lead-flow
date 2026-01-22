@@ -34,7 +34,8 @@ import {
   PRODUCT_OPTIONS, 
   PERIOD_OPTIONS,
   STATUS_CONFIG,
-  OPERATOR_STATUSES
+  OPERATOR_STATUSES,
+  ALL_STATUSES
 } from "../types";
 
 interface FiltersDrawerProps {
@@ -70,9 +71,16 @@ export const FiltersDrawer = ({
     });
   };
 
-  const operationalStatuses = Object.entries(STATUS_CONFIG)
-    .filter(([key]) => OPERATOR_STATUSES.includes(key as any))
-    .map(([key, config]) => ({ value: key, ...config }));
+  // Get available statuses based on role
+  const availableStatuses = useMemo(() => {
+    const statusList = isGestorOrAdmin ? ALL_STATUSES : OPERATOR_STATUSES;
+    return statusList
+      .filter((key) => STATUS_CONFIG[key])
+      .map((key) => ({ 
+        value: key, 
+        ...STATUS_CONFIG[key] 
+      }));
+  }, [isGestorOrAdmin]);
 
   // Generate month options (last 12 months)
   const monthOptions = useMemo(() => {
@@ -216,7 +224,7 @@ export const FiltersDrawer = ({
               >
                 Todos
               </Button>
-              {operationalStatuses.map((status) => (
+              {availableStatuses.map((status) => (
                 <Button
                   key={status.value}
                   variant={filters.status === status.value ? "default" : "outline"}
