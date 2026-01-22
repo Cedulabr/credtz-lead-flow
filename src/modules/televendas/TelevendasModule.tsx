@@ -6,7 +6,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw, FileText, Users, ClipboardCheck, Sparkles } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { RefreshCw, FileText, Users, ClipboardCheck, Sparkles, Search } from "lucide-react";
 
 import { 
   Televenda, 
@@ -19,6 +20,7 @@ import {
 import { getDateRange, normalizeStatus } from "./utils";
 import { SummaryCards } from "./components/SummaryCards";
 import { FiltersDrawer } from "./components/FiltersDrawer";
+import { DetailModal } from "./components/DetailModal";
 import { PropostasView } from "./views/PropostasView";
 import { ClientesView } from "./views/ClientesView";
 import { AprovacoesView } from "./views/AprovacoesView";
@@ -45,6 +47,10 @@ export const TelevendasModule = () => {
     month: "all",
     product: "all",
   });
+
+  // Detail modal state
+  const [selectedTelevenda, setSelectedTelevenda] = useState<Televenda | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
 
   // Role states
   const [isGestor, setIsGestor] = useState(false);
@@ -139,12 +145,17 @@ export const TelevendasModule = () => {
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => { fetchTelevendas(); }, [fetchTelevendas]);
 
-  // Filtered data
+  // Filtered data - now searches both name AND CPF
   const filteredTelevendas = useMemo(() => {
     return televendas.filter((tv) => {
-      const matchesSearch = !filters.search || 
-        tv.nome.toLowerCase().includes(filters.search.toLowerCase()) ||
-        tv.cpf.includes(filters.search.replace(/\D/g, ""));
+      const searchTerm = filters.search.toLowerCase().trim();
+      const cpfDigits = filters.search.replace(/\D/g, "");
+      
+      // Search by name OR CPF
+      const matchesSearch = !searchTerm || 
+        tv.nome.toLowerCase().includes(searchTerm) ||
+        tv.cpf.replace(/\D/g, "").includes(cpfDigits);
+      
       const matchesStatus = filters.status === "all" || tv.status === filters.status;
       const matchesProduct = filters.product === "all" || tv.tipo_operacao === filters.product;
       return matchesSearch && matchesStatus && matchesProduct;
@@ -158,9 +169,9 @@ export const TelevendasModule = () => {
       totalPropostas: televendas.length,
       clientesUnicos: uniqueCpfs.size,
       aguardandoGestao: televendas.filter((tv) => 
-        tv.status === "pago_aguardando" || tv.status === "cancelado_aguardando"
+        tv.status === "pago_aguardando" || tv.status === "solicitar_exclusao"
       ).length,
-      pendentes: televendas.filter((tv) => tv.status === "pendente").length,
+      pendentes: televendas.filter((tv) => tv.status === "proposta_pendente").length,
     };
   }, [televendas]);
 
@@ -170,7 +181,7 @@ export const TelevendasModule = () => {
     filters.period !== "all", filters.product !== "all"
   ].filter(Boolean).length;
 
-  // Handlers
+  // Status change handler
   const handleStatusChange = async (tv: Televenda, newStatus: string) => {
     try {
       await supabase.from("televendas").update({ 
@@ -193,13 +204,43 @@ export const TelevendasModule = () => {
     }
   };
 
+  // Delete handler (physical delete after manager approval)
+  const handleDeleteTelevendas = async (tv: Televenda) => {
+    try {
+      await supabase.from("televendas").delete().eq("id", tv.id);
+      toast({ title: "🗑️ Proposta excluída" });
+      fetchTelevendas();
+    } catch (error) {
+      toast({ title: "Erro", description: "Erro ao excluir", variant: "destructive" });
+    }
+  };
+
+  // View handlers
   const handleView = (tv: Televenda) => {
-    toast({ title: tv.nome, description: `CPF: ${tv.cpf} • ${tv.banco}` });
+    setSelectedTelevenda(tv);
+    setDetailModalOpen(true);
   };
 
   const handleEdit = (tv: Televenda) => toast({ title: "Editar", description: tv.nome });
-  const handleDelete = (tv: Televenda) => toast({ title: "Excluir", description: tv.nome });
+  
+  const handleDelete = (tv: Televenda) => {
+    // For regular users: request deletion (change status)
+    if (!isGestorOrAdmin) {
+      handleStatusChange(tv, "solicitar_exclusao");
+    } else {
+      // For managers: can delete directly or change status
+      handleDeleteTelevendas(tv);
+    }
+  };
 
+  // Approval handlers
+  const handleApprove = (tv: Televenda) => handleStatusChange(tv, "proposta_paga");
+  const handleReject = (tv: Televenda) => handleStatusChange(tv, "proposta_cancelada");
+  const handleReturn = (tv: Televenda) => handleStatusChange(tv, "devolvido");
+  const handleApproveExclusion = (tv: Televenda) => handleDeleteTelevendas(tv);
+  const handleRejectExclusion = (tv: Televenda) => handleStatusChange(tv, "exclusao_rejeitada");
+
+  // Permission checks
   const canEdit = (tv: Televenda) => isAdmin || (isGestor && userCompanyIds.includes(tv.company_id || ""));
   const canChangeStatus = (tv: Televenda) => isAdmin || isGestor || tv.user_id === user?.id;
 
@@ -227,10 +268,27 @@ export const TelevendasModule = () => {
             isGestorOrAdmin={isGestorOrAdmin}
             activeCount={activeFiltersCount}
           />
-          <Button variant="outline" size="icon" onClick={() => { setRefreshing(true); fetchTelevendas(); }} disabled={refreshing} className="h-12 w-12 rounded-xl">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={() => { setRefreshing(true); fetchTelevendas(); }} 
+            disabled={refreshing} 
+            className="h-12 w-12 rounded-xl"
+          >
             <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
           </Button>
         </div>
+      </div>
+
+      {/* Quick Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por nome ou CPF..."
+          value={filters.search}
+          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+          className="h-14 pl-12 text-base rounded-xl border-2 focus:border-primary"
+        />
       </div>
 
       {/* Summary Cards */}
@@ -289,16 +347,25 @@ export const TelevendasModule = () => {
               <motion.div key="aprovacoes" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <AprovacoesView
                   televendas={televendas}
-                  onApprove={(tv) => handleStatusChange(tv, "pago_aprovado")}
-                  onReject={(tv) => handleStatusChange(tv, "cancelado_confirmado")}
-                  onReturn={(tv) => handleStatusChange(tv, "devolvido")}
+                  onApprove={handleApprove}
+                  onReject={handleReject}
+                  onReturn={handleReturn}
                   onView={handleView}
+                  onApproveExclusion={handleApproveExclusion}
+                  onRejectExclusion={handleRejectExclusion}
                 />
               </motion.div>
             )}
           </AnimatePresence>
         </CardContent>
       </Card>
+
+      {/* Detail Modal */}
+      <DetailModal
+        open={detailModalOpen}
+        onOpenChange={setDetailModalOpen}
+        televenda={selectedTelevenda}
+      />
     </div>
   );
 };

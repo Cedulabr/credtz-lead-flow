@@ -5,6 +5,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import { 
   MoreHorizontal, 
@@ -12,9 +15,10 @@ import {
   Edit, 
   Trash2,
   MessageSquare,
-  Phone
+  Phone,
+  RefreshCw
 } from "lucide-react";
-import { Televenda, STATUS_CONFIG, OPERATOR_STATUSES } from "../types";
+import { Televenda, STATUS_CONFIG, OPERATOR_STATUSES, ALL_STATUSES } from "../types";
 
 interface ActionMenuProps {
   televenda: Televenda;
@@ -37,15 +41,16 @@ export const ActionMenu = ({
   canChangeStatus,
   isGestorOrAdmin,
 }: ActionMenuProps) => {
+  // Get available statuses based on role
   const getAvailableStatuses = () => {
     if (isGestorOrAdmin) {
-      return Object.keys(STATUS_CONFIG);
+      return ALL_STATUSES as unknown as string[];
     }
     return OPERATOR_STATUSES as unknown as string[];
   };
 
   const availableStatuses = getAvailableStatuses().filter(
-    (status) => status !== televenda.status
+    (status) => status !== televenda.status && STATUS_CONFIG[status]
   );
 
   const handleWhatsApp = () => {
@@ -67,7 +72,7 @@ export const ActionMenu = ({
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52">
+      <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuItem 
           onClick={(e) => { e.stopPropagation(); onView(televenda); }}
           className="gap-2 py-2.5"
@@ -98,22 +103,28 @@ export const ActionMenu = ({
         {canChangeStatus && availableStatuses.length > 0 && (
           <>
             <DropdownMenuSeparator />
-            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-              Alterar Status
-            </div>
-            {availableStatuses.slice(0, 4).map((status) => {
-              const config = STATUS_CONFIG[status];
-              return (
-                <DropdownMenuItem
-                  key={status}
-                  onClick={(e) => { e.stopPropagation(); onStatusChange(televenda, status); }}
-                  className="gap-2 py-2"
-                >
-                  <span>{config?.emoji}</span>
-                  <span className="truncate">{config?.shortLabel || status}</span>
-                </DropdownMenuItem>
-              );
-            })}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="gap-2 py-2">
+                <RefreshCw className="h-4 w-4" />
+                Alterar Status
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-56">
+                {availableStatuses.map((status) => {
+                  const config = STATUS_CONFIG[status];
+                  if (!config) return null;
+                  return (
+                    <DropdownMenuItem
+                      key={status}
+                      onClick={(e) => { e.stopPropagation(); onStatusChange(televenda, status); }}
+                      className="gap-2 py-2"
+                    >
+                      <span>{config.emoji}</span>
+                      <span className="truncate">{config.label}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
           </>
         )}
 
@@ -132,7 +143,7 @@ export const ActionMenu = ({
               className="gap-2 py-2.5 text-destructive focus:text-destructive"
             >
               <Trash2 className="h-4 w-4" />
-              Excluir
+              {isGestorOrAdmin ? "Excluir" : "Solicitar Exclusão"}
             </DropdownMenuItem>
           </>
         )}
