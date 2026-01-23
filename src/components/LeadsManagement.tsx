@@ -220,6 +220,8 @@ export function LeadsManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [userFilter, setUserFilter] = useState("all");
+  const [convenioFilter, setConvenioFilter] = useState("all");
+  const [tagFilter, setTagFilter] = useState("all");
   const [leads, setLeads] = useState<Lead[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -1154,9 +1156,13 @@ export function LeadsManagement() {
       
       const matchesUser = userFilter === "all" || lead.assigned_to === userFilter;
       
-      return matchesSearch && matchesStatus && matchesUser;
+      const matchesConvenio = convenioFilter === "all" || lead.convenio === convenioFilter;
+      
+      const matchesTag = tagFilter === "all" || lead.tag === tagFilter;
+      
+      return matchesSearch && matchesStatus && matchesUser && matchesConvenio && matchesTag;
     });
-  }, [leads, searchTerm, statusFilter, userFilter]);
+  }, [leads, searchTerm, statusFilter, userFilter, convenioFilter, tagFilter]);
 
   const stats = useMemo(() => ({
     total: leads.length,
@@ -1628,9 +1634,9 @@ export function LeadsManagement() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 md:flex gap-2 md:gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:flex gap-2 md:gap-3">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full md:w-60 border-2 focus:border-primary h-11 md:h-14 text-sm md:text-base font-semibold">
+                  <SelectTrigger className="w-full md:w-44 border-2 focus:border-primary h-11 md:h-14 text-sm md:text-base font-semibold">
                     <Filter className="h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2 flex-shrink-0" />
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -1652,9 +1658,56 @@ export function LeadsManagement() {
                   </SelectContent>
                 </Select>
 
+                {/* Filtro por Convênio - Disponível para todos */}
+                <Select value={convenioFilter} onValueChange={setConvenioFilter}>
+                  <SelectTrigger className="w-full md:w-44 border-2 focus:border-primary h-11 md:h-14 text-sm md:text-base font-semibold">
+                    <Building2 className="h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2 flex-shrink-0" />
+                    <SelectValue placeholder="Convênio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-sm md:text-base py-2 md:py-3">
+                      <span className="flex items-center gap-2 font-semibold">
+                        <Building2 className="h-4 w-4" />
+                        Todos Convênios
+                      </span>
+                    </SelectItem>
+                    {[...new Set(leads.map(l => l.convenio).filter(Boolean))].sort().map(convenio => (
+                      <SelectItem key={convenio} value={convenio} className="text-sm md:text-base py-2 md:py-3">
+                        <span className="flex items-center gap-2 font-semibold">
+                          {convenio}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Filtro por Tag - Disponível para todos */}
+                <Select value={tagFilter} onValueChange={setTagFilter}>
+                  <SelectTrigger className="w-full md:w-44 border-2 focus:border-primary h-11 md:h-14 text-sm md:text-base font-semibold">
+                    <Tag className="h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2 flex-shrink-0" />
+                    <SelectValue placeholder="Tag/Perfil" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-sm md:text-base py-2 md:py-3">
+                      <span className="flex items-center gap-2 font-semibold">
+                        <Tag className="h-4 w-4" />
+                        Todas Tags
+                      </span>
+                    </SelectItem>
+                    {[...new Set(leads.map(l => l.tag).filter(Boolean))].sort().map(tag => (
+                      <SelectItem key={tag} value={tag!} className="text-sm md:text-base py-2 md:py-3">
+                        <span className="flex items-center gap-2 font-semibold">
+                          <Tag className="h-4 w-4" />
+                          {tag}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
                 {isAdmin && (
                   <Select value={userFilter} onValueChange={setUserFilter}>
-                    <SelectTrigger className="w-full md:w-60 border-2 focus:border-primary h-11 md:h-14 text-sm md:text-base font-semibold">
+                    <SelectTrigger className="w-full md:w-44 border-2 focus:border-primary h-11 md:h-14 text-sm md:text-base font-semibold">
                       <User className="h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2 flex-shrink-0" />
                       <SelectValue placeholder="Usuário" />
                     </SelectTrigger>
