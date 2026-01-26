@@ -6,8 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { RefreshCw, FileText, Users, ClipboardCheck, Sparkles, Search } from "lucide-react";
+import { RefreshCw, FileText, Users, ClipboardCheck, Sparkles } from "lucide-react";
 
 import { 
   Televenda, 
@@ -18,7 +17,9 @@ import {
   STATUS_CONFIG
 } from "./types";
 import { getDateRange, normalizeStatus } from "./utils";
-import { SummaryCards } from "./components/SummaryCards";
+import { DashboardCards } from "./components/DashboardCards";
+import { SmartSearch } from "./components/SmartSearch";
+import { StatusChangeModal } from "./components/StatusChangeModal";
 import { FiltersDrawer } from "./components/FiltersDrawer";
 import { DetailModal } from "./components/DetailModal";
 import { PropostasView } from "./views/PropostasView";
@@ -51,6 +52,14 @@ export const TelevendasModule = () => {
   // Detail modal state
   const [selectedTelevenda, setSelectedTelevenda] = useState<Televenda | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+
+  // Status change modal state
+  const [statusChangeModal, setStatusChangeModal] = useState<{
+    open: boolean;
+    televenda: Televenda | null;
+    newStatus: string;
+  }>({ open: false, televenda: null, newStatus: "" });
+  const [statusChangeLoading, setStatusChangeLoading] = useState(false);
 
   // Role states
   const [isGestor, setIsGestor] = useState(false);
@@ -162,7 +171,7 @@ export const TelevendasModule = () => {
     });
   }, [televendas, filters]);
 
-  // Summary stats
+  // Summary stats (for badges and approval count)
   const stats = useMemo(() => {
     const uniqueCpfs = new Set(televendas.map((tv) => tv.cpf.replace(/\D/g, "")));
     return {
@@ -175,14 +184,72 @@ export const TelevendasModule = () => {
     };
   }, [televendas]);
 
+  // Handle filter by status from dashboard cards
+  const handleFilterByStatus = (status: string) => {
+    if (status === "all") {
+      setFilters({ ...filters, status: "all" });
+    } else {
+      setFilters({ ...filters, status });
+    }
+    setActiveTab("propostas");
+  };
+
   // Active filters count
   const activeFiltersCount = [
     filters.search, filters.status !== "all", filters.userId !== "all",
     filters.period !== "all", filters.product !== "all"
   ].filter(Boolean).length;
 
-  // Status change handler
-  const handleStatusChange = async (tv: Televenda, newStatus: string) => {
+  // Status change handler - opens modal for confirmation
+  const handleStatusChange = (tv: Televenda, newStatus: string) => {
+    setStatusChangeModal({
+      open: true,
+      televenda: tv,
+      newStatus,
+    });
+  };
+
+  // Confirm status change with reason
+  const confirmStatusChange = async (reason: string) => {
+    if (!statusChangeModal.televenda) return;
+
+    const tv = statusChangeModal.televenda;
+    const newStatus = statusChangeModal.newStatus;
+
+    setStatusChangeLoading(true);
+    try {
+      // Update status in televendas table
+      await supabase.from("televendas").update({ 
+        status: newStatus, 
+        status_updated_at: new Date().toISOString(),
+        status_updated_by: user?.id 
+      }).eq("id", tv.id);
+
+      // Record in history with reason
+      await supabase.from("televendas_status_history").insert({
+        televendas_id: tv.id,
+        from_status: tv.status,
+        to_status: newStatus,
+        changed_by: user?.id,
+        reason: reason || null,
+      });
+
+      toast({ 
+        title: "✅ Status atualizado", 
+        description: `Proposta de ${tv.nome} alterada para ${STATUS_CONFIG[newStatus]?.label || newStatus}` 
+      });
+      fetchTelevendas();
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast({ title: "Erro", description: "Erro ao atualizar status", variant: "destructive" });
+    } finally {
+      setStatusChangeLoading(false);
+      setStatusChangeModal({ open: false, televenda: null, newStatus: "" });
+    }
+  };
+
+  // Direct status change (without modal - for quick actions)
+  const handleQuickStatusChange = async (tv: Televenda, newStatus: string) => {
     try {
       await supabase.from("televendas").update({ 
         status: newStatus, 
@@ -280,19 +347,22 @@ export const TelevendasModule = () => {
         </div>
       </div>
 
-      {/* Quick Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nome ou CPF..."
-          value={filters.search}
-          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-          className="h-14 pl-12 text-base rounded-xl border-2 focus:border-primary"
-        />
-      </div>
+      {/* Smart Search Bar */}
+      <SmartSearch
+        value={filters.search}
+        onChange={(value) => setFilters({ ...filters, search: value })}
+        televendas={televendas}
+        onSelectResult={(tv) => handleView(tv)}
+        placeholder="Buscar por nome, CPF, telefone ou ID..."
+      />
 
-      {/* Summary Cards */}
-      <SummaryCards {...stats} />
+      {/* Dashboard Cards with clickable status filters */}
+      <DashboardCards
+        televendas={televendas}
+        onFilterByStatus={handleFilterByStatus}
+        selectedStatus={filters.status !== "all" ? filters.status : undefined}
+        isGestorOrAdmin={isGestorOrAdmin}
+      />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)} className="w-full">
@@ -365,6 +435,16 @@ export const TelevendasModule = () => {
         open={detailModalOpen}
         onOpenChange={setDetailModalOpen}
         televenda={selectedTelevenda}
+      />
+
+      {/* Status Change Modal with audit */}
+      <StatusChangeModal
+        open={statusChangeModal.open}
+        onOpenChange={(open) => setStatusChangeModal({ ...statusChangeModal, open })}
+        televenda={statusChangeModal.televenda}
+        newStatus={statusChangeModal.newStatus}
+        onConfirm={confirmStatusChange}
+        isLoading={statusChangeLoading}
       />
     </div>
   );
