@@ -218,31 +218,51 @@ export const TelevendasModule = () => {
 
     setStatusChangeLoading(true);
     try {
+      console.log("Updating status for:", tv.id, "to:", newStatus);
+      
       // Update status in televendas table
-      await supabase.from("televendas").update({ 
-        status: newStatus, 
-        status_updated_at: new Date().toISOString(),
-        status_updated_by: user?.id 
-      }).eq("id", tv.id);
+      const { error: updateError } = await supabase
+        .from("televendas")
+        .update({ 
+          status: newStatus, 
+          status_updated_at: new Date().toISOString(),
+          status_updated_by: user?.id 
+        })
+        .eq("id", tv.id);
+
+      if (updateError) {
+        console.error("Update error:", updateError);
+        throw updateError;
+      }
 
       // Record in history with reason
-      await supabase.from("televendas_status_history").insert({
-        televendas_id: tv.id,
-        from_status: tv.status,
-        to_status: newStatus,
-        changed_by: user?.id,
-        reason: reason || null,
-      });
+      const { error: historyError } = await supabase
+        .from("televendas_status_history")
+        .insert({
+          televendas_id: tv.id,
+          from_status: tv.status,
+          to_status: newStatus,
+          changed_by: user?.id,
+          reason: reason || null,
+        });
+
+      if (historyError) {
+        console.error("History error:", historyError);
+        // Don't throw - status was already updated
+      }
 
       toast({ 
         title: "✅ Status atualizado", 
         description: `Proposta de ${tv.nome} alterada para ${STATUS_CONFIG[newStatus]?.label || newStatus}` 
       });
-      fetchTelevendas();
+      
+      // Close modal first, then refresh
+      setStatusChangeModal({ open: false, televenda: null, newStatus: "" });
+      setStatusChangeLoading(false);
+      await fetchTelevendas();
     } catch (error) {
       console.error("Error updating status:", error);
       toast({ title: "Erro", description: "Erro ao atualizar status", variant: "destructive" });
-    } finally {
       setStatusChangeLoading(false);
       setStatusChangeModal({ open: false, televenda: null, newStatus: "" });
     }
@@ -251,22 +271,39 @@ export const TelevendasModule = () => {
   // Direct status change (without modal - for quick actions)
   const handleQuickStatusChange = async (tv: Televenda, newStatus: string) => {
     try {
-      await supabase.from("televendas").update({ 
-        status: newStatus, 
-        status_updated_at: new Date().toISOString(),
-        status_updated_by: user?.id 
-      }).eq("id", tv.id);
+      console.log("Quick status change for:", tv.id, "to:", newStatus);
+      
+      const { error: updateError } = await supabase
+        .from("televendas")
+        .update({ 
+          status: newStatus, 
+          status_updated_at: new Date().toISOString(),
+          status_updated_by: user?.id 
+        })
+        .eq("id", tv.id);
 
-      await supabase.from("televendas_status_history").insert({
-        televendas_id: tv.id,
-        from_status: tv.status,
-        to_status: newStatus,
-        changed_by: user?.id,
-      });
+      if (updateError) {
+        console.error("Update error:", updateError);
+        throw updateError;
+      }
+
+      const { error: historyError } = await supabase
+        .from("televendas_status_history")
+        .insert({
+          televendas_id: tv.id,
+          from_status: tv.status,
+          to_status: newStatus,
+          changed_by: user?.id,
+        });
+
+      if (historyError) {
+        console.error("History error:", historyError);
+      }
 
       toast({ title: "✅ Status atualizado" });
-      fetchTelevendas();
+      await fetchTelevendas();
     } catch (error) {
+      console.error("Quick status change error:", error);
       toast({ title: "Erro", description: "Erro ao atualizar", variant: "destructive" });
     }
   };

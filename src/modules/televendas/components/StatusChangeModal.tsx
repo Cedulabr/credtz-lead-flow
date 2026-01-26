@@ -56,12 +56,18 @@ export const StatusChangeModal = ({
     }
 
     setError("");
-    await onConfirm(reason.trim());
-    setReason("");
-    onOpenChange(false);
+    try {
+      await onConfirm(reason.trim());
+      setReason("");
+      // Modal will be closed by parent after successful update
+    } catch (error) {
+      console.error("Error in confirm:", error);
+      setError("Erro ao processar alteração");
+    }
   };
 
   const handleClose = () => {
+    if (isLoading) return; // Prevent closing while loading
     setReason("");
     setError("");
     onOpenChange(false);
