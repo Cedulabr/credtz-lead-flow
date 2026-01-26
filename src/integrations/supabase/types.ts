@@ -3676,6 +3676,7 @@ export type Database = {
           from_status: string | null
           id: string
           notes: string | null
+          reason: string | null
           televendas_id: string
           to_status: string
         }
@@ -3685,6 +3686,7 @@ export type Database = {
           from_status?: string | null
           id?: string
           notes?: string | null
+          reason?: string | null
           televendas_id: string
           to_status: string
         }
@@ -3694,6 +3696,7 @@ export type Database = {
           from_status?: string | null
           id?: string
           notes?: string | null
+          reason?: string | null
           televendas_id?: string
           to_status?: string
         }
