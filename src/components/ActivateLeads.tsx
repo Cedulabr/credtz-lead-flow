@@ -20,6 +20,7 @@ import { DuplicateManager } from '@/components/ActivateLeads/DuplicateManager';
 import { ActivateSimulationManager } from '@/components/ActivateLeads/SimulationManager';
 import { ActivateSimulationRequestButton } from '@/components/ActivateLeads/SimulationRequestButton';
 import { useActivateLeadSimulations } from '@/hooks/useActivateLeadSimulations';
+import { PasteImageUpload } from '@/components/ui/paste-image-upload';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
@@ -2112,51 +2113,26 @@ export const ActivateLeads = () => {
                 📎 Comprovante da Tentativa 
                 <span className="text-destructive">*</span>
               </Label>
-              <div className="border-2 border-dashed rounded-xl p-6 text-center hover:border-primary/50 transition-all duration-300 cursor-pointer relative">
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/jpg"
-                  onChange={handleProofFileChange}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  id="proof-upload"
-                />
-                <AnimatePresence mode="wait">
-                  {proofPreview ? (
-                    <motion.div
-                      key="preview"
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      className="space-y-3"
-                    >
-                      <img 
-                        src={proofPreview} 
-                        alt="Preview" 
-                        className="max-h-40 mx-auto rounded-lg shadow-lg"
-                      />
-                      <p className="text-sm text-primary font-medium">✅ {proofFile?.name}</p>
-                      <p className="text-xs text-muted-foreground">Clique para alterar</p>
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="empty"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                    >
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-primary/20 to-primary/10 flex items-center justify-center mx-auto mb-3">
-                        <Camera className="h-8 w-8 text-primary" />
-                      </div>
-                      <p className="text-base text-muted-foreground">
-                        Clique ou arraste para anexar o print
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        📷 JPG ou PNG • Máximo 5MB
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+              <PasteImageUpload
+                file={proofFile}
+                preview={proofPreview}
+                onFileChange={(file, preview) => {
+                  setProofFile(file);
+                  setProofPreview(preview);
+                }}
+                onError={(message) => {
+                  toast({
+                    title: '⚠️ Erro no anexo',
+                    description: message,
+                    variant: 'destructive',
+                  });
+                }}
+                isLoading={uploadingProof}
+                maxSizeBytes={5 * 1024 * 1024}
+                acceptedTypes={['image/jpeg', 'image/png', 'image/jpg', 'image/webp']}
+                placeholderText="Clique ou arraste o print"
+                pasteInstructionText="Cole o print aqui (Ctrl + V)"
+              />
             </div>
 
             <div className="space-y-3">
