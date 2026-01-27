@@ -4464,6 +4464,7 @@ export type Database = {
         }[]
       }
       count_baseoff_duplicates: { Args: never; Returns: number }
+      count_leads_database_duplicates: { Args: never; Returns: number }
       create_admin_profile: {
         Args: { user_email: string; user_name?: string }
         Returns: string
@@ -4524,6 +4525,15 @@ export type Database = {
         }[]
       }
       get_complete_schema: { Args: never; Returns: Json }
+      get_database_storage_stats: {
+        Args: never
+        Returns: {
+          duplicate_count: number
+          estimated_size: string
+          table_name: string
+          total_records: number
+        }[]
+      }
       get_televendas_sales_ranking: {
         Args: { p_company_id: string; p_end_date: string; p_start_date: string }
         Returns: {
@@ -4574,6 +4584,7 @@ export type Database = {
       normalize_cpf: { Args: { input_cpf: string }; Returns: string }
       process_expired_future_contacts: { Args: never; Returns: number }
       remove_baseoff_duplicates: { Args: never; Returns: number }
+      remove_leads_database_duplicates: { Args: never; Returns: number }
       request_leads: {
         Args: {
           banco_filter?: string

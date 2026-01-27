@@ -30,6 +30,7 @@ import { AdminTelevendasBanks } from "./AdminTelevendasBanks";
 import { AdminCommissionRules } from "./AdminCommissionRules";
 import { AdminBankReuseSettings } from "./AdminBankReuseSettings";
 import { AdminCreditsManagement } from "./AdminCreditsManagement";
+import { AdminDuplicatesManager } from "./AdminDuplicatesManager";
 import { AdminInactivitySettings } from "./AdminInactivitySettings";
 
 interface Announcement {
@@ -341,8 +342,9 @@ export function AdminPanel() {
       </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-11' : 'grid-cols-1'}`}>
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-12' : 'grid-cols-1'}`}>
             <TabsTrigger value="announcements">Avisos</TabsTrigger>
+            {isAdmin && <TabsTrigger value="duplicates">🗑️ Duplicatas</TabsTrigger>}
             {isAdmin && <TabsTrigger value="credits">💰 Créditos</TabsTrigger>}
             {isAdmin && <TabsTrigger value="commission-rules">Regras Flexíveis</TabsTrigger>}
             {isAdmin && <TabsTrigger value="companies">Empresas</TabsTrigger>}
@@ -451,6 +453,13 @@ export function AdminPanel() {
             ))}
           </div>
         </TabsContent>
+
+        {/* Duplicates Management Tab */}
+        {isAdmin && (
+          <TabsContent value="duplicates" className="space-y-4">
+            <AdminDuplicatesManager />
+          </TabsContent>
+        )}
 
         {/* Credits Management Tab */}
         {isAdmin && (
