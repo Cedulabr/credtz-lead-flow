@@ -14,6 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ImportHistory } from "@/components/ImportHistory";
 import { LeadsDatabase } from "@/components/LeadsDatabase";
+import { DuplicateFileAlert } from "@/components/ui/duplicate-file-alert";
+import { calculateFileHash, checkDuplicateImport, type DuplicateImportInfo } from "@/lib/fileHash";
 import { 
   Upload, 
   FileSpreadsheet, 
@@ -63,12 +65,18 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [file, setFile] = useState<File | null>(null);
+  const [fileHash, setFileHash] = useState<string | null>(null);
   const [parsedLeads, setParsedLeads] = useState<ParsedLead[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [showResultDialog, setShowResultDialog] = useState(false);
+  
+  // Duplicate file detection states
+  const [duplicateInfo, setDuplicateInfo] = useState<DuplicateImportInfo | null>(null);
+  const [showDuplicateAlert, setShowDuplicateAlert] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   // Check if user is admin
   const isAdmin = profile?.role === 'admin';
@@ -87,11 +95,50 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       return;
     }
 
+    // Calculate file hash and check for duplicates
+    try {
+      const hash = await calculateFileHash(selectedFile);
+      setFileHash(hash);
+      
+      const dupInfo = await checkDuplicateImport(hash, 'leads_database');
+      
+      if (dupInfo.isDuplicate) {
+        setDuplicateInfo(dupInfo);
+        setPendingFile(selectedFile);
+        setShowDuplicateAlert(true);
+        return;
+      }
+    } catch (error) {
+      console.warn('Hash calculation failed, continuing without duplicate check:', error);
+    }
+
+    await processFile(selectedFile);
+  };
+
+  const processFile = async (selectedFile: File) => {
     setFile(selectedFile);
+    const extension = selectedFile.name.toLowerCase();
     if (extension.endsWith('.csv')) {
       await parseCSV(selectedFile);
     } else {
       await parseXLSX(selectedFile);
+    }
+  };
+
+  const handleDuplicateConfirm = async () => {
+    setShowDuplicateAlert(false);
+    if (pendingFile) {
+      await processFile(pendingFile);
+      setPendingFile(null);
+    }
+  };
+
+  const handleDuplicateCancel = () => {
+    setShowDuplicateAlert(false);
+    setPendingFile(null);
+    setDuplicateInfo(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -419,6 +466,8 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       const { data: importLogData } = await supabase.from('import_logs').insert({
         module: 'leads_database',
         file_name: file?.name || 'unknown.csv',
+        file_hash: fileHash,
+        file_size_bytes: file?.size || 0,
         total_records: parsedLeads.length,
         success_count: result.imported,
         error_count: result.invalid || 0,
@@ -890,6 +939,15 @@ export function ImportBase({ onBack }: ImportBaseProps) {
           <LeadsDatabase />
         </TabsContent>
       </Tabs>
+
+      {/* Duplicate File Alert */}
+      <DuplicateFileAlert
+        isOpen={showDuplicateAlert}
+        onClose={handleDuplicateCancel}
+        onConfirm={handleDuplicateConfirm}
+        duplicateInfo={duplicateInfo}
+        currentFileName={pendingFile?.name}
+      />
     </div>
   );
 }

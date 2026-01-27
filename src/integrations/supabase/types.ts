@@ -2276,6 +2276,7 @@ export type Database = {
           duplicate_count: number | null
           error_count: number | null
           error_log: Json | null
+          file_hash: string | null
           file_name: string
           file_path: string | null
           file_size_bytes: number
@@ -2301,6 +2302,7 @@ export type Database = {
           duplicate_count?: number | null
           error_count?: number | null
           error_log?: Json | null
+          file_hash?: string | null
           file_name: string
           file_path?: string | null
           file_size_bytes?: number
@@ -2326,6 +2328,7 @@ export type Database = {
           duplicate_count?: number | null
           error_count?: number | null
           error_log?: Json | null
+          file_hash?: string | null
           file_name?: string
           file_path?: string | null
           file_size_bytes?: number
@@ -2352,7 +2355,9 @@ export type Database = {
           duplicate_count: number
           error_count: number
           error_details: Json | null
+          file_hash: string | null
           file_name: string
+          file_size_bytes: number | null
           id: string
           imported_by: string
           module: string
@@ -2366,7 +2371,9 @@ export type Database = {
           duplicate_count?: number
           error_count?: number
           error_details?: Json | null
+          file_hash?: string | null
           file_name: string
+          file_size_bytes?: number | null
           id?: string
           imported_by: string
           module: string
@@ -2380,7 +2387,9 @@ export type Database = {
           duplicate_count?: number
           error_count?: number
           error_details?: Json | null
+          file_hash?: string | null
           file_name?: string
+          file_size_bytes?: number | null
           id?: string
           imported_by?: string
           module?: string
@@ -4442,6 +4451,15 @@ export type Database = {
       check_daily_lead_limit: {
         Args: { user_id_param: string }
         Returns: number
+      }
+      check_duplicate_import: {
+        Args: { p_file_hash: string; p_module?: string }
+        Returns: {
+          is_duplicate: boolean
+          original_file_name: string
+          original_import_date: string
+          records_imported: number
+        }[]
       }
       check_rate_limit: {
         Args: {

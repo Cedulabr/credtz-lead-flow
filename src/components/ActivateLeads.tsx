@@ -21,6 +21,8 @@ import { ActivateSimulationManager } from '@/components/ActivateLeads/Simulation
 import { ActivateSimulationRequestButton } from '@/components/ActivateLeads/SimulationRequestButton';
 import { useActivateLeadSimulations } from '@/hooks/useActivateLeadSimulations';
 import { PasteImageUpload } from '@/components/ui/paste-image-upload';
+import { DuplicateFileAlert } from '@/components/ui/duplicate-file-alert';
+import { calculateFileHash, checkDuplicateImport, type DuplicateImportInfo } from '@/lib/fileHash';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
@@ -326,6 +328,12 @@ export const ActivateLeads = () => {
   
   // Duplicate Manager state
   const [showDuplicateManager, setShowDuplicateManager] = useState(false);
+  
+  // Duplicate file detection states
+  const [duplicateFileInfo, setDuplicateFileInfo] = useState<DuplicateImportInfo | null>(null);
+  const [showDuplicateFileAlert, setShowDuplicateFileAlert] = useState(false);
+  const [pendingCsvFile, setPendingCsvFile] = useState<File | null>(null);
+  const [csvFileHash, setCsvFileHash] = useState<string | null>(null);
 
   const isGestor = gestorId !== null;
   const canImport = isAdmin || isGestor;
@@ -1236,12 +1244,45 @@ export const ActivateLeads = () => {
     reader.readAsText(file);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setCsvFile(file);
-      parseCSV(file);
+    if (!file) return;
+    
+    // Calculate hash and check for duplicates
+    try {
+      const hash = await calculateFileHash(file);
+      setCsvFileHash(hash);
+      
+      const dupInfo = await checkDuplicateImport(hash, 'activate_leads');
+      
+      if (dupInfo.isDuplicate) {
+        setDuplicateFileInfo(dupInfo);
+        setPendingCsvFile(file);
+        setShowDuplicateFileAlert(true);
+        return;
+      }
+    } catch (error) {
+      console.warn('Hash calculation failed, continuing without duplicate check:', error);
     }
+    
+    setCsvFile(file);
+    parseCSV(file);
+  };
+
+  const handleDuplicateFileConfirm = () => {
+    setShowDuplicateFileAlert(false);
+    if (pendingCsvFile) {
+      setCsvFile(pendingCsvFile);
+      parseCSV(pendingCsvFile);
+      setPendingCsvFile(null);
+    }
+  };
+
+  const handleDuplicateFileCancel = () => {
+    setShowDuplicateFileAlert(false);
+    setPendingCsvFile(null);
+    setDuplicateFileInfo(null);
+    setCsvFileHash(null);
   };
 
   const handleImportSubmit = async () => {
@@ -1333,6 +1374,8 @@ export const ActivateLeads = () => {
       const { data: importLogData } = await supabase.from('import_logs').insert({
         module: 'activate_leads',
         file_name: csvFile.name,
+        file_hash: csvFileHash,
+        file_size_bytes: csvFile.size,
         total_records: parsedLeads.length,
         success_count: successCount,
         error_count: 0,
@@ -2904,6 +2947,15 @@ export const ActivateLeads = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Duplicate File Alert */}
+      <DuplicateFileAlert
+        isOpen={showDuplicateFileAlert}
+        onClose={handleDuplicateFileCancel}
+        onConfirm={handleDuplicateFileConfirm}
+        duplicateInfo={duplicateFileInfo}
+        currentFileName={pendingCsvFile?.name}
+      />
     </motion.div>
   );
 };

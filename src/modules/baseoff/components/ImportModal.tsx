@@ -22,6 +22,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { DuplicateFileAlert } from '@/components/ui/duplicate-file-alert';
+import { calculateFileHash, checkDuplicateImport, type DuplicateImportInfo } from '@/lib/fileHash';
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -36,15 +38,25 @@ export function ImportModal({ isOpen, onClose, onJobCreated }: ImportModalProps)
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileHash, setFileHash] = useState<string | null>(null);
   const [phase, setPhase] = useState<UploadPhase>('select');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  
+  // Duplicate file detection states
+  const [duplicateInfo, setDuplicateInfo] = useState<DuplicateImportInfo | null>(null);
+  const [showDuplicateAlert, setShowDuplicateAlert] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const resetState = () => {
     setSelectedFile(null);
+    setFileHash(null);
     setPhase('select');
     setUploadProgress(0);
     setError(null);
+    setDuplicateInfo(null);
+    setShowDuplicateAlert(false);
+    setPendingFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -55,7 +67,7 @@ export function ImportModal({ isOpen, onClose, onJobCreated }: ImportModalProps)
     onClose();
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -71,8 +83,43 @@ export function ImportModal({ isOpen, onClose, onJobCreated }: ImportModalProps)
       return;
     }
 
+    // Calculate hash and check for duplicates
+    try {
+      const hash = await calculateFileHash(file);
+      setFileHash(hash);
+      
+      const dupInfo = await checkDuplicateImport(hash, 'baseoff');
+      
+      if (dupInfo.isDuplicate) {
+        setDuplicateInfo(dupInfo);
+        setPendingFile(file);
+        setShowDuplicateAlert(true);
+        return;
+      }
+    } catch (err) {
+      console.warn('Hash calculation failed, continuing without duplicate check:', err);
+    }
+
     setSelectedFile(file);
     setError(null);
+  };
+
+  const handleDuplicateConfirm = () => {
+    setShowDuplicateAlert(false);
+    if (pendingFile) {
+      setSelectedFile(pendingFile);
+      setPendingFile(null);
+      setError(null);
+    }
+  };
+
+  const handleDuplicateCancel = () => {
+    setShowDuplicateAlert(false);
+    setPendingFile(null);
+    setDuplicateInfo(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleUpload = async () => {
@@ -111,6 +158,7 @@ export function ImportModal({ isOpen, onClose, onJobCreated }: ImportModalProps)
           file_name: selectedFile.name,
           file_path: filePathInBucket,
           file_size_bytes: selectedFile.size,
+          file_hash: fileHash,
           module: 'baseoff',
           status: 'uploaded',
           metadata: { unified_import: true },
@@ -154,6 +202,7 @@ export function ImportModal({ isOpen, onClose, onJobCreated }: ImportModalProps)
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -266,5 +315,15 @@ export function ImportModal({ isOpen, onClose, onJobCreated }: ImportModalProps)
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Duplicate File Alert */}
+    <DuplicateFileAlert
+      isOpen={showDuplicateAlert}
+      onClose={handleDuplicateCancel}
+      onConfirm={handleDuplicateConfirm}
+      duplicateInfo={duplicateInfo}
+      currentFileName={pendingFile?.name}
+    />
+    </>
   );
 }
