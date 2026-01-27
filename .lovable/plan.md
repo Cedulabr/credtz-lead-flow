@@ -1,115 +1,36 @@
+# ✅ Implementado: Sistema de Prevenção de Importação de Arquivos Duplicados
 
-# Plano: Sistema de Prevenção de Importação de Arquivos Duplicados
+## Status: CONCLUÍDO
 
-## Resumo Executivo
-Este plano adiciona uma camada de proteção para evitar que o mesmo arquivo seja importado múltiplas vezes nos três módulos principais: **Leads Premium**, **Activate Leads** e **Consulta Base Off**. O sistema calculará um hash (checksum) do arquivo e verificará se já existe no histórico antes de permitir a importação.
-
----
-
-## Estado Atual dos Módulos
-
-### Leads Premium
-- Verifica duplicatas por **nome + telefone + convênio** durante importação
-- Atualiza campos vazios em registros duplicados (não perde dados)
-- Executa varredura automática pós-importação
-- **Não verifica** se o mesmo arquivo já foi importado
-
-### Activate Leads  
-- Verifica duplicatas por **nome + telefone** antes de inserir
-- Filtra registros duplicados do CSV em tempo real
-- Possui Duplicate Manager para resolução manual
-- **Não verifica** se o mesmo arquivo já foi importado
-
-### Consulta Base Off
-- Usa UPSERT por **CPF** (clientes) e **CPF + contrato** (contratos)
-- Processa arquivos grandes de forma assíncrona
-- **Não verifica** se o mesmo arquivo já foi importado
+Este plano foi implementado com sucesso em 27/01/2026.
 
 ---
 
-## Solução Proposta
+## O que foi implementado
 
-### 1. Modificações no Banco de Dados
+### 1. Banco de Dados
+- ✅ Colunas `file_hash` e `file_size_bytes` adicionadas às tabelas `import_logs` e `import_jobs`
+- ✅ Índices criados para busca rápida por hash
+- ✅ Função RPC `check_duplicate_import(p_file_hash, p_module)` criada
 
-Adicionar coluna `file_hash` à tabela `import_logs`:
+### 2. Utilitário de Hash
+- ✅ `src/lib/fileHash.ts` - Calcula SHA-256 usando Web Crypto API
+- ✅ Função `calculateFileHash(file)` retorna hash hexadecimal
+- ✅ Função `checkDuplicateImport(hash, module)` verifica no banco
 
-```text
-ALTER TABLE import_logs 
-ADD COLUMN file_hash TEXT,
-ADD COLUMN file_size_bytes BIGINT;
+### 3. Componente de Alerta
+- ✅ `src/components/ui/duplicate-file-alert.tsx` - Modal de confirmação
 
-CREATE INDEX idx_import_logs_file_hash ON import_logs(file_hash);
-```
-
-Criar função RPC para verificar arquivo duplicado:
-
-```text
-CREATE FUNCTION check_duplicate_import(
-  p_file_hash TEXT,
-  p_module TEXT
-) RETURNS TABLE(
-  is_duplicate BOOLEAN,
-  original_import_date TIMESTAMP,
-  original_file_name TEXT,
-  records_imported INTEGER
-)
-```
-
-### 2. Função JavaScript para Cálculo de Hash
-
-Criar utilitário reutilizável em `src/lib/fileHash.ts`:
-
-```text
-export async function calculateFileHash(file: File): Promise<string> {
-  // Usa Web Crypto API para calcular SHA-256
-  // Retorna hash em formato hexadecimal
-}
-```
-
-### 3. Modificações por Módulo
-
-#### Leads Premium (ImportBase.tsx)
-- Calcular hash do arquivo após seleção
-- Verificar via RPC antes de processar
-- Mostrar alerta se arquivo já foi importado (com data e quantidade de registros)
-- Oferecer opção de "Importar mesmo assim" ou "Cancelar"
-
-#### Activate Leads (ActivateLeads.tsx)
-- Calcular hash ao selecionar CSV
-- Verificar duplicata antes de abrir preview
-- Bloquear importação se arquivo for idêntico (mesmo hash)
-- Permitir reimportação se confirmado pelo usuário
-
-#### Consulta Base Off (ImportModal.tsx)
-- Calcular hash antes do upload
-- Verificar no banco antes de criar job
-- Se duplicado: mostrar warning com opção de continuar
+### 4. Módulos Atualizados
+- ✅ **Leads Premium** (`ImportBase.tsx`) - Verifica hash antes de importar
+- ✅ **Activate Leads** (`ActivateLeads.tsx`) - Verifica hash antes de importar
+- ✅ **Consulta Base Off** (`ImportModal.tsx`) - Verifica hash antes de criar job
 
 ---
 
-## Interface de Usuário
+## Fluxo Implementado
 
-### Alerta de Arquivo Duplicado
-Quando detectar arquivo já importado:
-
-```text
-+--------------------------------------------------+
-|  ⚠️  Arquivo Já Importado                         |
-|                                                   |
-|  Este arquivo foi importado em 15/01/2026.        |
-|  Foram processados 1.500 registros.               |
-|                                                   |
-|  Deseja importar novamente?                       |
-|                                                   |
-|  [Cancelar]  [Importar Mesmo Assim]              |
-+--------------------------------------------------+
 ```
-
----
-
-## Fluxo Técnico
-
-```text
 1. Usuário seleciona arquivo
          │
          ▼
@@ -130,42 +51,12 @@ Quando detectar arquivo já importado:
                     └──► Usuário confirma ──► Continua importação
                                                     │
                                                     ▼
-                              5. Registra novo import_log com mesmo hash
+                              5. Registra import_log/import_job com hash
 ```
 
 ---
 
-## Arquivos a Serem Modificados
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `supabase/migrations/XXXXX.sql` | Adicionar coluna file_hash e função RPC |
-| `src/lib/fileHash.ts` | **Novo** - Utilitário para cálculo de hash |
-| `src/components/ImportBase.tsx` | Adicionar verificação de hash antes de importar |
-| `src/components/ActivateLeads.tsx` | Adicionar verificação de hash no handleImportSubmit |
-| `src/modules/baseoff/components/ImportModal.tsx` | Adicionar verificação antes de criar job |
-
----
-
-## Considerações Técnicas
-
-### Performance
-- O cálculo de hash usa Web Crypto API (nativa do browser, muito rápida)
-- Arquivos de 100MB levam ~2 segundos para calcular
-- A verificação no banco é instantânea (índice na coluna hash)
-
-### Limitações
-- Se o usuário modificar uma célula do arquivo, o hash será diferente
-- Não detecta "quase duplicados" (apenas arquivos idênticos byte a byte)
-- Arquivos muito grandes (>500MB) podem demorar no cálculo do hash
-
-### Fallback
-- Se o cálculo de hash falhar, continua sem verificação (não bloqueia o usuário)
-- Logs de erro são registrados para debug
-
----
-
-## Benefícios
+## Benefícios Alcançados
 
 1. **Prevenção de erros humanos**: Evita importar o mesmo arquivo por engano
 2. **Economia de recursos**: Não processa dados já existentes
