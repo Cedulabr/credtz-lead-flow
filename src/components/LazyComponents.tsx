@@ -13,6 +13,12 @@ export const TestFunctionalities = lazy(() => import('./TestFunctionalities').th
 export const ActivateLeads = lazy(() => import('./ActivateLeads').then(module => ({ default: module.ActivateLeads })));
 export const ClientReuseAlerts = lazy(() => import('./ClientReuseAlerts').then(module => ({ default: module.ClientReuseAlerts })));
 
+// Additional lazy loaded components for performance
+export const Dashboard = lazy(() => import('./Dashboard').then(module => ({ default: module.Dashboard })));
+export const TelevendasManagement = lazy(() => import('./TelevendasManagement').then(module => ({ default: module.TelevendasManagement })));
+export const MyClientsKanban = lazy(() => import('./MyClientsKanban').then(module => ({ default: module.MyClientsKanban })));
+export const Notifications = lazy(() => import('./Notifications').then(module => ({ default: module.Notifications })));
+
 // Loading skeleton components for better UX
 const TableSkeleton = () => (
   <Card>
@@ -61,6 +67,26 @@ const FormSkeleton = () => (
   </Card>
 );
 
+const DashboardSkeleton = () => (
+  <div className="space-y-6">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Card key={i}>
+          <CardContent className="p-6">
+            <Skeleton className="h-4 w-20 mb-2" />
+            <Skeleton className="h-8 w-32" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+    <Card>
+      <CardContent className="p-6">
+        <Skeleton className="h-64 w-full" />
+      </CardContent>
+    </Card>
+  </div>
+);
+
 // HOC for wrapping lazy components with appropriate loading states
 export const withLazyLoading = <P extends Record<string, any>>(
   Component: React.LazyExoticComponent<React.ComponentType<P>>,
@@ -83,3 +109,7 @@ export const LazyLeadsIndicados = withLazyLoading(LeadsIndicados, FormSkeleton);
 export const LazyTestFunctionalities = withLazyLoading(TestFunctionalities, FormSkeleton);
 export const LazyActivateLeads = withLazyLoading(ActivateLeads, TableSkeleton);
 export const LazyClientReuseAlerts = withLazyLoading(ClientReuseAlerts, TableSkeleton);
+export const LazyDashboard = withLazyLoading(Dashboard, DashboardSkeleton);
+export const LazyTelevendasManagement = withLazyLoading(TelevendasManagement, TableSkeleton);
+export const LazyMyClientsKanban = withLazyLoading(MyClientsKanban, TableSkeleton);
+export const LazyNotifications = withLazyLoading(Notifications, FormSkeleton);

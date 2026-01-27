@@ -287,8 +287,8 @@ export const TelevendasClientView = ({
               <div className="text-xl md:text-2xl font-bold text-green-600">{totals.pagosAprovados}</div>
               <div className="text-xs text-muted-foreground">✅ Pagos</div>
             </div>
-            <div className="text-center p-2 md:p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
-              <div className="text-xl md:text-2xl font-bold text-orange-600">{totals.pendentes}</div>
+            <div className="text-center p-2 md:p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <div className="text-xl md:text-2xl font-bold text-blue-600">{totals.pendentes}</div>
               <div className="text-xs text-muted-foreground">⚠️ Pendentes</div>
             </div>
             <div className="text-center p-2 md:p-3 rounded-lg bg-red-500/10 border border-red-500/20">
@@ -356,7 +356,7 @@ export const TelevendasClientView = ({
                           </Badge>
                         )}
                         {vendedor.pendentes > 0 && (
-                          <Badge className="bg-orange-500/10 text-orange-600 border-orange-500/20">
+                          <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20">
                             ⚠️ {vendedor.pendentes}
                           </Badge>
                         )}
@@ -397,7 +397,7 @@ export const TelevendasClientView = ({
                       </Badge>
                     )}
                     {vendedor.pendentes > 0 && (
-                      <Badge className="bg-orange-500/10 text-orange-600 border-orange-500/20 text-xs">
+                      <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20 text-xs">
                         ⚠️ {vendedor.pendentes}
                       </Badge>
                     )}
@@ -559,7 +559,7 @@ const ClientCard = ({
               </Badge>
             )}
             {client.pendentes > 0 && (
-              <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-500/20 text-xs">
+              <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/20 text-xs">
                 ⚠️ {client.pendentes}
               </Badge>
             )}

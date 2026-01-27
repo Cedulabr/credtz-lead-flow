@@ -124,12 +124,12 @@ const STATUS_CONFIG: Record<string, {
   em_andamento: { 
     label: 'Em Andamento', 
     emoji: '📞',
-    color: 'from-amber-500 to-orange-500', 
-    textColor: 'text-amber-700 dark:text-amber-300', 
-    bgColor: 'bg-gradient-to-r from-amber-50 to-orange-100 dark:from-amber-950 dark:to-orange-900',
-    borderColor: 'border-amber-200 dark:border-amber-800',
+    color: 'from-blue-500 to-indigo-500', 
+    textColor: 'text-blue-700 dark:text-blue-300', 
+    bgColor: 'bg-gradient-to-r from-blue-50 to-indigo-100 dark:from-blue-950 dark:to-indigo-900',
+    borderColor: 'border-blue-200 dark:border-blue-800',
     icon: <TrendingUp className="h-3.5 w-3.5" />,
-    dotColor: 'bg-amber-500'
+    dotColor: 'bg-blue-500'
   },
   segunda_tentativa: {
     label: 'Segunda Tentativa',
@@ -164,12 +164,12 @@ const STATUS_CONFIG: Record<string, {
   operacoes_recentes: { 
     label: 'Operações Recentes', 
     emoji: '⏳',
-    color: 'from-orange-500 to-amber-600', 
-    textColor: 'text-orange-700 dark:text-orange-300', 
-    bgColor: 'bg-gradient-to-r from-orange-50 to-amber-100 dark:from-orange-950 dark:to-amber-900',
-    borderColor: 'border-orange-200 dark:border-orange-800',
+    color: 'from-violet-500 to-purple-600', 
+    textColor: 'text-violet-700 dark:text-violet-300', 
+    bgColor: 'bg-gradient-to-r from-violet-50 to-purple-100 dark:from-violet-950 dark:to-purple-900',
+    borderColor: 'border-violet-200 dark:border-violet-800',
     icon: <Clock className="h-3.5 w-3.5" />,
-    dotColor: 'bg-orange-500'
+    dotColor: 'bg-violet-500'
   },
   fora_do_perfil: { 
     label: 'Fora do Perfil', 
@@ -1070,7 +1070,7 @@ export const ActivateLeads = () => {
     }
   };
 
-  const handleStatusModalSubmit = () => {
+  const handleStatusModalSubmit = async () => {
     if (!selectedLead || !motivoRecusa.trim()) {
       toast({
         title: '⚠️ Campo obrigatório',
@@ -1078,6 +1078,22 @@ export const ActivateLeads = () => {
         variant: 'destructive',
       });
       return;
+    }
+
+    // Add to blacklist when status is sem_possibilidade or sem_interesse
+    if (newStatus === 'sem_possibilidade' || newStatus === 'sem_interesse') {
+      try {
+        await supabase.rpc('add_activate_lead_to_blacklist', {
+          p_telefone: selectedLead.telefone,
+          p_nome: selectedLead.nome,
+          p_cpf: selectedLead.cpf || null,
+          p_reason: `${newStatus}: ${motivoRecusa}`,
+          p_lead_id: selectedLead.id
+        });
+        console.log('Lead added to blacklist (30 days)');
+      } catch (err) {
+        console.error('Error adding to blacklist:', err);
+      }
     }
 
     updateLeadStatus(selectedLead, newStatus, { motivo_recusa: motivoRecusa });

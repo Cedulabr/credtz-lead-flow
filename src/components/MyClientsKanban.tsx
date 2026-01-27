@@ -99,7 +99,7 @@ const pipelineStages = [
 const origemIcons: Record<string, { icon: typeof TrendingUp; color: string; label: string }> = {
   marketing: { icon: TrendingUp, color: "text-purple-500", label: "Marketing" },
   indicacao: { icon: Users, color: "text-blue-500", label: "Indicação" },
-  ativo: { icon: Zap, color: "text-orange-500", label: "Ativo" },
+  ativo: { icon: Zap, color: "text-indigo-500", label: "Ativo" },
 };
 
 const convenioOptions = [

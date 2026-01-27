@@ -20,7 +20,7 @@ const FILE_TYPES = [
   { value: "pdf", label: "PDF", color: "bg-red-500/10 text-red-500" },
   { value: "xlsx", label: "Excel", color: "bg-green-500/10 text-green-500" },
   { value: "docx", label: "Word", color: "bg-blue-500/10 text-blue-500" },
-  { value: "pptx", label: "PowerPoint", color: "bg-orange-500/10 text-orange-500" },
+  { value: "pptx", label: "PowerPoint", color: "bg-violet-500/10 text-violet-500" },
   { value: "link", label: "Link", color: "bg-purple-500/10 text-purple-500" },
   { value: "other", label: "Outro", color: "bg-gray-500/10 text-gray-500" },
 ];

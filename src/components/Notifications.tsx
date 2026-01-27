@@ -354,7 +354,7 @@ export function Notifications() {
 
       {/* Televendas Notifications */}
       {televendasNotifications.length > 0 && (
-        <Card className="border-yellow-500/20 bg-gradient-to-r from-yellow-500/5 to-orange-500/5">
+        <Card className="border-blue-500/20 bg-gradient-to-r from-blue-500/5 to-violet-500/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-yellow-600" />
@@ -523,7 +523,7 @@ export function Notifications() {
 
       {/* Inactivity Notifications for Gestors */}
       {isGestorOrAdmin && inactivityNotifications.length > 0 && (
-        <Card className="border-amber-500/20 bg-gradient-to-r from-amber-500/5 to-orange-500/5">
+        <Card className="border-violet-500/20 bg-gradient-to-r from-violet-500/5 to-purple-500/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UserMinus className="h-5 w-5 text-amber-600" />

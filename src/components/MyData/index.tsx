@@ -251,7 +251,7 @@ export function MyData() {
           <Users className="h-4 w-4" />
           Gestão de Cadastros
           {pendingCount > 0 && (
-            <Badge variant="secondary" className="ml-1 bg-orange-500 text-white">
+            <Badge variant="secondary" className="ml-1 bg-primary text-primary-foreground">
               {pendingCount}
             </Badge>
           )}
