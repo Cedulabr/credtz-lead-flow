@@ -266,9 +266,9 @@ export const DetailModal = ({ open, onOpenChange, televenda }: DetailModalProps)
                   </div>
                 )}
                 {televenda.saldo_devedor && televenda.saldo_devedor > 0 && (
-                  <div className="p-4 rounded-xl bg-orange-500/5 border border-orange-500/20">
+                  <div className="p-4 rounded-xl bg-violet-500/5 border border-violet-500/20">
                     <p className="text-xs text-muted-foreground mb-1">Saldo Devedor</p>
-                    <p className="text-lg font-bold text-orange-600">
+                    <p className="text-lg font-bold text-violet-600">
                       {formatCurrency(televenda.saldo_devedor)}
                     </p>
                   </div>

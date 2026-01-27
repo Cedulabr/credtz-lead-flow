@@ -174,7 +174,7 @@ export function LinksManager() {
       governo: "bg-blue-500/10 text-blue-500",
       parceiros: "bg-purple-500/10 text-purple-500",
       marketing: "bg-pink-500/10 text-pink-500",
-      ferramentas: "bg-orange-500/10 text-orange-500",
+      ferramentas: "bg-indigo-500/10 text-indigo-500",
       outros: "bg-gray-500/10 text-gray-500",
     };
     const label = LINK_CATEGORIES.find((c) => c.value === category)?.label || category;

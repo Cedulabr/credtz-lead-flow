@@ -124,8 +124,8 @@ export function SummaryCards({ summary, isLoading }: SummaryCardsProps) {
         <Card className="border shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <div className="p-1.5 bg-orange-100 rounded-lg">
-                <Zap className="h-4 w-4 text-orange-600" />
+              <div className="p-1.5 bg-blue-100 rounded-lg">
+                <Zap className="h-4 w-4 text-blue-600" />
               </div>
               Atividades com Leads
             </CardTitle>

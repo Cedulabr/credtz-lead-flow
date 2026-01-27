@@ -112,12 +112,12 @@ const STATUS_CONFIG = {
   },
   em_andamento: { 
     label: "Em Andamento", 
-    color: "from-amber-500 to-orange-500", 
-    textColor: "text-amber-700", 
-    bgColor: "bg-gradient-to-r from-amber-50 to-orange-100",
-    borderColor: "border-amber-200",
+    color: "from-blue-500 to-indigo-500", 
+    textColor: "text-blue-700", 
+    bgColor: "bg-gradient-to-r from-blue-50 to-indigo-100",
+    borderColor: "border-blue-200",
     icon: TrendingUp,
-    dotColor: "bg-amber-500"
+    dotColor: "bg-blue-500"
   },
   aguardando_retorno: { 
     label: "Aguardando Retorno", 
@@ -193,12 +193,12 @@ const STATUS_CONFIG = {
   },
   nao_e_whatsapp: {
     label: "Não é WhatsApp",
-    color: "from-orange-500 to-red-500",
-    textColor: "text-orange-700",
-    bgColor: "bg-gradient-to-r from-orange-50 to-red-100",
-    borderColor: "border-orange-200",
+    color: "from-violet-500 to-purple-500",
+    textColor: "text-violet-700",
+    bgColor: "bg-gradient-to-r from-violet-50 to-purple-100",
+    borderColor: "border-violet-200",
     icon: MessageCircle,
-    dotColor: "bg-orange-500"
+    dotColor: "bg-violet-500"
   }
 };
 
@@ -1002,6 +1002,19 @@ export function LeadsManagement() {
 
       if (error) throw error;
 
+      // Add to blacklist when status is recusou_oferta or sem_interesse (30 days)
+      if ((newStatus === 'recusou_oferta' || newStatus === 'sem_interesse') && lead.cpf) {
+        try {
+          await supabase.rpc('add_lead_to_blacklist', {
+            lead_cpf: lead.cpf,
+            blacklist_reason: `${newStatus}: Lead recusado e adicionado ao blacklist por 30 dias`
+          });
+          console.log('Lead added to blacklist (30 days)');
+        } catch (err) {
+          console.error('Error adding to blacklist:', err);
+        }
+      }
+
       setLeads(prev => prev.map(l => 
         l.id === leadId ? { ...l, status: newStatus, updated_at: new Date().toISOString() } : l
       ));
@@ -1242,7 +1255,7 @@ export function LeadsManagement() {
                 <Button 
                   variant="outline" 
                   size="default"
-                  className="flex items-center gap-1.5 hover:bg-orange-500/10 text-orange-600 border-orange-200 text-sm md:text-base font-semibold h-10 md:h-12"
+                  className="flex items-center gap-1.5 hover:bg-violet-500/10 text-violet-600 border-violet-200 text-sm md:text-base font-semibold h-10 md:h-12"
                   onClick={() => setShowDistributedManager(true)}
                 >
                   <Settings className="h-4 w-4 md:h-5 md:w-5" />
@@ -1574,13 +1587,13 @@ export function LeadsManagement() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-amber-50 to-orange-100 dark:from-amber-950 dark:to-orange-900 border-2 border-amber-200 dark:border-amber-800 hover:shadow-xl transition-all duration-200 w-28 md:w-auto flex-shrink-0">
+            <Card className="bg-gradient-to-br from-indigo-50 to-violet-100 dark:from-indigo-950 dark:to-violet-900 border-2 border-indigo-200 dark:border-indigo-800 hover:shadow-xl transition-all duration-200 w-28 md:w-auto flex-shrink-0">
               <CardContent className="p-4 text-center">
-                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center mx-auto mb-2 shadow-md">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 flex items-center justify-center mx-auto mb-2 shadow-md">
                   <TrendingUp className="h-5 w-5 md:h-6 md:w-6 text-white" />
                 </div>
-                <p className="text-2xl md:text-3xl font-bold text-amber-700 dark:text-amber-300">{stats.inProgress}</p>
-                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5">TRAB.</p>
+                <p className="text-2xl md:text-3xl font-bold text-indigo-700 dark:text-indigo-300">{stats.inProgress}</p>
+                <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">TRAB.</p>
               </CardContent>
             </Card>
 
@@ -1811,7 +1824,7 @@ export function LeadsManagement() {
                             {lead.name}
                           </h3>
                           {lead.is_rework && (
-                            <Badge className="bg-orange-100 text-orange-700 border-orange-300 font-semibold">
+                            <Badge className="bg-violet-100 text-violet-700 border-violet-300 font-semibold">
                               <RefreshCcw className="h-3 w-3 mr-1" />
                               Re-trabalho
                             </Badge>

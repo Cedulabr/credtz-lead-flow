@@ -57,8 +57,8 @@ const margensConfig: MargemItem[] = [
     label: 'Margem Cartão', 
     icon: CreditCard, 
     emoji: '💳',
-    bgColor: 'bg-orange-50 dark:bg-orange-950/30',
-    textColor: 'text-orange-700 dark:text-orange-400',
+    bgColor: 'bg-indigo-50 dark:bg-indigo-950/30',
+    textColor: 'text-indigo-700 dark:text-indigo-400',
   },
   { 
     key: 'cartaoBeneficio', 

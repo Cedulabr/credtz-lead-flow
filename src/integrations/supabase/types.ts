@@ -113,6 +113,53 @@ export type Database = {
           },
         ]
       }
+      activate_leads_blacklist: {
+        Row: {
+          blacklisted_at: string | null
+          blacklisted_by: string | null
+          cpf: string | null
+          created_at: string | null
+          expires_at: string
+          id: string
+          nome: string | null
+          original_lead_id: string | null
+          reason: string
+          telefone: string
+        }
+        Insert: {
+          blacklisted_at?: string | null
+          blacklisted_by?: string | null
+          cpf?: string | null
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          nome?: string | null
+          original_lead_id?: string | null
+          reason: string
+          telefone: string
+        }
+        Update: {
+          blacklisted_at?: string | null
+          blacklisted_by?: string | null
+          cpf?: string | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          nome?: string | null
+          original_lead_id?: string | null
+          reason?: string
+          telefone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activate_leads_blacklist_original_lead_id_fkey"
+            columns: ["original_lead_id"]
+            isOneToOne: false
+            referencedRelation: "activate_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activate_leads_contact_proofs: {
         Row: {
           attempt_number: number
@@ -4431,6 +4478,16 @@ export type Database = {
       }
     }
     Functions: {
+      add_activate_lead_to_blacklist: {
+        Args: {
+          p_cpf?: string
+          p_lead_id?: string
+          p_nome?: string
+          p_reason?: string
+          p_telefone: string
+        }
+        Returns: undefined
+      }
       add_lead_to_blacklist: {
         Args: { blacklist_reason?: string; lead_cpf: string }
         Returns: undefined
@@ -4601,6 +4658,7 @@ export type Database = {
       }
       normalize_cpf: { Args: { input_cpf: string }; Returns: string }
       process_expired_future_contacts: { Args: never; Returns: number }
+      release_expired_blacklisted_leads: { Args: never; Returns: Json }
       remove_baseoff_duplicates: { Args: never; Returns: number }
       remove_leads_database_duplicates: { Args: never; Returns: number }
       request_leads: {

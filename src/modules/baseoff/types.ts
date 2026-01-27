@@ -7,7 +7,7 @@ export const STATUS_CONFIG: Record<ClientStatus, { label: string; emoji: string;
   em_analise: { label: 'Em Análise', emoji: '🔵', color: 'bg-blue-100 text-blue-800 border-blue-200' },
   ativo: { label: 'Ativo', emoji: '🟢', color: 'bg-green-100 text-green-800 border-green-200' },
   finalizado: { label: 'Finalizado', emoji: '🔴', color: 'bg-red-100 text-red-800 border-red-200' },
-  vencendo: { label: 'Vencendo', emoji: '⚠️', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  vencendo: { label: 'Vencendo', emoji: '⚠️', color: 'bg-violet-100 text-violet-800 border-violet-200' },
 };
 
 export type ImportType = 'contratos' | 'simulacoes' | 'ativos';

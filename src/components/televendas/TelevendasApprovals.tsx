@@ -254,10 +254,10 @@ export const TelevendasApprovals = ({
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 md:p-6 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-red-500/20 border-2 border-amber-400/50"
+          className="p-4 md:p-6 rounded-2xl bg-gradient-to-r from-blue-500/20 via-violet-500/15 to-purple-500/20 border-2 border-blue-400/50"
         >
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-amber-500">
+            <div className="p-3 rounded-xl bg-primary">
               <Zap className="h-6 w-6 text-white" />
             </div>
             <div className="flex-1">
