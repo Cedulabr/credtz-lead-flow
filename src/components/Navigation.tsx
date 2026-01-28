@@ -6,7 +6,7 @@ import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import credtzLogo from "@/assets/credtz-logo-new.jpeg";
+import credtzLogo from "@/assets/logo-credtz.png";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { useWhitelabel } from "@/hooks/useWhitelabel";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
