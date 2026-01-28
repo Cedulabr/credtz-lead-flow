@@ -108,7 +108,7 @@ const Auth = () => {
         <div className="text-center">
           <img 
             src={credtzLogo} 
-            alt="Credtz Logo" 
+            alt="Leadyzer Logo" 
             className="mx-auto h-16 w-auto mb-4"
           />
           <h1 className="text-2xl font-bold text-foreground">

@@ -163,7 +163,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [notificationsCount, setNotificationsCount] = useState(0);
 
   const userName = profile?.name || user?.email?.split('@')[0] || 'Usuário';
-  const companyName = config?.company_name || 'Credtz';
+  const companyName = config?.company_name || 'Leadyzer';
 
   // Fetch user companies and check gestor status
   useEffect(() => {
