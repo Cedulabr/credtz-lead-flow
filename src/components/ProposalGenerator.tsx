@@ -919,13 +919,13 @@ export function ProposalGenerator() {
           </Card>
           <Card>
             <CardContent className="p-4 text-center">
-              <p className="text-lg font-bold text-foreground">{formatCurrency(String(totalParcela * 100))}</p>
+              <p className="text-lg font-bold text-foreground">{totalParcela.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p>
               <p className="text-xs text-muted-foreground">Parcela Total</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4 text-center">
-              <p className="text-lg font-bold text-emerald-500">{formatCurrency(String(totalTroco * 100))}</p>
+              <p className="text-lg font-bold text-emerald-500">{totalTroco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p>
               <p className="text-xs text-muted-foreground">Troco Total</p>
             </CardContent>
           </Card>
