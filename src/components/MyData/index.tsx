@@ -22,6 +22,8 @@ export function MyData() {
   const [documents, setDocuments] = useState<UserDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
+  const [isGestor, setIsGestor] = useState(false);
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
   
   // Admin/Partner view states
   const [viewMode, setViewMode] = useState<'my-data' | 'user-list' | 'user-detail'>('my-data');
@@ -29,8 +31,30 @@ export function MyData() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const isAdmin = profile?.role === 'admin';
-  const isPartner = profile?.role === 'partner';
-  const canManageUsers = isAdmin || isPartner;
+  
+  // Check if user is gestor (manager) in their company
+  useEffect(() => {
+    const checkGestorStatus = async () => {
+      if (!user) return;
+      
+      const { data } = await supabase
+        .from('user_companies')
+        .select('company_id, company_role')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .single();
+      
+      if (data) {
+        setUserCompanyId(data.company_id);
+        setIsGestor(data.company_role === 'gestor');
+      }
+    };
+    
+    checkGestorStatus();
+  }, [user]);
+
+  // Only admins and gestors can manage users
+  const canManageUsers = isAdmin || isGestor;
 
   // Set initial view based on role
   useEffect(() => {
@@ -268,7 +292,7 @@ export function MyData() {
     );
   };
 
-  // User list view for admin/partner
+  // User list view for admin/gestor
   if (viewMode === 'user-list' && canManageUsers) {
     return (
       <div className="space-y-6">
@@ -276,10 +300,15 @@ export function MyData() {
         <div>
           <h1 className="text-2xl font-bold">Gestão de Cadastros</h1>
           <p className="text-muted-foreground">
-            Gerencie os cadastros de todos os usuários
+            {isAdmin 
+              ? 'Gerencie os cadastros de todos os usuários' 
+              : 'Gerencie os cadastros dos usuários da sua empresa'}
           </p>
         </div>
-        <UserDataList onSelectUser={handleSelectUser} />
+        <UserDataList 
+          onSelectUser={handleSelectUser} 
+          companyId={isGestor && !isAdmin ? userCompanyId : null}
+        />
       </div>
     );
   }

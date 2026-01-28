@@ -19,9 +19,10 @@ interface UserDataWithProfile extends UserData {
 
 interface UserDataListProps {
   onSelectUser: (userData: UserData, userId: string) => void;
+  companyId?: string | null; // If provided, filter users by company
 }
 
-export function UserDataList({ onSelectUser }: UserDataListProps) {
+export function UserDataList({ onSelectUser, companyId }: UserDataListProps) {
   const [users, setUsers] = useState<UserDataWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -29,21 +30,55 @@ export function UserDataList({ onSelectUser }: UserDataListProps) {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [companyId]);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // Fetch all user_data with profile info
-      const { data: userData, error: userDataError } = await supabase
+      // If companyId is provided, get users from that company only
+      let targetUserIds: string[] = [];
+      
+      if (companyId) {
+        // Get all user IDs from the specific company
+        const { data: companyUsers, error: companyError } = await supabase
+          .from('user_companies')
+          .select('user_id')
+          .eq('company_id', companyId)
+          .eq('is_active', true);
+        
+        if (companyError) throw companyError;
+        targetUserIds = (companyUsers || []).map(cu => cu.user_id);
+        
+        if (targetUserIds.length === 0) {
+          setUsers([]);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Fetch user_data with optional company filter
+      let query = supabase
         .from('user_data')
         .select('*')
         .order('updated_at', { ascending: false });
+      
+      if (companyId && targetUserIds.length > 0) {
+        query = query.in('user_id', targetUserIds);
+      }
+
+      const { data: userData, error: userDataError } = await query;
 
       if (userDataError) throw userDataError;
 
       // Fetch profiles to get names and emails
       const userIds = (userData || []).map(u => u.user_id);
+      
+      if (userIds.length === 0) {
+        setUsers([]);
+        setLoading(false);
+        return;
+      }
+
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, name, email')
