@@ -112,10 +112,10 @@ const Auth = () => {
             className="mx-auto h-16 w-auto mb-4"
           />
           <h1 className="text-2xl font-bold text-foreground">
-            Welcome to Credtz
+            Bem vindo a Leadyzer
           </h1>
           <p className="text-muted-foreground">
-            Access your commission dashboard
+            Sua fábrica de resultados começa nos leads.
           </p>
         </div>
 
