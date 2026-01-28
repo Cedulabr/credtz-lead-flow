@@ -108,11 +108,11 @@ const Auth = () => {
         <div className="text-center">
           <img 
             src={credtzLogo} 
-            alt="Leadyzer Logo" 
+            alt="Lead Ryzer Logo" 
             className="mx-auto h-16 w-auto mb-4"
           />
           <h1 className="text-2xl font-bold text-foreground">
-            Bem vindo a Leadyzer
+            Bem vindo a Lead Ryzer
           </h1>
           <p className="text-muted-foreground">
             Sua fábrica de resultados começa nos leads.
