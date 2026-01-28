@@ -1928,17 +1928,15 @@ export const ActivateLeads = () => {
                             ) : (
                               <span className="text-muted-foreground text-sm">-</span>
                             )}
-                            {(isAdmin || isGestor) && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => openCpfModal(lead)}
-                                className="h-7 w-7 p-0 hover:bg-primary/10 transition-all duration-300"
-                                title="Editar CPF"
-                              >
-                                <Edit className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => openCpfModal(lead)}
+                              className="h-7 w-7 p-0 hover:bg-primary/10 transition-all duration-300"
+                              title="Editar CPF"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                         </TableCell>
                         <TableCell>
