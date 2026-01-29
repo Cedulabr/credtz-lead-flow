@@ -13,6 +13,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatedContainer, StaggerContainer, StaggerItem } from "@/components/ui/animated-container";
 import { SkeletonCard } from "@/components/ui/skeleton-card";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { 
   Users,
   Phone,
@@ -21,7 +25,7 @@ import {
   History,
   Plus,
   Filter,
-  Calendar,
+  Calendar as CalendarIcon,
   User,
   Search,
   Trash2,
@@ -41,7 +45,10 @@ import {
   Sparkles,
   RefreshCw,
   FileText,
-  Upload
+  Upload,
+  X,
+  Check,
+  Hourglass
 } from "lucide-react";
 import {
   AlertDialog,
@@ -114,6 +121,27 @@ interface Profile {
   email: string | null;
 }
 
+// Deletion request interface
+interface DeletionRequest {
+  id: string;
+  proposta_id: number;
+  requested_by: string;
+  requested_at: string;
+  reason: string;
+  status: string;
+  company_id: string | null;
+  propostas?: {
+    id: number;
+    "Nome do cliente": string | null;
+    cpf: string | null;
+    telefone: string | null;
+  };
+  profiles?: {
+    name: string | null;
+    email: string | null;
+  };
+}
+
 // Modern status configuration
 const clientStatuses = [
   { 
@@ -136,6 +164,16 @@ const clientStatuses = [
     borderColor: "border-amber-200",
     dotColor: "bg-amber-500",
     hasAlert: true 
+  },
+  { 
+    id: "aguardando_retorno", 
+    label: "Aguardando Retorno", 
+    icon: Hourglass, 
+    color: "from-orange-500 to-orange-600", 
+    textColor: "text-orange-700", 
+    bgColor: "bg-gradient-to-r from-orange-50 to-orange-100",
+    borderColor: "border-orange-200",
+    dotColor: "bg-orange-500"
   },
   { 
     id: "proposta_digitada", 
@@ -224,14 +262,23 @@ export function MyClientsList() {
   const [filterUser, setFilterUser] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterConvenio, setFilterConvenio] = useState<string>("all");
-  const [filterDateFrom, setFilterDateFrom] = useState<string>("");
-  const [filterDateTo, setFilterDateTo] = useState<string>("");
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>();
+  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
   const [filterFutureContact, setFilterFutureContact] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
   
   // Delete state
   const [deletingClient, setDeletingClient] = useState(false);
+  
+  // Deletion request states
+  const [deletionRequests, setDeletionRequests] = useState<DeletionRequest[]>([]);
+  const [isDeletionRequestModalOpen, setIsDeletionRequestModalOpen] = useState(false);
+  const [deletionRequestClient, setDeletionRequestClient] = useState<Client | null>(null);
+  const [deletionReason, setDeletionReason] = useState("");
+  const [savingDeletionRequest, setSavingDeletionRequest] = useState(false);
+  const [reviewNotes, setReviewNotes] = useState("");
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
 
   // Edit form states
   const [editForm, setEditForm] = useState({
@@ -302,6 +349,7 @@ export function MyClientsList() {
     fetchClients();
     if (isAdmin || isGestor) {
       fetchUsers();
+      fetchDeletionRequests();
     }
   }, [isAdmin, isGestor, gestorCompanyIds]);
 
@@ -335,6 +383,25 @@ export function MyClientsList() {
       }
     } catch (error) {
       console.error("Error fetching users:", error);
+    }
+  };
+
+  const fetchDeletionRequests = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("client_deletion_requests")
+        .select(`
+          *,
+          propostas (id, "Nome do cliente", cpf, telefone),
+          profiles:requested_by (name, email)
+        `)
+        .eq("status", "pending")
+        .order("requested_at", { ascending: false });
+
+      if (error) throw error;
+      setDeletionRequests((data || []) as unknown as DeletionRequest[]);
+    } catch (error) {
+      console.error("Error fetching deletion requests:", error);
     }
   };
 
@@ -770,6 +837,114 @@ export function MyClientsList() {
     }
   };
 
+  // Deletion request handlers
+  const handleRequestDeletion = async () => {
+    if (!deletionRequestClient || !deletionReason.trim()) {
+      toast({ title: "Erro", description: "Preencha o motivo da exclusão", variant: "destructive" });
+      return;
+    }
+    
+    setSavingDeletionRequest(true);
+    try {
+      const companyId = deletionRequestClient.company_id || gestorCompanyIds[0] || null;
+      
+      const { error } = await supabase.from("client_deletion_requests").insert({
+        proposta_id: deletionRequestClient.id,
+        requested_by: user?.id,
+        reason: deletionReason,
+        company_id: companyId,
+      });
+
+      if (error) throw error;
+
+      // Log interaction
+      await supabase.from("client_interactions").insert({
+        proposta_id: deletionRequestClient.id,
+        user_id: user?.id,
+        interaction_type: "deletion_requested",
+        notes: `Solicitação de exclusão: ${deletionReason}`,
+      });
+
+      toast({ title: "Sucesso", description: "Solicitação de exclusão enviada para aprovação" });
+      setIsDeletionRequestModalOpen(false);
+      setDeletionRequestClient(null);
+      setDeletionReason("");
+    } catch (error) {
+      console.error("Error requesting deletion:", error);
+      toast({ title: "Erro", description: "Erro ao solicitar exclusão", variant: "destructive" });
+    } finally {
+      setSavingDeletionRequest(false);
+    }
+  };
+
+  const handleApproveDeletion = async (request: DeletionRequest) => {
+    setProcessingRequestId(request.id);
+    try {
+      // Delete the client
+      const { error: deleteError } = await supabase
+        .from("propostas")
+        .delete()
+        .eq("id", request.proposta_id);
+
+      if (deleteError) throw deleteError;
+
+      // Update request status
+      await supabase
+        .from("client_deletion_requests")
+        .update({
+          status: "approved",
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString(),
+          review_notes: reviewNotes,
+        })
+        .eq("id", request.id);
+
+      toast({ title: "Sucesso", description: "Cliente excluído com sucesso" });
+      fetchClients();
+      fetchDeletionRequests();
+      setReviewNotes("");
+    } catch (error) {
+      console.error("Error approving deletion:", error);
+      toast({ title: "Erro", description: "Erro ao aprovar exclusão", variant: "destructive" });
+    } finally {
+      setProcessingRequestId(null);
+    }
+  };
+
+  const handleRejectDeletion = async (request: DeletionRequest) => {
+    setProcessingRequestId(request.id);
+    try {
+      const { error } = await supabase
+        .from("client_deletion_requests")
+        .update({
+          status: "rejected",
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString(),
+          review_notes: reviewNotes,
+        })
+        .eq("id", request.id);
+
+      if (error) throw error;
+
+      // Log interaction
+      await supabase.from("client_interactions").insert({
+        proposta_id: request.proposta_id,
+        user_id: user?.id,
+        interaction_type: "deletion_rejected",
+        notes: `Solicitação de exclusão rejeitada${reviewNotes ? `: ${reviewNotes}` : ""}`,
+      });
+
+      toast({ title: "Solicitação rejeitada", description: "O colaborador será notificado" });
+      fetchDeletionRequests();
+      setReviewNotes("");
+    } catch (error) {
+      console.error("Error rejecting deletion:", error);
+      toast({ title: "Erro", description: "Erro ao rejeitar solicitação", variant: "destructive" });
+    } finally {
+      setProcessingRequestId(null);
+    }
+  };
+
   const openWhatsApp = (phone: string) => {
     const cleanPhone = phone.replace(/\D/g, '');
     const phoneWithCountry = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
@@ -811,14 +986,20 @@ export function MyClientsList() {
     if (filterDateFrom) {
       filtered = filtered.filter(c => {
         if (!c.created_at) return false;
-        return new Date(c.created_at) >= new Date(filterDateFrom);
+        const createdDate = new Date(c.created_at);
+        const filterDate = new Date(filterDateFrom);
+        filterDate.setHours(0, 0, 0, 0);
+        return createdDate >= filterDate;
       });
     }
 
     if (filterDateTo) {
       filtered = filtered.filter(c => {
         if (!c.created_at) return false;
-        return new Date(c.created_at) <= new Date(filterDateTo + 'T23:59:59');
+        const createdDate = new Date(c.created_at);
+        const filterDate = new Date(filterDateTo);
+        filterDate.setHours(23, 59, 59, 999);
+        return createdDate <= filterDate;
       });
     }
 
@@ -895,6 +1076,58 @@ export function MyClientsList() {
 
   return (
     <AnimatedContainer animation="slide-up" className="p-4 md:p-6 space-y-6 pb-20 md:pb-6 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen">
+      {/* Pending Deletion Requests Panel - Only for Gestor/Admin */}
+      {(isAdmin || isGestor) && deletionRequests.length > 0 && (
+        <Card className="border-2 border-amber-300 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <h3 className="font-semibold text-amber-800 dark:text-amber-200">
+                Solicitações de Exclusão Pendentes ({deletionRequests.length})
+              </h3>
+            </div>
+            <div className="space-y-3">
+              {deletionRequests.map(request => (
+                <div key={request.id} className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 bg-white dark:bg-background rounded-lg border">
+                  <div className="flex-1">
+                    <p className="font-medium">{request.propostas?.["Nome do cliente"] || "Cliente"}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Solicitado por: {request.profiles?.name || request.profiles?.email || "Usuário"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Motivo: {request.reason}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(request.requested_at).toLocaleDateString('pt-BR', { 
+                        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' 
+                      })}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-rose-600 border-rose-200 hover:bg-rose-50"
+                      onClick={() => handleRejectDeletion(request)}
+                      disabled={processingRequestId === request.id}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Rejeitar
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => handleApproveDeletion(request)}
+                      disabled={processingRequestId === request.id}
+                    >
+                      <Check className="h-4 w-4 mr-1" />
+                      {processingRequestId === request.id ? "..." : "Aprovar"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {/* Modern Header */}
       <div className="flex flex-col space-y-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -1085,6 +1318,70 @@ export function MyClientsList() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">Data Cadastro (De)</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn(
+                      "w-full justify-start text-left font-normal border-2",
+                      !filterDateFrom && "text-muted-foreground"
+                    )}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {filterDateFrom ? format(filterDateFrom, "dd/MM/yyyy", { locale: ptBR }) : "Data inicial"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={filterDateFrom}
+                      onSelect={setFilterDateFrom}
+                      locale={ptBR}
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">Data Cadastro (Até)</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn(
+                      "w-full justify-start text-left font-normal border-2",
+                      !filterDateTo && "text-muted-foreground"
+                    )}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {filterDateTo ? format(filterDateTo, "dd/MM/yyyy", { locale: ptBR }) : "Data final"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={filterDateTo}
+                      onSelect={setFilterDateTo}
+                      locale={ptBR}
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {(filterDateFrom || filterDateTo) && (
+                <div className="flex items-end">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => {
+                      setFilterDateFrom(undefined);
+                      setFilterDateTo(undefined);
+                    }}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4 mr-1" /> Limpar datas
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -1101,6 +1398,7 @@ export function MyClientsList() {
                   <TableHead className="font-semibold">Contato</TableHead>
                   <TableHead className="font-semibold">Convênio</TableHead>
                   <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="font-semibold">Cadastrado em</TableHead>
                   <TableHead className="font-semibold">Próximo Contato</TableHead>
                   <TableHead className="font-semibold text-right">Ações</TableHead>
                 </TableRow>
@@ -1108,7 +1406,7 @@ export function MyClientsList() {
               <TableBody>
                 {filteredClients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-32">
+                    <TableCell colSpan={7} className="h-32">
                       <div className="flex flex-col items-center justify-center text-center">
                         <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-muted to-muted/50 flex items-center justify-center mb-4">
                           <Users className="h-8 w-8 text-muted-foreground" />
@@ -1205,6 +1503,14 @@ export function MyClientsList() {
                               ))}
                             </SelectContent>
                           </Select>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm text-muted-foreground">
+                            {client.created_at 
+                              ? new Date(client.created_at).toLocaleDateString('pt-BR')
+                              : "—"
+                            }
+                          </div>
                         </TableCell>
                         <TableCell>
                           {client.future_contact_date ? (
@@ -1518,6 +1824,7 @@ export function MyClientsList() {
             <DialogTitle className="flex items-center justify-between">
               <span className="text-xl font-bold">Detalhes do Cliente</span>
               <div className="flex gap-2">
+                {/* Gestores and Admins can delete directly */}
                 {(isAdmin || isGestor) && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -1541,6 +1848,22 @@ export function MyClientsList() {
                     </AlertDialogContent>
                   </AlertDialog>
                 )}
+                
+                {/* Colaboradores can only request deletion */}
+                {!isAdmin && !isGestor && canEditClient(selectedClient!) && (
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                    onClick={() => {
+                      setDeletionRequestClient(selectedClient);
+                      setIsDeletionRequestModalOpen(true);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" /> Solicitar Exclusão
+                  </Button>
+                )}
+                
                 <Button size="sm" variant="outline" onClick={() => setIsEditMode(!isEditMode)}>
                   <Pencil className="h-4 w-4 mr-2" />
                   {isEditMode ? "Cancelar" : "Editar"}
@@ -1796,6 +2119,53 @@ export function MyClientsList() {
               className="bg-gradient-to-r from-purple-500 to-indigo-500"
             >
               {savingStatus ? "Salvando..." : "Agendar Contato"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deletion Request Modal - For Colaboradores */}
+      <Dialog open={isDeletionRequestModalOpen} onOpenChange={setIsDeletionRequestModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-amber-600" />
+              Solicitar Exclusão de Cliente
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                <strong>Cliente:</strong> {deletionRequestClient?.["Nome do cliente"]}
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                Esta solicitação será enviada para aprovação do seu gestor.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Motivo da Exclusão *</Label>
+              <Textarea
+                placeholder="Descreva o motivo pelo qual deseja excluir este cliente..."
+                value={deletionReason}
+                onChange={(e) => setDeletionReason(e.target.value)}
+                className="border-2 focus:border-amber-500 min-h-[100px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsDeletionRequestModalOpen(false);
+              setDeletionReason("");
+            }}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleRequestDeletion}
+              disabled={savingDeletionRequest || !deletionReason.trim()}
+              className="bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+            >
+              {savingDeletionRequest ? "Enviando..." : "Solicitar Exclusão"}
             </Button>
           </DialogFooter>
         </DialogContent>
