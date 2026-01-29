@@ -563,7 +563,7 @@ export function ProposalGenerator() {
     });
 
     if (totalTroco > 0) {
-      text += `💰 *Troco Total Estimado:* ${formatCurrency(String(totalTroco * 100))}\n\n`;
+      text += `💰 *Troco Total Estimado:* ${totalTroco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}\n\n`;
     }
     
     text += `📅 Data: ${new Date().toLocaleDateString("pt-BR")}\n`;
@@ -722,7 +722,7 @@ export function ProposalGenerator() {
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.text(`Troco Total Estimado: ${formatCurrency(String(totalTroco * 100))}`, pageWidth / 2, y + 5, { align: "center" });
+      doc.text(`Troco Total Estimado: ${totalTroco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`, pageWidth / 2, y + 5, { align: "center" });
       y += 25;
     }
 
