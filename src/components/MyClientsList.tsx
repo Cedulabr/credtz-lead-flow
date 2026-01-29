@@ -345,13 +345,20 @@ export function MyClientsList() {
     checkGestorStatus();
   }, [user?.id]);
 
+  // Fetch clients only after user is available
   useEffect(() => {
+    if (!user?.id) return;
     fetchClients();
+  }, [user?.id, isAdmin, isGestor, gestorCompanyIds]);
+
+  // Fetch users and deletion requests for admins/gestores
+  useEffect(() => {
+    if (!user?.id) return;
     if (isAdmin || isGestor) {
       fetchUsers();
       fetchDeletionRequests();
     }
-  }, [isAdmin, isGestor, gestorCompanyIds]);
+  }, [user?.id, isAdmin, isGestor, gestorCompanyIds]);
 
   const fetchUsers = async () => {
     try {
