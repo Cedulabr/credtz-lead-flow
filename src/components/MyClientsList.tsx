@@ -491,7 +491,8 @@ export function MyClientsList() {
     return client.client_status === "proposta_enviada";
   };
 
-  const canEditClient = (client: Client) => {
+  const canEditClient = (client: Client | null) => {
+    if (!client) return false;
     if (isAdmin) return true;
     return client.created_by_id === user?.id || client.assigned_to === user?.id;
   };
@@ -1857,7 +1858,7 @@ export function MyClientsList() {
                 )}
                 
                 {/* Colaboradores can only request deletion */}
-                {!isAdmin && !isGestor && canEditClient(selectedClient!) && (
+                {!isAdmin && !isGestor && selectedClient && canEditClient(selectedClient) && (
                   <Button 
                     size="sm" 
                     variant="outline"
