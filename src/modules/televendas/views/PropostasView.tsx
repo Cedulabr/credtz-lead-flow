@@ -79,12 +79,17 @@ export const PropostasView = ({
                     </h3>
                     <StatusBadge status={tv.status} size="sm" />
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
                     <span className="font-mono">{formatCPF(tv.cpf)}</span>
                     <span className="hidden sm:inline">•</span>
                     <span className="hidden sm:inline">{tv.tipo_operacao}</span>
                     <span>•</span>
                     <span>{tv.banco}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                    <span>📅 Venda: {formatDate(tv.data_venda)}</span>
+                    <span>•</span>
+                    <span>📝 Cadastro: {formatDate(tv.created_at)}</span>
                   </div>
                 </div>
 
@@ -95,7 +100,7 @@ export const PropostasView = ({
                       {formatCurrency(tv.parcela)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {formatDate(tv.data_venda)} • {formatTimeAgo(tv.created_at)}
+                      {formatTimeAgo(tv.created_at)}
                     </p>
                   </div>
 

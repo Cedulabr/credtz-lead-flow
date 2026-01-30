@@ -26,7 +26,8 @@ import {
   Search,
   Package,
   CheckCircle,
-  CalendarDays
+  CalendarDays,
+  Building2
 } from "lucide-react";
 import { 
   User, 
@@ -44,6 +45,7 @@ interface FiltersDrawerProps {
   users: User[];
   isGestorOrAdmin: boolean;
   activeCount: number;
+  availableBanks?: string[];
 }
 
 export const FiltersDrawer = ({
@@ -52,6 +54,7 @@ export const FiltersDrawer = ({
   users,
   isGestorOrAdmin,
   activeCount,
+  availableBanks = [],
 }: FiltersDrawerProps) => {
   const updateFilter = <K extends keyof TelevendasFilters>(
     key: K,
@@ -68,6 +71,7 @@ export const FiltersDrawer = ({
       period: "all",
       month: "all",
       product: "all",
+      bank: "all",
     });
   };
 
@@ -208,6 +212,32 @@ export const FiltersDrawer = ({
               ))}
             </div>
           </div>
+
+          {/* Bank Filter */}
+          {availableBanks.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-base font-semibold">
+                <Building2 className="h-4 w-4 text-primary" />
+                Banco
+              </Label>
+              <Select
+                value={filters.bank}
+                onValueChange={(value) => updateFilter("bank", value)}
+              >
+                <SelectTrigger className="h-12 text-base rounded-xl">
+                  <SelectValue placeholder="Todos os bancos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os bancos</SelectItem>
+                  {availableBanks.map((bank) => (
+                    <SelectItem key={bank} value={bank}>
+                      🏦 {bank}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Status */}
           <div className="space-y-2">

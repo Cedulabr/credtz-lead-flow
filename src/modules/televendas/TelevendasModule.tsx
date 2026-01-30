@@ -22,6 +22,7 @@ import { SmartSearch } from "./components/SmartSearch";
 import { StatusChangeModal } from "./components/StatusChangeModal";
 import { FiltersDrawer } from "./components/FiltersDrawer";
 import { DetailModal } from "./components/DetailModal";
+import { EditProposalModal } from "./components/EditProposalModal";
 import { PropostasView } from "./views/PropostasView";
 import { ClientesView } from "./views/ClientesView";
 import { AprovacoesView } from "./views/AprovacoesView";
@@ -52,11 +53,16 @@ export const TelevendasModule = () => {
     period: "all",
     month: getCurrentMonth(),
     product: "all",
+    bank: "all",
   });
 
   // Detail modal state
   const [selectedTelevenda, setSelectedTelevenda] = useState<Televenda | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+
+  // Edit modal state
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingTelevenda, setEditingTelevenda] = useState<Televenda | null>(null);
 
   // Status change modal state
   const [statusChangeModal, setStatusChangeModal] = useState<{
@@ -159,7 +165,7 @@ export const TelevendasModule = () => {
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => { fetchTelevendas(); }, [fetchTelevendas]);
 
-  // Filtered data - now searches both name AND CPF
+  // Filtered data - now searches both name AND CPF, and filters by bank
   const filteredTelevendas = useMemo(() => {
     return televendas.filter((tv) => {
       const searchTerm = filters.search.toLowerCase().trim();
@@ -172,9 +178,16 @@ export const TelevendasModule = () => {
       
       const matchesStatus = filters.status === "all" || tv.status === filters.status;
       const matchesProduct = filters.product === "all" || tv.tipo_operacao === filters.product;
-      return matchesSearch && matchesStatus && matchesProduct;
+      const matchesBank = filters.bank === "all" || tv.banco === filters.bank;
+      return matchesSearch && matchesStatus && matchesProduct && matchesBank;
     });
   }, [televendas, filters]);
+
+  // Extract unique banks from televendas for filter
+  const availableBanks = useMemo(() => {
+    const banksSet = new Set(televendas.map((tv) => tv.banco).filter(Boolean));
+    return Array.from(banksSet).sort();
+  }, [televendas]);
 
   // Summary stats (for badges and approval count)
   const stats = useMemo(() => {
@@ -202,7 +215,7 @@ export const TelevendasModule = () => {
   // Active filters count
   const activeFiltersCount = [
     filters.search, filters.status !== "all", filters.userId !== "all",
-    filters.period !== "all", filters.product !== "all"
+    filters.period !== "all", filters.product !== "all", filters.bank !== "all"
   ].filter(Boolean).length;
 
   // Status change handler - opens modal for confirmation
@@ -330,7 +343,28 @@ export const TelevendasModule = () => {
     setDetailModalOpen(true);
   };
 
-  const handleEdit = (tv: Televenda) => toast({ title: "Editar", description: tv.nome });
+  const handleEdit = (tv: Televenda) => {
+    setEditingTelevenda(tv);
+    setEditModalOpen(true);
+  };
+
+  const handleEditSave = async (id: string, data: Partial<Televenda>) => {
+    try {
+      const { error } = await supabase
+        .from("televendas")
+        .update(data)
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast({ title: "✅ Proposta atualizada", description: "Alterações salvas com sucesso" });
+      fetchTelevendas();
+    } catch (error) {
+      console.error("Error updating proposal:", error);
+      toast({ title: "Erro", description: "Erro ao atualizar proposta", variant: "destructive" });
+      throw error;
+    }
+  };
   
   const handleDelete = (tv: Televenda) => {
     // For regular users: request deletion (change status)
@@ -376,6 +410,7 @@ export const TelevendasModule = () => {
             users={users}
             isGestorOrAdmin={isGestorOrAdmin}
             activeCount={activeFiltersCount}
+            availableBanks={availableBanks}
           />
           <Button 
             variant="outline" 
@@ -477,6 +512,15 @@ export const TelevendasModule = () => {
         open={detailModalOpen}
         onOpenChange={setDetailModalOpen}
         televenda={selectedTelevenda}
+      />
+
+      {/* Edit Proposal Modal */}
+      <EditProposalModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        televenda={editingTelevenda}
+        onSave={handleEditSave}
+        banks={availableBanks}
       />
 
       {/* Status Change Modal with audit */}

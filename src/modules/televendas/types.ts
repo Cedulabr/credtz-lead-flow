@@ -40,6 +40,7 @@ export interface TelevendasFilters {
   period: string;
   month: string;
   product: string;
+  bank: string;
 }
 
 // ===========================================
