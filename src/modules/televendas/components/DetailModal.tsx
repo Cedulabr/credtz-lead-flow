@@ -24,7 +24,8 @@ import {
   DollarSign,
   Hash,
   Copy,
-  Check
+  Check,
+  CheckCircle2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Televenda, StatusHistoryItem, STATUS_CONFIG } from "../types";
@@ -244,6 +245,14 @@ export const DetailModal = ({ open, onOpenChange, televenda }: DetailModalProps)
                   label="Data de Cadastro" 
                   value={formatDate(televenda.created_at)}
                 />
+                {televenda.data_pagamento && (
+                  <InfoRow 
+                    icon={CheckCircle2} 
+                    label="Data do Pagamento" 
+                    value={formatDate(televenda.data_pagamento)}
+                    className="bg-green-500/5"
+                  />
+                )}
               </div>
             </div>
 

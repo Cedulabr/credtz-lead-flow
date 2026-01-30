@@ -227,8 +227,8 @@ export const TelevendasModule = () => {
     });
   };
 
-  // Confirm status change with reason
-  const confirmStatusChange = async (reason: string) => {
+  // Confirm status change with reason and optional payment date
+  const confirmStatusChange = async (reason: string, paymentDate?: string) => {
     if (!statusChangeModal.televenda) return;
 
     const tv = statusChangeModal.televenda;
@@ -236,16 +236,24 @@ export const TelevendasModule = () => {
 
     setStatusChangeLoading(true);
     try {
-      console.log("Updating status for:", tv.id, "to:", newStatus);
+      console.log("Updating status for:", tv.id, "to:", newStatus, "payment date:", paymentDate);
+      
+      // Build update object
+      const updateData: Record<string, unknown> = { 
+        status: newStatus, 
+        status_updated_at: new Date().toISOString(),
+        status_updated_by: user?.id 
+      };
+
+      // Add payment date if provided (for payment statuses)
+      if (paymentDate) {
+        updateData.data_pagamento = paymentDate;
+      }
       
       // Update status in televendas table
       const { error: updateError } = await supabase
         .from("televendas")
-        .update({ 
-          status: newStatus, 
-          status_updated_at: new Date().toISOString(),
-          status_updated_by: user?.id 
-        })
+        .update(updateData)
         .eq("id", tv.id);
 
       if (updateError) {
