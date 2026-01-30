@@ -1,50 +1,40 @@
 
-# Plano: Melhorias no Módulo Gestão de Televendas
+# Plano: Adicionar Data de Pagamento ao Marcar Proposta como Paga
 
-## Problemas Identificados
-
-1. **Data de cadastro não registrada**: O sistema possui apenas "data_venda" (data da venda), mas não exibe claramente a data de cadastro da proposta (`created_at` existe mas não está visível nos campos do formulário/detalhe).
-
-2. **Botão Editar não funciona**: O `handleEdit` atual apenas mostra um toast sem funcionalidade real:
-   ```typescript
-   const handleEdit = (tv: Televenda) => toast({ title: "Editar", description: tv.nome });
-   ```
-
-3. **Filtro por banco não existe**: Os filtros atuais incluem período, status, usuário e produto, mas não há filtro por banco.
+## Problema Identificado
+Atualmente, quando uma proposta é marcada como "paga", não há opção para registrar a **data em que o pagamento foi efetivado**. O sistema apenas registra quando o status foi alterado (`status_updated_at`), mas não a data real do pagamento.
 
 ---
 
 ## Solução Proposta
 
-### 1. Exibir Data de Cadastro
+### 1. Adicionar Coluna no Banco de Dados
 
-**Alterações:**
-- **DetailModal.tsx**: Adicionar campo "Data de Cadastro" na seção "DADOS DA OPERAÇÃO", mostrando o `created_at` formatado
-- **PropostasView.tsx**: Exibir data de cadastro junto com data de venda nos cards
+Nova coluna `data_pagamento` na tabela `televendas`:
 
-### 2. Implementar Funcionalidade de Edição
+```sql
+ALTER TABLE public.televendas
+ADD COLUMN data_pagamento DATE NULL;
+```
 
-**Novo componente:** `EditProposalModal.tsx`
-- Modal com formulário pré-preenchido com dados da proposta
-- Campos editáveis: nome, telefone, banco, parcela, troco, saldo_devedor, tipo_operacao, observacao, data_venda
-- Apenas gestores/admin podem editar propostas de outros usuários
-- Operadores podem editar apenas suas próprias propostas (e apenas enquanto não estão em status final)
+### 2. Modificar o Modal de Mudança de Status
 
-**Alterações no TelevendasModule.tsx:**
-- Adicionar estado para controlar modal de edição
-- Implementar função `handleEditSubmit` para salvar alterações no banco
-- Passar props necessárias para o modal
+Atualizar o `StatusChangeModal.tsx` para:
+- Detectar quando o novo status é um status de pagamento (`pago_aguardando`, `proposta_paga`)
+- Exibir um **date picker** para selecionar a data do pagamento
+- Por padrão, mostrar a data de hoje
+- O campo será opcional mas recomendado
 
-### 3. Adicionar Filtro por Banco
+### 3. Atualizar a Lógica de Confirmação
 
-**Alterações:**
+Modificar a função `confirmStatusChange` no `TelevendasModule.tsx` para:
+- Receber a data de pagamento como parâmetro adicional
+- Salvar no banco de dados junto com a atualização de status
 
-- **types.ts**: Adicionar campo `bank` no tipo `TelevendasFilters`
-- **FiltersDrawer.tsx**: Adicionar seção de filtro por banco (usando bancos únicos das propostas existentes ou da tabela `televendas_banks`)
-- **TelevendasModule.tsx**: 
-  - Adicionar `bank: "all"` no estado inicial de filtros
-  - Adicionar lógica de filtragem por banco no `filteredTelevendas`
-  - Atualizar contagem de filtros ativos
+### 4. Exibir a Data de Pagamento
+
+Adicionar no `DetailModal.tsx`:
+- Exibir a "Data de Pagamento" quando a proposta estiver paga
 
 ---
 
@@ -52,90 +42,108 @@
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/modules/televendas/types.ts` | Adicionar `bank` ao `TelevendasFilters` |
-| `src/modules/televendas/TelevendasModule.tsx` | Estado de edição, filtro por banco, funções de edição |
-| `src/modules/televendas/components/FiltersDrawer.tsx` | UI do filtro por banco |
-| `src/modules/televendas/components/DetailModal.tsx` | Exibir data de cadastro |
-| `src/modules/televendas/views/PropostasView.tsx` | Mostrar data de cadastro nos cards |
-| `src/modules/televendas/components/EditProposalModal.tsx` | **NOVO** - Modal de edição |
+| `supabase/migrations/` | Nova migração para adicionar coluna `data_pagamento` |
+| `src/modules/televendas/types.ts` | Adicionar `data_pagamento?: string` no tipo `Televenda` |
+| `src/modules/televendas/components/StatusChangeModal.tsx` | Adicionar date picker para status de pagamento |
+| `src/modules/televendas/TelevendasModule.tsx` | Atualizar `confirmStatusChange` para salvar `data_pagamento` |
+| `src/modules/televendas/components/DetailModal.tsx` | Exibir data de pagamento na seção de operação |
+| `src/integrations/supabase/types.ts` | Atualizar tipos gerados (automático) |
 
 ---
 
 ## Detalhes Técnicos
 
-### Novo Tipo de Filtro
+### Interface do Modal Atualizada
+
+O `StatusChangeModal` será estendido com:
 
 ```typescript
-export interface TelevendasFilters {
-  search: string;
-  status: string;
-  userId: string;
-  period: string;
-  month: string;
-  product: string;
-  bank: string;  // NOVO
+interface StatusChangeModalProps {
+  // ... props existentes
+  onConfirm: (reason: string, paymentDate?: string) => Promise<void>;
 }
 ```
 
-### Filtro por Banco (FiltersDrawer)
+Quando o `newStatus` for `pago_aguardando` ou `proposta_paga`:
 
-```typescript
-// Extrair bancos únicos das propostas
-const uniqueBanks = useMemo(() => {
-  const banksSet = new Set(televendas.map(tv => tv.banco).filter(Boolean));
-  return Array.from(banksSet).sort();
-}, [televendas]);
+```text
+┌─────────────────────────────────────────────┐
+│  Alterar Status da Proposta                 │
+├─────────────────────────────────────────────┤
+│                                             │
+│  [Pendente] ──────▶ [Pago Aguard. Gestor]   │
+│                                             │
+│  ⚠️ Alteração crítica                       │
+│  Esta alteração será registrada...          │
+│                                             │
+│  📅 Data do Pagamento *                     │
+│  ┌─────────────────────────────────────┐    │
+│  │  30/01/2026               📅        │    │
+│  └─────────────────────────────────────┘    │
+│                                             │
+│  Motivo da alteração *                      │
+│  ┌─────────────────────────────────────┐    │
+│  │                                     │    │
+│  └─────────────────────────────────────┘    │
+│                                             │
+│          [Cancelar]  [Confirmar Alteração]  │
+└─────────────────────────────────────────────┘
 ```
 
-### Modal de Edição
-
-O modal reutilizará a estrutura de formulário similar ao `TelevendasForm.tsx`:
-- Campos organizados em seções (Cliente, Operação, Valores)
-- Validação com Zod
-- Formatação de CPF, telefone e valores monetários
-- Botão salvar com loading state
-- Registrar histórico de alterações (opcional)
-
-### Data de Cadastro no DetailModal
+### Atualização do Banco
 
 ```typescript
-<InfoRow 
-  icon={Clock} 
-  label="Data de Cadastro" 
-  value={formatDateTime(televenda.created_at)}
-/>
+const { error: updateError } = await supabase
+  .from("televendas")
+  .update({ 
+    status: newStatus, 
+    status_updated_at: new Date().toISOString(),
+    status_updated_by: user?.id,
+    data_pagamento: paymentDate || null  // NOVO
+  })
+  .eq("id", tv.id);
+```
+
+### Exibição no DetailModal
+
+Após "Data de Cadastro", adicionar:
+
+```typescript
+{televenda.data_pagamento && (
+  <InfoRow 
+    icon={CheckCircle} 
+    label="Data do Pagamento" 
+    value={formatDate(televenda.data_pagamento)}
+    className="bg-green-500/5"
+  />
+)}
 ```
 
 ---
 
-## Fluxo de Edição
+## Fluxo de Uso
 
-1. Usuário clica em "Editar" no menu de ações
-2. Modal abre com dados da proposta pré-preenchidos
-3. Usuário faz alterações
-4. Ao salvar:
-   - Validação dos campos
-   - UPDATE na tabela `televendas`
-   - Atualização do `updated_at`
-   - Feedback com toast
-   - Refresh da lista
-   - Fechamento do modal
+1. Operador clica para alterar status para "Pago Aguardando Gestor"
+2. Modal abre mostrando a transição de status
+3. Date picker aparece com data de hoje selecionada por padrão
+4. Operador pode alterar para a data real do pagamento
+5. Operador preenche o motivo (obrigatório)
+6. Ao confirmar, `data_pagamento` é salvo junto com o novo status
 
 ---
 
-## Permissões de Edição
+## Status que Exibem Date Picker
 
-| Usuário | Pode Editar |
-|---------|-------------|
-| Admin | Todas as propostas |
-| Gestor | Propostas da sua empresa |
-| Colaborador | Apenas próprias propostas (status não-final) |
+O date picker aparecerá apenas para os seguintes status:
+- `pago_aguardando` - Operador informando que o pagamento foi efetuado
+- `proposta_paga` - Gestor aprovando como pago (pode corrigir a data)
 
 ---
 
 ## Resumo de Entregas
 
-1. Exibição da data de cadastro no modal de detalhes e nos cards
-2. Modal funcional de edição de propostas
-3. Filtro por banco no drawer de filtros
-4. Integração completa com o módulo existente
+1. Nova coluna `data_pagamento` no banco de dados
+2. Date picker no modal de mudança de status (para status de pagamento)
+3. Data de pagamento salva automaticamente
+4. Exibição da data de pagamento no modal de detalhes
+5. Tipos TypeScript atualizados
