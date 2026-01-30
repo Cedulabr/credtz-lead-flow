@@ -28,6 +28,11 @@ import { AprovacoesView } from "./views/AprovacoesView";
 
 type TabType = "propostas" | "clientes" | "aprovacoes";
 
+const getCurrentMonth = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+};
+
 export const TelevendasModule = () => {
   const { toast } = useToast();
   const { isAdmin, user } = useAuth();
@@ -45,7 +50,7 @@ export const TelevendasModule = () => {
     status: "all",
     userId: "all",
     period: "all",
-    month: "all",
+    month: getCurrentMonth(),
     product: "all",
   });
 
