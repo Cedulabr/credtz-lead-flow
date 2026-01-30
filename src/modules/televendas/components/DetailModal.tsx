@@ -239,6 +239,11 @@ export const DetailModal = ({ open, onOpenChange, televenda }: DetailModalProps)
                   label="Data da Venda" 
                   value={formatDate(televenda.data_venda)}
                 />
+                <InfoRow 
+                  icon={Clock} 
+                  label="Data de Cadastro" 
+                  value={formatDate(televenda.created_at)}
+                />
               </div>
             </div>
 
