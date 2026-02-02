@@ -1,211 +1,165 @@
 
-# Plano: Corrigir Visibilidade de Alertas Financeiros por Empresa
+# Plano: Adicionar "Solicitar Cancelamento" para Colaboradores
 
-## Problema Identificado
+## Contexto
 
-Atualmente, todos os usuários estão vendo o alerta **"Atenção! 1 conta(s) vencida(s)"** no Dashboard, mesmo que a transação financeira não seja deles ou de sua empresa. Isso é um problema de **privacidade e segurança**.
+Atualmente, o fluxo de cancelamento funciona da seguinte forma:
+- **Gestores/Admins**: Podem cancelar propostas diretamente (status `proposta_cancelada`)
+- **Colaboradores**: Não têm opção de solicitar cancelamento - apenas gestores podem cancelar
 
-### Causa Raiz
-
-A política de RLS (Row Level Security) atual na tabela `financial_transactions` está **muito permissiva**:
-
-```sql
--- Política atual: Colaboradores podem VER todas as transações da empresa
-CREATE POLICY "Colaboradores can view financial transactions in their company"
-ON financial_transactions FOR SELECT
-USING (EXISTS (
-  SELECT 1 FROM user_companies uc
-  WHERE uc.company_id = financial_transactions.company_id
-  AND uc.user_id = auth.uid()
-  AND uc.is_active = true
-))
-```
-
-Isso significa que **qualquer colaborador** de uma empresa pode ver **todas** as transações financeiras dessa empresa.
-
----
-
-## Regras de Acesso Desejadas
-
-| Perfil | Acesso às Transações Financeiras |
-|--------|----------------------------------|
-| **Admin** | Todas as transações de todas as empresas |
-| **Gestor** | Todas as transações da sua empresa |
-| **Colaborador** | Apenas transações que ele próprio criou |
+O usuário deseja que **colaboradores possam solicitar o cancelamento**, e o **gestor aprove ou rejeite** a solicitação.
 
 ---
 
 ## Solução Proposta
 
-### 1. Atualizar Política de RLS para Colaboradores
+Adicionar um novo status `cancelado_aguardando` (já existe na constraint do banco) que funcionará de forma análoga ao `solicitar_exclusao`:
 
-Modificar a política de SELECT para colaboradores, adicionando a condição de que o colaborador só pode ver transações que ele mesmo criou (`created_by = auth.uid()`):
-
-```sql
--- DROP da política atual
-DROP POLICY IF EXISTS "Colaboradores can view financial transactions in their company" 
-ON financial_transactions;
-
--- Nova política para colaboradores: só podem ver transações que criaram
-CREATE POLICY "Colaboradores can view own financial transactions"
-ON financial_transactions FOR SELECT
-USING (
-  -- Colaborador só vê suas próprias transações
-  created_by = auth.uid()
-  -- OU é admin (já coberto por outra policy, mas reforçamos)
-  OR has_role(auth.uid(), 'admin'::app_role)
-  -- OU é gestor da empresa da transação
-  OR EXISTS (
-    SELECT 1 FROM user_companies uc
-    WHERE uc.company_id = financial_transactions.company_id
-    AND uc.user_id = auth.uid()
-    AND uc.company_role = 'gestor'
-    AND uc.is_active = true
-  )
-);
-```
-
-### 2. Verificar Políticas de INSERT/UPDATE/DELETE
-
-Garantir que colaboradores só possam:
-- **INSERT**: Criar transações para sua empresa (já existe policy de gestor)
-- **UPDATE/DELETE**: Apenas suas próprias transações ou se for gestor
-
-Atualmente, só gestores e admins podem modificar. Precisamos adicionar uma política para colaboradores criarem suas próprias transações (se aplicável ao fluxo de negócio).
+| Status | Quem pode usar | Ação do Gestor |
+|--------|----------------|----------------|
+| `cancelado_aguardando` | Colaborador | Aprovar ou Rejeitar |
+| `proposta_cancelada` | Gestor (após aprovação) | Final |
 
 ---
 
-## Arquivos a Serem Modificados
+## Alterações Necessárias
+
+### 1. Atualizar `types.ts`
+
+Adicionar `cancelado_aguardando` aos status operacionais e configurar sua exibição:
+
+```typescript
+// OPERATOR_STATUSES - adicionar:
+"cancelado_aguardando", // Cancelamento Aguardando Gestor
+
+// STATUS_CONFIG - adicionar:
+cancelado_aguardando: {
+  label: "Cancelamento Aguardando Gestor",
+  shortLabel: "Aguard. Cancel.",
+  emoji: "❌",
+  color: "text-red-500",
+  bgColor: "bg-red-500/10 border-red-300",
+  isOperational: true,
+  isFinal: false,
+}
+```
+
+### 2. Atualizar `AprovacoesView.tsx`
+
+Adicionar seção para aprovar/rejeitar solicitações de cancelamento:
+
+- Filtrar itens com status `cancelado_aguardando`
+- Mostrar botões "Aprovar Cancelamento" e "Rejeitar"
+- Passar props para handlers de aprovação/rejeição de cancelamento
+
+### 3. Atualizar `TelevendasModule.tsx`
+
+Adicionar handlers para aprovar/rejeitar cancelamento:
+
+```typescript
+// Novos handlers:
+handleApproveCancellation = (tv) => handleStatusChange(tv, "proposta_cancelada");
+handleRejectCancellation = (tv) => handleStatusChange(tv, "devolvido"); // ou outro status
+
+// Atualizar stats para contar cancelados_aguardando:
+aguardandoGestao: televendas.filter((tv) => 
+  ["pago_aguardando", "solicitar_exclusao", "cancelado_aguardando"].includes(tv.status)
+).length
+```
+
+### 4. Atualizar `ActionMenu.tsx` (já funciona automaticamente)
+
+Como o ActionMenu já usa `OPERATOR_STATUSES`, ao adicionar `cancelado_aguardando` à lista, o menu já mostrará a opção para colaboradores.
+
+---
+
+## Arquivos a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/migrations/` | Migração para atualizar RLS policies |
+| `src/modules/televendas/types.ts` | Adicionar `cancelado_aguardando` a OPERATOR_STATUSES e STATUS_CONFIG |
+| `src/modules/televendas/views/AprovacoesView.tsx` | Adicionar seção e props para aprovar/rejeitar cancelamento |
+| `src/modules/televendas/TelevendasModule.tsx` | Adicionar handlers e atualizar contagem de pendências |
 
 ---
 
-## Migração SQL Proposta
+## Fluxo de Trabalho Final
 
-```sql
--- 1. Remover política permissiva atual
-DROP POLICY IF EXISTS "Colaboradores can view financial transactions in their company" 
-ON public.financial_transactions;
-
--- 2. Criar nova política restritiva para SELECT
--- Colaboradores: só suas próprias transações
--- Gestores: todas da empresa
--- Admins: todas (já coberto pela policy existente)
-CREATE POLICY "Users can view financial transactions"
-ON public.financial_transactions FOR SELECT
-TO authenticated
-USING (
-  -- Admin pode ver tudo (já existe policy separada, mas incluímos por segurança)
-  has_role(auth.uid(), 'admin'::app_role)
-  -- Gestor pode ver tudo da sua empresa
-  OR EXISTS (
-    SELECT 1 FROM user_companies uc
-    WHERE uc.company_id = financial_transactions.company_id
-    AND uc.user_id = auth.uid()
-    AND uc.company_role = 'gestor'
-    AND uc.is_active = true
-  )
-  -- Colaborador só pode ver transações que criou
-  OR (
-    created_by = auth.uid()
-    AND EXISTS (
-      SELECT 1 FROM user_companies uc
-      WHERE uc.company_id = financial_transactions.company_id
-      AND uc.user_id = auth.uid()
-      AND uc.is_active = true
-    )
-  )
-);
-
--- 3. Adicionar política para colaboradores criarem transações (opcional)
--- Se colaboradores devem poder criar despesas para sua empresa
-CREATE POLICY "Colaboradores can create own financial transactions"
-ON public.financial_transactions FOR INSERT
-TO authenticated
-WITH CHECK (
-  -- Deve pertencer à empresa da transação
-  EXISTS (
-    SELECT 1 FROM user_companies uc
-    WHERE uc.company_id = financial_transactions.company_id
-    AND uc.user_id = auth.uid()
-    AND uc.is_active = true
-  )
-  -- E o created_by deve ser o próprio usuário
-  AND created_by = auth.uid()
-);
-
--- 4. Adicionar política para colaboradores editarem/excluírem suas próprias transações
-CREATE POLICY "Colaboradores can manage own financial transactions"
-ON public.financial_transactions FOR UPDATE
-TO authenticated
-USING (
-  created_by = auth.uid()
-  AND EXISTS (
-    SELECT 1 FROM user_companies uc
-    WHERE uc.company_id = financial_transactions.company_id
-    AND uc.user_id = auth.uid()
-    AND uc.is_active = true
-  )
-)
-WITH CHECK (
-  created_by = auth.uid()
-  AND EXISTS (
-    SELECT 1 FROM user_companies uc
-    WHERE uc.company_id = financial_transactions.company_id
-    AND uc.user_id = auth.uid()
-    AND uc.is_active = true
-  )
-);
-
-CREATE POLICY "Colaboradores can delete own financial transactions"
-ON public.financial_transactions FOR DELETE
-TO authenticated
-USING (
-  created_by = auth.uid()
-  AND EXISTS (
-    SELECT 1 FROM user_companies uc
-    WHERE uc.company_id = financial_transactions.company_id
-    AND uc.user_id = auth.uid()
-    AND uc.is_active = true
-  )
-);
+```text
+COLABORADOR                          GESTOR
+    │                                   │
+    ├─► Proposta Digitada               │
+    │                                   │
+    ├─► Solicitar Cancelamento ─────────►│ Aba "Aprovações"
+    │   (cancelado_aguardando)          │
+    │                                   ├─► Aprovar → proposta_cancelada
+    │                                   │   (com data de cancelamento)
+    │◄──────────────────────────────────┤
+    │                                   └─► Rejeitar → devolvido
+    │◄──────────────────────────────────┘
 ```
 
 ---
 
-## Comportamento Esperado Após a Correção
+## Detalhes Técnicos
 
-### Para Colaboradores Comuns
-- **Dashboard**: Só mostra alertas de contas que eles próprios cadastraram
-- **Conta Corrente**: Só exibe transações próprias
-- Não conseguem ver transações de outros usuários da mesma empresa
+### Interface do AprovacoesView
 
-### Para Gestores
-- **Dashboard**: Mostra alertas de todas as contas da empresa
-- **Conta Corrente**: Acesso completo a todas as transações da empresa
-- Podem editar/excluir qualquer transação da empresa
+```typescript
+interface AprovacoesViewProps {
+  // ... props existentes ...
+  onApproveCancellation: (tv: Televenda) => void;
+  onRejectCancellation: (tv: Televenda) => void;
+}
+```
 
-### Para Admins
-- Acesso total a todas as transações de todas as empresas
+### Nova Seção no AprovacoesView
+
+```typescript
+// Filtrar cancelados aguardando
+const canceladoAguardando = filteredApprovalItems.filter(
+  tv => tv.status === "cancelado_aguardando"
+);
+
+// Renderizar seção
+{canceladoAguardando.length > 0 && (
+  <div>
+    <SectionHeader 
+      emoji="❌" 
+      title="Solicitações de Cancelamento" 
+      count={canceladoAguardando.length}
+      urgent
+    />
+    {/* Cards com botões Aprovar/Rejeitar */}
+  </div>
+)}
+```
+
+### Atualização do StatusChangeModal
+
+O modal já suporta data de cancelamento, então ao aprovar (mudar para `proposta_cancelada`), o gestor poderá informar a data.
 
 ---
 
-## Verificação e Teste
+## Comportamento Esperado
 
-Após a migração, será necessário testar:
-1. Login como colaborador comum → Não deve ver contas de outros
-2. Login como gestor → Deve ver todas as contas da empresa
-3. Login como admin → Deve ver todas as contas de todas empresas
-4. Verificar que a edição/exclusão segue as mesmas regras
+### Para Colaboradores
+- No menu de ações, verão a opção "Cancelamento Aguardando Gestor"
+- Ao selecionar, abre modal para informar motivo
+- Proposta fica com status `cancelado_aguardando`
+- Badge amarelo/vermelho indica aguardando aprovação
+
+### Para Gestores
+- Na aba "Aprovações", verão nova seção "Solicitações de Cancelamento"
+- Podem aprovar (→ `proposta_cancelada` com data) ou rejeitar (→ `devolvido`)
+- Contagem no badge de pendências inclui cancelamentos aguardando
 
 ---
 
 ## Resumo de Entregas
 
-1. Migração SQL para atualizar políticas RLS na tabela `financial_transactions`
-2. Separação clara de permissões: Colaborador (só suas), Gestor (empresa), Admin (tudo)
-3. Manutenção da funcionalidade existente para gestores e admins
-4. Correção do alerta no Dashboard para mostrar apenas transações permitidas
+1. Novo status `cancelado_aguardando` disponível para colaboradores
+2. Seção "Solicitações de Cancelamento" na aba Aprovações
+3. Botões "Aprovar Cancelamento" e "Rejeitar" para gestores
+4. Registro de data de cancelamento ao aprovar
+5. Atualização da contagem de pendências no badge
