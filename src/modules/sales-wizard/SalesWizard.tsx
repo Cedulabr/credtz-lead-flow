@@ -12,6 +12,7 @@ import { ProductStep } from "./components/ProductStep";
 import { ValuesStep } from "./components/ValuesStep";
 import { PortabilidadeStep } from "./components/PortabilidadeStep";
 import { ConfirmStep } from "./components/ConfirmStep";
+import { DocumentUploadModal } from "./components/DocumentUploadModal";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Steps padrão (não-portabilidade)
@@ -37,6 +38,8 @@ export function SalesWizard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStepValid, setIsStepValid] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [savedClientData, setSavedClientData] = useState<{ name: string; cpf: string } | null>(null);
   
   const [wizardData, setWizardData] = useState<Partial<SalesWizardData>>({
     data_venda: new Date().toISOString().split('T')[0],
@@ -56,6 +59,20 @@ export function SalesWizard() {
   const handleValidChange = useCallback((isValid: boolean) => {
     setIsStepValid(isValid);
   }, []);
+
+  const resetWizard = () => {
+    setShowSuccess(false);
+    setCurrentStep(0);
+    setWizardData({
+      data_venda: new Date().toISOString().split('T')[0],
+    });
+    setSavedClientData(null);
+  };
+
+  const handleDocumentModalComplete = () => {
+    // Reset após upload de documentos
+    resetWizard();
+  };
 
   const handleComplete = async () => {
     if (!user) {
@@ -127,6 +144,12 @@ export function SalesWizard() {
 
       if (error) throw error;
 
+      // Salvar dados do cliente para o modal de documentos
+      setSavedClientData({
+        name: wizardData.nome || "",
+        cpf: wizardData.cpf || "",
+      });
+
       setShowSuccess(true);
       
       toast({
@@ -134,14 +157,11 @@ export function SalesWizard() {
         description: "A venda foi registrada com sucesso.",
       });
 
-      // Reset after 3 seconds
+      // Mostrar modal de documentos após 2 segundos
       setTimeout(() => {
         setShowSuccess(false);
-        setCurrentStep(0);
-        setWizardData({
-          data_venda: new Date().toISOString().split('T')[0],
-        });
-      }, 3000);
+        setShowDocumentModal(true);
+      }, 2000);
 
     } catch (error) {
       console.error("Error creating televendas:", error);
@@ -191,7 +211,7 @@ export function SalesWizard() {
               <PartyPopper className="h-12 w-12 text-primary" />
             </motion.div>
             <h2 className="text-2xl font-bold text-primary mb-2">Venda Cadastrada!</h2>
-            <p className="text-muted-foreground">Preparando para nova venda...</p>
+            <p className="text-muted-foreground">Preparando documentação...</p>
           </motion.div>
         ) : (
           <Card className="shadow-xl border-2">
@@ -224,6 +244,17 @@ export function SalesWizard() {
           </Card>
         )}
       </AnimatePresence>
+
+      {/* Modal de Upload de Documentos */}
+      {savedClientData && (
+        <DocumentUploadModal
+          open={showDocumentModal}
+          onOpenChange={setShowDocumentModal}
+          clientName={savedClientData.name}
+          clientCpf={savedClientData.cpf}
+          onComplete={handleDocumentModalComplete}
+        />
+      )}
     </div>
   );
 }
