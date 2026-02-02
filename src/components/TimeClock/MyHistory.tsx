@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -10,6 +9,8 @@ import { clockTypeLabels, statusLabels, statusColors, type TimeClock, type TimeC
 import { format, startOfMonth, endOfMonth, differenceInMinutes, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TimeClockPDF } from './TimeClockPDF';
+import { useWhitelabel } from '@/hooks/useWhitelabel';
+import { supabase } from '@/integrations/supabase/client';
 
 interface MyHistoryProps {
   userId: string;
@@ -28,12 +29,41 @@ export function MyHistory({ userId, userName }: MyHistoryProps) {
   const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
   const [history, setHistory] = useState<TimeClock[]>([]);
   const [loading, setLoading] = useState(false);
+  const [companyData, setCompanyData] = useState<{ name: string; cnpj: string | null }>({ name: '', cnpj: null });
 
   const { getUserHistory } = useTimeClock(userId);
+  const { companyName: whitelabelName } = useWhitelabel();
 
   useEffect(() => {
     loadHistory();
-  }, [startDate, endDate]);
+    loadCompanyData();
+  }, [startDate, endDate, userId]);
+
+  const loadCompanyData = async () => {
+    try {
+      // Buscar empresa do usuário
+      const { data: userCompany } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .single();
+
+      if (userCompany?.company_id) {
+        const { data: company } = await supabase
+          .from('companies')
+          .select('name, cnpj')
+          .eq('id', userCompany.company_id)
+          .single();
+
+        if (company) {
+          setCompanyData({ name: company.name, cnpj: company.cnpj });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading company data:', error);
+    }
+  };
 
   const loadHistory = async () => {
     setLoading(true);
@@ -94,7 +124,12 @@ export function MyHistory({ userId, userName }: MyHistoryProps) {
             </CardTitle>
             <CardDescription>Visualize seus registros de ponto</CardDescription>
           </div>
-          <TimeClockPDF userId={userId} userName={userName} />
+          <TimeClockPDF 
+            userId={userId} 
+            userName={userName} 
+            companyName={companyData.name || whitelabelName}
+            companyCNPJ={companyData.cnpj || undefined}
+          />
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
