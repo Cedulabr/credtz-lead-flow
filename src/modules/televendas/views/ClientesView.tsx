@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, ChevronRight, TrendingUp } from "lucide-react";
+import { Users, ChevronRight, TrendingUp, ChevronLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Televenda, STATUS_CONFIG } from "../types";
 import { formatCPF, formatCurrency } from "../utils";
 
@@ -21,11 +22,16 @@ interface ClientGroup {
   vendedor?: string;
 }
 
+const ITEMS_PER_PAGE = 10;
+
 export const ClientesView = ({
   televendas,
   onClientClick,
   isGestorOrAdmin,
 }: ClientesViewProps) => {
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Group clients by CPF and sort alphabetically by name
   const clientGroups = useMemo(() => {
     const groups = new Map<string, ClientGroup>();
 
@@ -55,10 +61,24 @@ export const ClientesView = ({
       }
     });
 
+    // Sort alphabetically by name (A-Z)
     return Array.from(groups.values()).sort(
-      (a, b) => new Date(b.ultimaAtualizacao).getTime() - new Date(a.ultimaAtualizacao).getTime()
+      (a, b) => a.nome.localeCompare(b.nome, 'pt-BR')
     );
   }, [televendas]);
+
+  // Reset page when data changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [televendas]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(clientGroups.length / ITEMS_PER_PAGE);
+  
+  const paginatedClients = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return clientGroups.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [clientGroups, currentPage]);
 
   const getStatusSummary = (propostas: Televenda[]) => {
     const counts: Record<string, number> = {};
@@ -66,6 +86,14 @@ export const ClientesView = ({
       counts[p.status] = (counts[p.status] || 0) + 1;
     });
     return counts;
+  };
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(1, prev - 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
   };
 
   if (clientGroups.length === 0) {
@@ -92,17 +120,17 @@ export const ClientesView = ({
     <div className="space-y-3">
       {/* Summary header */}
       <div className="flex items-center justify-between text-sm text-muted-foreground px-1">
-        <span>{clientGroups.length} cliente{clientGroups.length !== 1 ? 's' : ''}</span>
+        <span>{clientGroups.length} cliente{clientGroups.length !== 1 ? 's' : ''} (A-Z)</span>
         <span>
           Total: {formatCurrency(clientGroups.reduce((sum, c) => sum + c.valorTotal, 0))}
         </span>
       </div>
 
       <AnimatePresence mode="popLayout">
-        {clientGroups.map((client, index) => {
+        {paginatedClients.map((client, index) => {
           const statusCounts = getStatusSummary(client.propostas);
           const hasPago = client.propostas.some(p => 
-            p.status === "pago_aprovado" || p.status === "pago_aguardando"
+            p.status === "pago_aprovado" || p.status === "pago_aguardando" || p.status === "proposta_paga"
           );
 
           return (
@@ -171,6 +199,37 @@ export const ClientesView = ({
           );
         })}
       </AnimatePresence>
+
+      {/* Pagination controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-4 border-t">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePreviousPage}
+            disabled={currentPage === 1}
+            className="gap-1"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Anterior
+          </Button>
+          
+          <span className="text-sm text-muted-foreground">
+            Página {currentPage} de {totalPages}
+          </span>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleNextPage}
+            disabled={currentPage === totalPages}
+            className="gap-1"
+          >
+            Próximo
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

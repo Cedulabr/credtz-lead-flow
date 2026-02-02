@@ -20,7 +20,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { AlertTriangle, ArrowRight, CheckCircle, Shield, CalendarIcon } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle, Shield, CalendarIcon, XCircle } from "lucide-react";
 import { Televenda, STATUS_CONFIG } from "../types";
 import { cn } from "@/lib/utils";
 
@@ -29,12 +29,15 @@ interface StatusChangeModalProps {
   onOpenChange: (open: boolean) => void;
   televenda: Televenda | null;
   newStatus: string;
-  onConfirm: (reason: string, paymentDate?: string) => Promise<void>;
+  onConfirm: (reason: string, dateValue?: string) => Promise<void>;
   isLoading?: boolean;
 }
 
 // Status que requerem data de pagamento
 const PAYMENT_STATUSES = ["pago_aguardando", "proposta_paga"];
+
+// Status que requerem data de cancelamento
+const CANCELLATION_STATUSES = ["proposta_cancelada"];
 
 export const StatusChangeModal = ({
   open,
@@ -46,21 +49,26 @@ export const StatusChangeModal = ({
 }: StatusChangeModalProps) => {
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
-  const [paymentDate, setPaymentDate] = useState<Date | undefined>(undefined);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+
+  // Determine what type of date is needed
+  const requiresPaymentDate = PAYMENT_STATUSES.includes(newStatus);
+  const requiresCancellationDate = CANCELLATION_STATUSES.includes(newStatus);
+  const requiresDate = requiresPaymentDate || requiresCancellationDate;
 
   // Reset form when modal opens
   useEffect(() => {
     if (open) {
       setReason("");
       setError("");
-      // Default to today's date for payment statuses
-      if (PAYMENT_STATUSES.includes(newStatus)) {
-        setPaymentDate(new Date());
+      // Default to today's date for date-required statuses
+      if (requiresDate) {
+        setSelectedDate(new Date());
       } else {
-        setPaymentDate(undefined);
+        setSelectedDate(undefined);
       }
     }
-  }, [open, newStatus]);
+  }, [open, newStatus, requiresDate]);
 
   if (!televenda) return null;
 
@@ -75,9 +83,6 @@ export const StatusChangeModal = ({
     televenda.status.includes("pago") ||
     televenda.status.includes("cancelado");
 
-  // Check if we need to show payment date picker
-  const requiresPaymentDate = PAYMENT_STATUSES.includes(newStatus);
-
   const handleConfirm = async () => {
     if (isCriticalChange && !reason.trim()) {
       setError("Por favor, informe o motivo da alteração");
@@ -86,12 +91,12 @@ export const StatusChangeModal = ({
 
     setError("");
     try {
-      const paymentDateStr = paymentDate 
-        ? format(paymentDate, "yyyy-MM-dd")
+      const dateStr = selectedDate 
+        ? format(selectedDate, "yyyy-MM-dd")
         : undefined;
-      await onConfirm(reason.trim(), paymentDateStr);
+      await onConfirm(reason.trim(), dateStr);
       setReason("");
-      setPaymentDate(undefined);
+      setSelectedDate(undefined);
       // Modal will be closed by parent after successful update
     } catch (error) {
       console.error("Error in confirm:", error);
@@ -103,9 +108,17 @@ export const StatusChangeModal = ({
     if (isLoading) return; // Prevent closing while loading
     setReason("");
     setError("");
-    setPaymentDate(undefined);
+    setSelectedDate(undefined);
     onOpenChange(false);
   };
+
+  // Determine date picker label and icon
+  const dateLabel = requiresCancellationDate ? "Data do Cancelamento" : "Data do Pagamento";
+  const DateIcon = requiresCancellationDate ? XCircle : CalendarIcon;
+  const dateIconColor = requiresCancellationDate ? "text-red-600" : "text-green-600";
+  const dateHint = requiresCancellationDate 
+    ? "Informe a data em que o cancelamento foi efetivado"
+    : "Informe a data em que o pagamento foi efetivamente realizado";
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -165,30 +178,30 @@ export const StatusChangeModal = ({
             </motion.div>
           )}
 
-          {/* Payment date picker - only for payment statuses */}
-          {requiresPaymentDate && (
+          {/* Date picker - for payment or cancellation statuses */}
+          {requiresDate && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className="space-y-2"
             >
-              <Label htmlFor="payment-date" className="flex items-center gap-2">
-                <CalendarIcon className="h-4 w-4 text-green-600" />
-                Data do Pagamento
+              <Label htmlFor="status-date" className="flex items-center gap-2">
+                <DateIcon className={`h-4 w-4 ${dateIconColor}`} />
+                {dateLabel}
               </Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
-                    id="payment-date"
+                    id="status-date"
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !paymentDate && "text-muted-foreground"
+                      !selectedDate && "text-muted-foreground"
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {paymentDate ? (
-                      format(paymentDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+                    {selectedDate ? (
+                      format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
                     ) : (
                       <span>Selecionar data</span>
                     )}
@@ -197,8 +210,8 @@ export const StatusChangeModal = ({
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
-                    selected={paymentDate}
-                    onSelect={setPaymentDate}
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
                     initialFocus
                     className={cn("p-3 pointer-events-auto")}
                     locale={ptBR}
@@ -206,7 +219,7 @@ export const StatusChangeModal = ({
                 </PopoverContent>
               </Popover>
               <p className="text-xs text-muted-foreground">
-                Informe a data em que o pagamento foi efetivamente realizado
+                {dateHint}
               </p>
             </motion.div>
           )}

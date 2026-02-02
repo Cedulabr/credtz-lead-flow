@@ -3583,6 +3583,7 @@ export type Database = {
           company_id: string | null
           cpf: string
           created_at: string
+          data_cancelamento: string | null
           data_pagamento: string | null
           data_venda: string
           id: string
@@ -3607,6 +3608,7 @@ export type Database = {
           company_id?: string | null
           cpf: string
           created_at?: string
+          data_cancelamento?: string | null
           data_pagamento?: string | null
           data_venda: string
           id?: string
@@ -3631,6 +3633,7 @@ export type Database = {
           company_id?: string | null
           cpf?: string
           created_at?: string
+          data_cancelamento?: string | null
           data_pagamento?: string | null
           data_venda?: string
           id?: string

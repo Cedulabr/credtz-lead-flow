@@ -227,8 +227,8 @@ export const TelevendasModule = () => {
     });
   };
 
-  // Confirm status change with reason and optional payment date
-  const confirmStatusChange = async (reason: string, paymentDate?: string) => {
+  // Confirm status change with reason and optional date (payment or cancellation)
+  const confirmStatusChange = async (reason: string, dateValue?: string) => {
     if (!statusChangeModal.televenda) return;
 
     const tv = statusChangeModal.televenda;
@@ -236,7 +236,7 @@ export const TelevendasModule = () => {
 
     setStatusChangeLoading(true);
     try {
-      console.log("Updating status for:", tv.id, "to:", newStatus, "payment date:", paymentDate);
+      console.log("Updating status for:", tv.id, "to:", newStatus, "date:", dateValue);
       
       // Build update object
       const updateData: Record<string, unknown> = { 
@@ -246,8 +246,15 @@ export const TelevendasModule = () => {
       };
 
       // Add payment date if provided (for payment statuses)
-      if (paymentDate) {
-        updateData.data_pagamento = paymentDate;
+      const isPaymentStatus = ["pago_aguardando", "proposta_paga"].includes(newStatus);
+      const isCancellationStatus = newStatus === "proposta_cancelada";
+
+      if (dateValue && isPaymentStatus) {
+        updateData.data_pagamento = dateValue;
+      }
+      
+      if (dateValue && isCancellationStatus) {
+        updateData.data_cancelamento = dateValue;
       }
       
       // Update status in televendas table
