@@ -24,6 +24,28 @@ export interface Televenda {
   user?: { name: string } | null;
   data_pagamento?: string | null;
   data_cancelamento?: string | null;
+  edit_count?: number;
+}
+
+export interface EditHistoryItem {
+  id: string;
+  televendas_id: string;
+  edited_by: string;
+  edited_at: string;
+  original_data: {
+    banco?: string;
+    parcela?: number;
+    troco?: number | null;
+    saldo_devedor?: number | null;
+  };
+  new_data: {
+    banco?: string;
+    parcela?: number;
+    troco?: number | null;
+    saldo_devedor?: number | null;
+  };
+  fields_changed: string[];
+  edited_by_name?: string;
 }
 
 export interface StatusHistoryItem {

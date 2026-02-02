@@ -3586,6 +3586,7 @@ export type Database = {
           data_cancelamento: string | null
           data_pagamento: string | null
           data_venda: string
+          edit_count: number | null
           id: string
           lead_id: string | null
           nome: string
@@ -3611,6 +3612,7 @@ export type Database = {
           data_cancelamento?: string | null
           data_pagamento?: string | null
           data_venda: string
+          edit_count?: number | null
           id?: string
           lead_id?: string | null
           nome: string
@@ -3636,6 +3638,7 @@ export type Database = {
           data_cancelamento?: string | null
           data_pagamento?: string | null
           data_venda?: string
+          edit_count?: number | null
           id?: string
           lead_id?: string | null
           nome?: string
@@ -3699,6 +3702,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      televendas_edit_history: {
+        Row: {
+          edited_at: string
+          edited_by: string
+          fields_changed: string[]
+          id: string
+          new_data: Json
+          original_data: Json
+          televendas_id: string
+        }
+        Insert: {
+          edited_at?: string
+          edited_by: string
+          fields_changed: string[]
+          id?: string
+          new_data: Json
+          original_data: Json
+          televendas_id: string
+        }
+        Update: {
+          edited_at?: string
+          edited_by?: string
+          fields_changed?: string[]
+          id?: string
+          new_data?: Json
+          original_data?: Json
+          televendas_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "televendas_edit_history_televendas_id_fkey"
+            columns: ["televendas_id"]
+            isOneToOne: false
+            referencedRelation: "televendas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       televendas_notifications: {
         Row: {

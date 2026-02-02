@@ -23,6 +23,7 @@ import { StatusChangeModal } from "./components/StatusChangeModal";
 import { FiltersDrawer } from "./components/FiltersDrawer";
 import { DetailModal } from "./components/DetailModal";
 import { EditProposalModal } from "./components/EditProposalModal";
+import { CollaboratorEditModal } from "./components/CollaboratorEditModal";
 import { PropostasView } from "./views/PropostasView";
 import { ClientesView } from "./views/ClientesView";
 import { AprovacoesView } from "./views/AprovacoesView";
@@ -63,6 +64,9 @@ export const TelevendasModule = () => {
   // Edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingTelevenda, setEditingTelevenda] = useState<Televenda | null>(null);
+  
+  // Limited edit modal state (for collaborators)
+  const [limitedEditModalOpen, setLimitedEditModalOpen] = useState(false);
 
   // Status change modal state
   const [statusChangeModal, setStatusChangeModal] = useState<{
@@ -365,6 +369,82 @@ export const TelevendasModule = () => {
     setEditModalOpen(true);
   };
 
+  // Limited edit handler (for collaborators)
+  const handleLimitedEdit = (tv: Televenda) => {
+    setEditingTelevenda(tv);
+    setLimitedEditModalOpen(true);
+  };
+
+  // Save limited edit with history
+  const handleLimitedEditSave = async (
+    id: string, 
+    data: { banco: string; parcela: number; troco: number | null; saldo_devedor: number | null },
+    originalData: { banco: string; parcela: number; troco: number | null; saldo_devedor: number | null }
+  ) => {
+    try {
+      // Determine which fields changed
+      const fieldsChanged: string[] = [];
+      if (data.banco !== originalData.banco) fieldsChanged.push("banco");
+      if (data.parcela !== originalData.parcela) fieldsChanged.push("parcela");
+      if (data.troco !== originalData.troco) fieldsChanged.push("troco");
+      if (data.saldo_devedor !== originalData.saldo_devedor) fieldsChanged.push("saldo_devedor");
+
+      if (fieldsChanged.length === 0) {
+        toast({ title: "Nenhuma alteração detectada" });
+        return;
+      }
+
+      // 1. Save edit history
+      const { error: historyError } = await supabase
+        .from("televendas_edit_history")
+        .insert({
+          televendas_id: id,
+          edited_by: user?.id,
+          original_data: originalData,
+          new_data: data,
+          fields_changed: fieldsChanged,
+        });
+
+      if (historyError) {
+        console.error("Error saving edit history:", historyError);
+        throw historyError;
+      }
+
+      // 2. Get current edit_count
+      const { data: currentTv } = await supabase
+        .from("televendas")
+        .select("edit_count")
+        .eq("id", id)
+        .single();
+
+      // 3. Update proposal with new data and increment edit_count
+      const { error: updateError } = await supabase
+        .from("televendas")
+        .update({
+          ...data,
+          edit_count: (currentTv?.edit_count || 0) + 1,
+        })
+        .eq("id", id);
+
+      if (updateError) {
+        console.error("Error updating proposal:", updateError);
+        throw updateError;
+      }
+
+      toast({ 
+        title: "✅ Proposta atualizada", 
+        description: `Campos alterados: ${fieldsChanged.join(", ")}. Histórico registrado.` 
+      });
+      
+      setLimitedEditModalOpen(false);
+      fetchTelevendas();
+    } catch (error) {
+      console.error("Error in limited edit:", error);
+      toast({ title: "Erro", description: "Erro ao atualizar proposta", variant: "destructive" });
+      throw error;
+    }
+  };
+
   const handleEditSave = async (id: string, data: Partial<Televenda>) => {
     try {
       const { error } = await supabase
@@ -404,6 +484,7 @@ export const TelevendasModule = () => {
 
   // Permission checks
   const canEdit = (tv: Televenda) => isAdmin || (isGestor && userCompanyIds.includes(tv.company_id || ""));
+  const canEditLimited = (tv: Televenda) => tv.user_id === user?.id && !isGestorOrAdmin;
   const canChangeStatus = (tv: Televenda) => isAdmin || isGestor || tv.user_id === user?.id;
 
   if (loading) {
@@ -492,9 +573,11 @@ export const TelevendasModule = () => {
                   televendas={filteredTelevendas}
                   onView={handleView}
                   onEdit={handleEdit}
+                  onLimitedEdit={handleLimitedEdit}
                   onDelete={handleDelete}
                   onStatusChange={handleStatusChange}
                   canEdit={canEdit}
+                  canEditLimited={canEditLimited}
                   canChangeStatus={canChangeStatus}
                   isGestorOrAdmin={isGestorOrAdmin}
                 />
@@ -535,12 +618,21 @@ export const TelevendasModule = () => {
         televenda={selectedTelevenda}
       />
 
-      {/* Edit Proposal Modal */}
+      {/* Edit Proposal Modal (Admin/Gestor) */}
       <EditProposalModal
         open={editModalOpen}
         onOpenChange={setEditModalOpen}
         televenda={editingTelevenda}
         onSave={handleEditSave}
+        banks={availableBanks}
+      />
+
+      {/* Collaborator Edit Modal (Limited fields) */}
+      <CollaboratorEditModal
+        open={limitedEditModalOpen}
+        onOpenChange={setLimitedEditModalOpen}
+        televenda={editingTelevenda}
+        onSave={handleLimitedEditSave}
         banks={availableBanks}
       />
 

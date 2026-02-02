@@ -25,10 +25,11 @@ import {
   Hash,
   Copy,
   Check,
-  CheckCircle2
+  CheckCircle2,
+  Edit
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Televenda, StatusHistoryItem, STATUS_CONFIG } from "../types";
+import { Televenda, StatusHistoryItem, STATUS_CONFIG, EditHistoryItem } from "../types";
 import { formatCPF, formatCurrency, formatPhone, formatDate, formatTimeAgo } from "../utils";
 import { StatusBadge } from "./StatusBadge";
 
@@ -40,12 +41,15 @@ interface DetailModalProps {
 
 export const DetailModal = ({ open, onOpenChange, televenda }: DetailModalProps) => {
   const [history, setHistory] = useState<StatusHistoryItem[]>([]);
+  const [editHistory, setEditHistory] = useState<EditHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loadingEditHistory, setLoadingEditHistory] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && televenda) {
       fetchHistory();
+      fetchEditHistory();
     }
   }, [open, televenda?.id]);
 
@@ -83,6 +87,45 @@ export const DetailModal = ({ open, onOpenChange, televenda }: DetailModalProps)
       console.error("Error fetching history:", error);
     } finally {
       setLoadingHistory(false);
+    }
+  };
+
+  const fetchEditHistory = async () => {
+    if (!televenda) return;
+    setLoadingEditHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from("televendas_edit_history")
+        .select("*")
+        .eq("televendas_id", televenda.id)
+        .order("edited_at", { ascending: false });
+
+      if (error) throw error;
+
+      // Enrich with user names
+      if (data?.length) {
+        const userIds = [...new Set(data.map((h) => h.edited_by).filter(Boolean))];
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, name")
+          .in("id", userIds);
+        const profilesMap = new Map((profiles || []).map((p) => [p.id, p.name]));
+
+        setEditHistory(
+          data.map((h) => ({
+            ...h,
+            original_data: h.original_data as EditHistoryItem["original_data"],
+            new_data: h.new_data as EditHistoryItem["new_data"],
+            edited_by_name: profilesMap.get(h.edited_by) || "Sistema",
+          }))
+        );
+      } else {
+        setEditHistory([]);
+      }
+    } catch (error) {
+      console.error("Error fetching edit history:", error);
+    } finally {
+      setLoadingEditHistory(false);
     }
   };
 
@@ -382,6 +425,86 @@ export const DetailModal = ({ open, onOpenChange, televenda }: DetailModalProps)
                 </div>
               )}
             </div>
+
+            {/* Edit History Section */}
+            {editHistory.length > 0 && (
+              <>
+                <Separator />
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                    <Edit className="h-4 w-4" />
+                    HISTÓRICO DE EDIÇÕES
+                  </h3>
+                  
+                  {loadingEditHistory ? (
+                    <div className="space-y-3">
+                      {[1, 2].map((i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <Skeleton className="h-10 w-10 rounded-full" />
+                          <div className="flex-1">
+                            <Skeleton className="h-4 w-32 mb-1" />
+                            <Skeleton className="h-3 w-48" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {editHistory.map((edit, index) => (
+                        <motion.div
+                          key={edit.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          className="p-3 rounded-lg bg-amber-50 border border-amber-200"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-amber-800">
+                              ✏️ Editado por {edit.edited_by_name}
+                            </span>
+                            <span className="text-xs text-amber-600">
+                              {formatTimeAgo(edit.edited_at)}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="space-y-1">
+                              <p className="font-medium text-muted-foreground">Antes:</p>
+                              {edit.fields_changed.includes("banco") && (
+                                <p>Banco: <strong>{edit.original_data?.banco || "-"}</strong></p>
+                              )}
+                              {edit.fields_changed.includes("parcela") && (
+                                <p>Parcela: <strong>{edit.original_data?.parcela ? formatCurrency(edit.original_data.parcela) : "-"}</strong></p>
+                              )}
+                              {edit.fields_changed.includes("troco") && (
+                                <p>Troco: <strong>{edit.original_data?.troco ? formatCurrency(edit.original_data.troco) : "-"}</strong></p>
+                              )}
+                              {edit.fields_changed.includes("saldo_devedor") && (
+                                <p>Saldo: <strong>{edit.original_data?.saldo_devedor ? formatCurrency(edit.original_data.saldo_devedor) : "-"}</strong></p>
+                              )}
+                            </div>
+                            <div className="space-y-1">
+                              <p className="font-medium text-muted-foreground">Depois:</p>
+                              {edit.fields_changed.includes("banco") && (
+                                <p>Banco: <strong className="text-amber-800">{edit.new_data?.banco || "-"}</strong></p>
+                              )}
+                              {edit.fields_changed.includes("parcela") && (
+                                <p>Parcela: <strong className="text-amber-800">{edit.new_data?.parcela ? formatCurrency(edit.new_data.parcela) : "-"}</strong></p>
+                              )}
+                              {edit.fields_changed.includes("troco") && (
+                                <p>Troco: <strong className="text-amber-800">{edit.new_data?.troco ? formatCurrency(edit.new_data.troco) : "-"}</strong></p>
+                              )}
+                              {edit.fields_changed.includes("saldo_devedor") && (
+                                <p>Saldo: <strong className="text-amber-800">{edit.new_data?.saldo_devedor ? formatCurrency(edit.new_data.saldo_devedor) : "-"}</strong></p>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Metadata */}
             <div className="pt-4 border-t">
