@@ -1,56 +1,77 @@
 
-# Plano: Melhorias na Aba Aprovações e Clientes do Módulo Televendas
+# Plano: Corrigir Visibilidade de Alertas Financeiros por Empresa
 
-## Problemas Identificados
+## Problema Identificado
 
-1. **Aba Aprovações sem filtro por banco**: Não há como filtrar as aprovações pendentes por banco, dificultando a gestão quando há muitos itens.
+Atualmente, todos os usuários estão vendo o alerta **"Atenção! 1 conta(s) vencida(s)"** no Dashboard, mesmo que a transação financeira não seja deles ou de sua empresa. Isso é um problema de **privacidade e segurança**.
 
-2. **Aba Clientes sem ordenação alfabética e paginação**: Os clientes são exibidos por data de atualização e todos de uma vez, sem paginação.
+### Causa Raiz
 
-3. **Cancelamento sem data de cancelamento**: Quando uma proposta é cancelada (`proposta_cancelada`), não há opção de registrar a data do cancelamento (similar à `data_pagamento`).
+A política de RLS (Row Level Security) atual na tabela `financial_transactions` está **muito permissiva**:
+
+```sql
+-- Política atual: Colaboradores podem VER todas as transações da empresa
+CREATE POLICY "Colaboradores can view financial transactions in their company"
+ON financial_transactions FOR SELECT
+USING (EXISTS (
+  SELECT 1 FROM user_companies uc
+  WHERE uc.company_id = financial_transactions.company_id
+  AND uc.user_id = auth.uid()
+  AND uc.is_active = true
+))
+```
+
+Isso significa que **qualquer colaborador** de uma empresa pode ver **todas** as transações financeiras dessa empresa.
+
+---
+
+## Regras de Acesso Desejadas
+
+| Perfil | Acesso às Transações Financeiras |
+|--------|----------------------------------|
+| **Admin** | Todas as transações de todas as empresas |
+| **Gestor** | Todas as transações da sua empresa |
+| **Colaborador** | Apenas transações que ele próprio criou |
 
 ---
 
 ## Solução Proposta
 
-### 1. Filtro por Banco na Aba Aprovações
+### 1. Atualizar Política de RLS para Colaboradores
 
-**Alterações em `AprovacoesView.tsx`:**
-- Adicionar prop `availableBanks` e `bankFilter`/`onBankFilterChange`
-- Adicionar dropdown de seleção de banco no topo da view
-- Filtrar os `approvalItems` pelo banco selecionado
+Modificar a política de SELECT para colaboradores, adicionando a condição de que o colaborador só pode ver transações que ele mesmo criou (`created_by = auth.uid()`):
 
-**Alterações em `TelevendasModule.tsx`:**
-- Criar estado separado `approvalBankFilter` para a aba aprovações
-- Passar as props necessárias para AprovacoesView
+```sql
+-- DROP da política atual
+DROP POLICY IF EXISTS "Colaboradores can view financial transactions in their company" 
+ON financial_transactions;
 
-### 2. Ordenação Alfabética e Paginação na Aba Clientes
+-- Nova política para colaboradores: só podem ver transações que criaram
+CREATE POLICY "Colaboradores can view own financial transactions"
+ON financial_transactions FOR SELECT
+USING (
+  -- Colaborador só vê suas próprias transações
+  created_by = auth.uid()
+  -- OU é admin (já coberto por outra policy, mas reforçamos)
+  OR has_role(auth.uid(), 'admin'::app_role)
+  -- OU é gestor da empresa da transação
+  OR EXISTS (
+    SELECT 1 FROM user_companies uc
+    WHERE uc.company_id = financial_transactions.company_id
+    AND uc.user_id = auth.uid()
+    AND uc.company_role = 'gestor'
+    AND uc.is_active = true
+  )
+);
+```
 
-**Alterações em `ClientesView.tsx`:**
-- Alterar o `useMemo` de `clientGroups` para ordenar por `nome` em ordem alfabética (ao invés de por `ultimaAtualizacao`)
-- Adicionar estado de paginação: `currentPage` e `itemsPerPage = 10`
-- Implementar controles de paginação (Anterior/Próximo)
-- Mostrar apenas 10 clientes por página
-- Exibir indicador "Página X de Y"
+### 2. Verificar Políticas de INSERT/UPDATE/DELETE
 
-### 3. Data de Cancelamento ao Confirmar Cancelamento
+Garantir que colaboradores só possam:
+- **INSERT**: Criar transações para sua empresa (já existe policy de gestor)
+- **UPDATE/DELETE**: Apenas suas próprias transações ou se for gestor
 
-**Migração de banco de dados:**
-- Adicionar coluna `data_cancelamento` (DATE) na tabela `televendas`
-
-**Alterações em `types.ts`:**
-- Adicionar `data_cancelamento?: string | null` no tipo `Televenda`
-
-**Alterações em `StatusChangeModal.tsx`:**
-- Adicionar `proposta_cancelada` à lista de status que requerem data
-- Criar array separado `CANCELLATION_STATUSES`
-- Exibir date picker com label "Data do Cancelamento" quando o status for de cancelamento
-
-**Alterações em `TelevendasModule.tsx`:**
-- Modificar `confirmStatusChange` para salvar `data_cancelamento` quando aplicável
-
-**Alterações em `DetailModal.tsx`:**
-- Exibir "Data do Cancelamento" quando a proposta estiver cancelada
+Atualmente, só gestores e admins podem modificar. Precisamos adicionar uma política para colaboradores criarem suas próprias transações (se aplicável ao fluxo de negócio).
 
 ---
 
@@ -58,116 +79,133 @@
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/migrations/` | Adicionar coluna `data_cancelamento` |
-| `src/modules/televendas/types.ts` | Adicionar `data_cancelamento` ao tipo Televenda |
-| `src/modules/televendas/views/AprovacoesView.tsx` | Filtro por banco |
-| `src/modules/televendas/views/ClientesView.tsx` | Ordenação alfabética + paginação |
-| `src/modules/televendas/components/StatusChangeModal.tsx` | Date picker para cancelamentos |
-| `src/modules/televendas/TelevendasModule.tsx` | Estado do filtro de banco + salvar data_cancelamento |
-| `src/modules/televendas/components/DetailModal.tsx` | Exibir data de cancelamento |
+| `supabase/migrations/` | Migração para atualizar RLS policies |
 
 ---
 
-## Detalhes Técnicos
-
-### Ordenação e Paginação de Clientes
-
-```typescript
-// ClientesView.tsx
-const [currentPage, setCurrentPage] = useState(1);
-const ITEMS_PER_PAGE = 10;
-
-const clientGroups = useMemo(() => {
-  // ... grouping logic ...
-  return Array.from(groups.values()).sort(
-    (a, b) => a.nome.localeCompare(b.nome, 'pt-BR') // Ordem alfabética
-  );
-}, [televendas]);
-
-const paginatedClients = useMemo(() => {
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  return clientGroups.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-}, [clientGroups, currentPage]);
-
-const totalPages = Math.ceil(clientGroups.length / ITEMS_PER_PAGE);
-```
-
-### Filtro por Banco em Aprovações
-
-```typescript
-// AprovacoesView.tsx - Nova interface
-interface AprovacoesViewProps {
-  // ... props existentes ...
-  availableBanks: string[];
-  bankFilter: string;
-  onBankFilterChange: (bank: string) => void;
-}
-
-// Filtro aplicado
-const filteredApprovalItems = useMemo(() => {
-  if (bankFilter === "all") return approvalItems;
-  return approvalItems.filter(tv => tv.banco === bankFilter);
-}, [approvalItems, bankFilter]);
-```
-
-### Date Picker para Cancelamentos
-
-```typescript
-// StatusChangeModal.tsx
-const PAYMENT_STATUSES = ["pago_aguardando", "proposta_paga"];
-const CANCELLATION_STATUSES = ["proposta_cancelada"];
-
-const requiresPaymentDate = PAYMENT_STATUSES.includes(newStatus);
-const requiresCancellationDate = CANCELLATION_STATUSES.includes(newStatus);
-
-// No modal:
-{requiresCancellationDate && (
-  <DatePicker 
-    label="Data do Cancelamento" 
-    value={cancellationDate}
-    onChange={setCancellationDate}
-  />
-)}
-```
-
-### Migração SQL
+## Migração SQL Proposta
 
 ```sql
-ALTER TABLE public.televendas 
-ADD COLUMN IF NOT EXISTS data_cancelamento DATE NULL;
+-- 1. Remover política permissiva atual
+DROP POLICY IF EXISTS "Colaboradores can view financial transactions in their company" 
+ON public.financial_transactions;
 
-COMMENT ON COLUMN public.televendas.data_cancelamento IS 'Data em que a proposta foi cancelada';
+-- 2. Criar nova política restritiva para SELECT
+-- Colaboradores: só suas próprias transações
+-- Gestores: todas da empresa
+-- Admins: todas (já coberto pela policy existente)
+CREATE POLICY "Users can view financial transactions"
+ON public.financial_transactions FOR SELECT
+TO authenticated
+USING (
+  -- Admin pode ver tudo (já existe policy separada, mas incluímos por segurança)
+  has_role(auth.uid(), 'admin'::app_role)
+  -- Gestor pode ver tudo da sua empresa
+  OR EXISTS (
+    SELECT 1 FROM user_companies uc
+    WHERE uc.company_id = financial_transactions.company_id
+    AND uc.user_id = auth.uid()
+    AND uc.company_role = 'gestor'
+    AND uc.is_active = true
+  )
+  -- Colaborador só pode ver transações que criou
+  OR (
+    created_by = auth.uid()
+    AND EXISTS (
+      SELECT 1 FROM user_companies uc
+      WHERE uc.company_id = financial_transactions.company_id
+      AND uc.user_id = auth.uid()
+      AND uc.is_active = true
+    )
+  )
+);
+
+-- 3. Adicionar política para colaboradores criarem transações (opcional)
+-- Se colaboradores devem poder criar despesas para sua empresa
+CREATE POLICY "Colaboradores can create own financial transactions"
+ON public.financial_transactions FOR INSERT
+TO authenticated
+WITH CHECK (
+  -- Deve pertencer à empresa da transação
+  EXISTS (
+    SELECT 1 FROM user_companies uc
+    WHERE uc.company_id = financial_transactions.company_id
+    AND uc.user_id = auth.uid()
+    AND uc.is_active = true
+  )
+  -- E o created_by deve ser o próprio usuário
+  AND created_by = auth.uid()
+);
+
+-- 4. Adicionar política para colaboradores editarem/excluírem suas próprias transações
+CREATE POLICY "Colaboradores can manage own financial transactions"
+ON public.financial_transactions FOR UPDATE
+TO authenticated
+USING (
+  created_by = auth.uid()
+  AND EXISTS (
+    SELECT 1 FROM user_companies uc
+    WHERE uc.company_id = financial_transactions.company_id
+    AND uc.user_id = auth.uid()
+    AND uc.is_active = true
+  )
+)
+WITH CHECK (
+  created_by = auth.uid()
+  AND EXISTS (
+    SELECT 1 FROM user_companies uc
+    WHERE uc.company_id = financial_transactions.company_id
+    AND uc.user_id = auth.uid()
+    AND uc.is_active = true
+  )
+);
+
+CREATE POLICY "Colaboradores can delete own financial transactions"
+ON public.financial_transactions FOR DELETE
+TO authenticated
+USING (
+  created_by = auth.uid()
+  AND EXISTS (
+    SELECT 1 FROM user_companies uc
+    WHERE uc.company_id = financial_transactions.company_id
+    AND uc.user_id = auth.uid()
+    AND uc.is_active = true
+  )
+);
 ```
 
 ---
 
-## Comportamento Esperado
+## Comportamento Esperado Após a Correção
 
-### Aba Aprovações
-- Dropdown de filtro por banco no topo
-- Opções: "Todos os bancos" + bancos únicos das propostas pendentes
-- Filtragem instantânea ao selecionar um banco
-- Contagem de itens atualizada conforme o filtro
+### Para Colaboradores Comuns
+- **Dashboard**: Só mostra alertas de contas que eles próprios cadastraram
+- **Conta Corrente**: Só exibe transações próprias
+- Não conseguem ver transações de outros usuários da mesma empresa
 
-### Aba Clientes
-- Clientes ordenados de A a Z pelo nome
-- Máximo de 10 clientes por página
-- Botões "Anterior" / "Próximo" para navegação
-- Indicador "Página 1 de 5" (exemplo)
-- Reset da página ao mudar filtros
+### Para Gestores
+- **Dashboard**: Mostra alertas de todas as contas da empresa
+- **Conta Corrente**: Acesso completo a todas as transações da empresa
+- Podem editar/excluir qualquer transação da empresa
 
-### Cancelamento com Data
-- Ao mudar status para "Proposta Cancelada", aparece date picker
-- Data padrão: hoje
-- Campo salvo no banco como `data_cancelamento`
-- Exibido no modal de detalhes quando aplicável
+### Para Admins
+- Acesso total a todas as transações de todas as empresas
+
+---
+
+## Verificação e Teste
+
+Após a migração, será necessário testar:
+1. Login como colaborador comum → Não deve ver contas de outros
+2. Login como gestor → Deve ver todas as contas da empresa
+3. Login como admin → Deve ver todas as contas de todas empresas
+4. Verificar que a edição/exclusão segue as mesmas regras
 
 ---
 
 ## Resumo de Entregas
 
-1. Dropdown de filtro por banco na aba Aprovações
-2. Ordenação alfabética (A-Z) na aba Clientes
-3. Paginação com 10 clientes por página
-4. Date picker para registrar data do cancelamento
-5. Exibição da data de cancelamento no modal de detalhes
+1. Migração SQL para atualizar políticas RLS na tabela `financial_transactions`
+2. Separação clara de permissões: Colaborador (só suas), Gestor (empresa), Admin (tudo)
+3. Manutenção da funcionalidade existente para gestores e admins
+4. Correção do alerta no Dashboard para mostrar apenas transações permitidas
