@@ -253,6 +253,14 @@ export const DetailModal = ({ open, onOpenChange, televenda }: DetailModalProps)
                     className="bg-green-500/5"
                   />
                 )}
+                {televenda.data_cancelamento && (
+                  <InfoRow 
+                    icon={Clock} 
+                    label="Data do Cancelamento" 
+                    value={formatDate(televenda.data_cancelamento)}
+                    className="bg-red-500/5"
+                  />
+                )}
               </div>
             </div>
 

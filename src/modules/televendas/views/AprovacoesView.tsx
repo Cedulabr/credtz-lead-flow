@@ -1,14 +1,22 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   CheckCircle, 
   XCircle, 
   RotateCcw, 
   Clock,
   AlertTriangle,
-  Trash2
+  Trash2,
+  Building2
 } from "lucide-react";
 import { Televenda, STATUS_CONFIG } from "../types";
 import { formatCPF, formatCurrency, formatTimeAgo } from "../utils";
@@ -33,6 +41,8 @@ export const AprovacoesView = ({
   onApproveExclusion,
   onRejectExclusion,
 }: AprovacoesViewProps) => {
+  const [bankFilter, setBankFilter] = useState("all");
+
   // Filter items that need manager action
   const approvalItems = useMemo(() => {
     return televendas.filter((tv) =>
@@ -45,11 +55,23 @@ export const AprovacoesView = ({
     );
   }, [televendas]);
 
-  // Group by status
-  const pagoAguardando = approvalItems.filter(tv => tv.status === "pago_aguardando");
-  const solicitarExclusao = approvalItems.filter(tv => tv.status === "solicitar_exclusao");
-  const pendentes = approvalItems.filter(tv => tv.status === "proposta_pendente");
-  const devolvidos = approvalItems.filter(tv => tv.status === "devolvido");
+  // Get unique banks from approval items
+  const availableBanks = useMemo(() => {
+    const banksSet = new Set(approvalItems.map((tv) => tv.banco).filter(Boolean));
+    return Array.from(banksSet).sort();
+  }, [approvalItems]);
+
+  // Filter by selected bank
+  const filteredApprovalItems = useMemo(() => {
+    if (bankFilter === "all") return approvalItems;
+    return approvalItems.filter((tv) => tv.banco === bankFilter);
+  }, [approvalItems, bankFilter]);
+
+  // Group by status (using filtered items)
+  const pagoAguardando = filteredApprovalItems.filter(tv => tv.status === "pago_aguardando");
+  const solicitarExclusao = filteredApprovalItems.filter(tv => tv.status === "solicitar_exclusao");
+  const pendentes = filteredApprovalItems.filter(tv => tv.status === "proposta_pendente");
+  const devolvidos = filteredApprovalItems.filter(tv => tv.status === "devolvido");
 
   if (approvalItems.length === 0) {
     return (
@@ -98,7 +120,10 @@ export const AprovacoesView = ({
           <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
             <span className="font-mono">{formatCPF(tv.cpf)}</span>
             <span>•</span>
-            <span>{tv.banco}</span>
+            <span className="flex items-center gap-1">
+              <Building2 className="h-3 w-3" />
+              {tv.banco}
+            </span>
             <span>•</span>
             <span className="font-semibold">{formatCurrency(tv.parcela)}</span>
           </div>
@@ -223,13 +248,35 @@ export const AprovacoesView = ({
 
   return (
     <div className="space-y-2">
-      {/* Summary banner */}
+      {/* Summary banner with bank filter */}
       <div className="p-4 rounded-xl bg-amber-500/10 border-2 border-amber-300 mb-6">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-amber-600" />
-          <span className="font-semibold text-amber-700">
-            {approvalItems.length} item{approvalItems.length !== 1 ? 's' : ''} aguardando ação
-          </span>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-600" />
+            <span className="font-semibold text-amber-700">
+              {filteredApprovalItems.length} item{filteredApprovalItems.length !== 1 ? 's' : ''} aguardando ação
+            </span>
+          </div>
+          
+          {/* Bank filter */}
+          {availableBanks.length > 1 && (
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-amber-600" />
+              <Select value={bankFilter} onValueChange={setBankFilter}>
+                <SelectTrigger className="w-[180px] h-9 bg-white/80 border-amber-300">
+                  <SelectValue placeholder="Filtrar por banco" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os bancos</SelectItem>
+                  {availableBanks.map((bank) => (
+                    <SelectItem key={bank} value={bank}>
+                      {bank}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </div>
 

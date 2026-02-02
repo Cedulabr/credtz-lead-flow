@@ -23,6 +23,7 @@ export interface Televenda {
   user_id: string;
   user?: { name: string } | null;
   data_pagamento?: string | null;
+  data_cancelamento?: string | null;
 }
 
 export interface StatusHistoryItem {
