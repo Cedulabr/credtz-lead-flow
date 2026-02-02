@@ -17,7 +17,7 @@ import { MargemCards } from '../components/MargemCards';
 import { TelefoneHotPanel } from '../components/TelefoneHotPanel';
 import { ContratoCard } from '../components/ContratoCard';
 import { SimulationModal } from '../components/SimulationModal';
-import { ProposalGenerator } from '../components/ProposalGenerator';
+import { ProfessionalProposalPDF } from '../components/ProfessionalProposalPDF';
 import { formatDate, formatCurrency } from '../utils';
 import { validatePhone } from '../utils/phoneValidation';
 import { toast } from 'sonner';
@@ -155,11 +155,12 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
         />
       )}
 
-      <ProposalGenerator
+      <ProfessionalProposalPDF
         isOpen={showProposal}
         onClose={() => setShowProposal(false)}
         client={client}
         contracts={contracts}
+        companyName="Credtz"
       />
 
       {/* Back Button */}
