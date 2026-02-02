@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   ArrowLeft, 
   FileText, 
@@ -18,6 +19,7 @@ import { TelefoneHotPanel } from '../components/TelefoneHotPanel';
 import { ContratoCard } from '../components/ContratoCard';
 import { SimulationModal } from '../components/SimulationModal';
 import { ProfessionalProposalPDF } from '../components/ProfessionalProposalPDF';
+import { TrocoCalculator, TrocoSimulation } from '../components/TrocoCalculator';
 import { formatDate, formatCurrency } from '../utils';
 import { validatePhone } from '../utils/phoneValidation';
 import { toast } from 'sonner';
@@ -35,6 +37,8 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
   const [selectedContract, setSelectedContract] = useState<BaseOffContract | null>(null);
   const [showSimulation, setShowSimulation] = useState(false);
   const [showProposal, setShowProposal] = useState(false);
+  const [selectedContractIds, setSelectedContractIds] = useState<string[]>([]);
+  const [currentSimulation, setCurrentSimulation] = useState<TrocoSimulation | null>(null);
 
   const fetchContracts = useCallback(async () => {
     setIsLoading(true);
@@ -161,6 +165,8 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
         client={client}
         contracts={contracts}
         companyName="Credtz"
+        trocoSimulation={currentSimulation}
+        selectedContractIds={selectedContractIds}
       />
 
       {/* Back Button */}
@@ -209,9 +215,27 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
             {/* Contracts Tab */}
             <TabsContent value="contratos" className="space-y-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  {contracts.length} contrato(s) encontrado(s)
-                </p>
+                <div className="flex items-center gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    {contracts.length} contrato(s) encontrado(s)
+                  </p>
+                  {contracts.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (selectedContractIds.length === contracts.length) {
+                          setSelectedContractIds([]);
+                        } else {
+                          setSelectedContractIds(contracts.map(c => c.id));
+                        }
+                      }}
+                      className="text-xs"
+                    >
+                      {selectedContractIds.length === contracts.length ? 'Desmarcar todos' : 'Selecionar todos'}
+                    </Button>
+                  )}
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
@@ -238,16 +262,42 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
               ) : (
                 <div className="space-y-3">
                   {contracts.map(contract => (
-                    <ContratoCard
-                      key={contract.id}
-                      contract={contract}
-                      onSimular={() => handleSimular(contract)}
-                      onRefinanciar={() => handleRefinanciar(contract)}
-                      onPortar={() => handlePortar(contract)}
-                      onGerarProposta={() => handleGerarProposta()}
-                    />
+                    <div key={contract.id} className="flex items-start gap-3">
+                      <div className="pt-4">
+                        <Checkbox
+                          checked={selectedContractIds.includes(contract.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedContractIds([...selectedContractIds, contract.id]);
+                            } else {
+                              setSelectedContractIds(selectedContractIds.filter(id => id !== contract.id));
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <ContratoCard
+                          contract={contract}
+                          onSimular={() => handleSimular(contract)}
+                          onRefinanciar={() => handleRefinanciar(contract)}
+                          onPortar={() => handlePortar(contract)}
+                          onGerarProposta={() => handleGerarProposta()}
+                        />
+                      </div>
+                    </div>
                   ))}
                 </div>
+              )}
+
+              {/* Troco Calculator Panel */}
+              {contracts.length > 0 && (
+                <TrocoCalculator
+                  contracts={contracts}
+                  selectedContracts={selectedContractIds}
+                  onSelectionChange={setSelectedContractIds}
+                  onSimulationChange={setCurrentSimulation}
+                  onGeneratePDF={() => setShowProposal(true)}
+                />
               )}
             </TabsContent>
 
@@ -263,16 +313,16 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
                 </Card>
               ) : (
                 <div className="relative pl-6 border-l-2 border-muted space-y-6">
-                  {timelineEvents.map((event, index) => (
+                  {timelineEvents.map((event) => (
                     <div key={event.id} className="relative">
                       {/* Timeline dot */}
                       <div className={cn(
                         "absolute -left-[25px] w-4 h-4 rounded-full border-2 bg-background",
-                        event.type === 'contrato' && "border-blue-500",
-                        event.type === 'simulacao' && "border-yellow-500",
-                        event.type === 'refinanciamento' && "border-purple-500",
-                        event.type === 'contato' && "border-green-500",
-                        event.type === 'vencimento' && "border-orange-500"
+                        event.type === 'contrato' && "border-primary",
+                        event.type === 'simulacao' && "border-warning",
+                        event.type === 'refinanciamento' && "border-secondary",
+                        event.type === 'contato' && "border-accent",
+                        event.type === 'vencimento' && "border-destructive"
                       )} />
                       
                       <Card className="p-4 ml-2 hover:bg-muted/50 transition-colors">
