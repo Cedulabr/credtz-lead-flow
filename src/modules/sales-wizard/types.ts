@@ -16,16 +16,13 @@ export interface SalesWizardData {
   saldo_devedor?: number;
   
   // Step 3b: Portabilidade - Contrato Atual (Credora Original)
-  credora_original?: string;
-  numero_contrato_atual?: string;
+  credora_original?: string;        // Campo aberto - texto livre
   parcela_atual?: number;
   saldo_devedor_atual?: number;
   prazo_restante?: number;
   
-  // Step 3b: Portabilidade - Novo Contrato (Proponente)
-  banco_proponente?: string;
-  novo_prazo?: number;
-  nova_parcela?: number;
+  // Step 3b: Portabilidade - Novo Banco (Proponente)
+  banco_proponente?: string;        // Select do banco de dados
   
   // Step 4: Confirmation
   observacao?: string;
