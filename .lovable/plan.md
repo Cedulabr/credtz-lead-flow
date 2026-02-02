@@ -1,40 +1,56 @@
 
-# Plano: Adicionar Data de Pagamento ao Marcar Proposta como Paga
+# Plano: Melhorias na Aba Aprovações e Clientes do Módulo Televendas
 
-## Problema Identificado
-Atualmente, quando uma proposta é marcada como "paga", não há opção para registrar a **data em que o pagamento foi efetivado**. O sistema apenas registra quando o status foi alterado (`status_updated_at`), mas não a data real do pagamento.
+## Problemas Identificados
+
+1. **Aba Aprovações sem filtro por banco**: Não há como filtrar as aprovações pendentes por banco, dificultando a gestão quando há muitos itens.
+
+2. **Aba Clientes sem ordenação alfabética e paginação**: Os clientes são exibidos por data de atualização e todos de uma vez, sem paginação.
+
+3. **Cancelamento sem data de cancelamento**: Quando uma proposta é cancelada (`proposta_cancelada`), não há opção de registrar a data do cancelamento (similar à `data_pagamento`).
 
 ---
 
 ## Solução Proposta
 
-### 1. Adicionar Coluna no Banco de Dados
+### 1. Filtro por Banco na Aba Aprovações
 
-Nova coluna `data_pagamento` na tabela `televendas`:
+**Alterações em `AprovacoesView.tsx`:**
+- Adicionar prop `availableBanks` e `bankFilter`/`onBankFilterChange`
+- Adicionar dropdown de seleção de banco no topo da view
+- Filtrar os `approvalItems` pelo banco selecionado
 
-```sql
-ALTER TABLE public.televendas
-ADD COLUMN data_pagamento DATE NULL;
-```
+**Alterações em `TelevendasModule.tsx`:**
+- Criar estado separado `approvalBankFilter` para a aba aprovações
+- Passar as props necessárias para AprovacoesView
 
-### 2. Modificar o Modal de Mudança de Status
+### 2. Ordenação Alfabética e Paginação na Aba Clientes
 
-Atualizar o `StatusChangeModal.tsx` para:
-- Detectar quando o novo status é um status de pagamento (`pago_aguardando`, `proposta_paga`)
-- Exibir um **date picker** para selecionar a data do pagamento
-- Por padrão, mostrar a data de hoje
-- O campo será opcional mas recomendado
+**Alterações em `ClientesView.tsx`:**
+- Alterar o `useMemo` de `clientGroups` para ordenar por `nome` em ordem alfabética (ao invés de por `ultimaAtualizacao`)
+- Adicionar estado de paginação: `currentPage` e `itemsPerPage = 10`
+- Implementar controles de paginação (Anterior/Próximo)
+- Mostrar apenas 10 clientes por página
+- Exibir indicador "Página X de Y"
 
-### 3. Atualizar a Lógica de Confirmação
+### 3. Data de Cancelamento ao Confirmar Cancelamento
 
-Modificar a função `confirmStatusChange` no `TelevendasModule.tsx` para:
-- Receber a data de pagamento como parâmetro adicional
-- Salvar no banco de dados junto com a atualização de status
+**Migração de banco de dados:**
+- Adicionar coluna `data_cancelamento` (DATE) na tabela `televendas`
 
-### 4. Exibir a Data de Pagamento
+**Alterações em `types.ts`:**
+- Adicionar `data_cancelamento?: string | null` no tipo `Televenda`
 
-Adicionar no `DetailModal.tsx`:
-- Exibir a "Data de Pagamento" quando a proposta estiver paga
+**Alterações em `StatusChangeModal.tsx`:**
+- Adicionar `proposta_cancelada` à lista de status que requerem data
+- Criar array separado `CANCELLATION_STATUSES`
+- Exibir date picker com label "Data do Cancelamento" quando o status for de cancelamento
+
+**Alterações em `TelevendasModule.tsx`:**
+- Modificar `confirmStatusChange` para salvar `data_cancelamento` quando aplicável
+
+**Alterações em `DetailModal.tsx`:**
+- Exibir "Data do Cancelamento" quando a proposta estiver cancelada
 
 ---
 
@@ -42,108 +58,116 @@ Adicionar no `DetailModal.tsx`:
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/migrations/` | Nova migração para adicionar coluna `data_pagamento` |
-| `src/modules/televendas/types.ts` | Adicionar `data_pagamento?: string` no tipo `Televenda` |
-| `src/modules/televendas/components/StatusChangeModal.tsx` | Adicionar date picker para status de pagamento |
-| `src/modules/televendas/TelevendasModule.tsx` | Atualizar `confirmStatusChange` para salvar `data_pagamento` |
-| `src/modules/televendas/components/DetailModal.tsx` | Exibir data de pagamento na seção de operação |
-| `src/integrations/supabase/types.ts` | Atualizar tipos gerados (automático) |
+| `supabase/migrations/` | Adicionar coluna `data_cancelamento` |
+| `src/modules/televendas/types.ts` | Adicionar `data_cancelamento` ao tipo Televenda |
+| `src/modules/televendas/views/AprovacoesView.tsx` | Filtro por banco |
+| `src/modules/televendas/views/ClientesView.tsx` | Ordenação alfabética + paginação |
+| `src/modules/televendas/components/StatusChangeModal.tsx` | Date picker para cancelamentos |
+| `src/modules/televendas/TelevendasModule.tsx` | Estado do filtro de banco + salvar data_cancelamento |
+| `src/modules/televendas/components/DetailModal.tsx` | Exibir data de cancelamento |
 
 ---
 
 ## Detalhes Técnicos
 
-### Interface do Modal Atualizada
-
-O `StatusChangeModal` será estendido com:
+### Ordenação e Paginação de Clientes
 
 ```typescript
-interface StatusChangeModalProps {
-  // ... props existentes
-  onConfirm: (reason: string, paymentDate?: string) => Promise<void>;
+// ClientesView.tsx
+const [currentPage, setCurrentPage] = useState(1);
+const ITEMS_PER_PAGE = 10;
+
+const clientGroups = useMemo(() => {
+  // ... grouping logic ...
+  return Array.from(groups.values()).sort(
+    (a, b) => a.nome.localeCompare(b.nome, 'pt-BR') // Ordem alfabética
+  );
+}, [televendas]);
+
+const paginatedClients = useMemo(() => {
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  return clientGroups.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+}, [clientGroups, currentPage]);
+
+const totalPages = Math.ceil(clientGroups.length / ITEMS_PER_PAGE);
+```
+
+### Filtro por Banco em Aprovações
+
+```typescript
+// AprovacoesView.tsx - Nova interface
+interface AprovacoesViewProps {
+  // ... props existentes ...
+  availableBanks: string[];
+  bankFilter: string;
+  onBankFilterChange: (bank: string) => void;
 }
+
+// Filtro aplicado
+const filteredApprovalItems = useMemo(() => {
+  if (bankFilter === "all") return approvalItems;
+  return approvalItems.filter(tv => tv.banco === bankFilter);
+}, [approvalItems, bankFilter]);
 ```
 
-Quando o `newStatus` for `pago_aguardando` ou `proposta_paga`:
-
-```text
-┌─────────────────────────────────────────────┐
-│  Alterar Status da Proposta                 │
-├─────────────────────────────────────────────┤
-│                                             │
-│  [Pendente] ──────▶ [Pago Aguard. Gestor]   │
-│                                             │
-│  ⚠️ Alteração crítica                       │
-│  Esta alteração será registrada...          │
-│                                             │
-│  📅 Data do Pagamento *                     │
-│  ┌─────────────────────────────────────┐    │
-│  │  30/01/2026               📅        │    │
-│  └─────────────────────────────────────┘    │
-│                                             │
-│  Motivo da alteração *                      │
-│  ┌─────────────────────────────────────┐    │
-│  │                                     │    │
-│  └─────────────────────────────────────┘    │
-│                                             │
-│          [Cancelar]  [Confirmar Alteração]  │
-└─────────────────────────────────────────────┘
-```
-
-### Atualização do Banco
+### Date Picker para Cancelamentos
 
 ```typescript
-const { error: updateError } = await supabase
-  .from("televendas")
-  .update({ 
-    status: newStatus, 
-    status_updated_at: new Date().toISOString(),
-    status_updated_by: user?.id,
-    data_pagamento: paymentDate || null  // NOVO
-  })
-  .eq("id", tv.id);
-```
+// StatusChangeModal.tsx
+const PAYMENT_STATUSES = ["pago_aguardando", "proposta_paga"];
+const CANCELLATION_STATUSES = ["proposta_cancelada"];
 
-### Exibição no DetailModal
+const requiresPaymentDate = PAYMENT_STATUSES.includes(newStatus);
+const requiresCancellationDate = CANCELLATION_STATUSES.includes(newStatus);
 
-Após "Data de Cadastro", adicionar:
-
-```typescript
-{televenda.data_pagamento && (
-  <InfoRow 
-    icon={CheckCircle} 
-    label="Data do Pagamento" 
-    value={formatDate(televenda.data_pagamento)}
-    className="bg-green-500/5"
+// No modal:
+{requiresCancellationDate && (
+  <DatePicker 
+    label="Data do Cancelamento" 
+    value={cancellationDate}
+    onChange={setCancellationDate}
   />
 )}
 ```
 
----
+### Migração SQL
 
-## Fluxo de Uso
+```sql
+ALTER TABLE public.televendas 
+ADD COLUMN IF NOT EXISTS data_cancelamento DATE NULL;
 
-1. Operador clica para alterar status para "Pago Aguardando Gestor"
-2. Modal abre mostrando a transição de status
-3. Date picker aparece com data de hoje selecionada por padrão
-4. Operador pode alterar para a data real do pagamento
-5. Operador preenche o motivo (obrigatório)
-6. Ao confirmar, `data_pagamento` é salvo junto com o novo status
+COMMENT ON COLUMN public.televendas.data_cancelamento IS 'Data em que a proposta foi cancelada';
+```
 
 ---
 
-## Status que Exibem Date Picker
+## Comportamento Esperado
 
-O date picker aparecerá apenas para os seguintes status:
-- `pago_aguardando` - Operador informando que o pagamento foi efetuado
-- `proposta_paga` - Gestor aprovando como pago (pode corrigir a data)
+### Aba Aprovações
+- Dropdown de filtro por banco no topo
+- Opções: "Todos os bancos" + bancos únicos das propostas pendentes
+- Filtragem instantânea ao selecionar um banco
+- Contagem de itens atualizada conforme o filtro
+
+### Aba Clientes
+- Clientes ordenados de A a Z pelo nome
+- Máximo de 10 clientes por página
+- Botões "Anterior" / "Próximo" para navegação
+- Indicador "Página 1 de 5" (exemplo)
+- Reset da página ao mudar filtros
+
+### Cancelamento com Data
+- Ao mudar status para "Proposta Cancelada", aparece date picker
+- Data padrão: hoje
+- Campo salvo no banco como `data_cancelamento`
+- Exibido no modal de detalhes quando aplicável
 
 ---
 
 ## Resumo de Entregas
 
-1. Nova coluna `data_pagamento` no banco de dados
-2. Date picker no modal de mudança de status (para status de pagamento)
-3. Data de pagamento salva automaticamente
-4. Exibição da data de pagamento no modal de detalhes
-5. Tipos TypeScript atualizados
+1. Dropdown de filtro por banco na aba Aprovações
+2. Ordenação alfabética (A-Z) na aba Clientes
+3. Paginação com 10 clientes por página
+4. Date picker para registrar data do cancelamento
+5. Exibição da data de cancelamento no modal de detalhes
