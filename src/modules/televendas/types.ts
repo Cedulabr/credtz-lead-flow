@@ -54,9 +54,7 @@ export const OPERATOR_STATUSES = [
   "solicitar_digitacao",    // Solicitar Digitação
   "proposta_digitada",      // Proposta Digitada
   "pago_aguardando",        // Pago Aguardando Gestor
-  "cancelado_aguardando",   // Cancelamento Aguardando Gestor
-  "solicitar_exclusao",     // Solicitar Exclusão
-  "proposta_pendente",      // Proposta Pendente (informativo)
+  "cancelado_aguardando",   // Solicitar Cancelamento (Aguardando Gestor)
 ] as const;
 
 // Status que apenas o GESTOR pode definir (finais)
@@ -78,7 +76,6 @@ export const LEGACY_STATUS_MAP: Record<string, string> = {
   "pago_aprovado": "proposta_paga",
   "cancelado": "proposta_cancelada",
   "cancelado_confirmado": "proposta_cancelada",
-  "cancelado_aguardando": "proposta_cancelada",
   "digitada": "proposta_digitada",
   "enviada": "proposta_digitada",
   "em_analise": "proposta_pendente",
