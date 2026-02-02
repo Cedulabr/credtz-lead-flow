@@ -1,165 +1,116 @@
 
-# Plano: Adicionar "Solicitar Cancelamento" para Colaboradores
+# Plano: Correção do Fluxo de Status no Módulo Televendas
 
-## Contexto
+## Problemas Identificados
 
-Atualmente, o fluxo de cancelamento funciona da seguinte forma:
-- **Gestores/Admins**: Podem cancelar propostas diretamente (status `proposta_cancelada`)
-- **Colaboradores**: Não têm opção de solicitar cancelamento - apenas gestores podem cancelar
-
-O usuário deseja que **colaboradores possam solicitar o cancelamento**, e o **gestor aprove ou rejeite** a solicitação.
-
----
-
-## Solução Proposta
-
-Adicionar um novo status `cancelado_aguardando` (já existe na constraint do banco) que funcionará de forma análoga ao `solicitar_exclusao`:
-
-| Status | Quem pode usar | Ação do Gestor |
-|--------|----------------|----------------|
-| `cancelado_aguardando` | Colaborador | Aprovar ou Rejeitar |
-| `proposta_cancelada` | Gestor (após aprovação) | Final |
-
----
-
-## Alterações Necessárias
-
-### 1. Atualizar `types.ts`
-
-Adicionar `cancelado_aguardando` aos status operacionais e configurar sua exibição:
+### 1. Erro Crítico no LEGACY_STATUS_MAP
+O mapeamento `"cancelado_aguardando": "proposta_cancelada"` está **convertendo automaticamente** todas as solicitações de cancelamento em propostas canceladas, impedindo o fluxo de aprovação.
 
 ```typescript
-// OPERATOR_STATUSES - adicionar:
-"cancelado_aguardando", // Cancelamento Aguardando Gestor
-
-// STATUS_CONFIG - adicionar:
-cancelado_aguardando: {
-  label: "Cancelamento Aguardando Gestor",
-  shortLabel: "Aguard. Cancel.",
-  emoji: "❌",
-  color: "text-red-500",
-  bgColor: "bg-red-500/10 border-red-300",
-  isOperational: true,
-  isFinal: false,
-}
+// ERRO: Esta linha está transformando solicitar cancelamento em cancelado direto!
+"cancelado_aguardando": "proposta_cancelada", // ❌ REMOVER
 ```
 
-### 2. Atualizar `AprovacoesView.tsx`
+### 2. Status do Colaborador
+Conforme requisitos, o colaborador deve ter acesso a:
 
-Adicionar seção para aprovar/rejeitar solicitações de cancelamento:
+| Status | Código | Situação Atual |
+|--------|--------|----------------|
+| Solicitar Digitação | `solicitar_digitacao` | OK |
+| Solicitar Cancelamento | `cancelado_aguardando` | OK (mas LEGACY_MAP quebra) |
+| Proposta Digitada | `proposta_digitada` | OK |
+| Pago aguardando Gestor | `pago_aguardando` | OK |
 
-- Filtrar itens com status `cancelado_aguardando`
-- Mostrar botões "Aprovar Cancelamento" e "Rejeitar"
-- Passar props para handlers de aprovação/rejeição de cancelamento
+**Problema**: `solicitar_exclusao` e `proposta_pendente` estão na lista de operador mas não foram mencionados nos requisitos.
 
-### 3. Atualizar `TelevendasModule.tsx`
+### 3. Status do Gestor
+O gestor precisa ter acesso a TODOS os status (colaborador + finais):
 
-Adicionar handlers para aprovar/rejeitar cancelamento:
+| Status | Código | Situação Atual |
+|--------|--------|----------------|
+| Proposta Cancelada | `proposta_cancelada` | OK |
+| Exclusão Aprovada | `exclusao_aprovada` | OK |
+| Exclusão Rejeitada | `exclusao_rejeitada` | OK |
+| Devolvido para revisão | `devolvido` | OK |
+| + Todos do colaborador | * | OK (via ALL_STATUSES) |
+| **Proposta Paga** | `proposta_paga` | Falta no menu de ações |
 
-```typescript
-// Novos handlers:
-handleApproveCancellation = (tv) => handleStatusChange(tv, "proposta_cancelada");
-handleRejectCancellation = (tv) => handleStatusChange(tv, "devolvido"); // ou outro status
-
-// Atualizar stats para contar cancelados_aguardando:
-aguardandoGestao: televendas.filter((tv) => 
-  ["pago_aguardando", "solicitar_exclusao", "cancelado_aguardando"].includes(tv.status)
-).length
-```
-
-### 4. Atualizar `ActionMenu.tsx` (já funciona automaticamente)
-
-Como o ActionMenu já usa `OPERATOR_STATUSES`, ao adicionar `cancelado_aguardando` à lista, o menu já mostrará a opção para colaboradores.
+### 4. Filtros não aplicam a propostas antigas
+Os filtros de status funcionam, mas propostas antigas podem ter status legados que são mapeados incorretamente.
 
 ---
 
-## Arquivos a Modificar
+## Correções Necessárias
+
+### 1. Arquivo: `src/modules/televendas/types.ts`
+
+**Remover mapeamento incorreto do LEGACY_STATUS_MAP:**
+```typescript
+// REMOVER esta linha:
+"cancelado_aguardando": "proposta_cancelada",
+```
+
+**Ajustar OPERATOR_STATUSES (opcional, baseado em confirmação):**
+```typescript
+export const OPERATOR_STATUSES = [
+  "solicitar_digitacao",    // Solicitar Digitação
+  "proposta_digitada",      // Proposta Digitada
+  "pago_aguardando",        // Pago Aguardando Gestor
+  "cancelado_aguardando",   // Solicitar Cancelamento (Aguardando Gestor)
+] as const;
+```
+
+**Nota**: Remover `solicitar_exclusao` e `proposta_pendente` se não forem necessários para colaboradores.
+
+### 2. Arquivo: `src/modules/televendas/components/ActionMenu.tsx`
+
+O ActionMenu já usa `ALL_STATUSES` para gestores, então todos os status aparecem. Nenhuma alteração necessária aqui.
+
+### 3. Arquivo: `src/modules/televendas/components/FiltersDrawer.tsx`
+
+O FiltersDrawer já usa `ALL_STATUSES` para gestores. Nenhuma alteração estrutural necessária, mas os filtros funcionarão melhor após corrigir o LEGACY_STATUS_MAP.
+
+### 4. Verificar/Atualizar Status Legados no Banco
+
+Propostas antigas com status legados serão normalizadas corretamente após remover o mapeamento incorreto.
+
+---
+
+## Resumo das Alterações
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/modules/televendas/types.ts` | Adicionar `cancelado_aguardando` a OPERATOR_STATUSES e STATUS_CONFIG |
-| `src/modules/televendas/views/AprovacoesView.tsx` | Adicionar seção e props para aprovar/rejeitar cancelamento |
-| `src/modules/televendas/TelevendasModule.tsx` | Adicionar handlers e atualizar contagem de pendências |
+| `src/modules/televendas/types.ts` | Remover `"cancelado_aguardando": "proposta_cancelada"` do LEGACY_STATUS_MAP |
+| `src/modules/televendas/types.ts` | (Opcional) Ajustar OPERATOR_STATUSES conforme requisitos |
 
 ---
 
-## Fluxo de Trabalho Final
+## Fluxo Correto Após Correção
 
 ```text
-COLABORADOR                          GESTOR
-    │                                   │
-    ├─► Proposta Digitada               │
-    │                                   │
-    ├─► Solicitar Cancelamento ─────────►│ Aba "Aprovações"
-    │   (cancelado_aguardando)          │
-    │                                   ├─► Aprovar → proposta_cancelada
-    │                                   │   (com data de cancelamento)
-    │◄──────────────────────────────────┤
-    │                                   └─► Rejeitar → devolvido
-    │◄──────────────────────────────────┘
+COLABORADOR                              GESTOR
+    │                                       │
+    ├─► Solicitar Digitação                 │
+    │                                       │
+    ├─► Proposta Digitada                   │
+    │                                       │
+    ├─► Pago Aguardando Gestor ─────────────► Aprovar → Proposta Paga
+    │                                       │ Rejeitar → Proposta Cancelada
+    │                                       │ Devolver → Devolvido
+    │                                       │
+    ├─► Solicitar Cancelamento ─────────────► Aprovar → Proposta Cancelada
+    │   (cancelado_aguardando)              │ Rejeitar → Devolvido
+    │                                       │
+    └─► Solicitar Exclusão ─────────────────► Aprovar → Exclusão Aprovada
+                                            │ Rejeitar → Exclusão Rejeitada
 ```
 
 ---
 
-## Detalhes Técnicos
+## Testes Recomendados
 
-### Interface do AprovacoesView
-
-```typescript
-interface AprovacoesViewProps {
-  // ... props existentes ...
-  onApproveCancellation: (tv: Televenda) => void;
-  onRejectCancellation: (tv: Televenda) => void;
-}
-```
-
-### Nova Seção no AprovacoesView
-
-```typescript
-// Filtrar cancelados aguardando
-const canceladoAguardando = filteredApprovalItems.filter(
-  tv => tv.status === "cancelado_aguardando"
-);
-
-// Renderizar seção
-{canceladoAguardando.length > 0 && (
-  <div>
-    <SectionHeader 
-      emoji="❌" 
-      title="Solicitações de Cancelamento" 
-      count={canceladoAguardando.length}
-      urgent
-    />
-    {/* Cards com botões Aprovar/Rejeitar */}
-  </div>
-)}
-```
-
-### Atualização do StatusChangeModal
-
-O modal já suporta data de cancelamento, então ao aprovar (mudar para `proposta_cancelada`), o gestor poderá informar a data.
-
----
-
-## Comportamento Esperado
-
-### Para Colaboradores
-- No menu de ações, verão a opção "Cancelamento Aguardando Gestor"
-- Ao selecionar, abre modal para informar motivo
-- Proposta fica com status `cancelado_aguardando`
-- Badge amarelo/vermelho indica aguardando aprovação
-
-### Para Gestores
-- Na aba "Aprovações", verão nova seção "Solicitações de Cancelamento"
-- Podem aprovar (→ `proposta_cancelada` com data) ou rejeitar (→ `devolvido`)
-- Contagem no badge de pendências inclui cancelamentos aguardando
-
----
-
-## Resumo de Entregas
-
-1. Novo status `cancelado_aguardando` disponível para colaboradores
-2. Seção "Solicitações de Cancelamento" na aba Aprovações
-3. Botões "Aprovar Cancelamento" e "Rejeitar" para gestores
-4. Registro de data de cancelamento ao aprovar
-5. Atualização da contagem de pendências no badge
+1. Login como colaborador → Verificar que os 4 status aparecem no menu
+2. Alterar para "Solicitar Cancelamento" → Verificar que NÃO converte automaticamente para cancelado
+3. Login como gestor → Verificar que aparece na aba Aprovações
+4. Aprovar/Rejeitar cancelamento → Verificar fluxo completo
+5. Aplicar filtros por status em propostas antigas e novas
