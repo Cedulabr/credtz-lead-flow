@@ -4605,6 +4605,15 @@ export type Database = {
         }
         Returns: Json
       }
+      calculate_lead_priority: {
+        Args: {
+          lead_created_at: string
+          lead_status: string
+          proxima_acao: string
+          ultima_interacao: string
+        }
+        Returns: Json
+      }
       check_baseoff_daily_limit: {
         Args: { user_id_param: string }
         Returns: number
@@ -4703,6 +4712,10 @@ export type Database = {
           valor_beneficio: string
         }[]
       }
+      get_client_contracts_count: {
+        Args: { client_id_param: string }
+        Returns: number
+      }
       get_complete_schema: { Args: never; Returns: Json }
       get_database_storage_stats: {
         Args: never
@@ -4761,6 +4774,7 @@ export type Database = {
         Returns: Json
       }
       normalize_cpf: { Args: { input_cpf: string }; Returns: string }
+      normalize_phone: { Args: { phone_input: string }; Returns: string }
       process_expired_future_contacts: { Args: never; Returns: number }
       release_expired_blacklisted_leads: { Args: never; Returns: Json }
       remove_baseoff_duplicates: { Args: never; Returns: number }
@@ -4845,6 +4859,37 @@ export type Database = {
           duplicates_found: number
           leads_with_issues: number
           total_scanned: number
+        }[]
+      }
+      search_baseoff_clients: {
+        Args: {
+          search_limit?: number
+          search_offset?: number
+          search_term: string
+        }
+        Returns: {
+          banco_pagto: string
+          cpf: string
+          created_at: string
+          data_nascimento: string
+          email_1: string
+          esp: string
+          id: string
+          match_score: number
+          match_type: string
+          mr: number
+          municipio: string
+          nb: string
+          nome: string
+          nome_mae: string
+          sexo: string
+          status_beneficio: string
+          tel_cel_1: string
+          tel_cel_2: string
+          tel_fixo_1: string
+          total_count: number
+          uf: string
+          updated_at: string
         }[]
       }
       secure_baseoff_access: {
