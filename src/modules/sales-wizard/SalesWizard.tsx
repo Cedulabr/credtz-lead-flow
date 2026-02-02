@@ -86,7 +86,7 @@ export function SalesWizard() {
       
       // Para Portabilidade, usar dados específicos
       const bancoFinal = isPortabilidadeOp ? wizardData.banco_proponente : wizardData.banco;
-      const parcelaFinal = isPortabilidadeOp ? wizardData.nova_parcela : wizardData.parcela;
+      const parcelaFinal = isPortabilidadeOp ? wizardData.parcela_atual : wizardData.parcela;
       const saldoDevedorFinal = isPortabilidadeOp ? wizardData.saldo_devedor_atual : wizardData.saldo_devedor;
       
       // Construir observação com detalhes da portabilidade
@@ -95,14 +95,11 @@ export function SalesWizard() {
         const portabilidadeInfo = [
           `[PORTABILIDADE]`,
           `Credora Original: ${wizardData.credora_original}`,
-          wizardData.numero_contrato_atual ? `Contrato: ${wizardData.numero_contrato_atual}` : null,
           `Parcela Atual: R$ ${(wizardData.parcela_atual || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
           wizardData.prazo_restante ? `Prazo Restante: ${wizardData.prazo_restante} meses` : null,
           `Saldo Devedor: R$ ${(wizardData.saldo_devedor_atual || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
           `---`,
           `Proponente: ${wizardData.banco_proponente}`,
-          wizardData.novo_prazo ? `Novo Prazo: ${wizardData.novo_prazo} meses` : null,
-          `Nova Parcela: R$ ${(wizardData.nova_parcela || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
           wizardData.troco ? `Troco: R$ ${wizardData.troco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null,
         ].filter(Boolean).join('\n');
         

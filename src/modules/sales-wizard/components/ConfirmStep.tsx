@@ -137,12 +137,6 @@ export function ConfirmStep({ data, onUpdate, onValidChange }: WizardStepProps) 
                       <p className="text-xs text-muted-foreground">Credora Original</p>
                       <p className="font-medium">{data.credora_original || "—"}</p>
                     </div>
-                    {data.numero_contrato_atual && (
-                      <div>
-                        <p className="text-xs text-muted-foreground">Nº Contrato</p>
-                        <p className="font-mono text-sm">{data.numero_contrato_atual}</p>
-                      </div>
-                    )}
                     <div className="flex gap-4">
                       <div>
                         <p className="text-xs text-muted-foreground">Parcela Atual</p>
@@ -167,67 +161,23 @@ export function ConfirmStep({ data, onUpdate, onValidChange }: WizardStepProps) 
                   <CardHeader className="pb-2 pt-3">
                     <CardTitle className="text-sm flex items-center gap-2 text-green-700">
                       <Building2 className="h-4 w-4" />
-                      NOVO CONTRATO
+                      BANCO PROPONENTE
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2 pb-3">
                     <div>
-                      <p className="text-xs text-muted-foreground">Banco Proponente</p>
-                      <p className="font-medium">{data.banco_proponente || "—"}</p>
-                    </div>
-                    <div className="flex gap-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Nova Parcela</p>
-                        <p className="font-semibold text-lg text-green-600">{formatCurrency(data.nova_parcela)}</p>
-                      </div>
-                      {data.novo_prazo && (
-                        <div>
-                          <p className="text-xs text-muted-foreground">Novo Prazo</p>
-                          <p className="font-medium">{data.novo_prazo} meses</p>
-                        </div>
-                      )}
+                      <p className="text-xs text-muted-foreground">Banco</p>
+                      <p className="font-medium text-lg">{data.banco_proponente || "—"}</p>
                     </div>
                     {data.troco && data.troco > 0 && (
                       <div>
                         <p className="text-xs text-muted-foreground">💰 Troco</p>
-                        <p className="font-semibold text-blue-600">{formatCurrency(data.troco)}</p>
+                        <p className="font-semibold text-lg text-blue-600">{formatCurrency(data.troco)}</p>
                       </div>
                     )}
                   </CardContent>
                 </Card>
               </div>
-
-              {/* Resumo Visual da Economia */}
-              {data.parcela_atual && data.nova_parcela && (
-                <div className="pl-6">
-                  <Card className="border-primary/30 bg-primary/5">
-                    <CardContent className="py-3">
-                      <div className="flex items-center justify-center gap-4 text-sm">
-                        <div className="text-center">
-                          <p className="text-muted-foreground text-xs">Paga hoje</p>
-                          <p className="font-bold text-amber-600">{formatCurrency(data.parcela_atual)}</p>
-                        </div>
-                        <ArrowRight className="h-5 w-5 text-primary" />
-                        <div className="text-center">
-                          <p className="text-muted-foreground text-xs">Vai pagar</p>
-                          <p className="font-bold text-green-600">{formatCurrency(data.nova_parcela)}</p>
-                        </div>
-                        {data.parcela_atual > data.nova_parcela && (
-                          <>
-                            <Separator orientation="vertical" className="h-8" />
-                            <div className="text-center">
-                              <p className="text-muted-foreground text-xs">Economia</p>
-                              <p className="font-bold text-primary">
-                                {formatCurrency(data.parcela_atual - data.nova_parcela)}
-                              </p>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
             </motion.div>
           ) : (
             /* SEÇÃO VALORES PADRÃO (não-portabilidade) */

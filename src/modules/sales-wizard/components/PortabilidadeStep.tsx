@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowRightLeft, Building2, FileText, HelpCircle, Wallet, ArrowRight } from "lucide-react";
+import { ArrowRightLeft, Building2, HelpCircle, Wallet, ArrowRight, DollarSign } from "lucide-react";
 import { WizardStepProps } from "../types";
 import { StepHeader } from "./StepHeader";
 import { FieldHint } from "./FieldHint";
@@ -18,26 +18,27 @@ export function PortabilidadeStep({ data, onUpdate, onValidChange }: WizardStepP
 
   useEffect(() => {
     // Validação: Credora Original, Parcela Atual, Saldo Devedor e Proponente são obrigatórios
-    const hasCredora = Boolean(data.credora_original);
+    const hasCredora = Boolean(data.credora_original && data.credora_original.trim());
     const hasParcelaAtual = Boolean(data.parcela_atual && data.parcela_atual > 0);
     const hasSaldoDevedor = Boolean(data.saldo_devedor_atual && data.saldo_devedor_atual > 0);
     const hasProponente = Boolean(data.banco_proponente);
-    const hasNovaParcela = Boolean(data.nova_parcela && data.nova_parcela > 0);
     
     // Não pode ser o mesmo banco
-    const bancosDiferentes = data.credora_original !== data.banco_proponente;
+    const bancosDiferentes = !data.credora_original || !data.banco_proponente || 
+      data.credora_original.toLowerCase() !== data.banco_proponente.toLowerCase();
     
-    onValidChange(hasCredora && hasParcelaAtual && hasSaldoDevedor && hasProponente && hasNovaParcela && bancosDiferentes);
-  }, [data.credora_original, data.parcela_atual, data.saldo_devedor_atual, data.banco_proponente, data.nova_parcela, onValidChange]);
+    onValidChange(hasCredora && hasParcelaAtual && hasSaldoDevedor && hasProponente && bancosDiferentes);
+  }, [data.credora_original, data.parcela_atual, data.saldo_devedor_atual, data.banco_proponente, onValidChange]);
 
-  const isSameBank = data.credora_original && data.banco_proponente && data.credora_original === data.banco_proponente;
+  const isSameBank = data.credora_original && data.banco_proponente && 
+    data.credora_original.toLowerCase() === data.banco_proponente.toLowerCase();
 
   return (
     <div className="space-y-6">
       <StepHeader
         stepNumber={3}
         title="Detalhes da Portabilidade"
-        subtitle="Preencha os dados do contrato atual e do novo contrato"
+        subtitle="Preencha os dados do contrato atual e do novo banco"
         icon={<ArrowRightLeft className="h-5 w-5" />}
       />
 
@@ -63,7 +64,7 @@ export function PortabilidadeStep({ data, onUpdate, onValidChange }: WizardStepP
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Credora Original */}
+                {/* Credora Original - Campo aberto para digitação */}
                 <div className="space-y-2">
                   <Label className="text-base font-medium flex items-center gap-2">
                     <Building2 className="h-4 w-4 text-muted-foreground" />
@@ -78,53 +79,18 @@ export function PortabilidadeStep({ data, onUpdate, onValidChange }: WizardStepP
                       </TooltipContent>
                     </Tooltip>
                   </Label>
-                  <Select
+                  <Input
                     value={data.credora_original || ""}
-                    onValueChange={(credora_original) => onUpdate({ credora_original })}
-                  >
-                    <SelectTrigger className="h-12 text-base">
-                      <SelectValue placeholder="Selecione o banco atual do cliente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {loadingBanks ? (
-                        <SelectItem value="_loading" disabled>Carregando...</SelectItem>
-                      ) : (
-                        banks.map((bank) => (
-                          <SelectItem key={bank.id} value={bank.name} className="text-base">
-                            {bank.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+                    onChange={(e) => onUpdate({ credora_original: e.target.value.toUpperCase() })}
+                    placeholder="Digite o nome do banco (ex: BRADESCO, ITAÚ, BMG...)"
+                    className="h-12 text-base uppercase"
+                  />
                   <p className="text-xs text-muted-foreground">
                     💬 "Em qual banco você está pagando seu empréstimo atual?"
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Número do Contrato */}
-                  <div className="space-y-2">
-                    <Label className="text-base font-medium flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      Nº Contrato
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Número do contrato atual (opcional, mas ajuda a identificar)</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </Label>
-                    <Input
-                      value={data.numero_contrato_atual || ""}
-                      onChange={(e) => onUpdate({ numero_contrato_atual: e.target.value })}
-                      placeholder="Ex: 123456789"
-                      className="h-12 text-base"
-                    />
-                  </div>
-
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {/* Prazo Restante */}
                   <div className="space-y-2">
                     <Label className="text-base font-medium flex items-center gap-2">
@@ -142,15 +108,14 @@ export function PortabilidadeStep({ data, onUpdate, onValidChange }: WizardStepP
                       type="number"
                       value={data.prazo_restante || ""}
                       onChange={(e) => onUpdate({ prazo_restante: parseInt(e.target.value) || undefined })}
-                      placeholder="Ex: 36 meses"
+                      placeholder="Ex: 36"
                       className="h-12 text-base"
                       min={1}
                       max={120}
                     />
+                    <p className="text-xs text-muted-foreground">meses</p>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Parcela Atual */}
                   <div className="space-y-2">
                     <Label className="text-base font-medium">
@@ -163,7 +128,7 @@ export function PortabilidadeStep({ data, onUpdate, onValidChange }: WizardStepP
                       placeholder="0,00"
                     />
                     <p className="text-xs text-muted-foreground">
-                      💬 "Quanto você paga de parcela hoje?"
+                      💬 "Quanto você paga de parcela?"
                     </p>
                   </div>
 
@@ -179,7 +144,7 @@ export function PortabilidadeStep({ data, onUpdate, onValidChange }: WizardStepP
                       placeholder="0,00"
                     />
                     <p className="text-xs text-muted-foreground">
-                      💬 "Quanto você ainda deve no contrato atual?"
+                      💬 "Quanto ainda deve?"
                     </p>
                   </div>
                 </div>
@@ -201,7 +166,7 @@ export function PortabilidadeStep({ data, onUpdate, onValidChange }: WizardStepP
             </motion.div>
           </div>
 
-          {/* BLOCO 2: NOVO CONTRATO */}
+          {/* BLOCO 2: NOVO BANCO */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -211,133 +176,86 @@ export function PortabilidadeStep({ data, onUpdate, onValidChange }: WizardStepP
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg text-green-800">
                   <Building2 className="h-5 w-5" />
-                  🆕 NOVO CONTRATO
+                  🆕 BANCO PROPONENTE
                   <span className="text-sm font-normal text-green-600 ml-2">
                     (Banco para onde vai portar)
                   </span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Banco Proponente */}
-                <div className="space-y-2">
-                  <Label className="text-base font-medium flex items-center gap-2">
-                    <Building2 className="h-4 w-4 text-muted-foreground" />
-                    Banco Proponente
-                    <span className="text-destructive">*</span>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>O banco que VAI RECEBER o contrato. É o banco novo onde o cliente vai passar a pagar.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </Label>
-                  <Select
-                    value={data.banco_proponente || ""}
-                    onValueChange={(banco_proponente) => {
-                      onUpdate({ banco_proponente });
-                      // Também atualiza o campo "banco" para compatibilidade
-                      onUpdate({ banco: banco_proponente });
-                    }}
-                  >
-                    <SelectTrigger className={`h-12 text-base ${isSameBank ? 'border-destructive' : ''}`}>
-                      <SelectValue placeholder="Selecione o novo banco" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {loadingBanks ? (
-                        <SelectItem value="_loading" disabled>Carregando...</SelectItem>
-                      ) : (
-                        banks.map((bank) => (
-                          <SelectItem 
-                            key={bank.id} 
-                            value={bank.name} 
-                            className="text-base"
-                            disabled={bank.name === data.credora_original}
-                          >
-                            {bank.name} {bank.name === data.credora_original && "(já é a credora)"}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  {isSameBank && (
-                    <p className="text-xs text-destructive">
-                      ⚠️ O banco proponente não pode ser o mesmo da credora original!
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    💬 "Para qual banco vamos portar o contrato?"
-                  </p>
-                </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Novo Prazo */}
+                  {/* Banco Proponente - Select do banco de dados */}
                   <div className="space-y-2">
                     <Label className="text-base font-medium flex items-center gap-2">
-                      Novo Prazo
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      Banco Proponente
+                      <span className="text-destructive">*</span>
                       <Tooltip>
                         <TooltipTrigger>
                           <HelpCircle className="h-4 w-4 text-muted-foreground" />
                         </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Prazo do novo contrato em meses</p>
+                        <TooltipContent className="max-w-xs">
+                          <p>O banco que VAI RECEBER o contrato. É o banco novo onde o cliente vai passar a pagar.</p>
                         </TooltipContent>
                       </Tooltip>
                     </Label>
-                    <Input
-                      type="number"
-                      value={data.novo_prazo || ""}
-                      onChange={(e) => onUpdate({ novo_prazo: parseInt(e.target.value) || undefined })}
-                      placeholder="Ex: 84 meses"
-                      className="h-12 text-base"
-                      min={1}
-                      max={120}
-                    />
+                    <Select
+                      value={data.banco_proponente || ""}
+                      onValueChange={(banco_proponente) => {
+                        onUpdate({ banco_proponente });
+                        // Também atualiza o campo "banco" para compatibilidade
+                        onUpdate({ banco: banco_proponente });
+                      }}
+                    >
+                      <SelectTrigger className={`h-12 text-base ${isSameBank ? 'border-destructive' : ''}`}>
+                        <SelectValue placeholder="Selecione o banco" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {loadingBanks ? (
+                          <SelectItem value="_loading" disabled>Carregando...</SelectItem>
+                        ) : (
+                          banks.map((bank) => (
+                            <SelectItem 
+                              key={bank.id} 
+                              value={bank.name} 
+                              className="text-base"
+                            >
+                              {bank.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {isSameBank && (
+                      <p className="text-xs text-destructive">
+                        ⚠️ O proponente não pode ser igual à credora!
+                      </p>
+                    )}
                   </div>
 
-                  {/* Nova Parcela */}
+                  {/* Troco */}
                   <div className="space-y-2">
-                    <Label className="text-base font-medium">
-                      Nova Parcela
-                      <span className="text-destructive ml-1">*</span>
+                    <Label className="text-base font-medium flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      Troco
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>Valor que sobra para o cliente após quitar o saldo devedor.</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </Label>
                     <CurrencyInput
-                      value={data.nova_parcela}
-                      onChange={(nova_parcela) => {
-                        onUpdate({ nova_parcela });
-                        // Também atualiza o campo "parcela" para compatibilidade
-                        onUpdate({ parcela: nova_parcela });
-                      }}
+                      value={data.troco}
+                      onChange={(troco) => onUpdate({ troco })}
                       placeholder="0,00"
                     />
                     <p className="text-xs text-muted-foreground">
-                      💬 "Qual será a nova parcela?"
+                      💰 Valor que o cliente recebe na conta
                     </p>
                   </div>
-                </div>
-
-                {/* Troco */}
-                <div className="space-y-2">
-                  <Label className="text-base font-medium flex items-center gap-2">
-                    Troco (valor que o cliente recebe)
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>Valor que sobra para o cliente após quitar o saldo devedor. É o dinheiro extra que ele recebe na conta.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </Label>
-                  <CurrencyInput
-                    value={data.troco}
-                    onChange={(troco) => onUpdate({ troco })}
-                    placeholder="0,00"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    💰 "Quanto vai sobrar para o cliente na conta?"
-                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -346,38 +264,32 @@ export function PortabilidadeStep({ data, onUpdate, onValidChange }: WizardStepP
       </TooltipProvider>
 
       {/* Resumo Visual */}
-      {data.credora_original && data.banco_proponente && data.parcela_atual && data.nova_parcela && (
+      {data.credora_original && data.banco_proponente && data.parcela_atual && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
         >
           <Card className="border-primary/50 bg-primary/5">
             <CardContent className="py-4">
-              <div className="flex items-center justify-center gap-4 text-sm">
+              <div className="flex items-center justify-center gap-4 text-sm flex-wrap">
                 <div className="text-center">
-                  <p className="text-muted-foreground">Parcela Atual</p>
-                  <p className="font-bold text-lg text-amber-600">
-                    R$ {data.parcela_atual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{data.credora_original}</p>
+                  <p className="text-muted-foreground text-xs">Credora</p>
+                  <p className="font-bold text-amber-600">{data.credora_original}</p>
+                  <p className="text-sm">R$ {data.parcela_atual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                 </div>
-                <ArrowRight className="h-8 w-8 text-primary" />
+                <ArrowRight className="h-6 w-6 text-primary" />
                 <div className="text-center">
-                  <p className="text-muted-foreground">Nova Parcela</p>
-                  <p className="font-bold text-lg text-green-600">
-                    R$ {data.nova_parcela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{data.banco_proponente}</p>
+                  <p className="text-muted-foreground text-xs">Proponente</p>
+                  <p className="font-bold text-green-600">{data.banco_proponente}</p>
                 </div>
                 {data.troco && data.troco > 0 && (
                   <>
-                    <Separator orientation="vertical" className="h-12" />
+                    <Separator orientation="vertical" className="h-10" />
                     <div className="text-center">
-                      <p className="text-muted-foreground">Troco</p>
+                      <p className="text-muted-foreground text-xs">Troco</p>
                       <p className="font-bold text-lg text-blue-600">
                         R$ {data.troco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </p>
-                      <p className="text-xs text-muted-foreground">para o cliente</p>
                     </div>
                   </>
                 )}
@@ -385,12 +297,6 @@ export function PortabilidadeStep({ data, onUpdate, onValidChange }: WizardStepP
             </CardContent>
           </Card>
         </motion.div>
-      )}
-
-      {data.credora_original && data.banco_proponente && data.parcela_atual && data.saldo_devedor_atual && data.nova_parcela && !isSameBank && (
-        <FieldHint type="success">
-          ✅ Portabilidade configurada! Vamos revisar tudo na próxima etapa.
-        </FieldHint>
       )}
     </div>
   );

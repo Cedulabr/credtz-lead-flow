@@ -34,9 +34,20 @@ export const formatPhone = (value: string): string => {
   return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
 };
 
-export const formatDate = (dateStr: string): string => {
+export const formatDate = (dateStr: string | null | undefined): string => {
   if (!dateStr) return "-";
-  const date = new Date(dateStr + 'T12:00:00');
+  
+  // Handle both DATE (YYYY-MM-DD) and ISO timestamps
+  let date: Date;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    // DATE format: add noon time to avoid timezone issues
+    date = new Date(dateStr + 'T12:00:00');
+  } else {
+    // ISO timestamp or other format
+    date = new Date(dateStr);
+  }
+  
+  if (isNaN(date.getTime())) return "-";
   return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 };
 
