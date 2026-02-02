@@ -6,7 +6,7 @@ import { IndicateClient } from "@/components/IndicateClient";
 import { Notifications } from "@/components/Notifications";
 import { BlockedAccess } from "@/components/BlockedAccess";
 import { SystemStatus } from "@/components/SystemStatus";
-import { TelevendasForm } from "@/components/TelevendasForm";
+import { SalesWizard } from "@/modules/sales-wizard";
 import { TelevendasModule as TelevendasModuleNew } from "@/modules/televendas/TelevendasModule";
 import { BaseOffModule } from "@/modules/baseoff";
 import { CommissionTable } from "@/components/CommissionTable";
@@ -160,7 +160,7 @@ const Index = () => {
         }
         return (
           <div className="p-4">
-            <TelevendasForm />
+            <SalesWizard />
           </div>
         );
       

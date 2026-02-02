@@ -12,6 +12,7 @@ import { useUserDataNotifications } from "@/hooks/useUserDataNotifications";
 import { AnimatedContainer, StaggerContainer, StaggerItem } from "./ui/animated-container";
 import { SkeletonCard } from "./ui/skeleton-card";
 import { SalesRanking } from "./SalesRanking";
+import { ConsultorDashboard } from "./ConsultorDashboard";
 import { 
   Users, 
   TrendingUp, 
@@ -165,6 +166,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const userName = profile?.name || user?.email?.split('@')[0] || 'Usuário';
   const companyName = config?.company_name || 'Leadyzer';
 
+  // State for showing simplified dashboard
+  const [showSimpleDashboard, setShowSimpleDashboard] = useState<boolean | null>(null);
+
   // Fetch user companies and check gestor status
   useEffect(() => {
     const fetchUserCompanies = async () => {
@@ -180,8 +184,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         if (error) throw error;
         
         const gestorCompanies = (data || []).filter(uc => uc.company_role === 'gestor');
-        setIsGestor(gestorCompanies.length > 0);
+        const userIsGestor = gestorCompanies.length > 0;
+        setIsGestor(userIsGestor);
         setUserCompanyIds((data || []).map(uc => uc.company_id));
+        
+        // Show simple dashboard for non-admin, non-gestor users
+        setShowSimpleDashboard(!isAdmin && !userIsGestor);
         
         const uniqueCompanies = (data || [])
           .filter(uc => uc.companies)
@@ -198,6 +206,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         }
       } catch (error) {
         console.error('Error fetching user companies:', error);
+        // Default to simple dashboard on error for safety
+        if (!isAdmin) {
+          setShowSimpleDashboard(true);
+        }
       }
     };
     
@@ -206,10 +218,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   // Main data fetch
   useEffect(() => {
-    if (user) {
+    if (user && showSimpleDashboard === false) {
       fetchAllData();
     }
-  }, [user, isAdmin, isGestor, selectedMonth, selectedCompany, userCompanyIds]);
+  }, [user, isAdmin, isGestor, selectedMonth, selectedCompany, userCompanyIds, showSimpleDashboard]);
+
+  // Early return states are handled in the render section below
 
   const getDateRange = () => {
     const [year, month] = selectedMonth.split('-').map(Number);
@@ -768,6 +782,24 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     
     return months.reverse();
   }, []);
+
+  // Conditional rendering based on user role
+  if (showSimpleDashboard === true) {
+    return <ConsultorDashboard onNavigate={onNavigate} />;
+  }
+
+  if (showSimpleDashboard === null) {
+    return (
+      <div className="p-6 space-y-6">
+        <SkeletonCard />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <AnimatedContainer animation="fade" className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 w-full max-w-full overflow-x-hidden">
