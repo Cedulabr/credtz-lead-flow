@@ -4,12 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Calendar, Download, Clock, MapPin, Loader2 } from 'lucide-react';
+import { Calendar, Clock, MapPin, Loader2 } from 'lucide-react';
 import { useTimeClock } from '@/hooks/useTimeClock';
 import { clockTypeLabels, statusLabels, statusColors, type TimeClock, type TimeClockType, type TimeClockStatus } from './types';
 import { format, startOfMonth, endOfMonth, differenceInMinutes, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import jsPDF from 'jspdf';
+import { TimeClockPDF } from './TimeClockPDF';
 
 interface MyHistoryProps {
   userId: string;
@@ -81,59 +81,6 @@ export function MyHistory({ userId, userName }: MyHistoryProps) {
     return `${hours}h ${mins}min`;
   };
 
-  const exportToPDF = () => {
-    const doc = new jsPDF();
-    const groups = groupByDate();
-
-    doc.setFontSize(18);
-    doc.text('Folha de Ponto', 105, 15, { align: 'center' });
-    doc.setFontSize(12);
-    doc.text(userName, 105, 25, { align: 'center' });
-    doc.text(`Período: ${format(parseISO(startDate), 'dd/MM/yyyy')} a ${format(parseISO(endDate), 'dd/MM/yyyy')}`, 105, 32, { align: 'center' });
-
-    let yPos = 45;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Data', 14, yPos);
-    doc.text('Entrada', 45, yPos);
-    doc.text('Pausa', 75, yPos);
-    doc.text('Retorno', 105, yPos);
-    doc.text('Saída', 135, yPos);
-    doc.text('Total', 165, yPos);
-    yPos += 8;
-
-    doc.setFont('helvetica', 'normal');
-    let totalHours = 0;
-
-    groups.forEach((group) => {
-      if (yPos > 270) {
-        doc.addPage();
-        yPos = 20;
-      }
-
-      const entrada = group.records.find((r) => r.clock_type === 'entrada');
-      const pausa = group.records.find((r) => r.clock_type === 'pausa_inicio');
-      const retorno = group.records.find((r) => r.clock_type === 'pausa_fim');
-      const saida = group.records.find((r) => r.clock_type === 'saida');
-
-      doc.text(format(parseISO(group.date), 'dd/MM/yyyy'), 14, yPos);
-      doc.text(entrada ? format(parseISO(entrada.clock_time), 'HH:mm') : '-', 45, yPos);
-      doc.text(pausa ? format(parseISO(pausa.clock_time), 'HH:mm') : '-', 75, yPos);
-      doc.text(retorno ? format(parseISO(retorno.clock_time), 'HH:mm') : '-', 105, yPos);
-      doc.text(saida ? format(parseISO(saida.clock_time), 'HH:mm') : '-', 135, yPos);
-      doc.text(formatMinutes(group.totalMinutes), 165, yPos);
-
-      totalHours += group.totalMinutes;
-      yPos += 6;
-    });
-
-    yPos += 10;
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Total do Período: ${formatMinutes(totalHours)}`, 14, yPos);
-
-    doc.save(`folha-ponto-${format(new Date(), 'yyyy-MM')}.pdf`);
-  };
-
   const groups = groupByDate();
 
   return (
@@ -147,10 +94,7 @@ export function MyHistory({ userId, userName }: MyHistoryProps) {
             </CardTitle>
             <CardDescription>Visualize seus registros de ponto</CardDescription>
           </div>
-          <Button onClick={exportToPDF} variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Exportar PDF
-          </Button>
+          <TimeClockPDF userId={userId} userName={userName} />
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

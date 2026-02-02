@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, History, Users, Settings as SettingsIcon } from 'lucide-react';
+import { Clock, History, Users, Settings as SettingsIcon, CalendarClock, FileText, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ClockButton } from './ClockButton';
 import { MyHistory } from './MyHistory';
 import { AdminControl } from './AdminControl';
 import { Settings } from './Settings';
+import { ScheduleManager } from './ScheduleManager';
+import { JustificationManager } from './JustificationManager';
+import { ManagerDashboard } from './ManagerDashboard';
 import { BlockedAccess } from '@/components/BlockedAccess';
 import { Loader2 } from 'lucide-react';
 
@@ -59,29 +62,41 @@ export function TimeClock() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Controle de Ponto</h1>
         <p className="text-muted-foreground">
-          Registre seu ponto e acompanhe seu histórico
+          Registre seu ponto, envie justificativas e acompanhe seu histórico
         </p>
       </div>
 
       <Tabs defaultValue="clock" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
+        <TabsList className={`grid w-full ${canManage ? 'grid-cols-3 lg:grid-cols-7' : 'grid-cols-3'}`}>
           <TabsTrigger value="clock" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
-            <span className="hidden sm:inline">Bater Ponto</span>
+            <span className="hidden sm:inline">Ponto</span>
           </TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-2">
             <History className="h-4 w-4" />
-            <span className="hidden sm:inline">Meu Histórico</span>
+            <span className="hidden sm:inline">Histórico</span>
+          </TabsTrigger>
+          <TabsTrigger value="justifications" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            <span className="hidden sm:inline">Justificativas</span>
           </TabsTrigger>
           {canManage && (
             <>
+              <TabsTrigger value="dashboard" className="flex items-center gap-2">
+                <LayoutDashboard className="h-4 w-4" />
+                <span className="hidden sm:inline">Painel</span>
+              </TabsTrigger>
+              <TabsTrigger value="schedules" className="flex items-center gap-2">
+                <CalendarClock className="h-4 w-4" />
+                <span className="hidden sm:inline">Jornadas</span>
+              </TabsTrigger>
               <TabsTrigger value="control" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
                 <span className="hidden sm:inline">Controle</span>
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <SettingsIcon className="h-4 w-4" />
-                <span className="hidden sm:inline">Configurações</span>
+                <span className="hidden sm:inline">Config</span>
               </TabsTrigger>
             </>
           )}
@@ -102,8 +117,18 @@ export function TimeClock() {
           <MyHistory userId={user.id} userName={profile?.name || profile?.email || 'Usuário'} />
         </TabsContent>
 
+        <TabsContent value="justifications">
+          <JustificationManager isManager={false} />
+        </TabsContent>
+
         {canManage && (
           <>
+            <TabsContent value="dashboard">
+              <ManagerDashboard />
+            </TabsContent>
+            <TabsContent value="schedules">
+              <ScheduleManager />
+            </TabsContent>
             <TabsContent value="control">
               <AdminControl />
             </TabsContent>

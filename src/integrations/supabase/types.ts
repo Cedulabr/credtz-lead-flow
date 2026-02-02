@@ -3951,6 +3951,75 @@ export type Database = {
           },
         ]
       }
+      time_clock_alerts: {
+        Row: {
+          alert_type: string
+          company_id: string | null
+          created_at: string | null
+          description: string
+          gestor_id: string | null
+          id: string
+          is_resolved: boolean | null
+          notified_at: string | null
+          reference_date: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          time_clock_id: string | null
+          user_id: string
+        }
+        Insert: {
+          alert_type: string
+          company_id?: string | null
+          created_at?: string | null
+          description: string
+          gestor_id?: string | null
+          id?: string
+          is_resolved?: boolean | null
+          notified_at?: string | null
+          reference_date: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          time_clock_id?: string | null
+          user_id: string
+        }
+        Update: {
+          alert_type?: string
+          company_id?: string | null
+          created_at?: string | null
+          description?: string
+          gestor_id?: string | null
+          id?: string
+          is_resolved?: boolean | null
+          notified_at?: string | null
+          reference_date?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          time_clock_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_clock_alerts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_clock_alerts_time_clock_id_fkey"
+            columns: ["time_clock_id"]
+            isOneToOne: false
+            referencedRelation: "time_clock"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_clock_break_types: {
         Row: {
           company_id: string | null
@@ -4025,6 +4094,75 @@ export type Database = {
         }
         Relationships: []
       }
+      time_clock_justifications: {
+        Row: {
+          attachment_url: string | null
+          company_id: string | null
+          created_at: string | null
+          description: string
+          id: string
+          justification_type: string
+          minutes_affected: number | null
+          reference_date: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          reviewer_notes: string | null
+          status: string
+          time_clock_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          attachment_url?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description: string
+          id?: string
+          justification_type: string
+          minutes_affected?: number | null
+          reference_date: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_notes?: string | null
+          status?: string
+          time_clock_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          attachment_url?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string
+          id?: string
+          justification_type?: string
+          minutes_affected?: number | null
+          reference_date?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_notes?: string | null
+          status?: string
+          time_clock_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_clock_justifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_clock_justifications_time_clock_id_fkey"
+            columns: ["time_clock_id"]
+            isOneToOne: false
+            referencedRelation: "time_clock"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_clock_logs: {
         Row: {
           action: string
@@ -4062,6 +4200,151 @@ export type Database = {
             columns: ["time_clock_id"]
             isOneToOne: false
             referencedRelation: "time_clock"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      time_clock_monthly_summary: {
+        Row: {
+          approved_justifications: number | null
+          closed_at: string | null
+          closed_by: string | null
+          company_id: string | null
+          created_at: string | null
+          expected_minutes: number | null
+          id: string
+          is_closed: boolean | null
+          pending_justifications: number | null
+          rejected_justifications: number | null
+          total_absences: number | null
+          total_delay_minutes: number | null
+          total_delays: number | null
+          total_overtime_minutes: number | null
+          total_worked_minutes: number | null
+          updated_at: string | null
+          user_id: string
+          year_month: string
+        }
+        Insert: {
+          approved_justifications?: number | null
+          closed_at?: string | null
+          closed_by?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          expected_minutes?: number | null
+          id?: string
+          is_closed?: boolean | null
+          pending_justifications?: number | null
+          rejected_justifications?: number | null
+          total_absences?: number | null
+          total_delay_minutes?: number | null
+          total_delays?: number | null
+          total_overtime_minutes?: number | null
+          total_worked_minutes?: number | null
+          updated_at?: string | null
+          user_id: string
+          year_month: string
+        }
+        Update: {
+          approved_justifications?: number | null
+          closed_at?: string | null
+          closed_by?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          expected_minutes?: number | null
+          id?: string
+          is_closed?: boolean | null
+          pending_justifications?: number | null
+          rejected_justifications?: number | null
+          total_absences?: number | null
+          total_delay_minutes?: number | null
+          total_delays?: number | null
+          total_overtime_minutes?: number | null
+          total_worked_minutes?: number | null
+          updated_at?: string | null
+          user_id?: string
+          year_month?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_clock_monthly_summary_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      time_clock_schedules: {
+        Row: {
+          allow_overtime: boolean | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          daily_hours: number
+          entry_time: string
+          exit_time: string
+          id: string
+          is_active: boolean | null
+          lunch_duration_minutes: number | null
+          lunch_end: string | null
+          lunch_start: string | null
+          max_overtime_daily_minutes: number | null
+          monthly_hours: number
+          schedule_type: string
+          tolerance_minutes: number
+          updated_at: string | null
+          user_id: string
+          work_days: number[] | null
+        }
+        Insert: {
+          allow_overtime?: boolean | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          daily_hours?: number
+          entry_time?: string
+          exit_time?: string
+          id?: string
+          is_active?: boolean | null
+          lunch_duration_minutes?: number | null
+          lunch_end?: string | null
+          lunch_start?: string | null
+          max_overtime_daily_minutes?: number | null
+          monthly_hours?: number
+          schedule_type?: string
+          tolerance_minutes?: number
+          updated_at?: string | null
+          user_id: string
+          work_days?: number[] | null
+        }
+        Update: {
+          allow_overtime?: boolean | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          daily_hours?: number
+          entry_time?: string
+          exit_time?: string
+          id?: string
+          is_active?: boolean | null
+          lunch_duration_minutes?: number | null
+          lunch_end?: string | null
+          lunch_start?: string | null
+          max_overtime_daily_minutes?: number | null
+          monthly_hours?: number
+          schedule_type?: string
+          tolerance_minutes?: number
+          updated_at?: string | null
+          user_id?: string
+          work_days?: number[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_clock_schedules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -4614,6 +4897,17 @@ export type Database = {
         }
         Returns: Json
       }
+      calculate_worked_hours: {
+        Args: { p_date: string; p_user_id: string }
+        Returns: {
+          break_minutes: number
+          delay_minutes: number
+          overtime_minutes: number
+          status: string
+          total_minutes: number
+          worked_minutes: number
+        }[]
+      }
       check_baseoff_daily_limit: {
         Args: { user_id_param: string }
         Returns: number
@@ -4629,6 +4923,15 @@ export type Database = {
           original_file_name: string
           original_import_date: string
           records_imported: number
+        }[]
+      }
+      check_month_pending_issues: {
+        Args: { p_user_id: string; p_year_month: string }
+        Returns: {
+          has_pending: boolean
+          incomplete_days: number
+          missing_entries: number
+          pending_justifications: number
         }[]
       }
       check_rate_limit: {
