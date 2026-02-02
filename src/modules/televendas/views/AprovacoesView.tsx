@@ -30,6 +30,8 @@ interface AprovacoesViewProps {
   onView: (tv: Televenda) => void;
   onApproveExclusion: (tv: Televenda) => void;
   onRejectExclusion: (tv: Televenda) => void;
+  onApproveCancellation: (tv: Televenda) => void;
+  onRejectCancellation: (tv: Televenda) => void;
 }
 
 export const AprovacoesView = ({
@@ -40,6 +42,8 @@ export const AprovacoesView = ({
   onView,
   onApproveExclusion,
   onRejectExclusion,
+  onApproveCancellation,
+  onRejectCancellation,
 }: AprovacoesViewProps) => {
   const [bankFilter, setBankFilter] = useState("all");
 
@@ -48,6 +52,7 @@ export const AprovacoesView = ({
     return televendas.filter((tv) =>
       [
         "pago_aguardando",        // Aguardando aprovação de pagamento
+        "cancelado_aguardando",   // Aguardando aprovação de cancelamento
         "solicitar_exclusao",     // Aguardando aprovação de exclusão
         "proposta_pendente",      // Propostas pendentes
         "devolvido",              // Devolvidos pelo gestor
@@ -69,6 +74,7 @@ export const AprovacoesView = ({
 
   // Group by status (using filtered items)
   const pagoAguardando = filteredApprovalItems.filter(tv => tv.status === "pago_aguardando");
+  const canceladoAguardando = filteredApprovalItems.filter(tv => tv.status === "cancelado_aguardando");
   const solicitarExclusao = filteredApprovalItems.filter(tv => tv.status === "solicitar_exclusao");
   const pendentes = filteredApprovalItems.filter(tv => tv.status === "proposta_pendente");
   const devolvidos = filteredApprovalItems.filter(tv => tv.status === "devolvido");
@@ -98,7 +104,7 @@ export const AprovacoesView = ({
     type = "payment"
   }: { 
     tv: Televenda; 
-    type?: "payment" | "exclusion" | "pending" | "returned";
+    type?: "payment" | "cancellation" | "exclusion" | "pending" | "returned";
   }) => (
     <motion.div
       layout
@@ -168,6 +174,29 @@ export const AprovacoesView = ({
               >
                 <RotateCcw className="h-4 w-4" />
                 <span className="hidden sm:inline">Devolver</span>
+              </Button>
+            </>
+          )}
+
+          {type === "cancellation" && (
+            <>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={(e) => { e.stopPropagation(); onApproveCancellation(tv); }}
+                className="gap-1.5 h-10 px-4"
+              >
+                <XCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">Aprovar Cancelamento</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => { e.stopPropagation(); onRejectCancellation(tv); }}
+                className="gap-1.5 h-10 px-4"
+              >
+                <RotateCcw className="h-4 w-4" />
+                <span className="hidden sm:inline">Rejeitar</span>
               </Button>
             </>
           )}
@@ -293,6 +322,23 @@ export const AprovacoesView = ({
             <div className="space-y-2">
               {pagoAguardando.map((tv) => (
                 <ApprovalCard key={tv.id} tv={tv} type="payment" />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Cancelado Aguardando Gestor */}
+        {canceladoAguardando.length > 0 && (
+          <div>
+            <SectionHeader 
+              emoji="❌" 
+              title="Solicitações de Cancelamento" 
+              count={canceladoAguardando.length}
+              urgent
+            />
+            <div className="space-y-2">
+              {canceladoAguardando.map((tv) => (
+                <ApprovalCard key={tv.id} tv={tv} type="cancellation" />
               ))}
             </div>
           </div>

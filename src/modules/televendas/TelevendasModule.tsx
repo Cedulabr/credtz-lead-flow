@@ -196,7 +196,9 @@ export const TelevendasModule = () => {
       totalPropostas: televendas.length,
       clientesUnicos: uniqueCpfs.size,
       aguardandoGestao: televendas.filter((tv) => 
-        tv.status === "pago_aguardando" || tv.status === "solicitar_exclusao"
+        tv.status === "pago_aguardando" || 
+        tv.status === "cancelado_aguardando" || 
+        tv.status === "solicitar_exclusao"
       ).length,
       pendentes: televendas.filter((tv) => tv.status === "proposta_pendente").length,
     };
@@ -397,6 +399,8 @@ export const TelevendasModule = () => {
   const handleReturn = (tv: Televenda) => handleStatusChange(tv, "devolvido");
   const handleApproveExclusion = (tv: Televenda) => handleDeleteTelevendas(tv);
   const handleRejectExclusion = (tv: Televenda) => handleStatusChange(tv, "exclusao_rejeitada");
+  const handleApproveCancellation = (tv: Televenda) => handleStatusChange(tv, "proposta_cancelada");
+  const handleRejectCancellation = (tv: Televenda) => handleStatusChange(tv, "devolvido");
 
   // Permission checks
   const canEdit = (tv: Televenda) => isAdmin || (isGestor && userCompanyIds.includes(tv.company_id || ""));
@@ -515,6 +519,8 @@ export const TelevendasModule = () => {
                   onView={handleView}
                   onApproveExclusion={handleApproveExclusion}
                   onRejectExclusion={handleRejectExclusion}
+                  onApproveCancellation={handleApproveCancellation}
+                  onRejectCancellation={handleRejectCancellation}
                 />
               </motion.div>
             )}

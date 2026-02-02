@@ -54,6 +54,7 @@ export const OPERATOR_STATUSES = [
   "solicitar_digitacao",    // Solicitar Digitação
   "proposta_digitada",      // Proposta Digitada
   "pago_aguardando",        // Pago Aguardando Gestor
+  "cancelado_aguardando",   // Cancelamento Aguardando Gestor
   "solicitar_exclusao",     // Solicitar Exclusão
   "proposta_pendente",      // Proposta Pendente (informativo)
 ] as const;
@@ -121,6 +122,15 @@ export const STATUS_CONFIG: Record<string, {
     emoji: "💰",
     color: "text-amber-600",
     bgColor: "bg-amber-500/10 border-amber-300",
+    isOperational: true,
+    isFinal: false,
+  },
+  cancelado_aguardando: {
+    label: "Cancelamento Aguardando Gestor",
+    shortLabel: "Aguard. Cancel.",
+    emoji: "❌",
+    color: "text-red-500",
+    bgColor: "bg-red-500/10 border-red-300",
     isOperational: true,
     isFinal: false,
   },
