@@ -46,6 +46,15 @@ export const AprovacoesView = ({
   onRejectCancellation,
 }: AprovacoesViewProps) => {
   const [bankFilter, setBankFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+
+  // Type filter options
+  const TYPE_FILTER_OPTIONS = [
+    { value: "all", label: "Todos", emoji: "📋" },
+    { value: "pago_aguardando", label: "Aguard Gestor", emoji: "💰" },
+    { value: "cancelado_aguardando", label: "Aguard Cancel.", emoji: "❌" },
+    { value: "solicitar_exclusao", label: "Aguard Exclusão", emoji: "🗑️" },
+  ];
 
   // Filter items that need manager action
   const approvalItems = useMemo(() => {
@@ -66,11 +75,32 @@ export const AprovacoesView = ({
     return Array.from(banksSet).sort();
   }, [approvalItems]);
 
-  // Filter by selected bank
+  // Filter options with dynamic counts
+  const filterOptionsWithCount = useMemo(() => {
+    return TYPE_FILTER_OPTIONS.map(option => ({
+      ...option,
+      count: option.value === "all" 
+        ? approvalItems.length 
+        : approvalItems.filter(tv => tv.status === option.value).length
+    })).filter(option => option.value === "all" || option.count > 0);
+  }, [approvalItems]);
+
+  // Filter by type and bank
   const filteredApprovalItems = useMemo(() => {
-    if (bankFilter === "all") return approvalItems;
-    return approvalItems.filter((tv) => tv.banco === bankFilter);
-  }, [approvalItems, bankFilter]);
+    let items = approvalItems;
+    
+    // Filter by type
+    if (typeFilter !== "all") {
+      items = items.filter((tv) => tv.status === typeFilter);
+    }
+    
+    // Filter by bank
+    if (bankFilter !== "all") {
+      items = items.filter((tv) => tv.banco === bankFilter);
+    }
+    
+    return items;
+  }, [approvalItems, bankFilter, typeFilter]);
 
   // Group by status (using filtered items)
   const pagoAguardando = filteredApprovalItems.filter(tv => tv.status === "pago_aguardando");
@@ -277,35 +307,59 @@ export const AprovacoesView = ({
 
   return (
     <div className="space-y-2">
-      {/* Summary banner with bank filter */}
+      {/* Summary banner with filters */}
       <div className="p-4 rounded-xl bg-amber-500/10 border-2 border-amber-300 mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-600" />
-            <span className="font-semibold text-amber-700">
-              {filteredApprovalItems.length} item{filteredApprovalItems.length !== 1 ? 's' : ''} aguardando ação
-            </span>
-          </div>
-          
-          {/* Bank filter */}
-          {availableBanks.length > 1 && (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-amber-600" />
-              <Select value={bankFilter} onValueChange={setBankFilter}>
-                <SelectTrigger className="w-[180px] h-9 bg-white/80 border-amber-300">
-                  <SelectValue placeholder="Filtrar por banco" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os bancos</SelectItem>
-                  {availableBanks.map((bank) => (
-                    <SelectItem key={bank} value={bank}>
-                      {bank}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <span className="font-semibold text-amber-700">
+                {filteredApprovalItems.length} item{filteredApprovalItems.length !== 1 ? 's' : ''} aguardando ação
+              </span>
             </div>
-          )}
+            
+            {/* Bank filter */}
+            {availableBanks.length > 1 && (
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-amber-600" />
+                <Select value={bankFilter} onValueChange={setBankFilter}>
+                  <SelectTrigger className="w-[180px] h-9 bg-white/80 border-amber-300">
+                    <SelectValue placeholder="Filtrar por banco" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os bancos</SelectItem>
+                    {availableBanks.map((bank) => (
+                      <SelectItem key={bank} value={bank}>
+                        {bank}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          {/* Type filter buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            {filterOptionsWithCount.map((option) => (
+              <Button
+                key={option.value}
+                variant={typeFilter === option.value ? "default" : "outline"}
+                size="sm"
+                onClick={() => setTypeFilter(option.value)}
+                className="gap-1.5 h-8"
+              >
+                <span>{option.emoji}</span>
+                <span className="hidden sm:inline">{option.label}</span>
+                <Badge 
+                  variant="secondary" 
+                  className="ml-1 h-5 px-1.5 text-xs"
+                >
+                  {option.count}
+                </Badge>
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
 
