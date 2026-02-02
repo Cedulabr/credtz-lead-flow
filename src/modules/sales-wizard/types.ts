@@ -9,11 +9,23 @@ export interface SalesWizardData {
   // Step 2: Product
   tipo_operacao: "Portabilidade" | "Novo empréstimo" | "Refinanciamento" | "Cartão";
   
-  // Step 3: Values
+  // Step 3: Values (for non-portability products)
   banco: string;
   parcela: number;
   troco?: number;
   saldo_devedor?: number;
+  
+  // Step 3b: Portabilidade - Contrato Atual (Credora Original)
+  credora_original?: string;
+  numero_contrato_atual?: string;
+  parcela_atual?: number;
+  saldo_devedor_atual?: number;
+  prazo_restante?: number;
+  
+  // Step 3b: Portabilidade - Novo Contrato (Proponente)
+  banco_proponente?: string;
+  novo_prazo?: number;
+  nova_parcela?: number;
   
   // Step 4: Confirmation
   observacao?: string;

@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2, User, ShoppingCart, DollarSign, Calendar, Building2 } from "lucide-react";
+import { CheckCircle2, User, ShoppingCart, DollarSign, Calendar, Building2, ArrowRightLeft, Wallet, ArrowRight } from "lucide-react";
 import { WizardStepProps, PRODUCT_OPTIONS } from "../types";
 import { StepHeader } from "./StepHeader";
 import { FieldHint } from "./FieldHint";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
@@ -39,6 +39,8 @@ export function ConfirmStep({ data, onUpdate, onValidChange }: WizardStepProps) 
     }
     return `(${phone.slice(0, 2)}) ${phone.slice(2, 6)}-${phone.slice(6)}`;
   };
+
+  const isPortabilidade = data.tipo_operacao === "Portabilidade";
 
   return (
     <div className="space-y-6">
@@ -107,42 +109,164 @@ export function ConfirmStep({ data, onUpdate, onValidChange }: WizardStepProps) 
 
           <Separator />
 
-          {/* Values Section */}
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-            className="space-y-3"
-          >
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <DollarSign className="h-4 w-4" />
-              VALORES
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pl-6">
-              <div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Building2 className="h-3 w-3" /> Banco
-                </p>
-                <p className="font-medium">{data.banco || "—"}</p>
+          {/* Values Section - Condicional por tipo de produto */}
+          {isPortabilidade ? (
+            /* SEÇÃO PORTABILIDADE */
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="space-y-4"
+            >
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <ArrowRightLeft className="h-4 w-4" />
+                DETALHES DA PORTABILIDADE
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Parcela</p>
-                <p className="font-semibold text-lg text-primary">{formatCurrency(data.parcela)}</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
+                {/* Contrato Atual */}
+                <Card className="border-amber-200 bg-amber-50/50">
+                  <CardHeader className="pb-2 pt-3">
+                    <CardTitle className="text-sm flex items-center gap-2 text-amber-700">
+                      <Wallet className="h-4 w-4" />
+                      CONTRATO ATUAL
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 pb-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Credora Original</p>
+                      <p className="font-medium">{data.credora_original || "—"}</p>
+                    </div>
+                    {data.numero_contrato_atual && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Nº Contrato</p>
+                        <p className="font-mono text-sm">{data.numero_contrato_atual}</p>
+                      </div>
+                    )}
+                    <div className="flex gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Parcela Atual</p>
+                        <p className="font-semibold text-amber-600">{formatCurrency(data.parcela_atual)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Saldo Devedor</p>
+                        <p className="font-medium">{formatCurrency(data.saldo_devedor_atual)}</p>
+                      </div>
+                    </div>
+                    {data.prazo_restante && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Prazo Restante</p>
+                        <p className="font-medium">{data.prazo_restante} meses</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Novo Contrato */}
+                <Card className="border-green-200 bg-green-50/50">
+                  <CardHeader className="pb-2 pt-3">
+                    <CardTitle className="text-sm flex items-center gap-2 text-green-700">
+                      <Building2 className="h-4 w-4" />
+                      NOVO CONTRATO
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 pb-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Banco Proponente</p>
+                      <p className="font-medium">{data.banco_proponente || "—"}</p>
+                    </div>
+                    <div className="flex gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Nova Parcela</p>
+                        <p className="font-semibold text-lg text-green-600">{formatCurrency(data.nova_parcela)}</p>
+                      </div>
+                      {data.novo_prazo && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Novo Prazo</p>
+                          <p className="font-medium">{data.novo_prazo} meses</p>
+                        </div>
+                      )}
+                    </div>
+                    {data.troco && data.troco > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">💰 Troco</p>
+                        <p className="font-semibold text-blue-600">{formatCurrency(data.troco)}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
-              {data.saldo_devedor && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Saldo Devedor</p>
-                  <p className="font-medium">{formatCurrency(data.saldo_devedor)}</p>
+
+              {/* Resumo Visual da Economia */}
+              {data.parcela_atual && data.nova_parcela && (
+                <div className="pl-6">
+                  <Card className="border-primary/30 bg-primary/5">
+                    <CardContent className="py-3">
+                      <div className="flex items-center justify-center gap-4 text-sm">
+                        <div className="text-center">
+                          <p className="text-muted-foreground text-xs">Paga hoje</p>
+                          <p className="font-bold text-amber-600">{formatCurrency(data.parcela_atual)}</p>
+                        </div>
+                        <ArrowRight className="h-5 w-5 text-primary" />
+                        <div className="text-center">
+                          <p className="text-muted-foreground text-xs">Vai pagar</p>
+                          <p className="font-bold text-green-600">{formatCurrency(data.nova_parcela)}</p>
+                        </div>
+                        {data.parcela_atual > data.nova_parcela && (
+                          <>
+                            <Separator orientation="vertical" className="h-8" />
+                            <div className="text-center">
+                              <p className="text-muted-foreground text-xs">Economia</p>
+                              <p className="font-bold text-primary">
+                                {formatCurrency(data.parcela_atual - data.nova_parcela)}
+                              </p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
-              {data.troco && (
+            </motion.div>
+          ) : (
+            /* SEÇÃO VALORES PADRÃO (não-portabilidade) */
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="space-y-3"
+            >
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <DollarSign className="h-4 w-4" />
+                VALORES
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pl-6">
                 <div>
-                  <p className="text-xs text-muted-foreground">Troco</p>
-                  <p className="font-medium text-green-600">{formatCurrency(data.troco)}</p>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Building2 className="h-3 w-3" /> Banco
+                  </p>
+                  <p className="font-medium">{data.banco || "—"}</p>
                 </div>
-              )}
-            </div>
-          </motion.div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Parcela</p>
+                  <p className="font-semibold text-lg text-primary">{formatCurrency(data.parcela)}</p>
+                </div>
+                {data.saldo_devedor && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Saldo Devedor</p>
+                    <p className="font-medium">{formatCurrency(data.saldo_devedor)}</p>
+                  </div>
+                )}
+                {data.troco && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Troco</p>
+                    <p className="font-medium text-green-600">{formatCurrency(data.troco)}</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
 
           <Separator />
 

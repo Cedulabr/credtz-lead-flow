@@ -1,22 +1,32 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FormWizard } from "@/components/ui/form-wizard";
-import { Phone, User, ShoppingCart, DollarSign, CheckCircle2, Sparkles, PartyPopper } from "lucide-react";
+import { Phone, User, ShoppingCart, DollarSign, CheckCircle2, Sparkles, PartyPopper, ArrowRightLeft } from "lucide-react";
 import { SalesWizardData } from "./types";
 import { ClientDataStep } from "./components/ClientDataStep";
 import { ProductStep } from "./components/ProductStep";
 import { ValuesStep } from "./components/ValuesStep";
+import { PortabilidadeStep } from "./components/PortabilidadeStep";
 import { ConfirmStep } from "./components/ConfirmStep";
 import { motion, AnimatePresence } from "framer-motion";
 
-const WIZARD_STEPS = [
+// Steps padrão (não-portabilidade)
+const DEFAULT_WIZARD_STEPS = [
   { id: "client", title: "Cliente", icon: User },
   { id: "product", title: "Produto", icon: ShoppingCart },
   { id: "values", title: "Valores", icon: DollarSign },
+  { id: "confirm", title: "Confirmar", icon: CheckCircle2 },
+];
+
+// Steps para Portabilidade (etapa especial)
+const PORTABILIDADE_WIZARD_STEPS = [
+  { id: "client", title: "Cliente", icon: User },
+  { id: "product", title: "Produto", icon: ShoppingCart },
+  { id: "portabilidade", title: "Portabilidade", icon: ArrowRightLeft },
   { id: "confirm", title: "Confirmar", icon: CheckCircle2 },
 ];
 
@@ -31,6 +41,13 @@ export function SalesWizard() {
   const [wizardData, setWizardData] = useState<Partial<SalesWizardData>>({
     data_venda: new Date().toISOString().split('T')[0],
   });
+
+  // Determinar se é Portabilidade para usar steps especiais
+  const isPortabilidade = wizardData.tipo_operacao === "Portabilidade";
+  const WIZARD_STEPS = useMemo(() => 
+    isPortabilidade ? PORTABILIDADE_WIZARD_STEPS : DEFAULT_WIZARD_STEPS,
+    [isPortabilidade]
+  );
 
   const handleUpdate = useCallback((updates: Partial<SalesWizardData>) => {
     setWizardData(prev => ({ ...prev, ...updates }));
@@ -64,6 +81,36 @@ export function SalesWizard() {
 
       const companyId = userCompanyData?.company_id || null;
 
+      // Preparar dados baseado no tipo de operação
+      const isPortabilidadeOp = wizardData.tipo_operacao === "Portabilidade";
+      
+      // Para Portabilidade, usar dados específicos
+      const bancoFinal = isPortabilidadeOp ? wizardData.banco_proponente : wizardData.banco;
+      const parcelaFinal = isPortabilidadeOp ? wizardData.nova_parcela : wizardData.parcela;
+      const saldoDevedorFinal = isPortabilidadeOp ? wizardData.saldo_devedor_atual : wizardData.saldo_devedor;
+      
+      // Construir observação com detalhes da portabilidade
+      let observacaoFinal = wizardData.observacao || "";
+      if (isPortabilidadeOp && wizardData.credora_original) {
+        const portabilidadeInfo = [
+          `[PORTABILIDADE]`,
+          `Credora Original: ${wizardData.credora_original}`,
+          wizardData.numero_contrato_atual ? `Contrato: ${wizardData.numero_contrato_atual}` : null,
+          `Parcela Atual: R$ ${(wizardData.parcela_atual || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          wizardData.prazo_restante ? `Prazo Restante: ${wizardData.prazo_restante} meses` : null,
+          `Saldo Devedor: R$ ${(wizardData.saldo_devedor_atual || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          `---`,
+          `Proponente: ${wizardData.banco_proponente}`,
+          wizardData.novo_prazo ? `Novo Prazo: ${wizardData.novo_prazo} meses` : null,
+          `Nova Parcela: R$ ${(wizardData.nova_parcela || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          wizardData.troco ? `Troco: R$ ${wizardData.troco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : null,
+        ].filter(Boolean).join('\n');
+        
+        observacaoFinal = observacaoFinal 
+          ? `${portabilidadeInfo}\n\n${observacaoFinal}` 
+          : portabilidadeInfo;
+      }
+
       // Insert televendas record
       const { error } = await (supabase as any).from("televendas").insert({
         user_id: user.id,
@@ -72,12 +119,12 @@ export function SalesWizard() {
         cpf: wizardData.cpf?.replace(/\D/g, ""),
         data_venda: wizardData.data_venda,
         telefone: wizardData.telefone?.replace(/\D/g, ""),
-        banco: wizardData.banco,
-        parcela: wizardData.parcela || 0,
+        banco: bancoFinal,
+        parcela: parcelaFinal || 0,
         troco: wizardData.troco || null,
-        saldo_devedor: wizardData.saldo_devedor || null,
+        saldo_devedor: saldoDevedorFinal || null,
         tipo_operacao: wizardData.tipo_operacao,
-        observacao: wizardData.observacao || null,
+        observacao: observacaoFinal || null,
         status: 'solicitar_digitacao',
       });
 
@@ -164,7 +211,12 @@ export function SalesWizard() {
                 canProceed={isStepValid}
                 completeText="Finalizar Venda"
               >
-                {[
+                {isPortabilidade ? [
+                  <ClientDataStep key="client" data={wizardData} onUpdate={handleUpdate} onValidChange={handleValidChange} />,
+                  <ProductStep key="product" data={wizardData} onUpdate={handleUpdate} onValidChange={handleValidChange} />,
+                  <PortabilidadeStep key="portabilidade" data={wizardData} onUpdate={handleUpdate} onValidChange={handleValidChange} />,
+                  <ConfirmStep key="confirm" data={wizardData} onUpdate={handleUpdate} onValidChange={handleValidChange} />,
+                ] : [
                   <ClientDataStep key="client" data={wizardData} onUpdate={handleUpdate} onValidChange={handleValidChange} />,
                   <ProductStep key="product" data={wizardData} onUpdate={handleUpdate} onValidChange={handleValidChange} />,
                   <ValuesStep key="values" data={wizardData} onUpdate={handleUpdate} onValidChange={handleValidChange} />,
