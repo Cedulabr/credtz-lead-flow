@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -18,13 +18,15 @@ import {
   CreditCard,
   User,
   CheckCircle,
-  Building2
+  Building2,
+  Wallet
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { BaseOffClient, BaseOffContract } from '../types';
 import { formatCurrency, formatDate, formatCPF, formatPhone } from '../utils';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { TrocoSimulation } from './TrocoCalculator';
 
 interface ProfessionalProposalPDFProps {
   isOpen: boolean;
@@ -33,6 +35,8 @@ interface ProfessionalProposalPDFProps {
   contracts: BaseOffContract[];
   companyName?: string;
   companyLogo?: string;
+  trocoSimulation?: TrocoSimulation | null;
+  selectedContractIds?: string[];
 }
 
 // PDF Template Configuration
@@ -66,9 +70,18 @@ export function ProfessionalProposalPDF({
   client, 
   contracts,
   companyName = 'Credtz',
+  trocoSimulation,
+  selectedContractIds: externalSelectedIds,
 }: ProfessionalProposalPDFProps) {
   const [selectedContracts, setSelectedContracts] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Sync with external selection if provided
+  useEffect(() => {
+    if (externalSelectedIds && externalSelectedIds.length > 0) {
+      setSelectedContracts(externalSelectedIds);
+    }
+  }, [externalSelectedIds, isOpen]);
 
   const toggleContract = (contractId: string) => {
     setSelectedContracts(prev => 
@@ -222,6 +235,52 @@ export function ProfessionalProposalPDF({
       drawLine(y);
       y += 15;
 
+      // ===== TROCO SIMULATION SECTION (if available) =====
+      if (trocoSimulation && trocoSimulation.troco > 0) {
+        addText('SIMULAÇÃO DE REFINANCIAMENTO', margin, y, { 
+          fontSize: fonts.heading, 
+          color: colors.primary, 
+          bold: true 
+        });
+        y += 12;
+
+        // Simulation highlight box
+        doc.setFillColor(colors.success.r, colors.success.g, colors.success.b, 0.1);
+        doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, 45, 3, 3, 'F');
+        doc.setDrawColor(colors.success.r, colors.success.g, colors.success.b);
+        doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, 45, 3, 3, 'S');
+
+        // Troco (highlighted)
+        addText('TROCO ESTIMADO:', margin + 5, y + 8, { 
+          fontSize: fonts.body, 
+          color: colors.success 
+        });
+        addText(formatCurrency(trocoSimulation.troco), margin + 55, y + 8, { 
+          fontSize: fonts.subtitle, 
+          color: colors.success, 
+          bold: true 
+        });
+
+        // Simulation details row
+        y += 18;
+        addText(`Banco: ${trocoSimulation.bancoLabel}`, margin + 5, y, { fontSize: fonts.small });
+        addText(`Taxa: ${trocoSimulation.taxa.toFixed(2)}% a.m.`, margin + 60, y, { fontSize: fonts.small });
+        addText(`Prazo: ${trocoSimulation.prazo} meses`, margin + 115, y, { fontSize: fonts.small });
+
+        y += 10;
+        addText(`Nova Parcela: ${formatCurrency(trocoSimulation.novaParcela)}`, margin + 5, y, { 
+          fontSize: fonts.body, 
+          bold: true 
+        });
+        addText(`Saldo Refinanciado: ${formatCurrency(trocoSimulation.saldoDevedor)}`, margin + 80, y, { 
+          fontSize: fonts.body 
+        });
+
+        y += 20;
+        drawLine(y);
+        y += 15;
+      }
+
       // ===== CONTRACTS SECTION =====
       addText('CONTRATOS SELECIONADOS PARA REFINANCIAMENTO', margin, y, { 
         fontSize: fonts.heading, 
@@ -306,13 +365,13 @@ export function ProfessionalProposalPDF({
       const totalParcelas = selectedContractsList.reduce((sum, c) => sum + (c.vl_parcela || 0), 0);
 
       // Check page break for summary
-      if (y > pageHeight - 60) {
+      if (y > pageHeight - 80) {
         doc.addPage();
         y = margin;
       }
 
       doc.setFillColor(colors.primary.r, colors.primary.g, colors.primary.b, 0.05);
-      doc.roundedRect(margin, y - 5, pageWidth - 2 * margin, 35, 3, 3, 'F');
+      doc.roundedRect(margin, y - 5, pageWidth - 2 * margin, trocoSimulation ? 50 : 35, 3, 3, 'F');
 
       addText('RESUMO DA OPERAÇÃO', margin + 5, y + 5, { 
         fontSize: fonts.heading, 
@@ -331,7 +390,18 @@ export function ProfessionalProposalPDF({
       y += lineHeight;
       addText(`Parcelas Atuais: ${formatCurrency(totalParcelas)}/mês`, margin + 5, y, { fontSize: fonts.body });
 
-      y += 25;
+      // Add troco summary if available
+      if (trocoSimulation && trocoSimulation.troco > 0) {
+        y += lineHeight;
+        addText(`Nova Parcela Proposta: ${formatCurrency(trocoSimulation.novaParcela)}/mês`, margin + 5, y, { fontSize: fonts.body });
+        addText(`TROCO DISPONÍVEL: ${formatCurrency(trocoSimulation.troco)}`, margin + 90, y, { 
+          fontSize: fonts.body, 
+          color: colors.success, 
+          bold: true 
+        });
+      }
+
+      y += 30;
 
       // ===== FOOTER =====
       drawLine(y);
@@ -377,6 +447,10 @@ export function ProfessionalProposalPDF({
     }
   };
 
+  // Calculate totals for display
+  const selectedContractsList = contracts.filter(c => selectedContracts.includes(c.id));
+  const totalSaldo = selectedContractsList.reduce((sum, c) => sum + (c.saldo || 0), 0);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -402,6 +476,27 @@ export function ProfessionalProposalPDF({
               </div>
             </div>
           </Card>
+
+          {/* Troco Simulation Summary (if available) */}
+          {trocoSimulation && trocoSimulation.troco > 0 && (
+            <Card className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20 border-emerald-200 dark:border-emerald-800 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                  <Wallet className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-emerald-700 dark:text-emerald-400">Troco Calculado</p>
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {formatCurrency(trocoSimulation.troco)}
+                  </p>
+                </div>
+                <div className="text-right text-sm">
+                  <p className="text-muted-foreground">{trocoSimulation.bancoLabel}</p>
+                  <p className="text-muted-foreground">{trocoSimulation.taxa}% • {trocoSimulation.prazo}x</p>
+                </div>
+              </div>
+            </Card>
+          )}
 
           {/* Contract Selection */}
           <div className="flex items-center justify-between shrink-0">
@@ -467,13 +562,10 @@ export function ProfessionalProposalPDF({
               <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
                 <CheckCircle className="w-4 h-4" />
                 <span className="text-sm font-medium">
-                  {selectedContracts.length} contrato(s) • Saldo total: {
-                    formatCurrency(
-                      contracts
-                        .filter(c => selectedContracts.includes(c.id))
-                        .reduce((sum, c) => sum + (c.saldo || 0), 0)
-                    )
-                  }
+                  {selectedContracts.length} contrato(s) • Saldo total: {formatCurrency(totalSaldo)}
+                  {trocoSimulation && trocoSimulation.troco > 0 && (
+                    <span className="ml-2 font-bold">• Troco: {formatCurrency(trocoSimulation.troco)}</span>
+                  )}
                 </span>
               </div>
             </Card>
