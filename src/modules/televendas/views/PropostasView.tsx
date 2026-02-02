@@ -10,9 +10,11 @@ interface PropostasViewProps {
   televendas: Televenda[];
   onView: (tv: Televenda) => void;
   onEdit: (tv: Televenda) => void;
+  onLimitedEdit?: (tv: Televenda) => void;
   onDelete: (tv: Televenda) => void;
   onStatusChange: (tv: Televenda, newStatus: string) => void;
   canEdit: (tv: Televenda) => boolean;
+  canEditLimited?: (tv: Televenda) => boolean;
   canChangeStatus: (tv: Televenda) => boolean;
   isGestorOrAdmin: boolean;
 }
@@ -21,9 +23,11 @@ export const PropostasView = ({
   televendas,
   onView,
   onEdit,
+  onLimitedEdit,
   onDelete,
   onStatusChange,
   canEdit,
+  canEditLimited,
   canChangeStatus,
   isGestorOrAdmin,
 }: PropostasViewProps) => {
@@ -78,6 +82,11 @@ export const PropostasView = ({
                       {tv.nome}
                     </h3>
                     <StatusBadge status={tv.status} size="sm" />
+                    {tv.edit_count && tv.edit_count > 0 && (
+                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 font-medium">
+                        ✏️ Editado {tv.edit_count > 1 ? `(${tv.edit_count}x)` : ""}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
                     <span className="font-mono">{formatCPF(tv.cpf)}</span>
@@ -117,9 +126,11 @@ export const PropostasView = ({
                     televenda={tv}
                     onView={onView}
                     onEdit={onEdit}
+                    onLimitedEdit={onLimitedEdit}
                     onDelete={onDelete}
                     onStatusChange={onStatusChange}
                     canEdit={canEdit(tv)}
+                    canEditLimited={canEditLimited ? canEditLimited(tv) : false}
                     canChangeStatus={canChangeStatus(tv)}
                     isGestorOrAdmin={isGestorOrAdmin}
                   />

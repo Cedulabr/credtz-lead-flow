@@ -24,9 +24,11 @@ interface ActionMenuProps {
   televenda: Televenda;
   onView: (tv: Televenda) => void;
   onEdit: (tv: Televenda) => void;
+  onLimitedEdit?: (tv: Televenda) => void;
   onDelete: (tv: Televenda) => void;
   onStatusChange: (tv: Televenda, newStatus: string) => void;
   canEdit: boolean;
+  canEditLimited?: boolean;
   canChangeStatus: boolean;
   isGestorOrAdmin: boolean;
 }
@@ -35,9 +37,11 @@ export const ActionMenu = ({
   televenda,
   onView,
   onEdit,
+  onLimitedEdit,
   onDelete,
   onStatusChange,
   canEdit,
+  canEditLimited,
   canChangeStatus,
   isGestorOrAdmin,
 }: ActionMenuProps) => {
@@ -128,6 +132,19 @@ export const ActionMenu = ({
           </>
         )}
 
+        {canEditLimited && onLimitedEdit && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={(e) => { e.stopPropagation(); onLimitedEdit(televenda); }}
+              className="gap-2 py-2.5"
+            >
+              <Edit className="h-4 w-4" />
+              Editar Dados
+            </DropdownMenuItem>
+          </>
+        )}
+
         {canEdit && (
           <>
             <DropdownMenuSeparator />
@@ -136,7 +153,7 @@ export const ActionMenu = ({
               className="gap-2 py-2.5"
             >
               <Edit className="h-4 w-4" />
-              Editar
+              Editar Completo
             </DropdownMenuItem>
             <DropdownMenuItem 
               onClick={(e) => { e.stopPropagation(); onDelete(televenda); }}
