@@ -1,4 +1,4 @@
-import { AdminPanel } from "@/components/AdminPanel";
+import { AdminPanelNew } from "@/components/admin";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,5 +34,5 @@ export default function Admin() {
   }
   
   if (!isAdmin) return <div className="p-6">Acesso restrito ao administrador.</div>;
-  return <AdminPanel />;
+  return <AdminPanelNew />;
 }
