@@ -27,6 +27,7 @@ import { CollaboratorEditModal } from "./components/CollaboratorEditModal";
 import { PropostasView } from "./views/PropostasView";
 import { ClientesView } from "./views/ClientesView";
 import { AprovacoesView } from "./views/AprovacoesView";
+import { useTelevendasBanks } from "./hooks/useTelevendasBanks";
 
 type TabType = "propostas" | "clientes" | "aprovacoes";
 
@@ -38,6 +39,9 @@ const getCurrentMonth = () => {
 export const TelevendasModule = () => {
   const { toast } = useToast();
   const { isAdmin, user } = useAuth();
+  
+  // Fetch banks from televendas_banks table
+  const { bankNames: registeredBanks } = useTelevendasBanks();
 
   // Data states
   const [televendas, setTelevendas] = useState<Televenda[]>([]);
@@ -624,7 +628,7 @@ export const TelevendasModule = () => {
         onOpenChange={setEditModalOpen}
         televenda={editingTelevenda}
         onSave={handleEditSave}
-        banks={availableBanks}
+        banks={registeredBanks}
       />
 
       {/* Collaborator Edit Modal (Limited fields) */}
@@ -633,7 +637,7 @@ export const TelevendasModule = () => {
         onOpenChange={setLimitedEditModalOpen}
         televenda={editingTelevenda}
         onSave={handleLimitedEditSave}
-        banks={availableBanks}
+        banks={registeredBanks}
       />
 
       {/* Status Change Modal with audit */}
