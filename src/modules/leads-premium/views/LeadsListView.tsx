@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { RefreshCcw, Inbox } from "lucide-react";
+import { startOfDay, startOfWeek, startOfMonth, subDays, isAfter } from "date-fns";
 
 interface LeadsListViewProps {
   leads: Lead[];
@@ -26,12 +27,13 @@ export function LeadsListView({
   onRefresh 
 }: LeadsListViewProps) {
   const isMobile = useIsMobile();
-  const [filters, setFilters] = useState<LeadFilters>({
+  const [filters, setFilters] = useState<LeadFilters & { dateFilter?: string }>({
     search: "",
     status: "all",
     user: "all",
     convenio: "all",
-    tag: "all"
+    tag: "all",
+    dateFilter: "all"
   });
 
   // Extract unique convenios and tags from leads
@@ -71,6 +73,31 @@ export function LeadsListView({
       // Tag filter
       if (filters.tag !== "all" && lead.tag !== filters.tag) {
         return false;
+      }
+
+      // Date filter
+      if (filters.dateFilter && filters.dateFilter !== "all") {
+        const leadDate = new Date(lead.created_at);
+        const now = new Date();
+        
+        switch (filters.dateFilter) {
+          case "today":
+            if (!isAfter(leadDate, startOfDay(now))) return false;
+            break;
+          case "yesterday":
+            const yesterday = subDays(now, 1);
+            if (!isAfter(leadDate, startOfDay(yesterday)) || isAfter(leadDate, startOfDay(now))) return false;
+            break;
+          case "last3days":
+            if (!isAfter(leadDate, subDays(now, 3))) return false;
+            break;
+          case "thisWeek":
+            if (!isAfter(leadDate, startOfWeek(now, { weekStartsOn: 0 }))) return false;
+            break;
+          case "thisMonth":
+            if (!isAfter(leadDate, startOfMonth(now))) return false;
+            break;
+        }
       }
 
       return true;
@@ -128,7 +155,7 @@ export function LeadsListView({
                   Nenhum lead encontrado
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {filters.search || filters.status !== "all" || filters.convenio !== "all"
+                  {filters.search || filters.status !== "all" || filters.convenio !== "all" || filters.dateFilter !== "all"
                     ? "Tente ajustar os filtros"
                     : "Solicite novos leads para começar"}
                 </p>
