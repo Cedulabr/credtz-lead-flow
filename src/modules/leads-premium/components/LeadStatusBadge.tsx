@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { STATUS_CONFIG } from "../types";
+import { PIPELINE_STAGES } from "../types";
 import { cn } from "@/lib/utils";
 import { 
   Sparkles, TrendingUp, Clock, CheckCircle, XCircle, 
@@ -12,21 +12,23 @@ interface LeadStatusBadgeProps {
   showIcon?: boolean;
 }
 
-const ICON_MAP: Record<string, React.ElementType> = {
-  Sparkles,
-  TrendingUp,
-  Clock,
-  CheckCircle,
-  XCircle,
-  Calendar,
-  UserX,
-  Ban,
-  PhoneOff,
-  MessageCircle
+// Map status to icons
+const STATUS_ICONS: Record<string, React.ElementType> = {
+  new_lead: Sparkles,
+  em_andamento: TrendingUp,
+  aguardando_retorno: Clock,
+  agendamento: Calendar,
+  cliente_fechado: CheckCircle,
+  contato_futuro: Calendar,
+  recusou_oferta: XCircle,
+  sem_interesse: Ban,
+  nao_e_cliente: UserX,
+  sem_retorno: PhoneOff,
+  nao_e_whatsapp: MessageCircle
 };
 
 export function LeadStatusBadge({ status, size = "md", showIcon = true }: LeadStatusBadgeProps) {
-  const config = STATUS_CONFIG[status];
+  const config = PIPELINE_STAGES[status];
   
   if (!config) {
     return (
@@ -36,7 +38,7 @@ export function LeadStatusBadge({ status, size = "md", showIcon = true }: LeadSt
     );
   }
 
-  const Icon = ICON_MAP[config.icon];
+  const Icon = STATUS_ICONS[status];
   
   const sizeClasses = {
     sm: "text-xs px-2 py-0.5",

@@ -7,7 +7,7 @@ export const AdminPanel = lazy(() => import('./AdminPanel').then(module => ({ de
 export const BaseOff = lazy(() => import('./BaseOff').then(module => ({ default: module.BaseOff })));
 export const BaseOffModern = lazy(() => import('./BaseOffModern').then(module => ({ default: module.BaseOffModern })));
 export const Commissions = lazy(() => import('./Commissions').then(module => ({ default: module.Commissions })));
-export const LeadsManagement = lazy(() => import('./LeadsManagement').then(module => ({ default: module.LeadsManagement })));
+export const LeadsManagement = lazy(() => import('@/modules/leads-premium/LeadsPremiumModule').then(module => ({ default: module.LeadsPremiumModule })));
 export const LeadsIndicados = lazy(() => import('./LeadsIndicados'));
 export const TestFunctionalities = lazy(() => import('./TestFunctionalities').then(module => ({ default: module.TestFunctionalities })));
 export const ActivateLeads = lazy(() => import('./ActivateLeads').then(module => ({ default: module.ActivateLeads })));
