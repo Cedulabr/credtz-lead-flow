@@ -3,35 +3,45 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, X, SlidersHorizontal } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Search, Filter, X, SlidersHorizontal, Calendar } from "lucide-react";
 import { LeadFilters, PIPELINE_STAGES } from "../types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState } from "react";
 
 interface LeadsFiltersBarProps {
-  filters: LeadFilters;
-  onFiltersChange: (filters: LeadFilters) => void;
+  filters: LeadFilters & { dateFilter?: string };
+  onFiltersChange: (filters: LeadFilters & { dateFilter?: string }) => void;
   availableConvenios: string[];
   availableTags: string[];
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function LeadsFiltersBar({ 
   filters, 
   onFiltersChange, 
   availableConvenios,
-  availableTags 
+  availableTags,
+  isOpen: externalOpen,
+  onOpenChange: externalOpenChange
 }: LeadsFiltersBarProps) {
   const isMobile = useIsMobile();
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+
+  const isOpen = externalOpen ?? internalOpen;
+  const setIsOpen = externalOpenChange ?? setInternalOpen;
 
   const hasActiveFilters = filters.status !== "all" || 
     filters.convenio !== "all" || 
-    filters.tag !== "all";
+    filters.tag !== "all" ||
+    filters.dateFilter !== "all";
 
   const activeFilterCount = [
     filters.status !== "all",
     filters.convenio !== "all",
-    filters.tag !== "all"
+    filters.tag !== "all",
+    filters.dateFilter !== "all"
   ].filter(Boolean).length;
 
   const clearFilters = () => {
@@ -40,15 +50,40 @@ export function LeadsFiltersBar({
       status: "all",
       user: "all",
       convenio: "all",
-      tag: "all"
+      tag: "all",
+      dateFilter: "all"
     });
   };
 
   const filterContent = (
     <div className="space-y-4">
+      {/* Date Filter */}
+      <div className="space-y-2">
+        <Label className="text-sm font-medium flex items-center gap-2">
+          <Calendar className="h-4 w-4" />
+          Período
+        </Label>
+        <Select 
+          value={filters.dateFilter || "all"} 
+          onValueChange={(value) => onFiltersChange({ ...filters, dateFilter: value })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Todos os períodos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os períodos</SelectItem>
+            <SelectItem value="today">Hoje</SelectItem>
+            <SelectItem value="yesterday">Ontem</SelectItem>
+            <SelectItem value="last3days">Últimos 3 dias</SelectItem>
+            <SelectItem value="thisWeek">Esta semana</SelectItem>
+            <SelectItem value="thisMonth">Este mês</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Status Filter */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">Status</label>
+        <Label className="text-sm font-medium">Status</Label>
         <Select 
           value={filters.status} 
           onValueChange={(value) => onFiltersChange({ ...filters, status: value })}
@@ -70,7 +105,7 @@ export function LeadsFiltersBar({
       {/* Convenio Filter */}
       {availableConvenios.length > 0 && (
         <div className="space-y-2">
-          <label className="text-sm font-medium">Convênio</label>
+          <Label className="text-sm font-medium">Convênio</Label>
           <Select 
             value={filters.convenio} 
             onValueChange={(value) => onFiltersChange({ ...filters, convenio: value })}
@@ -91,7 +126,7 @@ export function LeadsFiltersBar({
       {/* Tag Filter */}
       {availableTags.length > 0 && (
         <div className="space-y-2">
-          <label className="text-sm font-medium">Tag</label>
+          <Label className="text-sm font-medium">Tag</Label>
           <Select 
             value={filters.tag} 
             onValueChange={(value) => onFiltersChange({ ...filters, tag: value })}
@@ -133,7 +168,7 @@ export function LeadsFiltersBar({
         </div>
 
         {/* Filter Sheet */}
-        <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+        <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" size="icon" className="relative shrink-0">
               <SlidersHorizontal className="h-4 w-4" />
@@ -173,6 +208,25 @@ export function LeadsFiltersBar({
         />
       </div>
 
+      {/* Date Filter */}
+      <Select 
+        value={filters.dateFilter || "all"} 
+        onValueChange={(value) => onFiltersChange({ ...filters, dateFilter: value })}
+      >
+        <SelectTrigger className="w-[150px]">
+          <Calendar className="h-4 w-4 mr-2" />
+          <SelectValue placeholder="Período" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos</SelectItem>
+          <SelectItem value="today">Hoje</SelectItem>
+          <SelectItem value="yesterday">Ontem</SelectItem>
+          <SelectItem value="last3days">3 dias</SelectItem>
+          <SelectItem value="thisWeek">Semana</SelectItem>
+          <SelectItem value="thisMonth">Mês</SelectItem>
+        </SelectContent>
+      </Select>
+
       {/* Status Filter */}
       <Select 
         value={filters.status} 
@@ -205,6 +259,24 @@ export function LeadsFiltersBar({
             <SelectItem value="all">Todos Convênios</SelectItem>
             {availableConvenios.map((conv) => (
               <SelectItem key={conv} value={conv}>{conv}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
+      {/* Tag Filter */}
+      {availableTags.length > 0 && (
+        <Select 
+          value={filters.tag} 
+          onValueChange={(value) => onFiltersChange({ ...filters, tag: value })}
+        >
+          <SelectTrigger className="w-[120px]">
+            <SelectValue placeholder="Tag" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas Tags</SelectItem>
+            {availableTags.map((tag) => (
+              <SelectItem key={tag} value={tag}>{tag}</SelectItem>
             ))}
           </SelectContent>
         </Select>
