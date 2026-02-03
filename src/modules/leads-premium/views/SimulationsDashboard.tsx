@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,52 +19,33 @@ import {
   Calculator, 
   Clock, 
   CheckCircle, 
-  AlertCircle, 
   User,
   Phone,
   Building,
   Loader2,
   RefreshCcw,
-  ChevronRight
+  ChevronRight,
+  FileText,
+  Send
 } from "lucide-react";
+import { Lead } from "../types";
 
-interface SimulationRequest {
-  id: string;
-  lead_id: string;
-  requested_by: string;
-  requested_at: string;
-  status: string;
-  banco: string | null;
-  produto: string | null;
-  notes: string | null;
-  valor_liberado: number | null;
-  parcela: number | null;
-  completed_at: string | null;
-  completed_by: string | null;
-  lead?: {
-    name: string;
-    cpf: string | null;
-    phone: string;
-    convenio: string;
-  };
-  requester?: {
-    name: string | null;
-    email: string | null;
-  };
+interface SimulationLead extends Lead {
+  requester_name?: string;
 }
 
 export function SimulationsDashboard() {
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const { user, profile } = useAuth();
-  const [simulations, setSimulations] = useState<SimulationRequest[]>([]);
+  const [leads, setLeads] = useState<SimulationLead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedSimulation, setSelectedSimulation] = useState<SimulationRequest | null>(null);
+  const [selectedLead, setSelectedLead] = useState<SimulationLead | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [resultForm, setResultForm] = useState({
-    valor_liberado: "",
-    parcela: "",
+    valor_operacao: "",
+    banco_operacao: "",
     notes: ""
   });
 
@@ -79,17 +60,16 @@ export function SimulationsDashboard() {
 
     setIsLoading(true);
     try {
+      // Buscar leads que têm simulação solicitada (simulation_status não é null)
       const { data, error } = await supabase
-        .from('activate_leads_simulations')
-        .select(`
-          *,
-          lead:activate_leads(name:nome, cpf, phone:telefone, convenio:produto)
-        `)
-        .order('requested_at', { ascending: false })
+        .from('leads')
+        .select('*')
+        .not('simulation_status', 'is', null)
+        .order('updated_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
-      setSimulations(data || []);
+      setLeads(data || []);
     } catch (error) {
       console.error('Error fetching simulations:', error);
       toast({
@@ -103,58 +83,61 @@ export function SimulationsDashboard() {
   };
 
   const stats = useMemo(() => {
-    const pending = simulations.filter(s => s.status === 'pending').length;
-    const completed = simulations.filter(s => s.status === 'completed').length;
-    const today = simulations.filter(s => {
-      const date = new Date(s.requested_at);
+    const solicitada = leads.filter(l => l.simulation_status === 'solicitada').length;
+    const enviada = leads.filter(l => l.simulation_status === 'enviada').length;
+    const concluida = leads.filter(l => l.simulation_status === 'concluida').length;
+    const today = leads.filter(l => {
+      const date = new Date(l.updated_at || l.created_at);
       const todayDate = new Date();
       return date.toDateString() === todayDate.toDateString();
     }).length;
 
-    return { pending, completed, today, total: simulations.length };
-  }, [simulations]);
+    return { solicitada, enviada, concluida, today, total: leads.length };
+  }, [leads]);
 
-  const handleCompleteSimulation = async () => {
-    if (!selectedSimulation) return;
+  const handleUpdateSimulation = async (newStatus: string) => {
+    if (!selectedLead) return;
 
     setIsProcessing(true);
     try {
+      const updateData: any = {
+        simulation_status: newStatus,
+        updated_at: new Date().toISOString()
+      };
+
+      // Se for concluída, adicionar os valores
+      if (newStatus === 'concluida' || newStatus === 'enviada') {
+        if (resultForm.valor_operacao) {
+          updateData.valor_operacao = parseFloat(resultForm.valor_operacao);
+        }
+        if (resultForm.banco_operacao) {
+          updateData.banco_operacao = resultForm.banco_operacao;
+        }
+        if (resultForm.notes) {
+          updateData.notes = resultForm.notes;
+        }
+      }
+
       const { error } = await supabase
-        .from('activate_leads_simulations')
-        .update({
-          status: 'completed',
-          valor_liberado: resultForm.valor_liberado ? parseFloat(resultForm.valor_liberado) : null,
-          parcela: resultForm.parcela ? parseFloat(resultForm.parcela) : null,
-          notes: resultForm.notes || selectedSimulation.notes,
-          completed_at: new Date().toISOString(),
-          completed_by: user?.id
-        })
-        .eq('id', selectedSimulation.id);
+        .from('leads')
+        .update(updateData)
+        .eq('id', selectedLead.id);
 
       if (error) throw error;
 
-      // Update lead simulation status
-      await supabase
-        .from('activate_leads')
-        .update({
-          simulation_status: 'completed',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', selectedSimulation.lead_id);
-
       toast({
-        title: "Simulação concluída!",
-        description: "O consultor será notificado do resultado."
+        title: newStatus === 'enviada' ? "Simulação enviada!" : "Simulação concluída!",
+        description: "O status foi atualizado com sucesso."
       });
 
-      setSelectedSimulation(null);
-      setResultForm({ valor_liberado: "", parcela: "", notes: "" });
+      setSelectedLead(null);
+      setResultForm({ valor_operacao: "", banco_operacao: "", notes: "" });
       fetchSimulations();
     } catch (error: any) {
-      console.error('Error completing simulation:', error);
+      console.error('Error updating simulation:', error);
       toast({
         title: "Erro",
-        description: error.message || "Erro ao concluir simulação",
+        description: error.message || "Erro ao atualizar simulação",
         variant: "destructive"
       });
     } finally {
@@ -162,8 +145,10 @@ export function SimulationsDashboard() {
     }
   };
 
-  const pendingSimulations = simulations.filter(s => s.status === 'pending');
-  const completedSimulations = simulations.filter(s => s.status === 'completed');
+  // Agrupar leads por status de simulação
+  const solicitadas = leads.filter(l => l.simulation_status === 'solicitada');
+  const enviadas = leads.filter(l => l.simulation_status === 'enviada');
+  const concluidas = leads.filter(l => l.simulation_status === 'concluida');
 
   if (isLoading) {
     return (
@@ -192,16 +177,16 @@ export function SimulationsDashboard() {
         </div>
         <div className="grid grid-cols-4 gap-2">
           <div className="text-center p-2 rounded-lg bg-amber-50 border border-amber-200">
-            <p className="text-xl font-bold text-amber-700">{stats.pending}</p>
-            <p className="text-[10px] text-amber-600">Pendentes</p>
-          </div>
-          <div className="text-center p-2 rounded-lg bg-emerald-50 border border-emerald-200">
-            <p className="text-xl font-bold text-emerald-700">{stats.completed}</p>
-            <p className="text-[10px] text-emerald-600">Concluídas</p>
+            <p className="text-xl font-bold text-amber-700">{stats.solicitada}</p>
+            <p className="text-[10px] text-amber-600">Solicitadas</p>
           </div>
           <div className="text-center p-2 rounded-lg bg-blue-50 border border-blue-200">
-            <p className="text-xl font-bold text-blue-700">{stats.today}</p>
-            <p className="text-[10px] text-blue-600">Hoje</p>
+            <p className="text-xl font-bold text-blue-700">{stats.enviada}</p>
+            <p className="text-[10px] text-blue-600">Enviadas</p>
+          </div>
+          <div className="text-center p-2 rounded-lg bg-emerald-50 border border-emerald-200">
+            <p className="text-xl font-bold text-emerald-700">{stats.concluida}</p>
+            <p className="text-[10px] text-emerald-600">Concluídas</p>
           </div>
           <div className="text-center p-2 rounded-lg bg-purple-50 border border-purple-200">
             <p className="text-xl font-bold text-purple-700">{stats.total}</p>
@@ -213,16 +198,16 @@ export function SimulationsDashboard() {
       {/* Simulations List */}
       <ScrollArea className="flex-1">
         <div className={`${isMobile ? 'px-4 py-3' : 'p-4'} space-y-4`}>
-          {/* Pending Section */}
-          {pendingSimulations.length > 0 && (
+          {/* Solicitadas Section */}
+          {solicitadas.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold flex items-center gap-2 text-amber-700">
                 <Clock className="h-4 w-4" />
-                Aguardando ({pendingSimulations.length})
+                Aguardando Simulação ({solicitadas.length})
               </h3>
-              {pendingSimulations.map((sim, index) => (
+              {solicitadas.map((lead, index) => (
                 <motion.div
-                  key={sim.id}
+                  key={lead.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
@@ -230,32 +215,36 @@ export function SimulationsDashboard() {
                   <Card 
                     className="border-l-4 border-l-amber-500 cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => {
-                      setSelectedSimulation(sim);
-                      setResultForm({ valor_liberado: "", parcela: "", notes: sim.notes || "" });
+                      setSelectedLead(lead);
+                      setResultForm({ 
+                        valor_operacao: lead.valor_operacao?.toString() || "", 
+                        banco_operacao: lead.banco_operacao || "",
+                        notes: lead.notes || "" 
+                      });
                     }}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between">
                         <div className="space-y-1 flex-1">
                           <div className="flex items-center gap-2">
-                            <p className="font-semibold">{sim.lead?.name || 'Cliente'}</p>
+                            <p className="font-semibold">{lead.name}</p>
                             <Badge variant="outline" className="text-xs">
-                              {sim.banco || 'Banco não definido'}
+                              {lead.convenio || 'INSS'}
                             </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">
                             <Phone className="inline h-3 w-3 mr-1" />
-                            {sim.lead?.phone}
+                            {lead.phone}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Solicitado {format(new Date(sim.requested_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                            Atualizado {format(new Date(lead.updated_at || lead.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
                           </p>
                         </div>
                         <ChevronRight className="h-5 w-5 text-muted-foreground" />
                       </div>
-                      {sim.notes && (
-                        <p className="text-xs text-muted-foreground mt-2 p-2 bg-muted rounded">
-                          {sim.notes}
+                      {lead.notes && (
+                        <p className="text-xs text-muted-foreground mt-2 p-2 bg-muted rounded line-clamp-2">
+                          {lead.notes}
                         </p>
                       )}
                     </CardContent>
@@ -265,16 +254,71 @@ export function SimulationsDashboard() {
             </div>
           )}
 
-          {/* Completed Section */}
-          {completedSimulations.length > 0 && (
+          {/* Enviadas Section */}
+          {enviadas.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold flex items-center gap-2 text-blue-700">
+                <Send className="h-4 w-4" />
+                Simulações Enviadas ({enviadas.length})
+              </h3>
+              {enviadas.map((lead, index) => (
+                <motion.div
+                  key={lead.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.03 }}
+                >
+                  <Card 
+                    className="border-l-4 border-l-blue-500 cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => {
+                      setSelectedLead(lead);
+                      setResultForm({ 
+                        valor_operacao: lead.valor_operacao?.toString() || "", 
+                        banco_operacao: lead.banco_operacao || "",
+                        notes: lead.notes || "" 
+                      });
+                    }}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <p className="font-medium">{lead.name}</p>
+                          <div className="flex gap-2">
+                            {lead.valor_operacao && (
+                              <Badge variant="secondary" className="text-xs">
+                                R$ {lead.valor_operacao.toLocaleString('pt-BR')}
+                              </Badge>
+                            )}
+                            {lead.banco_operacao && (
+                              <Badge variant="outline" className="text-xs">
+                                {lead.banco_operacao}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            <Phone className="inline h-3 w-3 mr-1" />
+                            {lead.phone}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          {/* Concluidas Section */}
+          {concluidas.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-semibold flex items-center gap-2 text-emerald-700">
                 <CheckCircle className="h-4 w-4" />
-                Concluídas ({completedSimulations.length})
+                Concluídas ({concluidas.length})
               </h3>
-              {completedSimulations.slice(0, 10).map((sim, index) => (
+              {concluidas.slice(0, 10).map((lead, index) => (
                 <motion.div
-                  key={sim.id}
+                  key={lead.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.03 }}
@@ -283,21 +327,21 @@ export function SimulationsDashboard() {
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between">
                         <div className="space-y-1">
-                          <p className="font-medium">{sim.lead?.name || 'Cliente'}</p>
+                          <p className="font-medium">{lead.name}</p>
                           <div className="flex gap-2">
-                            {sim.valor_liberado && (
+                            {lead.valor_operacao && (
                               <Badge variant="secondary" className="text-xs">
-                                R$ {sim.valor_liberado.toLocaleString('pt-BR')}
+                                R$ {lead.valor_operacao.toLocaleString('pt-BR')}
                               </Badge>
                             )}
-                            {sim.parcela && (
+                            {lead.banco_operacao && (
                               <Badge variant="outline" className="text-xs">
-                                {sim.parcela}x
+                                {lead.banco_operacao}
                               </Badge>
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            Concluído {format(new Date(sim.completed_at!), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                            Atualizado {format(new Date(lead.updated_at || lead.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
                           </p>
                         </div>
                         <CheckCircle className="h-5 w-5 text-emerald-500" />
@@ -309,7 +353,7 @@ export function SimulationsDashboard() {
             </div>
           )}
 
-          {simulations.length === 0 && (
+          {leads.length === 0 && (
             <Card>
               <CardContent className="py-12 text-center">
                 <Calculator className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -326,42 +370,50 @@ export function SimulationsDashboard() {
       </ScrollArea>
 
       {/* Process Simulation Sheet */}
-      <Sheet open={!!selectedSimulation} onOpenChange={() => setSelectedSimulation(null)}>
-        <SheetContent side={isMobile ? "bottom" : "right"} className={isMobile ? "h-[80vh]" : ""}>
+      <Sheet open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
+        <SheetContent side={isMobile ? "bottom" : "right"} className={isMobile ? "h-[85vh]" : ""}>
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5" />
               Processar Simulação
             </SheetTitle>
+            <SheetDescription>
+              Preencha os dados da simulação e atualize o status
+            </SheetDescription>
           </SheetHeader>
           
-          {selectedSimulation && (
+          {selectedLead && (
             <div className="py-4 space-y-4">
               {/* Client Info */}
               <div className="p-4 rounded-lg bg-muted/50 space-y-2">
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-semibold">{selectedSimulation.lead?.name}</span>
+                  <span className="font-semibold">{selectedLead.name}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Phone className="h-3 w-3" />
-                  {selectedSimulation.lead?.phone}
+                  {selectedLead.phone}
                 </div>
-                {selectedSimulation.banco && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Building className="h-3 w-3 text-muted-foreground" />
-                    <Badge variant="secondary">{selectedSimulation.banco}</Badge>
-                    {selectedSimulation.produto && (
-                      <Badge variant="outline">{selectedSimulation.produto}</Badge>
-                    )}
-                  </div>
-                )}
+                <div className="flex items-center gap-2 text-sm">
+                  <Badge variant="secondary">{selectedLead.convenio || 'INSS'}</Badge>
+                  <Badge 
+                    variant="outline"
+                    className={
+                      selectedLead.simulation_status === 'solicitada' ? 'bg-amber-50 text-amber-700' :
+                      selectedLead.simulation_status === 'enviada' ? 'bg-blue-50 text-blue-700' :
+                      'bg-emerald-50 text-emerald-700'
+                    }
+                  >
+                    {selectedLead.simulation_status === 'solicitada' ? 'Aguardando' :
+                     selectedLead.simulation_status === 'enviada' ? 'Enviada' : 'Concluída'}
+                  </Badge>
+                </div>
               </div>
 
-              {selectedSimulation.notes && (
+              {selectedLead.notes && (
                 <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
-                  <p className="text-xs font-medium text-amber-700 mb-1">Observações do consultor:</p>
-                  <p className="text-sm text-amber-800">{selectedSimulation.notes}</p>
+                  <p className="text-xs font-medium text-amber-700 mb-1">Observações:</p>
+                  <p className="text-sm text-amber-800">{selectedLead.notes}</p>
                 </div>
               )}
 
@@ -372,22 +424,22 @@ export function SimulationsDashboard() {
                     <Label>Valor Liberado (R$)</Label>
                     <Input
                       placeholder="0,00"
-                      value={resultForm.valor_liberado}
-                      onChange={(e) => setResultForm(prev => ({ ...prev, valor_liberado: e.target.value }))}
+                      value={resultForm.valor_operacao}
+                      onChange={(e) => setResultForm(prev => ({ ...prev, valor_operacao: e.target.value }))}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Parcela</Label>
+                    <Label>Banco</Label>
                     <Input
-                      placeholder="84"
-                      value={resultForm.parcela}
-                      onChange={(e) => setResultForm(prev => ({ ...prev, parcela: e.target.value }))}
+                      placeholder="Ex: Bradesco"
+                      value={resultForm.banco_operacao}
+                      onChange={(e) => setResultForm(prev => ({ ...prev, banco_operacao: e.target.value }))}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Observações do Resultado</Label>
+                  <Label>Observações</Label>
                   <Textarea
                     placeholder="Detalhes da simulação..."
                     value={resultForm.notes}
@@ -396,23 +448,47 @@ export function SimulationsDashboard() {
                   />
                 </div>
 
-                <Button 
-                  className="w-full h-12 bg-emerald-600 hover:bg-emerald-700"
-                  onClick={handleCompleteSimulation}
-                  disabled={isProcessing}
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Processando...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Concluir Simulação
-                    </>
+                <div className="flex flex-col gap-2">
+                  {selectedLead.simulation_status === 'solicitada' && (
+                    <Button 
+                      className="w-full h-12 bg-blue-600 hover:bg-blue-700"
+                      onClick={() => handleUpdateSimulation('enviada')}
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Processando...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-2" />
+                          Marcar como Enviada
+                        </>
+                      )}
+                    </Button>
                   )}
-                </Button>
+
+                  {(selectedLead.simulation_status === 'solicitada' || selectedLead.simulation_status === 'enviada') && (
+                    <Button 
+                      className="w-full h-12 bg-emerald-600 hover:bg-emerald-700"
+                      onClick={() => handleUpdateSimulation('concluida')}
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Processando...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Concluir Simulação
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           )}
