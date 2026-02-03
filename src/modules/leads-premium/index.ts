@@ -1,6 +1,12 @@
+export { LeadsPremiumModule } from "./LeadsPremiumModule";
 export { LeadCard } from "./components/LeadCard";
 export { LeadStatusBadge } from "./components/LeadStatusBadge";
 export { LeadsSummaryCards } from "./components/LeadsSummaryCards";
 export { LeadsFiltersBar } from "./components/LeadsFiltersBar";
+export { LeadMiniCard } from "./components/LeadMiniCard";
+export { LeadListItem } from "./components/LeadListItem";
+export { LeadDetailDrawer } from "./components/LeadDetailDrawer";
+export { MobileNavBar } from "./components/MobileNavBar";
+export { useLeadsPremium } from "./hooks/useLeadsPremium";
 export { useLeads } from "./hooks/useLeads";
 export * from "./types";

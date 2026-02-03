@@ -50,115 +50,158 @@ export interface LeadFilters {
   tag: string;
 }
 
-// Status configuration
-export const STATUS_CONFIG: Record<string, {
+export interface LeadStats {
+  total: number;
+  novos: number;
+  emAndamento: number;
+  fechados: number;
+  recusados: number;
+  pendentes: number;
+  conversionRate: number;
+  avgTimeToConversion: number;
+  todayCount: number;
+  weekCount: number;
+  byStatus: Record<string, number>;
+}
+
+export interface HistoryEntry {
+  action: string;
+  timestamp: string;
+  user_id?: string;
+  user_name?: string;
+  from_status?: string;
+  to_status?: string;
+  note?: string;
+  rejection_data?: {
+    reason?: string;
+    offered_value?: number;
+    bank?: string;
+    description?: string;
+  };
+  future_contact_date?: string;
+  scheduled_date?: string;
+  scheduled_time?: string;
+  assigned_to?: string;
+  assigned_to_name?: string;
+}
+
+// Pipeline stages configuration
+export const PIPELINE_STAGES: Record<string, {
   label: string;
   color: string;
   textColor: string;
   bgColor: string;
   borderColor: string;
-  icon: string;
   dotColor: string;
+  order: number;
 }> = {
   new_lead: { 
     label: "Novo Lead", 
     color: "from-blue-500 to-blue-600", 
     textColor: "text-blue-700", 
-    bgColor: "bg-gradient-to-r from-blue-50 to-blue-100",
+    bgColor: "bg-blue-50",
     borderColor: "border-blue-200",
-    icon: "Sparkles",
-    dotColor: "bg-blue-500"
+    dotColor: "bg-blue-500",
+    order: 1
   },
   em_andamento: { 
     label: "Em Andamento", 
-    color: "from-blue-500 to-indigo-500", 
-    textColor: "text-blue-700", 
-    bgColor: "bg-gradient-to-r from-blue-50 to-indigo-100",
-    borderColor: "border-blue-200",
-    icon: "TrendingUp",
-    dotColor: "bg-blue-500"
+    color: "from-indigo-500 to-violet-500", 
+    textColor: "text-indigo-700", 
+    bgColor: "bg-indigo-50",
+    borderColor: "border-indigo-200",
+    dotColor: "bg-indigo-500",
+    order: 2
   },
   aguardando_retorno: { 
     label: "Aguardando Retorno", 
-    color: "from-purple-500 to-indigo-500", 
+    color: "from-purple-500 to-fuchsia-500", 
     textColor: "text-purple-700", 
-    bgColor: "bg-gradient-to-r from-purple-50 to-indigo-100",
+    bgColor: "bg-purple-50",
     borderColor: "border-purple-200",
-    icon: "Clock",
-    dotColor: "bg-purple-500"
+    dotColor: "bg-purple-500",
+    order: 3
+  },
+  agendamento: { 
+    label: "Agendamento", 
+    color: "from-cyan-500 to-teal-500", 
+    textColor: "text-cyan-700", 
+    bgColor: "bg-cyan-50",
+    borderColor: "border-cyan-200",
+    dotColor: "bg-cyan-500",
+    order: 4
   },
   cliente_fechado: { 
     label: "Cliente Fechado", 
     color: "from-emerald-500 to-green-500", 
     textColor: "text-emerald-700", 
-    bgColor: "bg-gradient-to-r from-emerald-50 to-green-100",
+    bgColor: "bg-emerald-50",
     borderColor: "border-emerald-200",
-    icon: "CheckCircle",
-    dotColor: "bg-emerald-500"
-  },
-  recusou_oferta: { 
-    label: "Recusado", 
-    color: "from-rose-500 to-red-500", 
-    textColor: "text-rose-700", 
-    bgColor: "bg-gradient-to-r from-rose-50 to-red-100",
-    borderColor: "border-rose-200",
-    icon: "XCircle",
-    dotColor: "bg-rose-500"
+    dotColor: "bg-emerald-500",
+    order: 5
   },
   contato_futuro: { 
     label: "Contato Futuro", 
     color: "from-slate-500 to-gray-500", 
     textColor: "text-slate-700", 
-    bgColor: "bg-gradient-to-r from-slate-50 to-gray-100",
+    bgColor: "bg-slate-50",
     borderColor: "border-slate-200",
-    icon: "Calendar",
-    dotColor: "bg-slate-500"
+    dotColor: "bg-slate-500",
+    order: 6
   },
-  agendamento: { 
-    label: "Agendamento", 
-    color: "from-indigo-500 to-violet-500", 
-    textColor: "text-indigo-700", 
-    bgColor: "bg-gradient-to-r from-indigo-50 to-violet-100",
-    borderColor: "border-indigo-200",
-    icon: "Calendar",
-    dotColor: "bg-indigo-500"
-  },
-  nao_e_cliente: {
-    label: "Não é o cliente",
-    color: "from-gray-500 to-zinc-500",
-    textColor: "text-gray-700",
-    bgColor: "bg-gradient-to-r from-gray-50 to-zinc-100",
-    borderColor: "border-gray-200",
-    icon: "UserX",
-    dotColor: "bg-gray-500"
+  recusou_oferta: { 
+    label: "Recusado", 
+    color: "from-rose-500 to-red-500", 
+    textColor: "text-rose-700", 
+    bgColor: "bg-rose-50",
+    borderColor: "border-rose-200",
+    dotColor: "bg-rose-500",
+    order: 7
   },
   sem_interesse: {
     label: "Sem Interesse",
-    color: "from-yellow-500 to-amber-600",
-    textColor: "text-yellow-800",
-    bgColor: "bg-gradient-to-r from-yellow-50 to-amber-100",
-    borderColor: "border-yellow-200",
-    icon: "Ban",
-    dotColor: "bg-yellow-500"
+    color: "from-amber-500 to-orange-500",
+    textColor: "text-amber-700",
+    bgColor: "bg-amber-50",
+    borderColor: "border-amber-200",
+    dotColor: "bg-amber-500",
+    order: 8
+  },
+  nao_e_cliente: {
+    label: "Não é o Cliente",
+    color: "from-gray-500 to-zinc-500",
+    textColor: "text-gray-700",
+    bgColor: "bg-gray-50",
+    borderColor: "border-gray-200",
+    dotColor: "bg-gray-500",
+    order: 9
   },
   sem_retorno: {
-    label: "Sem retorno",
+    label: "Sem Retorno",
     color: "from-zinc-500 to-neutral-600",
     textColor: "text-zinc-700",
-    bgColor: "bg-gradient-to-r from-zinc-50 to-neutral-100",
+    bgColor: "bg-zinc-50",
     borderColor: "border-zinc-200",
-    icon: "PhoneOff",
-    dotColor: "bg-zinc-500"
+    dotColor: "bg-zinc-500",
+    order: 10
   },
   nao_e_whatsapp: {
     label: "Não é WhatsApp",
     color: "from-violet-500 to-purple-500",
     textColor: "text-violet-700",
-    bgColor: "bg-gradient-to-r from-violet-50 to-purple-100",
+    bgColor: "bg-violet-50",
     borderColor: "border-violet-200",
-    icon: "MessageCircle",
-    dotColor: "bg-violet-500"
+    dotColor: "bg-violet-500",
+    order: 11
   }
+};
+
+// Status categories for quick filtering
+export const STATUS_CATEGORIES = {
+  active: ['new_lead', 'em_andamento', 'aguardando_retorno', 'agendamento'],
+  converted: ['cliente_fechado'],
+  lost: ['recusou_oferta', 'sem_interesse', 'nao_e_cliente', 'sem_retorno', 'nao_e_whatsapp'],
+  scheduled: ['contato_futuro', 'agendamento']
 };
 
 export const REJECTION_REASONS = [
@@ -172,3 +215,6 @@ export const BANKS_LIST = [
   "BRADESCO", "BMG", "C6", "DAYCOVAL", "FACTA", "ITAU", "MASTER", 
   "MERCANTIL", "OLE", "PAN", "PARANÁ", "SAFRA", "SANTANDER"
 ];
+
+// Legacy STATUS_CONFIG for backward compatibility
+export const STATUS_CONFIG = PIPELINE_STAGES;
