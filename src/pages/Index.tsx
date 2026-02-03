@@ -9,6 +9,7 @@ import { SystemStatus } from "@/components/SystemStatus";
 import { SalesWizard } from "@/modules/sales-wizard";
 import { TelevendasModule as TelevendasModuleNew } from "@/modules/televendas/TelevendasModule";
 import { BaseOffModule } from "@/modules/baseoff";
+import { OpportunitiesModule } from "@/modules/opportunities";
 import { CommissionTable } from "@/components/CommissionTable";
 import { ClientDocuments } from "@/components/ClientDocuments";
 import { MyClientsList } from "@/components/MyClientsList";
@@ -27,8 +28,7 @@ import {
   LazyLeadsManagement, 
   LazyCommissions, 
   LazyTestFunctionalities,
-  LazyActivateLeads,
-  LazyClientReuseAlerts
+  LazyActivateLeads
 } from "@/components/LazyComponents";
 import { PerformanceReport } from "@/components/PerformanceReport";
 import { Collaborative } from "@/components/Collaborative";
@@ -198,13 +198,9 @@ const Index = () => {
       
       case "reuse-alerts":
         if (!hasPermission('can_access_alertas')) {
-          return <BlockedAccess message="Acesso aos Alertas de Reaproveitamento bloqueado pelo administrador" />;
+          return <BlockedAccess message="Acesso ao Painel de Oportunidades bloqueado pelo administrador" />;
         }
-        return (
-          <Suspense fallback={<LoadingFallback />}>
-            <LazyClientReuseAlerts />
-          </Suspense>
-        );
+        return <OpportunitiesModule />;
       
       case "performance-report":
         return <PerformanceReport />;
