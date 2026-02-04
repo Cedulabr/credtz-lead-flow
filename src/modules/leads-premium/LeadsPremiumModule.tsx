@@ -8,7 +8,7 @@ import { MetricsDashboard } from "./views/MetricsDashboard";
 import { SimulationsDashboard } from "./views/SimulationsDashboard";
 import { LeadDetailDrawer } from "./components/LeadDetailDrawer";
 import { MobileActionBar } from "./components/MobileActionBar";
-import { RequestLeadsModal } from "./components/RequestLeadsModal";
+import { RequestLeadsWizard } from "./components/RequestLeadsWizard";
 import { useLeadsPremium } from "./hooks/useLeadsPremium";
 import { Lead, LeadFilters } from "./types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -241,8 +241,8 @@ export function LeadsPremiumModule() {
           users={users}
         />
 
-        {/* Request Leads Modal */}
-        <RequestLeadsModal
+        {/* Request Leads Wizard */}
+        <RequestLeadsWizard
           isOpen={isRequestModalOpen}
           onClose={() => setIsRequestModalOpen(false)}
           userCredits={userCredits}
@@ -351,8 +351,8 @@ export function LeadsPremiumModule() {
         users={users}
       />
 
-      {/* Request Leads Modal */}
-      <RequestLeadsModal
+      {/* Request Leads Wizard */}
+      <RequestLeadsWizard
         isOpen={isRequestModalOpen}
         onClose={() => setIsRequestModalOpen(false)}
         userCredits={userCredits}
