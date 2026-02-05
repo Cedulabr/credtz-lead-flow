@@ -31,7 +31,6 @@ export function SimulationActionsBar({ lead, onSuccess }: SimulationActionsBarPr
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [simulationForm, setSimulationForm] = useState({
-    banco: "",
     produto: "",
     notes: ""
   });
@@ -44,10 +43,10 @@ export function SimulationActionsBar({ lead, onSuccess }: SimulationActionsBarPr
   });
 
   const handleRequestSimulation = async () => {
-    if (!simulationForm.banco || !simulationForm.produto) {
+    if (!simulationForm.produto) {
       toast({
         title: "Erro",
-        description: "Selecione o banco e o produto para simulação",
+        description: "Selecione o tipo de produto para simulação",
         variant: "destructive"
       });
       return;
@@ -61,7 +60,6 @@ export function SimulationActionsBar({ lead, onSuccess }: SimulationActionsBarPr
         .insert({
           lead_id: lead.id,
           requested_by: user?.id,
-          banco: simulationForm.banco,
           produto: simulationForm.produto,
           notes: simulationForm.notes,
           status: 'pending'
@@ -84,7 +82,7 @@ export function SimulationActionsBar({ lead, onSuccess }: SimulationActionsBarPr
       });
 
       setShowSimulationModal(false);
-      setSimulationForm({ banco: "", produto: "", notes: "" });
+      setSimulationForm({ produto: "", notes: "" });
       onSuccess();
     } catch (error: any) {
       console.error('Error requesting simulation:', error);
@@ -197,23 +195,6 @@ export function SimulationActionsBar({ lead, onSuccess }: SimulationActionsBarPr
         </div>
 
         <div className="space-y-2">
-          <Label>Banco *</Label>
-          <Select 
-            value={simulationForm.banco} 
-            onValueChange={(v) => setSimulationForm(prev => ({ ...prev, banco: v }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione o banco" />
-            </SelectTrigger>
-            <SelectContent>
-              {BANKS_LIST.map(bank => (
-                <SelectItem key={bank} value={bank}>{bank}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
           <Label>Observações</Label>
           <Textarea
             placeholder="Informações adicionais para simulação..."
@@ -226,7 +207,7 @@ export function SimulationActionsBar({ lead, onSuccess }: SimulationActionsBarPr
         <Button 
           className="w-full h-12" 
           onClick={handleRequestSimulation}
-          disabled={isSubmitting || !simulationForm.banco || !simulationForm.produto}
+          disabled={isSubmitting || !simulationForm.produto}
         >
           {isSubmitting ? (
             <>
