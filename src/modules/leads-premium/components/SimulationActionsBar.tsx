@@ -7,12 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Calculator, FileText, Loader2, Send } from "lucide-react";
 import { BANKS_LIST } from "../types";
+import { ProductSelectCard } from "./ProductEducationPopover";
 
 interface SimulationActionsBarProps {
   lead: Lead;
@@ -42,10 +44,10 @@ export function SimulationActionsBar({ lead, onSuccess }: SimulationActionsBarPr
   });
 
   const handleRequestSimulation = async () => {
-    if (!simulationForm.banco) {
+    if (!simulationForm.banco || !simulationForm.produto) {
       toast({
         title: "Erro",
-        description: "Selecione o banco para simulação",
+        description: "Selecione o banco e o produto para simulação",
         variant: "destructive"
       });
       return;
@@ -159,76 +161,87 @@ export function SimulationActionsBar({ lead, onSuccess }: SimulationActionsBarPr
   };
 
   const SimulationModalContent = () => (
-    <div className="space-y-4 py-4">
-      <div className="p-3 rounded-lg bg-muted/50">
-        <p className="text-sm font-medium">{lead.name}</p>
-        <p className="text-xs text-muted-foreground">CPF: {lead.cpf || "Não informado"}</p>
-        <p className="text-xs text-muted-foreground">Convênio: {lead.convenio}</p>
-      </div>
+    <ScrollArea className="max-h-[70vh]">
+      <div className="space-y-4 py-4 px-1">
+        <div className="p-3 rounded-lg bg-muted/50">
+          <p className="text-sm font-medium">{lead.name}</p>
+          <p className="text-xs text-muted-foreground">CPF: {lead.cpf || "Não informado"}</p>
+          <p className="text-xs text-muted-foreground">Convênio: {lead.convenio}</p>
+        </div>
 
-      <div className="space-y-2">
-        <Label>Banco *</Label>
-        <Select 
-          value={simulationForm.banco} 
-          onValueChange={(v) => setSimulationForm(prev => ({ ...prev, banco: v }))}
+        {/* Product Selection with Education */}
+        <div>
+          <Label className="mb-3 block">Tipo de Produto *</Label>
+          <div className="space-y-2">
+            <ProductSelectCard 
+              productId="portabilidade" 
+              isSelected={simulationForm.produto === "portabilidade"}
+              onSelect={(id) => setSimulationForm(prev => ({ ...prev, produto: id }))}
+            />
+            <ProductSelectCard 
+              productId="refinanciamento" 
+              isSelected={simulationForm.produto === "refinanciamento"}
+              onSelect={(id) => setSimulationForm(prev => ({ ...prev, produto: id }))}
+            />
+            <ProductSelectCard 
+              productId="novo" 
+              isSelected={simulationForm.produto === "novo"}
+              onSelect={(id) => setSimulationForm(prev => ({ ...prev, produto: id }))}
+            />
+            <ProductSelectCard 
+              productId="cartao" 
+              isSelected={simulationForm.produto === "cartao"}
+              onSelect={(id) => setSimulationForm(prev => ({ ...prev, produto: id }))}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Banco *</Label>
+          <Select 
+            value={simulationForm.banco} 
+            onValueChange={(v) => setSimulationForm(prev => ({ ...prev, banco: v }))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o banco" />
+            </SelectTrigger>
+            <SelectContent>
+              {BANKS_LIST.map(bank => (
+                <SelectItem key={bank} value={bank}>{bank}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Observações</Label>
+          <Textarea
+            placeholder="Informações adicionais para simulação..."
+            value={simulationForm.notes}
+            onChange={(e) => setSimulationForm(prev => ({ ...prev, notes: e.target.value }))}
+            rows={3}
+          />
+        </div>
+
+        <Button 
+          className="w-full h-12" 
+          onClick={handleRequestSimulation}
+          disabled={isSubmitting || !simulationForm.banco || !simulationForm.produto}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione o banco" />
-          </SelectTrigger>
-          <SelectContent>
-            {BANKS_LIST.map(bank => (
-              <SelectItem key={bank} value={bank}>{bank}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          {isSubmitting ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Solicitando...
+            </>
+          ) : (
+            <>
+              <Send className="h-4 w-4 mr-2" />
+              Solicitar Simulação
+            </>
+          )}
+        </Button>
       </div>
-
-      <div className="space-y-2">
-        <Label>Produto</Label>
-        <Select 
-          value={simulationForm.produto} 
-          onValueChange={(v) => setSimulationForm(prev => ({ ...prev, produto: v }))}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Tipo de produto" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="novo">Novo</SelectItem>
-            <SelectItem value="portabilidade">Portabilidade</SelectItem>
-            <SelectItem value="refinanciamento">Refinanciamento</SelectItem>
-            <SelectItem value="cartao">Cartão</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Observações</Label>
-        <Textarea
-          placeholder="Informações adicionais para simulação..."
-          value={simulationForm.notes}
-          onChange={(e) => setSimulationForm(prev => ({ ...prev, notes: e.target.value }))}
-          rows={3}
-        />
-      </div>
-
-      <Button 
-        className="w-full h-12" 
-        onClick={handleRequestSimulation}
-        disabled={isSubmitting || !simulationForm.banco}
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Solicitando...
-          </>
-        ) : (
-          <>
-            <Send className="h-4 w-4 mr-2" />
-            Solicitar Simulação
-          </>
-        )}
-      </Button>
-    </div>
+    </ScrollArea>
   );
 
   const TypingModalContent = () => (
