@@ -38,6 +38,7 @@ import {
   Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ProductSelectCard } from "./ProductEducationPopover";
 
 interface LeadDetailDrawerProps {
   lead: Lead | null;
@@ -514,6 +515,15 @@ export function LeadDetailDrawer({
                   >
                     Não é WhatsApp
                   </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => handleQuickStatusChange("nao_e_cliente")}
+                    disabled={isProcessing}
+                  >
+                    Não é o Cliente
+                  </Button>
                 </div>
               </CollapsibleContent>
             </Collapsible>
@@ -668,9 +678,9 @@ export function LeadDetailDrawer({
         </DialogContent>
       </Dialog>
 
-      {/* Simulation Modal */}
+      {/* Simulation Modal with Product Education */}
       <Dialog open={showSimulationModal} onOpenChange={setShowSimulationModal}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5" />
@@ -681,7 +691,36 @@ export function LeadDetailDrawer({
             <div className="p-3 rounded-lg bg-muted/50">
               <p className="text-sm font-medium">{lead?.name}</p>
               <p className="text-xs text-muted-foreground">CPF: {lead?.cpf || "Não informado"}</p>
+              <p className="text-xs text-muted-foreground">Convênio: {lead?.convenio || "Não informado"}</p>
             </div>
+            
+            {/* Product Selection with Education */}
+            <div>
+              <Label className="mb-3 block">Tipo de Produto *</Label>
+              <div className="space-y-2">
+                <ProductSelectCard 
+                  productId="portabilidade" 
+                  isSelected={simulationForm.produto === "portabilidade"}
+                  onSelect={(id) => setSimulationForm(prev => ({ ...prev, produto: id }))}
+                />
+                <ProductSelectCard 
+                  productId="refinanciamento" 
+                  isSelected={simulationForm.produto === "refinanciamento"}
+                  onSelect={(id) => setSimulationForm(prev => ({ ...prev, produto: id }))}
+                />
+                <ProductSelectCard 
+                  productId="novo" 
+                  isSelected={simulationForm.produto === "novo"}
+                  onSelect={(id) => setSimulationForm(prev => ({ ...prev, produto: id }))}
+                />
+                <ProductSelectCard 
+                  productId="cartao" 
+                  isSelected={simulationForm.produto === "cartao"}
+                  onSelect={(id) => setSimulationForm(prev => ({ ...prev, produto: id }))}
+                />
+              </div>
+            </div>
+
             <div>
               <Label>Banco *</Label>
               <Select 
@@ -698,23 +737,7 @@ export function LeadDetailDrawer({
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Produto</Label>
-              <Select 
-                value={simulationForm.produto} 
-                onValueChange={(v) => setSimulationForm(prev => ({ ...prev, produto: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Tipo de produto" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="novo">Novo</SelectItem>
-                  <SelectItem value="portabilidade">Portabilidade</SelectItem>
-                  <SelectItem value="refinanciamento">Refinanciamento</SelectItem>
-                  <SelectItem value="cartao">Cartão</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            
             <div>
               <Label>Observações</Label>
               <Textarea
@@ -731,7 +754,7 @@ export function LeadDetailDrawer({
             </Button>
             <Button 
               onClick={handleSimulationRequest} 
-              disabled={isProcessing || !simulationForm.banco}
+              disabled={isProcessing || !simulationForm.banco || !simulationForm.produto}
             >
               {isProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Solicitar
