@@ -39,28 +39,54 @@ interface DetailModalProps {
   televenda: Televenda | null;
 }
 
-export const DetailModal = ({ open, onOpenChange, televenda }: DetailModalProps) => {
+export const DetailModal = ({ open, onOpenChange, televenda: initialTelevenda }: DetailModalProps) => {
+  const [televenda, setTelevenda] = useState<Televenda | null>(initialTelevenda);
   const [history, setHistory] = useState<StatusHistoryItem[]>([]);
   const [editHistory, setEditHistory] = useState<EditHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingEditHistory, setLoadingEditHistory] = useState(false);
+  const [loadingDetails, setLoadingDetails] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
+  // Fetch fresh data when modal opens
+  const fetchTelevendaDetails = async () => {
+    if (!initialTelevenda?.id) return;
+    setLoadingDetails(true);
+    try {
+      const { data, error } = await supabase
+        .from("televendas")
+        .select("*")
+        .eq("id", initialTelevenda.id)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setTelevenda({ ...data, user: initialTelevenda.user });
+      }
+    } catch (error) {
+      console.error("Error fetching televenda details:", error);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
   useEffect(() => {
-    if (open && televenda) {
+    if (open && initialTelevenda) {
+      setTelevenda(initialTelevenda); // Set initial state immediately
+      fetchTelevendaDetails(); // Then fetch fresh data
       fetchHistory();
       fetchEditHistory();
     }
-  }, [open, televenda?.id]);
+  }, [open, initialTelevenda?.id]);
 
   const fetchHistory = async () => {
-    if (!televenda) return;
+    if (!initialTelevenda?.id) return;
     setLoadingHistory(true);
     try {
       const { data, error } = await supabase
         .from("televendas_status_history")
         .select("*")
-        .eq("televendas_id", televenda.id)
+        .eq("televendas_id", initialTelevenda.id)
         .order("changed_at", { ascending: false });
 
       if (error) throw error;
@@ -91,13 +117,13 @@ export const DetailModal = ({ open, onOpenChange, televenda }: DetailModalProps)
   };
 
   const fetchEditHistory = async () => {
-    if (!televenda) return;
+    if (!initialTelevenda?.id) return;
     setLoadingEditHistory(true);
     try {
       const { data, error } = await supabase
         .from("televendas_edit_history")
         .select("*")
-        .eq("televendas_id", televenda.id)
+        .eq("televendas_id", initialTelevenda.id)
         .order("edited_at", { ascending: false });
 
       if (error) throw error;
