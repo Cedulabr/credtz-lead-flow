@@ -164,7 +164,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [notificationsCount, setNotificationsCount] = useState(0);
 
   const userName = profile?.name || user?.email?.split('@')[0] || 'Usuário';
-  const companyName = config?.company_name || 'Leadyzer';
+  const companyName = config?.company_name || 'Easyn';
 
   // State for showing simplified dashboard
   const [showSimpleDashboard, setShowSimpleDashboard] = useState<boolean | null>(null);

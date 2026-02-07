@@ -57,7 +57,7 @@ export function useWhitelabel() {
   return {
     config,
     loading,
-    companyName: config?.company_name || 'Lead Ryzer',
+    companyName: config?.company_name || 'Easyn',
     logoUrl: config?.logo_url,
     primaryColor: config?.primary_color,
     secondaryColor: config?.secondary_color,
