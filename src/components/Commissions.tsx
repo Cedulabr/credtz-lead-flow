@@ -702,11 +702,11 @@ export function Commissions() {
                   doc.setFillColor(primaryOrange[0], primaryOrange[1], primaryOrange[2]);
                   doc.rect(0, 0, pageWidth, 45, "F");
                   
-                  // Logo Leadyzer (texto estilizado como logo)
+                  // Logo Easyn (texto estilizado como logo)
                   doc.setFontSize(28);
                   doc.setFont("helvetica", "bold");
                   doc.setTextColor(255, 255, 255);
-                  doc.text("LEADYZER", pageWidth / 2, 22, { align: "center" });
+                  doc.text("EASYN", pageWidth / 2, 22, { align: "center" });
                   
                   doc.setFontSize(10);
                   doc.setFont("helvetica", "normal");
@@ -758,7 +758,7 @@ export function Commissions() {
                     doc.rect(0, pageHeight - 15, pageWidth, 15, "F");
                     doc.setTextColor(255, 255, 255);
                     doc.setFontSize(8);
-                    doc.text("LEADYZER - Sistema de Gestão de Comissões", pageWidth / 2, pageHeight - 6, { align: "center" });
+                    doc.text("EASYN - Sistema de Gestão de Comissões", pageWidth / 2, pageHeight - 6, { align: "center" });
                     
                     doc.addPage();
                     yPos = 25;
@@ -828,10 +828,10 @@ export function Commissions() {
                 doc.rect(0, pageHeight - 15, pageWidth, 15, "F");
                 doc.setTextColor(255, 255, 255);
                 doc.setFontSize(8);
-                doc.text("LEADYZER - Sistema de Gestão de Comissões", pageWidth / 2, pageHeight - 6, { align: "center" });
+                doc.text("EASYN - Sistema de Gestão de Comissões", pageWidth / 2, pageHeight - 6, { align: "center" });
                 
                 // Save PDF
-                const fileName = `leadyzer_comissoes_${year}_${String(month).padStart(2, '0')}.pdf`;
+                const fileName = `easyn_comissoes_${year}_${String(month).padStart(2, '0')}.pdf`;
                 doc.save(fileName);
                 
                 toast({

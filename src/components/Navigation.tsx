@@ -6,7 +6,7 @@ import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import credtzLogo from "@/assets/logo-credtz.png";
+import easynLogo from "@/assets/easyn-logo.jpg";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { useWhitelabel } from "@/hooks/useWhitelabel";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
@@ -132,7 +132,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
       >
         <div className="flex items-center gap-3">
           <motion.img 
-            src={logoUrl || credtzLogo} 
+            src={logoUrl || easynLogo} 
             alt={`${companyName} Logo`} 
             className="w-8 h-8 rounded-lg object-contain"
             whileTap={{ scale: 0.95 }}
@@ -286,7 +286,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         <div className="p-6 border-b">
           <div className="flex items-center space-x-3">
             <img 
-              src={logoUrl || credtzLogo} 
+              src={logoUrl || easynLogo} 
               alt={`${companyName} Logo`} 
               className="w-10 h-10 rounded-xl object-contain"
             />

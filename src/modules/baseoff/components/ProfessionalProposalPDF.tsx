@@ -69,7 +69,7 @@ export function ProfessionalProposalPDF({
   onClose, 
   client, 
   contracts,
-  companyName = 'Credtz',
+  companyName = 'Easyn',
   trocoSimulation,
   selectedContractIds: externalSelectedIds,
 }: ProfessionalProposalPDFProps) {

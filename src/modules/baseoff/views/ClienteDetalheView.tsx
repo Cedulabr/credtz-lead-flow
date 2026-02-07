@@ -164,7 +164,7 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
         onClose={() => setShowProposal(false)}
         client={client}
         contracts={contracts}
-        companyName="Credtz"
+        companyName="Easyn"
         trocoSimulation={currentSimulation}
         selectedContractIds={selectedContractIds}
       />

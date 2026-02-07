@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { checkConnection } from '@/integrations/supabase/client';
-import credtzLogo from '@/assets/logo-credtz.png';
+import easynLogo from '@/assets/easyn-logo.jpg';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -107,12 +107,12 @@ const Auth = () => {
         {/* Logo */}
         <div className="text-center">
           <img 
-            src={credtzLogo} 
-            alt="Lead Ryzer Logo" 
+            src={easynLogo} 
+            alt="Easyn Logo" 
             className="mx-auto h-16 w-auto mb-4"
           />
           <h1 className="text-2xl font-bold text-foreground">
-            Bem vindo a Lead Ryzer
+            Bem vindo à Easyn
           </h1>
           <p className="text-muted-foreground">
             Sua fábrica de resultados começa nos leads.
