@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { checkConnection } from '@/integrations/supabase/client';
-import easynLogo from '@/assets/easyn-logo.jpg';
+import easynLogo from '@/assets/easyn-logo.png';
 
 const Auth = () => {
   const [email, setEmail] = useState('');

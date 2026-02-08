@@ -6,7 +6,7 @@ import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import easynLogo from "@/assets/easyn-logo.jpg";
+import easynLogo from "@/assets/easyn-logo.png";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { useWhitelabel } from "@/hooks/useWhitelabel";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
