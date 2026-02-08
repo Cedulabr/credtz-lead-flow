@@ -17,6 +17,10 @@ interface LeadsListViewProps {
   isLoading: boolean;
   onLeadSelect: (lead: Lead) => void;
   onRefresh: () => void;
+  onSimulation?: (lead: Lead) => void;
+  onTyping?: (lead: Lead) => void;
+  onStatusChange?: (lead: Lead, status: string) => void;
+  canEditLead?: (lead: Lead) => boolean;
 }
 
 export function LeadsListView({ 
@@ -24,7 +28,11 @@ export function LeadsListView({
   users,
   isLoading, 
   onLeadSelect,
-  onRefresh 
+  onRefresh,
+  onSimulation,
+  onTyping,
+  onStatusChange,
+  canEditLead
 }: LeadsListViewProps) {
   const isMobile = useIsMobile();
   const [filters, setFilters] = useState<LeadFilters & { dateFilter?: string }>({
@@ -109,7 +117,7 @@ export function LeadsListView({
       <div className="p-4 space-y-3">
         <Skeleton className="h-12 rounded-lg" />
         {[...Array(6)].map((_, i) => (
-          <Skeleton key={i} className="h-20 rounded-lg" />
+          <Skeleton key={i} className="h-24 rounded-lg" />
         ))}
       </div>
     );
@@ -172,6 +180,10 @@ export function LeadsListView({
                 <LeadListItem
                   lead={lead}
                   onClick={() => onLeadSelect(lead)}
+                  onSimulation={onSimulation}
+                  onTyping={onTyping}
+                  onStatusChange={onStatusChange}
+                  canEdit={canEditLead ? canEditLead(lead) : true}
                 />
               </motion.div>
             ))

@@ -10,24 +10,41 @@ import { LeadDetailDrawer } from "./components/LeadDetailDrawer";
 import { MobileActionBar } from "./components/MobileActionBar";
 import { RequestLeadsWizard } from "./components/RequestLeadsWizard";
 import { useLeadsPremium } from "./hooks/useLeadsPremium";
-import { Lead, LeadFilters } from "./types";
+import { Lead, LeadFilters, BANKS_LIST } from "./types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { LayoutGrid, List, BarChart3, Calculator, Plus, CreditCard, Filter } from "lucide-react";
 
 export function LeadsPremiumModule() {
   const isMobile = useIsMobile();
   const { user, profile } = useAuth();
+  const { toast } = useToast();
   const [activeView, setActiveView] = useState<"pipeline" | "list" | "metrics" | "simulations">("list");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-  const [isSimulationsOpen, setIsSimulationsOpen] = useState(false);
   const [pendingSimulationsCount, setPendingSimulationsCount] = useState(0);
+
+  // Inline Simulation Modal
+  const [showSimulationModal, setShowSimulationModal] = useState(false);
+  const [simulationLead, setSimulationLead] = useState<Lead | null>(null);
+  const [simulationForm, setSimulationForm] = useState({ banco: "", produto: "", notes: "" });
+  const [isSimProcessing, setIsSimProcessing] = useState(false);
+
+  // Inline Typing Modal
+  const [showTypingModal, setShowTypingModal] = useState(false);
+  const [typingLead, setTypingLead] = useState<Lead | null>(null);
+  const [typingForm, setTypingForm] = useState({ banco: "", valor: "", parcela: "", notes: "" });
+  const [isTypProcessing, setIsTypProcessing] = useState(false);
 
   const {
     leads,
@@ -83,8 +100,95 @@ export function LeadsPremiumModule() {
     return success;
   };
 
+  // Inline handlers for list-level simulation
+  const handleListSimulation = (lead: Lead) => {
+    setSimulationLead(lead);
+    setSimulationForm({ banco: "", produto: "", notes: "" });
+    setShowSimulationModal(true);
+  };
+
+  const handleSimulationSubmit = async () => {
+    if (!simulationLead || !simulationForm.banco) {
+      toast({ title: "Selecione o banco", variant: "destructive" });
+      return;
+    }
+
+    setIsSimProcessing(true);
+    try {
+      const { error } = await supabase
+        .from('activate_leads_simulations')
+        .insert({
+          lead_id: simulationLead.id,
+          requested_by: user?.id,
+          banco: simulationForm.banco,
+          produto: simulationForm.produto,
+          notes: simulationForm.notes,
+          status: 'pending'
+        });
+
+      if (error) throw error;
+      toast({ title: "Simulação solicitada!", description: "O operador será notificado." });
+      setShowSimulationModal(false);
+      fetchLeads();
+    } catch (error: any) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSimProcessing(false);
+    }
+  };
+
+  // Inline handlers for list-level typing
+  const handleListTyping = (lead: Lead) => {
+    setTypingLead(lead);
+    setTypingForm({ banco: "", valor: "", parcela: "", notes: "" });
+    setShowTypingModal(true);
+  };
+
+  const handleTypingSubmit = async () => {
+    if (!typingLead || !typingForm.banco) {
+      toast({ title: "Selecione o banco", variant: "destructive" });
+      return;
+    }
+
+    setIsTypProcessing(true);
+    try {
+      const { error } = await supabase
+        .from('propostas')
+        .insert({
+          "Nome do cliente": typingLead.name,
+          cpf: typingLead.cpf,
+          telefone: typingLead.phone,
+          convenio: typingLead.convenio,
+          banco: typingForm.banco,
+          valor_operacao: typingForm.valor ? parseFloat(typingForm.valor) : null,
+          parcela: typingForm.parcela || null,
+          pipeline_stage: "digitacao",
+          client_status: "aguardando_digitacao",
+          origem_lead: "leads_premium",
+          created_by_id: user?.id,
+          assigned_to: user?.id,
+          notes: typingForm.notes || 'Digitação solicitada de Leads Premium'
+        });
+
+      if (error) throw error;
+      await updateLeadStatus(typingLead.id, 'cliente_fechado');
+      toast({ title: "Digitação solicitada!", description: "Lead convertido para proposta." });
+      setShowTypingModal(false);
+      fetchLeads();
+    } catch (error: any) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } finally {
+      setIsTypProcessing(false);
+    }
+  };
+
+  // Handle status change from list item
+  const handleListStatusChange = (lead: Lead, newStatus: string) => {
+    handleStatusChange(lead.id, newStatus);
+  };
+
   // Calculate active filters count
-  const [activeFiltersCount, setActiveFiltersCount] = useState(0);
+  const [activeFiltersCount] = useState(0);
 
   if (isMobile) {
     return (
@@ -108,7 +212,7 @@ export function LeadsPremiumModule() {
           </div>
         </div>
 
-        {/* View Tabs */}
+        {/* View Tabs - No Pipeline on mobile */}
         <div className="border-b px-4 py-2 flex gap-2 overflow-x-auto">
           <Button
             variant={activeView === "list" ? "default" : "ghost"}
@@ -118,15 +222,6 @@ export function LeadsPremiumModule() {
           >
             <List className="h-4 w-4 mr-1" />
             Lista
-          </Button>
-          <Button
-            variant={activeView === "pipeline" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setActiveView("pipeline")}
-            className="shrink-0"
-          >
-            <LayoutGrid className="h-4 w-4 mr-1" />
-            Pipeline
           </Button>
           <Button
             variant={activeView === "metrics" ? "default" : "ghost"}
@@ -159,22 +254,6 @@ export function LeadsPremiumModule() {
         {/* Content Area */}
         <div className="flex-1 overflow-hidden">
           <AnimatePresence mode="wait">
-            {activeView === "pipeline" && (
-              <motion.div
-                key="pipeline"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="h-full"
-              >
-                <PipelineView 
-                  leads={leads}
-                  isLoading={isLoading}
-                  onLeadSelect={handleLeadSelect}
-                  stats={stats}
-                />
-              </motion.div>
-            )}
             {activeView === "list" && (
               <motion.div
                 key="list"
@@ -189,6 +268,10 @@ export function LeadsPremiumModule() {
                   isLoading={isLoading}
                   onLeadSelect={handleLeadSelect}
                   onRefresh={fetchLeads}
+                  onSimulation={handleListSimulation}
+                  onTyping={handleListTyping}
+                  onStatusChange={handleListStatusChange}
+                  canEditLead={canEditLead}
                 />
               </motion.div>
             )}
@@ -247,6 +330,28 @@ export function LeadsPremiumModule() {
           onClose={() => setIsRequestModalOpen(false)}
           userCredits={userCredits}
           onRequestLeads={handleRequestLeads}
+        />
+
+        {/* Inline Simulation Modal */}
+        <SimulationModal
+          open={showSimulationModal}
+          onOpenChange={setShowSimulationModal}
+          lead={simulationLead}
+          form={simulationForm}
+          onFormChange={setSimulationForm}
+          onSubmit={handleSimulationSubmit}
+          isProcessing={isSimProcessing}
+        />
+
+        {/* Inline Typing Modal */}
+        <TypingModal
+          open={showTypingModal}
+          onOpenChange={setShowTypingModal}
+          lead={typingLead}
+          form={typingForm}
+          onFormChange={setTypingForm}
+          onSubmit={handleTypingSubmit}
+          isProcessing={isTypProcessing}
         />
       </div>
     );
@@ -316,6 +421,10 @@ export function LeadsPremiumModule() {
             isLoading={isLoading}
             onLeadSelect={handleLeadSelect}
             onRefresh={fetchLeads}
+            onSimulation={handleListSimulation}
+            onTyping={handleListTyping}
+            onStatusChange={handleListStatusChange}
+            canEditLead={canEditLead}
           />
         </TabsContent>
 
@@ -358,6 +467,185 @@ export function LeadsPremiumModule() {
         userCredits={userCredits}
         onRequestLeads={handleRequestLeads}
       />
+
+      {/* Inline Simulation Modal */}
+      <SimulationModal
+        open={showSimulationModal}
+        onOpenChange={setShowSimulationModal}
+        lead={simulationLead}
+        form={simulationForm}
+        onFormChange={setSimulationForm}
+        onSubmit={handleSimulationSubmit}
+        isProcessing={isSimProcessing}
+      />
+
+      {/* Inline Typing Modal */}
+      <TypingModal
+        open={showTypingModal}
+        onOpenChange={setShowTypingModal}
+        lead={typingLead}
+        form={typingForm}
+        onFormChange={setTypingForm}
+        onSubmit={handleTypingSubmit}
+        isProcessing={isTypProcessing}
+      />
     </div>
+  );
+}
+
+// ----- Extracted Modal Components -----
+
+function SimulationModal({ 
+  open, onOpenChange, lead, form, onFormChange, onSubmit, isProcessing 
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  lead: Lead | null;
+  form: { banco: string; produto: string; notes: string };
+  onFormChange: (form: { banco: string; produto: string; notes: string }) => void;
+  onSubmit: () => void;
+  isProcessing: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Calculator className="h-5 w-5 text-blue-600" />
+            Solicitar Simulação
+          </DialogTitle>
+        </DialogHeader>
+        {lead && (
+          <div className="p-3 rounded-lg bg-muted/50 border mb-2">
+            <p className="font-semibold">{lead.name}</p>
+            <p className="text-sm text-muted-foreground">{lead.phone}</p>
+          </div>
+        )}
+        <div className="space-y-4">
+          <div>
+            <Label>Banco *</Label>
+            <Select value={form.banco} onValueChange={(v) => onFormChange({ ...form, banco: v })}>
+              <SelectTrigger><SelectValue placeholder="Selecione o banco" /></SelectTrigger>
+              <SelectContent>
+                {BANKS_LIST.map(bank => (
+                  <SelectItem key={bank} value={bank}>{bank}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Produto</Label>
+            <Select value={form.produto} onValueChange={(v) => onFormChange({ ...form, produto: v })}>
+              <SelectTrigger><SelectValue placeholder="Selecione (opcional)" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="novo">Novo Empréstimo</SelectItem>
+                <SelectItem value="portabilidade">Portabilidade</SelectItem>
+                <SelectItem value="refinanciamento">Refinanciamento</SelectItem>
+                <SelectItem value="cartao">Cartão Consignado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Observações</Label>
+            <Textarea 
+              value={form.notes} 
+              onChange={(e) => onFormChange({ ...form, notes: e.target.value })}
+              placeholder="Informações adicionais..."
+              rows={3}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={onSubmit} disabled={isProcessing || !form.banco}>
+            {isProcessing ? "Enviando..." : "Solicitar Simulação"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TypingModal({ 
+  open, onOpenChange, lead, form, onFormChange, onSubmit, isProcessing 
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  lead: Lead | null;
+  form: { banco: string; valor: string; parcela: string; notes: string };
+  onFormChange: (form: { banco: string; valor: string; parcela: string; notes: string }) => void;
+  onSubmit: () => void;
+  isProcessing: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <span className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+              <span className="text-emerald-700 text-lg">📝</span>
+            </span>
+            Solicitar Digitação
+          </DialogTitle>
+        </DialogHeader>
+        {lead && (
+          <div className="p-3 rounded-lg bg-muted/50 border mb-2">
+            <p className="font-semibold">{lead.name}</p>
+            <p className="text-sm text-muted-foreground">{lead.phone} {lead.cpf ? `· CPF: ${lead.cpf}` : ''}</p>
+          </div>
+        )}
+        <div className="space-y-4">
+          <div>
+            <Label>Banco *</Label>
+            <Select value={form.banco} onValueChange={(v) => onFormChange({ ...form, banco: v })}>
+              <SelectTrigger><SelectValue placeholder="Selecione o banco" /></SelectTrigger>
+              <SelectContent>
+                {BANKS_LIST.map(bank => (
+                  <SelectItem key={bank} value={bank}>{bank}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Valor da Operação</Label>
+              <Input 
+                type="number"
+                value={form.valor} 
+                onChange={(e) => onFormChange({ ...form, valor: e.target.value })}
+                placeholder="R$ 0,00"
+              />
+            </div>
+            <div>
+              <Label>Parcela</Label>
+              <Input 
+                value={form.parcela} 
+                onChange={(e) => onFormChange({ ...form, parcela: e.target.value })}
+                placeholder="Ex: 84x"
+              />
+            </div>
+          </div>
+          <div>
+            <Label>Observações</Label>
+            <Textarea 
+              value={form.notes} 
+              onChange={(e) => onFormChange({ ...form, notes: e.target.value })}
+              placeholder="Informações adicionais..."
+              rows={3}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button 
+            onClick={onSubmit} 
+            disabled={isProcessing || !form.banco}
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            {isProcessing ? "Enviando..." : "Enviar Digitação"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
