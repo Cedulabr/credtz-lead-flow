@@ -10,6 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   Form,
   FormControl,
   FormField,
@@ -81,6 +88,8 @@ export const TelevendasForm = () => {
   const [rgVersoFile, setRgVersoFile] = useState<File | null>(null);
   const [extratoFile, setExtratoFile] = useState<File | null>(null);
   const [uploadingDocs, setUploadingDocs] = useState(false);
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [pendingSubmitValues, setPendingSubmitValues] = useState<z.infer<typeof formSchema> | null>(null);
 
   // Verificar se usuário é admin ou gestor
   const isAdminOrGestor = profile?.role === 'admin' || isGestor;
@@ -257,6 +266,16 @@ export const TelevendasForm = () => {
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    // Store values and show status selection dialog
+    setPendingSubmitValues(values);
+    setShowStatusDialog(true);
+  };
+
+  const handleStatusSelection = async (selectedStatus: string) => {
+    if (!pendingSubmitValues) return;
+    const values = pendingSubmitValues;
+    
+    setShowStatusDialog(false);
     setIsSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -282,8 +301,6 @@ export const TelevendasForm = () => {
 
       const companyId = userCompanyData?.company_id || null;
 
-      // Converter valores formatados para número
-      // O formatCurrency retorna valores como "1.234,56" então precisamos limpar e converter
       const parseCurrencyValue = (val: string | undefined): number | null => {
         if (!val) return null;
         const numbers = val.replace(/\D/g, "");
@@ -308,7 +325,7 @@ export const TelevendasForm = () => {
         saldo_devedor: saldoDevedorValue,
         tipo_operacao: values.tipo_operacao,
         observacao: values.observacao || null,
-        status: 'solicitado_digitacao',
+        status: selectedStatus,
       });
 
       if (error) throw error;
@@ -849,6 +866,51 @@ export const TelevendasForm = () => {
           </Form>
         </CardContent>
       </Card>
+
+      {/* Status Selection Dialog */}
+      <Dialog open={showStatusDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowStatusDialog(false);
+          setPendingSubmitValues(null);
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Como deseja salvar a proposta?</DialogTitle>
+            <DialogDescription>
+              Selecione o status inicial da proposta
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-3 mt-4">
+            <Button
+              variant="outline"
+              className="h-auto py-4 px-5 flex flex-col items-start gap-1 border-2 hover:border-primary hover:bg-primary/5"
+              onClick={() => handleStatusSelection('proposta_digitada')}
+            >
+              <span className="text-base font-semibold flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                Proposta Digitada
+              </span>
+              <span className="text-sm text-muted-foreground text-left">
+                A proposta já foi digitada no sistema do banco
+              </span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto py-4 px-5 flex flex-col items-start gap-1 border-2 hover:border-amber-500 hover:bg-amber-500/5"
+              onClick={() => handleStatusSelection('solicitar_digitacao')}
+            >
+              <span className="text-base font-semibold flex items-center gap-2">
+                <FileText className="h-5 w-5 text-amber-600" />
+                Solicitar Digitação
+              </span>
+              <span className="text-sm text-muted-foreground text-left">
+                Solicitar que a proposta seja digitada pelo gestor
+              </span>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
