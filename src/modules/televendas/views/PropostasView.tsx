@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Inbox } from "lucide-react";
-import { Televenda, STATUS_CONFIG } from "../types";
+import { Televenda, STATUS_CONFIG, STATUS_PROPOSTA_OPTIONS } from "../types";
 import { formatCPF, formatCurrency, formatDate, formatTimeAgo } from "../utils";
 import { StatusBadge } from "../components/StatusBadge";
 import { ActionMenu } from "../components/ActionMenu";
@@ -82,6 +82,14 @@ export const PropostasView = ({
                       {tv.nome}
                     </h3>
                     <StatusBadge status={tv.status} size="sm" />
+                    {tv.status_proposta && (() => {
+                      const spConfig = STATUS_PROPOSTA_OPTIONS.find(s => s.value === tv.status_proposta);
+                      return spConfig ? (
+                        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${spConfig.bgColor} ${spConfig.color}`}>
+                          {spConfig.emoji} {spConfig.label}
+                        </span>
+                      ) : null;
+                    })()}
                     {tv.edit_count && tv.edit_count > 0 && (
                       <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 font-medium">
                         ✏️ Editado {tv.edit_count > 1 ? `(${tv.edit_count}x)` : ""}
@@ -95,10 +103,24 @@ export const PropostasView = ({
                     <span>•</span>
                     <span>{tv.banco}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 flex-wrap">
                     <span>📅 Venda: {formatDate(tv.data_venda)}</span>
                     <span>•</span>
                     <span>📝 Cadastro: {formatDate(tv.created_at)}</span>
+                    {tv.status_proposta === "pendente" && tv.motivo_pendencia && (
+                      <>
+                        <span>•</span>
+                        <span className="text-yellow-600 font-medium">⚠️ Pendente</span>
+                      </>
+                    )}
+                    {tv.tipo_operacao === "Portabilidade" && tv.previsao_saldo && (
+                      <>
+                        <span>•</span>
+                        <span className="text-blue-600 font-medium">
+                          📆 Prev. saldo: {new Date(tv.previsao_saldo + "T12:00:00").toLocaleDateString("pt-BR")}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
 

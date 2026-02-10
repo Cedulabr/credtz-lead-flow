@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Dialog,
   DialogContent,
@@ -32,14 +33,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { Televenda, StatusHistoryItem, STATUS_CONFIG, EditHistoryItem } from "../types";
 import { formatCPF, formatCurrency, formatPhone, formatDate, formatTimeAgo } from "../utils";
 import { StatusBadge } from "./StatusBadge";
+import { StatusPropostaEditor } from "./StatusPropostaEditor";
 
 interface DetailModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   televenda: Televenda | null;
+  isGestorOrAdmin?: boolean;
+  onRefresh?: () => void;
 }
 
-export const DetailModal = ({ open, onOpenChange, televenda: initialTelevenda }: DetailModalProps) => {
+export const DetailModal = ({ open, onOpenChange, televenda: initialTelevenda, isGestorOrAdmin = false, onRefresh }: DetailModalProps) => {
+  const { user } = useAuth();
   const [televenda, setTelevenda] = useState<Televenda | null>(initialTelevenda);
   const [history, setHistory] = useState<StatusHistoryItem[]>([]);
   const [editHistory, setEditHistory] = useState<EditHistoryItem[]>([]);
@@ -335,7 +340,25 @@ export const DetailModal = ({ open, onOpenChange, televenda: initialTelevenda }:
 
             <Separator />
 
-            {/* Values Section */}
+            {/* Status da Proposta Section */}
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                STATUS DA PROPOSTA
+              </h3>
+              <div className="bg-muted/30 rounded-xl p-4">
+                <StatusPropostaEditor
+                  televenda={televenda}
+                  onUpdate={() => {
+                    fetchTelevendaDetails();
+                    onRefresh?.();
+                  }}
+                  isGestorOrAdmin={isGestorOrAdmin}
+                />
+              </div>
+            </div>
+
+            <Separator />
             <div>
               <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
                 <DollarSign className="h-4 w-4" />

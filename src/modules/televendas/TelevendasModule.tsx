@@ -620,6 +620,8 @@ export const TelevendasModule = () => {
         open={detailModalOpen}
         onOpenChange={setDetailModalOpen}
         televenda={selectedTelevenda}
+        isGestorOrAdmin={isGestorOrAdmin}
+        onRefresh={fetchTelevendas}
       />
 
       {/* Edit Proposal Modal (Admin/Gestor) */}
