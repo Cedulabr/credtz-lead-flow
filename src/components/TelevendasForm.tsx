@@ -312,6 +312,18 @@ export const TelevendasForm = () => {
       const trocoValue = parseCurrencyValue(values.troco);
       const saldoDevedorValue = parseCurrencyValue(values.saldo_devedor);
 
+      // Calcular previsão de saldo para Portabilidade
+      let previsaoSaldo: string | null = null;
+      if (values.tipo_operacao === "Portabilidade" && selectedStatus === "proposta_digitada") {
+        const result = new Date();
+        let added = 0;
+        while (added < 5) {
+          result.setDate(result.getDate() + 1);
+          if (result.getDay() !== 0 && result.getDay() !== 6) added++;
+        }
+        previsaoSaldo = result.toISOString().split("T")[0];
+      }
+
       const { error } = await (supabase as any).from("televendas").insert({
         user_id: user.id,
         company_id: companyId,
@@ -326,6 +338,9 @@ export const TelevendasForm = () => {
         tipo_operacao: values.tipo_operacao,
         observacao: values.observacao || null,
         status: selectedStatus,
+        status_proposta: selectedStatus === "proposta_digitada" ? "digitada" : "digitada",
+        status_proposta_updated_at: new Date().toISOString(),
+        previsao_saldo: previsaoSaldo,
       });
 
       if (error) throw error;

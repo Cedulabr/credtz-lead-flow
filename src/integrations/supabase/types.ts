@@ -3589,13 +3589,18 @@ export type Database = {
           edit_count: number | null
           id: string
           lead_id: string | null
+          motivo_pendencia: string | null
+          motivo_pendencia_descricao: string | null
           nome: string
           observacao: string | null
           parcela: number
+          previsao_saldo: string | null
           saldo_devedor: number | null
           simulation_data: Json | null
           simulation_file_url: string | null
           status: string
+          status_proposta: string | null
+          status_proposta_updated_at: string | null
           status_updated_at: string | null
           status_updated_by: string | null
           telefone: string
@@ -3615,13 +3620,18 @@ export type Database = {
           edit_count?: number | null
           id?: string
           lead_id?: string | null
+          motivo_pendencia?: string | null
+          motivo_pendencia_descricao?: string | null
           nome: string
           observacao?: string | null
           parcela: number
+          previsao_saldo?: string | null
           saldo_devedor?: number | null
           simulation_data?: Json | null
           simulation_file_url?: string | null
           status?: string
+          status_proposta?: string | null
+          status_proposta_updated_at?: string | null
           status_updated_at?: string | null
           status_updated_by?: string | null
           telefone: string
@@ -3641,13 +3651,18 @@ export type Database = {
           edit_count?: number | null
           id?: string
           lead_id?: string | null
+          motivo_pendencia?: string | null
+          motivo_pendencia_descricao?: string | null
           nome?: string
           observacao?: string | null
           parcela?: number
+          previsao_saldo?: string | null
           saldo_devedor?: number | null
           simulation_data?: Json | null
           simulation_file_url?: string | null
           status?: string
+          status_proposta?: string | null
+          status_proposta_updated_at?: string | null
           status_updated_at?: string | null
           status_updated_by?: string | null
           telefone?: string
@@ -3869,6 +3884,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      televendas_status_proposta_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          from_status: string | null
+          id: string
+          reason: string | null
+          televendas_id: string
+          to_status: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          from_status?: string | null
+          id?: string
+          reason?: string | null
+          televendas_id: string
+          to_status: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          from_status?: string | null
+          id?: string
+          reason?: string | null
+          televendas_id?: string
+          to_status?: string
+        }
+        Relationships: []
       }
       time_clock: {
         Row: {

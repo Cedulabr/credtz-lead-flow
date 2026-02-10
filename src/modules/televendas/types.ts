@@ -25,6 +25,11 @@ export interface Televenda {
   data_pagamento?: string | null;
   data_cancelamento?: string | null;
   edit_count?: number;
+  status_proposta?: string | null;
+  status_proposta_updated_at?: string | null;
+  motivo_pendencia?: string | null;
+  motivo_pendencia_descricao?: string | null;
+  previsao_saldo?: string | null;
 }
 
 export interface EditHistoryItem {
@@ -221,6 +226,38 @@ export const STATUS_CONFIG: Record<string, {
     isFinal: false,
   },
 };
+
+// ===========================================
+// STATUS DA PROPOSTA (novo campo separado do workflow)
+// ===========================================
+export const STATUS_PROPOSTA_OPTIONS = [
+  { value: "digitada", label: "Digitada", emoji: "✍️", color: "text-blue-600", bgColor: "bg-blue-500/10 border-blue-300" },
+  { value: "aguardando_saldo", label: "Aguardando Saldo", emoji: "💰", color: "text-amber-600", bgColor: "bg-amber-500/10 border-amber-300" },
+  { value: "aguardando_aprovacao", label: "Aguardando Aprovação", emoji: "⏳", color: "text-orange-600", bgColor: "bg-orange-500/10 border-orange-300" },
+  { value: "aguardando_analise_credito", label: "Aguardando Análise de Crédito", emoji: "🔍", color: "text-purple-600", bgColor: "bg-purple-500/10 border-purple-300" },
+  { value: "pendente", label: "Pendente", emoji: "⚠️", color: "text-yellow-600", bgColor: "bg-yellow-500/10 border-yellow-300" },
+  { value: "aprovada", label: "Aprovada", emoji: "✅", color: "text-green-600", bgColor: "bg-green-500/10 border-green-300" },
+  { value: "cancelada", label: "Cancelada", emoji: "❌", color: "text-red-600", bgColor: "bg-red-500/10 border-red-300" },
+] as const;
+
+export const MOTIVO_PENDENCIA_OPTIONS = [
+  { value: "nova_selfie", label: "Nova selfie solicitada" },
+  { value: "confirmacao_video", label: "Confirmação via vídeo" },
+  { value: "documento_ilegivel", label: "Documento ilegível" },
+  { value: "dados_divergentes", label: "Dados divergentes" },
+  { value: "outros", label: "Outros" },
+] as const;
+
+export interface StatusPropostaHistoryItem {
+  id: string;
+  televendas_id: string;
+  from_status: string | null;
+  to_status: string;
+  changed_by: string;
+  changed_at: string;
+  reason: string | null;
+  changed_by_name?: string;
+}
 
 export const PRODUCT_OPTIONS = [
   { value: "all", label: "Todos", icon: "📦" },
