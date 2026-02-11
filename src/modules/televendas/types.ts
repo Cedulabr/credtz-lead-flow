@@ -62,6 +62,8 @@ export interface StatusHistoryItem {
   changed_by_name?: string;
 }
 
+export type DateMode = "criacao" | "pagamento";
+
 export interface TelevendasFilters {
   search: string;
   status: string;
@@ -70,6 +72,7 @@ export interface TelevendasFilters {
   month: string;
   product: string;
   bank: string;
+  dateMode: DateMode;
 }
 
 // ===========================================

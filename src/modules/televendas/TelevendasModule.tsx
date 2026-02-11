@@ -12,6 +12,7 @@ import {
   Televenda, 
   User, 
   TelevendasFilters as FiltersType, 
+  DateMode,
   LEGACY_STATUS_MAP,
   OPERATOR_STATUSES,
   STATUS_CONFIG
@@ -59,6 +60,7 @@ export const TelevendasModule = () => {
     month: getCurrentMonth(),
     product: "all",
     bank: "all",
+    dateMode: "criacao",
   });
 
   // Detail modal state
@@ -129,12 +131,13 @@ export const TelevendasModule = () => {
         query = query.in("company_id", userCompanyIds);
       }
 
-      // Date range
+      // Date range - use different date column based on dateMode
       const dateRange = getDateRange(filters.period, filters.month);
       if (dateRange) {
+        const dateColumn = filters.dateMode === "pagamento" ? "data_pagamento" : "data_venda";
         query = query
-          .gte("data_venda", dateRange.start.toISOString().split("T")[0])
-          .lte("data_venda", dateRange.end.toISOString().split("T")[0]);
+          .gte(dateColumn, dateRange.start.toISOString().split("T")[0])
+          .lte(dateColumn, dateRange.end.toISOString().split("T")[0]);
       }
 
       // User filter
@@ -168,7 +171,7 @@ export const TelevendasModule = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.id, isAdmin, isGestor, userCompanyIds, filters.period, filters.month, filters.userId, toast]);
+  }, [user?.id, isAdmin, isGestor, userCompanyIds, filters.period, filters.month, filters.userId, filters.dateMode, toast]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => { fetchTelevendas(); }, [fetchTelevendas]);
@@ -225,7 +228,8 @@ export const TelevendasModule = () => {
   // Active filters count
   const activeFiltersCount = [
     filters.search, filters.status !== "all", filters.userId !== "all",
-    filters.period !== "all", filters.product !== "all", filters.bank !== "all"
+    filters.period !== "all", filters.product !== "all", filters.bank !== "all",
+    filters.dateMode !== "criacao"
   ].filter(Boolean).length;
 
   // Status change handler - opens modal for confirmation
@@ -505,7 +509,12 @@ export const TelevendasModule = () => {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Sparkles className="h-6 w-6 text-primary" />
-          <h1 className="text-xl md:text-2xl font-bold">Gestão de Televendas</h1>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold">Gestão de Televendas</h1>
+            {filters.dateMode === "pagamento" && (
+              <p className="text-xs text-amber-600 font-medium">💰 Visão por Data de Pagamento</p>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <FiltersDrawer
@@ -543,6 +552,7 @@ export const TelevendasModule = () => {
         onFilterByStatus={handleFilterByStatus}
         selectedStatus={filters.status !== "all" ? filters.status : undefined}
         isGestorOrAdmin={isGestorOrAdmin}
+        dateMode={filters.dateMode}
       />
 
       {/* Tabs */}
