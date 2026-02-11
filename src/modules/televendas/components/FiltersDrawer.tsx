@@ -27,11 +27,13 @@ import {
   Package,
   CheckCircle,
   CalendarDays,
-  Building2
+  Building2,
+  CalendarClock
 } from "lucide-react";
 import { 
   User, 
   TelevendasFilters, 
+  DateMode,
   PRODUCT_OPTIONS, 
   PERIOD_OPTIONS,
   STATUS_CONFIG,
@@ -72,6 +74,7 @@ export const FiltersDrawer = ({
       month: "all",
       product: "all",
       bank: "all",
+      dateMode: filters.dateMode,
     });
   };
 
@@ -138,7 +141,37 @@ export const FiltersDrawer = ({
             />
           </div>
 
-          {/* Period */}
+          {/* Date Mode Toggle */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-base font-semibold">
+              <CalendarClock className="h-4 w-4 text-primary" />
+              Visão por Data
+            </Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant={filters.dateMode === "criacao" ? "default" : "outline"}
+                size="sm"
+                onClick={() => updateFilter("dateMode", "criacao")}
+                className="h-10 text-sm gap-1.5"
+              >
+                📝 Criação
+              </Button>
+              <Button
+                variant={filters.dateMode === "pagamento" ? "default" : "outline"}
+                size="sm"
+                onClick={() => updateFilter("dateMode", "pagamento")}
+                className="h-10 text-sm gap-1.5"
+              >
+                💰 Pagamento
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {filters.dateMode === "pagamento" 
+                ? "Mostrando propostas pela data de pagamento (competência)" 
+                : "Mostrando propostas pela data de criação/venda"}
+            </p>
+          </div>
+
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-base font-semibold">
               <Calendar className="h-4 w-4 text-primary" />

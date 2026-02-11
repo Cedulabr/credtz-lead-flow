@@ -13,7 +13,7 @@ import {
   TrendingUp,
   DollarSign
 } from "lucide-react";
-import { Televenda, STATUS_CONFIG } from "../types";
+import { Televenda, STATUS_CONFIG, DateMode } from "../types";
 import { cn } from "@/lib/utils";
 
 interface DashboardCardsProps {
@@ -21,6 +21,7 @@ interface DashboardCardsProps {
   onFilterByStatus: (status: string) => void;
   selectedStatus?: string;
   isGestorOrAdmin: boolean;
+  dateMode: DateMode;
 }
 
 interface StatCard {
@@ -41,6 +42,7 @@ export const DashboardCards = ({
   onFilterByStatus,
   selectedStatus,
   isGestorOrAdmin,
+  dateMode,
 }: DashboardCardsProps) => {
   const stats = useMemo(() => {
     const uniqueCpfs = new Set(televendas.map((tv) => tv.cpf.replace(/\D/g, "")));
