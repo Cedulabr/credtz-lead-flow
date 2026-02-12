@@ -13,6 +13,7 @@ import { ValuesStep } from "./components/ValuesStep";
 import { PortabilidadeStep } from "./components/PortabilidadeStep";
 import { ConfirmStep } from "./components/ConfirmStep";
 import { DocumentUploadModal } from "./components/DocumentUploadModal";
+import { InitialStatusDialog } from "./components/InitialStatusDialog";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Steps padrão (não-portabilidade)
@@ -38,6 +39,7 @@ export function SalesWizard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStepValid, setIsStepValid] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [savedClientData, setSavedClientData] = useState<{ name: string; cpf: string } | null>(null);
   
@@ -62,6 +64,7 @@ export function SalesWizard() {
 
   const resetWizard = () => {
     setShowSuccess(false);
+    setShowStatusDialog(false);
     setCurrentStep(0);
     setWizardData({
       data_venda: new Date().toISOString().split('T')[0],
@@ -74,39 +77,38 @@ export function SalesWizard() {
     resetWizard();
   };
 
+  // Step 1: When wizard completes, show status dialog
   const handleComplete = async () => {
     if (!user) {
-      toast({
-        title: "Erro",
-        description: "Você precisa estar logado",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Você precisa estar logado", variant: "destructive" });
       return;
     }
+    // Save client data and show status dialog
+    setSavedClientData({ name: wizardData.nome || "", cpf: wizardData.cpf || "" });
+    setShowStatusDialog(true);
+  };
 
+  // Step 2: After user picks initial status, insert into DB
+  const handleStatusSelected = async (initialStatus: "solicitar_digitacao" | "em_andamento") => {
+    setShowStatusDialog(false);
     setIsSubmitting(true);
     try {
-      // Get user's company
       const { data: userCompanyData } = await supabase
         .from('user_companies')
         .select('company_id')
-        .eq('user_id', user.id)
+        .eq('user_id', user!.id)
         .eq('is_active', true)
         .order('created_at', { ascending: true })
         .limit(1)
         .maybeSingle();
 
       const companyId = userCompanyData?.company_id || null;
-
-      // Preparar dados baseado no tipo de operação
       const isPortabilidadeOp = wizardData.tipo_operacao === "Portabilidade";
       
-      // Para Portabilidade, usar dados específicos
       const bancoFinal = isPortabilidadeOp ? wizardData.banco_proponente : wizardData.banco;
       const parcelaFinal = isPortabilidadeOp ? wizardData.parcela_atual : wizardData.parcela;
       const saldoDevedorFinal = isPortabilidadeOp ? wizardData.saldo_devedor_atual : wizardData.saldo_devedor;
       
-      // Construir observação com detalhes da portabilidade
       let observacaoFinal = wizardData.observacao || "";
       if (isPortabilidadeOp && wizardData.credora_original) {
         const portabilidadeInfo = [
@@ -125,9 +127,8 @@ export function SalesWizard() {
           : portabilidadeInfo;
       }
 
-      // Insert televendas record
       const { error } = await (supabase as any).from("televendas").insert({
-        user_id: user.id,
+        user_id: user!.id,
         company_id: companyId,
         nome: wizardData.nome,
         cpf: wizardData.cpf?.replace(/\D/g, ""),
@@ -139,25 +140,14 @@ export function SalesWizard() {
         saldo_devedor: saldoDevedorFinal || null,
         tipo_operacao: wizardData.tipo_operacao,
         observacao: observacaoFinal || null,
-        status: 'solicitar_digitacao',
+        status: initialStatus,
       });
 
       if (error) throw error;
 
-      // Salvar dados do cliente para o modal de documentos
-      setSavedClientData({
-        name: wizardData.nome || "",
-        cpf: wizardData.cpf || "",
-      });
-
       setShowSuccess(true);
-      
-      toast({
-        title: "🎉 Venda cadastrada!",
-        description: "A venda foi registrada com sucesso.",
-      });
+      toast({ title: "🎉 Venda cadastrada!", description: "A venda foi registrada com sucesso." });
 
-      // Mostrar modal de documentos após 2 segundos
       setTimeout(() => {
         setShowSuccess(false);
         setShowDocumentModal(true);
@@ -165,11 +155,7 @@ export function SalesWizard() {
 
     } catch (error) {
       console.error("Error creating televendas:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao cadastrar venda. Tente novamente.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Erro ao cadastrar venda. Tente novamente.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -244,6 +230,13 @@ export function SalesWizard() {
           </Card>
         )}
       </AnimatePresence>
+
+      {/* Dialog de Status Inicial */}
+      <InitialStatusDialog
+        open={showStatusDialog}
+        onSelect={handleStatusSelected}
+        clientName={wizardData.nome || ""}
+      />
 
       {/* Modal de Upload de Documentos */}
       {savedClientData && (
