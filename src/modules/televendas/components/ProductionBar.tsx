@@ -17,9 +17,9 @@ export const ProductionBar = ({ televendas, isGestorOrAdmin, bankCalculationMode
     );
     const approved = televendas.filter((tv) => tv.status === "proposta_paga");
     
-    // Aguardando Saldo: only portabilidade proposals with banking status em_andamento
+    // Aguardando Saldo: portabilidade proposals with commercial status em_andamento
     const awaitingBalance = televendas.filter(
-      (tv) => tv.tipo_operacao === "Portabilidade" && (tv as any).status_bancario === "em_andamento"
+      (tv) => tv.tipo_operacao === "Portabilidade" && tv.status === "em_andamento"
     );
 
     const getBase = (tv: Televenda) => {
