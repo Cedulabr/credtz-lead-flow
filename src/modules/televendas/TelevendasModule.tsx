@@ -32,6 +32,7 @@ import { PropostasView } from "./views/PropostasView";
 import { ClientesView } from "./views/ClientesView";
 import { AprovacoesView } from "./views/AprovacoesView";
 import { useTelevendasBanks } from "./hooks/useTelevendasBanks";
+import { useCommissionRules } from "./hooks/useCommissionRules";
 
 type TabType = "propostas" | "clientes" | "aprovacoes";
 
@@ -46,6 +47,7 @@ export const TelevendasModule = () => {
   
   // Fetch banks from televendas_banks table
   const { bankNames: registeredBanks } = useTelevendasBanks();
+  const { bankCalculationModel, bankCommissionRate } = useCommissionRules();
 
   // Data states
   const [televendas, setTelevendas] = useState<Televenda[]>([]);
@@ -623,6 +625,8 @@ export const TelevendasModule = () => {
         selectedStatus={filters.status !== "all" ? filters.status : undefined}
         isGestorOrAdmin={isGestorOrAdmin}
         dateMode={filters.dateMode}
+        bankCalculationModel={bankCalculationModel}
+        bankCommissionRate={bankCommissionRate}
       />
 
       {/* BLOCO 2 — Pipeline Operacional */}
@@ -636,6 +640,7 @@ export const TelevendasModule = () => {
       <ProductionBar
         televendas={televendas}
         isGestorOrAdmin={isGestorOrAdmin}
+        bankCalculationModel={bankCalculationModel}
       />
 
       {/* Tabs */}

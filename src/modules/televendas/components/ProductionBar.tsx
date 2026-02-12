@@ -7,20 +7,34 @@ import { formatCurrency } from "../utils";
 interface ProductionBarProps {
   televendas: Televenda[];
   isGestorOrAdmin: boolean;
+  bankCalculationModel?: Record<string, string>;
 }
 
-export const ProductionBar = ({ televendas, isGestorOrAdmin }: ProductionBarProps) => {
+export const ProductionBar = ({ televendas, isGestorOrAdmin, bankCalculationModel = {} }: ProductionBarProps) => {
   const production = useMemo(() => {
     const nonCancelled = televendas.filter(
       (tv) => tv.status !== "proposta_cancelada" && tv.status !== "exclusao_aprovada"
     );
     const approved = televendas.filter((tv) => tv.status === "proposta_paga");
+    
+    // Aguardando Saldo: only portabilidade proposals with banking status em_andamento
     const awaitingBalance = televendas.filter(
-      (tv) => (tv as any).status_bancario === "em_andamento"
+      (tv) => tv.tipo_operacao === "Portabilidade" && (tv as any).status_bancario === "em_andamento"
     );
-    const totalBruto = nonCancelled.reduce((sum, tv) => sum + (tv.parcela || 0), 0);
-    const totalAprovado = approved.reduce((sum, tv) => sum + (tv.parcela || 0), 0);
-    const totalAguardando = awaitingBalance.reduce((sum, tv) => sum + (tv.parcela || 0), 0);
+
+    const getBase = (tv: Televenda) => {
+      if (tv.tipo_operacao === "Portabilidade") {
+        const model = bankCalculationModel[tv.banco];
+        if (model === "saldo_devedor" && tv.saldo_devedor && tv.saldo_devedor > 0) {
+          return tv.saldo_devedor;
+        }
+      }
+      return tv.parcela || 0;
+    };
+
+    const totalBruto = nonCancelled.reduce((sum, tv) => sum + getBase(tv), 0);
+    const totalAprovado = approved.reduce((sum, tv) => sum + getBase(tv), 0);
+    const totalAguardando = awaitingBalance.reduce((sum, tv) => sum + getBase(tv), 0);
     const ticketMedio = nonCancelled.length > 0 ? totalBruto / nonCancelled.length : 0;
 
     // Ranking by user
@@ -28,7 +42,7 @@ export const ProductionBar = ({ televendas, isGestorOrAdmin }: ProductionBarProp
       const name = tv.user?.name || "Sem nome";
       if (!acc[name]) acc[name] = { count: 0, value: 0 };
       acc[name].count += 1;
-      acc[name].value += tv.parcela || 0;
+      acc[name].value += getBase(tv);
       return acc;
     }, {} as Record<string, { count: number; value: number }>);
 
@@ -37,8 +51,8 @@ export const ProductionBar = ({ televendas, isGestorOrAdmin }: ProductionBarProp
       .sort((a, b) => b.count - a.count)
       .slice(0, 3);
 
-    return { totalBruto, totalAprovado, totalAguardando, ticketMedio, topSellers, totalPropostas: nonCancelled.length };
-  }, [televendas]);
+    return { totalBruto, totalAprovado, totalAguardando, ticketMedio, topSellers, totalPropostas: nonCancelled.length, awaitingCount: awaitingBalance.length };
+  }, [televendas, bankCalculationModel]);
 
   const metrics = [
     {
@@ -54,7 +68,7 @@ export const ProductionBar = ({ televendas, isGestorOrAdmin }: ProductionBarProp
       color: "text-green-600",
     },
     {
-      label: "Aguardando Saldo",
+      label: `Aguard. Saldo (${production.awaitingCount})`,
       value: formatCurrency(production.totalAguardando),
       icon: Clock,
       color: "text-amber-600",

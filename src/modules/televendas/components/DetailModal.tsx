@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import { 
   Phone, 
   MessageSquare, 
@@ -35,6 +36,7 @@ import { formatCPF, formatCurrency, formatPhone, formatDate, formatTimeAgo } fro
 import { StatusBadge } from "./StatusBadge";
 import { StatusPropostaEditor } from "./StatusPropostaEditor";
 import { BankingStatusEditor } from "./BankingStatusEditor";
+import { toast } from "sonner";
 
 interface DetailModalProps {
   open: boolean;
@@ -336,6 +338,14 @@ export const DetailModal = ({ open, onOpenChange, televenda: initialTelevenda, i
                     className="bg-red-500/5"
                   />
                 )}
+                {televenda.previsao_saldo && televenda.tipo_operacao === "Portabilidade" && (
+                  <InfoRow 
+                    icon={Calendar} 
+                    label="Previsão de Saldo" 
+                    value={formatDate(televenda.previsao_saldo)}
+                    className="bg-amber-500/5"
+                  />
+                )}
               </div>
             </div>
 
@@ -378,6 +388,51 @@ export const DetailModal = ({ open, onOpenChange, televenda: initialTelevenda, i
                 />
               </div>
             </div>
+
+            {/* Previsão de Saldo - only for Portabilidade */}
+            {televenda.tipo_operacao === "Portabilidade" && (
+              <>
+                <Separator />
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    PREVISÃO DE SALDO
+                  </h3>
+                  <div className="bg-muted/30 rounded-xl p-4">
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="date"
+                        value={televenda.previsao_saldo || ""}
+                        onChange={async (e) => {
+                          const val = e.target.value || null;
+                          try {
+                            const { error } = await supabase
+                              .from("televendas")
+                              .update({ previsao_saldo: val } as any)
+                              .eq("id", televenda.id);
+                            if (error) throw error;
+                            toast.success("Previsão de saldo atualizada");
+                            fetchTelevendaDetails();
+                            onRefresh?.();
+                          } catch {
+                            toast.error("Erro ao atualizar previsão");
+                          }
+                        }}
+                        className="h-9 max-w-[200px]"
+                      />
+                      {televenda.previsao_saldo && (
+                        <span className="text-sm text-muted-foreground">
+                          📆 {formatDate(televenda.previsao_saldo)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-2">
+                      Data prevista para retorno do saldo da portabilidade
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
 
             <Separator />
             <div>

@@ -154,6 +154,12 @@ export const PropostasView = ({
                     <span>{tv.banco}</span>
                     <span>•</span>
                     <span>📅 {formatDate(tv.data_venda)}</span>
+                    {tv.tipo_operacao === "Portabilidade" && tv.previsao_saldo && (
+                      <>
+                        <span>•</span>
+                        <span className="text-amber-600">📆 Saldo: {formatDate(tv.previsao_saldo)}</span>
+                      </>
+                    )}
                     {tv.data_pagamento && (
                       <>
                         <span>•</span>
