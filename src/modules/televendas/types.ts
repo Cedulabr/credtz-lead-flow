@@ -85,7 +85,7 @@ export interface TelevendasFilters {
 // Status que o OPERADOR pode definir
 export const OPERATOR_STATUSES = [
   "solicitar_digitacao",    // Solicitar Digitação
-  "proposta_digitada",      // Proposta Digitada
+  "em_andamento",           // Em Andamento
   "pago_aguardando",        // Pago Aguardando Gestor
   "cancelado_aguardando",   // Solicitar Cancelamento (Aguardando Gestor)
 ] as const;
@@ -103,14 +103,15 @@ export const ALL_STATUSES = [...OPERATOR_STATUSES, ...MANAGER_STATUSES] as const
 
 // Legacy status mapping for backwards compatibility
 export const LEGACY_STATUS_MAP: Record<string, string> = {
-  "proposta_digitada_old": "proposta_digitada",
+  "proposta_digitada": "em_andamento",
+  "proposta_digitada_old": "em_andamento",
   "solicitado_digitacao": "solicitar_digitacao",
   "pago": "proposta_paga",
   "pago_aprovado": "proposta_paga",
   "cancelado": "proposta_cancelada",
   "cancelado_confirmado": "proposta_cancelada",
-  "digitada": "proposta_digitada",
-  "enviada": "proposta_digitada",
+  "digitada": "em_andamento",
+  "enviada": "em_andamento",
   "em_analise": "proposta_pendente",
   "pendente": "proposta_pendente",
 };
@@ -137,10 +138,10 @@ export const STATUS_CONFIG: Record<string, {
     isOperational: true,
     isFinal: false,
   },
-  proposta_digitada: {
-    label: "Proposta Digitada",
-    shortLabel: "Digitada",
-    emoji: "✍️",
+  em_andamento: {
+    label: "Em Andamento",
+    shortLabel: "Em Andamento",
+    emoji: "⏳",
     color: "text-blue-600",
     bgColor: "bg-blue-500/10 border-blue-300",
     isOperational: true,
