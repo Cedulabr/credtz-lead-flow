@@ -16,7 +16,7 @@ export const ProductionBar = ({ televendas, isGestorOrAdmin }: ProductionBarProp
     );
     const approved = televendas.filter((tv) => tv.status === "proposta_paga");
     const awaitingBalance = televendas.filter(
-      (tv) => (tv as any).status_bancario === "aguardando_pagamento"
+      (tv) => (tv as any).status_bancario === "em_andamento"
     );
     const totalBruto = nonCancelled.reduce((sum, tv) => sum + (tv.parcela || 0), 0);
     const totalAprovado = approved.reduce((sum, tv) => sum + (tv.parcela || 0), 0);
@@ -46,38 +46,35 @@ export const ProductionBar = ({ televendas, isGestorOrAdmin }: ProductionBarProp
       value: formatCurrency(production.totalBruto),
       icon: DollarSign,
       color: "text-blue-600",
-      bg: "bg-blue-500/10",
     },
     {
       label: "Aprovado",
       value: formatCurrency(production.totalAprovado),
       icon: TrendingUp,
       color: "text-green-600",
-      bg: "bg-green-500/10",
     },
     {
       label: "Aguardando Saldo",
       value: formatCurrency(production.totalAguardando),
       icon: Clock,
       color: "text-amber-600",
-      bg: "bg-amber-500/10",
     },
     {
       label: "Ticket Médio",
       value: formatCurrency(production.ticketMedio),
       icon: Target,
       color: "text-purple-600",
-      bg: "bg-purple-500/10",
     },
   ];
 
   return (
-    <div className="space-y-3">
+    <div className="rounded-xl border border-border/50 bg-muted/30 p-4 space-y-3">
       <div className="flex items-center gap-2">
         <BarChart3 className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-semibold text-muted-foreground">
-          Produção do Mês ({production.totalPropostas} propostas)
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Produção do Mês
         </span>
+        <span className="text-xs text-muted-foreground">({production.totalPropostas} propostas)</span>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -86,16 +83,16 @@ export const ProductionBar = ({ televendas, isGestorOrAdmin }: ProductionBarProp
           return (
             <motion.div
               key={m.label}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className={`rounded-xl p-3 border border-border/50 ${m.bg}`}
+              transition={{ delay: i * 0.04 }}
+              className="flex items-center gap-2"
             >
-              <div className="flex items-center gap-2 mb-1">
-                <Icon className={`h-4 w-4 ${m.color}`} />
-                <span className="text-xs text-muted-foreground">{m.label}</span>
+              <Icon className={`h-4 w-4 ${m.color} flex-shrink-0`} />
+              <div>
+                <span className="text-[10px] text-muted-foreground">{m.label}</span>
+                <p className="text-sm font-bold leading-tight">{m.value}</p>
               </div>
-              <p className="text-lg font-bold">{m.value}</p>
             </motion.div>
           );
         })}
@@ -103,10 +100,10 @@ export const ProductionBar = ({ televendas, isGestorOrAdmin }: ProductionBarProp
 
       {/* Top sellers */}
       {isGestorOrAdmin && production.topSellers.length > 0 && (
-        <div className="flex items-center gap-3 overflow-x-auto pb-1">
-          <span className="text-xs text-muted-foreground whitespace-nowrap">🏆 Ranking:</span>
+        <div className="flex items-center gap-3 overflow-x-auto pt-1 border-t border-border/50">
+          <span className="text-[10px] text-muted-foreground whitespace-nowrap">🏆 Ranking:</span>
           {production.topSellers.map((seller, i) => (
-            <span key={seller.name} className="text-xs font-medium bg-muted px-2 py-1 rounded-full whitespace-nowrap">
+            <span key={seller.name} className="text-[11px] font-medium bg-background px-2 py-0.5 rounded-full whitespace-nowrap border border-border/50">
               {i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"} {seller.name} ({seller.count})
             </span>
           ))}
