@@ -129,22 +129,9 @@ export const PropostasView = ({
                     )}
                   </div>
 
-                  {/* Row 2: Status badges */}
+                  {/* Row 2: Current status only */}
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <StatusBadge status={tv.status} size="sm" />
-                    {bankConfig && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${bankConfig.bgColor} ${bankConfig.borderColor} ${bankConfig.color}`}>
-                        {bankConfig.emoji} {bankConfig.shortLabel}
-                      </span>
-                    )}
-                    {tv.status_proposta && (() => {
-                      const spConfig = STATUS_PROPOSTA_OPTIONS.find(s => s.value === tv.status_proposta);
-                      return spConfig ? (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${spConfig.bgColor} ${spConfig.color}`}>
-                          {spConfig.emoji} {spConfig.label}
-                        </span>
-                      ) : null;
-                    })()}
                   </div>
 
                   {/* Row 3: Details */}
