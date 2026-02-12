@@ -10,21 +10,49 @@ interface DashboardCardsProps {
   selectedStatus?: string;
   isGestorOrAdmin: boolean;
   dateMode: DateMode;
+  bankCalculationModel?: Record<string, string>;
+  bankCommissionRate?: Record<string, number>;
+}
+
+/**
+ * For portabilidade: use saldo_devedor or parcela depending on bank's calculation_model.
+ * For other operations: always use parcela (valor liberado).
+ */
+function getBaseValue(tv: Televenda, bankCalcModel: Record<string, string>): number {
+  if (tv.tipo_operacao === "Portabilidade") {
+    const model = bankCalcModel[tv.banco];
+    if (model === "saldo_devedor" && tv.saldo_devedor && tv.saldo_devedor > 0) {
+      return tv.saldo_devedor;
+    }
+    // Default to parcela (valor_bruto)
+    return tv.parcela || 0;
+  }
+  return tv.parcela || 0;
+}
+
+function getCommissionValue(tv: Televenda, bankCalcModel: Record<string, string>, bankCommRate: Record<string, number>): number {
+  const rate = bankCommRate[tv.banco];
+  if (!rate) return (tv.parcela || 0) * 0.08; // default 8%
+  
+  const base = getBaseValue(tv, bankCalcModel);
+  return base * (rate / 100);
 }
 
 export const DashboardCards = ({
   televendas,
+  bankCalculationModel = {},
+  bankCommissionRate = {},
 }: DashboardCardsProps) => {
   const stats = useMemo(() => {
     const nonCancelled = televendas.filter(
       (tv) => tv.status !== "proposta_cancelada" && tv.status !== "exclusao_aprovada"
     );
     const approved = televendas.filter((tv) => tv.status === "proposta_paga");
-    const totalBruto = nonCancelled.reduce((sum, tv) => sum + (tv.parcela || 0), 0);
-    const totalAprovado = approved.reduce((sum, tv) => sum + (tv.parcela || 0), 0);
+    
+    const totalBruto = nonCancelled.reduce((sum, tv) => sum + getBaseValue(tv, bankCalculationModel), 0);
+    const totalAprovado = approved.reduce((sum, tv) => sum + getBaseValue(tv, bankCalculationModel), 0);
     const ticketMedio = nonCancelled.length > 0 ? totalBruto / nonCancelled.length : 0;
-    // Estimated commission ~8%
-    const comissaoPrevista = totalAprovado * 0.08;
+    const comissaoPrevista = approved.reduce((sum, tv) => sum + getCommissionValue(tv, bankCalculationModel, bankCommissionRate), 0);
 
     return {
       totalPropostas: televendas.length,
@@ -33,7 +61,7 @@ export const DashboardCards = ({
       comissaoPrevista,
       ticketMedio,
     };
-  }, [televendas]);
+  }, [televendas, bankCalculationModel, bankCommissionRate]);
 
   const cards = [
     {
