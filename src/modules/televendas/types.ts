@@ -30,6 +30,9 @@ export interface Televenda {
   motivo_pendencia?: string | null;
   motivo_pendencia_descricao?: string | null;
   previsao_saldo?: string | null;
+  status_bancario?: string | null;
+  last_sync_at?: string | null;
+  last_sync_by?: string | null;
 }
 
 export interface EditHistoryItem {

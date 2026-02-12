@@ -6,7 +6,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw, FileText, Users, ClipboardCheck, Sparkles } from "lucide-react";
+import { RefreshCw, FileText, Users, ClipboardCheck, Sparkles, Activity } from "lucide-react";
+import { toast as sonnerToast } from "sonner";
 
 import { 
   Televenda, 
@@ -19,6 +20,8 @@ import {
 } from "./types";
 import { getDateRange, normalizeStatus } from "./utils";
 import { DashboardCards } from "./components/DashboardCards";
+import { BankingPipeline } from "./components/BankingPipeline";
+import { ProductionBar } from "./components/ProductionBar";
 import { SmartSearch } from "./components/SmartSearch";
 import { StatusChangeModal } from "./components/StatusChangeModal";
 import { FiltersDrawer } from "./components/FiltersDrawer";
@@ -52,12 +55,14 @@ export const TelevendasModule = () => {
 
   // UI states
   const [activeTab, setActiveTab] = useState<TabType>("propostas");
+  const [showActiveOnly, setShowActiveOnly] = useState(false);
+  const [bankStatusFilter, setBankStatusFilter] = useState<string | undefined>();
   const [filters, setFilters] = useState<FiltersType>({
     search: "",
     status: "all",
     userId: "all",
     period: "all",
-    month: getCurrentMonth(),
+    month: showActiveOnly ? "all" : getCurrentMonth(),
     product: "all",
     bank: "all",
     dateMode: "criacao",
@@ -131,13 +136,18 @@ export const TelevendasModule = () => {
         query = query.in("company_id", userCompanyIds);
       }
 
-      // Date range - use different date column based on dateMode
-      const dateRange = getDateRange(filters.period, filters.month);
-      if (dateRange) {
-        const dateColumn = filters.dateMode === "pagamento" ? "data_pagamento" : "data_venda";
-        query = query
-          .gte(dateColumn, dateRange.start.toISOString().split("T")[0])
-          .lte(dateColumn, dateRange.end.toISOString().split("T")[0]);
+      // Active only mode: show non-final proposals regardless of date
+      if (showActiveOnly) {
+        query = query.not("status", "in", '("proposta_paga","proposta_cancelada","exclusao_aprovada")');
+      } else {
+        // Date range - use different date column based on dateMode
+        const dateRange = getDateRange(filters.period, filters.month);
+        if (dateRange) {
+          const dateColumn = filters.dateMode === "pagamento" ? "data_pagamento" : "data_venda";
+          query = query
+            .gte(dateColumn, dateRange.start.toISOString().split("T")[0])
+            .lte(dateColumn, dateRange.end.toISOString().split("T")[0]);
+        }
       }
 
       // User filter
@@ -171,7 +181,7 @@ export const TelevendasModule = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.id, isAdmin, isGestor, userCompanyIds, filters.period, filters.month, filters.userId, filters.dateMode, toast]);
+  }, [user?.id, isAdmin, isGestor, userCompanyIds, filters.period, filters.month, filters.userId, filters.dateMode, showActiveOnly, toast]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => { fetchTelevendas(); }, [fetchTelevendas]);
@@ -182,7 +192,6 @@ export const TelevendasModule = () => {
       const searchTerm = filters.search.toLowerCase().trim();
       const cpfDigits = filters.search.replace(/\D/g, "");
       
-      // Search by name OR CPF
       const matchesSearch = !searchTerm || 
         tv.nome.toLowerCase().includes(searchTerm) ||
         tv.cpf.replace(/\D/g, "").includes(cpfDigits);
@@ -190,9 +199,10 @@ export const TelevendasModule = () => {
       const matchesStatus = filters.status === "all" || tv.status === filters.status;
       const matchesProduct = filters.product === "all" || tv.tipo_operacao === filters.product;
       const matchesBank = filters.bank === "all" || tv.banco === filters.bank;
-      return matchesSearch && matchesStatus && matchesProduct && matchesBank;
+      const matchesBankStatus = !bankStatusFilter || (tv.status_bancario || "aguardando_digitacao") === bankStatusFilter;
+      return matchesSearch && matchesStatus && matchesProduct && matchesBank && matchesBankStatus;
     });
-  }, [televendas, filters]);
+  }, [televendas, filters, bankStatusFilter]);
 
   // Extract unique banks from televendas for filter
   const availableBanks = useMemo(() => {
@@ -225,7 +235,39 @@ export const TelevendasModule = () => {
     setActiveTab("propostas");
   };
 
-  // Active filters count
+  const handleFilterByBankStatus = (status: string) => {
+    setBankStatusFilter(status === "all" ? undefined : status);
+    setActiveTab("propostas");
+  };
+
+  const handleToggleActiveOnly = () => {
+    const next = !showActiveOnly;
+    setShowActiveOnly(next);
+    if (next) {
+      setFilters((f) => ({ ...f, month: "all", period: "all" }));
+    } else {
+      setFilters((f) => ({ ...f, month: getCurrentMonth() }));
+    }
+  };
+
+  const handleSyncAll = async () => {
+    setRefreshing(true);
+    try {
+      const ids = filteredTelevendas.map((tv) => tv.id);
+      if (ids.length === 0) return;
+      const { error } = await supabase
+        .from("televendas")
+        .update({ last_sync_at: new Date().toISOString(), last_sync_by: user?.id } as any)
+        .in("id", ids);
+      if (error) throw error;
+      sonnerToast.success(`${ids.length} propostas verificadas`);
+      await fetchTelevendas();
+    } catch (e) {
+      sonnerToast.error("Erro ao sincronizar");
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const activeFiltersCount = [
     filters.search, filters.status !== "all", filters.userId !== "all",
     filters.period !== "all", filters.product !== "all", filters.bank !== "all",
@@ -511,12 +553,40 @@ export const TelevendasModule = () => {
           <Sparkles className="h-6 w-6 text-primary" />
           <div>
             <h1 className="text-xl md:text-2xl font-bold">Gestão de Televendas</h1>
-            {filters.dateMode === "pagamento" && (
-              <p className="text-xs text-amber-600 font-medium">💰 Visão por Data de Pagamento</p>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {filters.dateMode === "pagamento" && (
+                <span className="text-xs text-amber-600 font-medium">💰 Visão por Data de Pagamento</span>
+              )}
+              {showActiveOnly && (
+                <span className="text-xs text-blue-600 font-medium">📌 Propostas em Andamento</span>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Active proposals toggle */}
+          <Button
+            variant={showActiveOnly ? "default" : "outline"}
+            size="sm"
+            onClick={handleToggleActiveOnly}
+            className="h-10 rounded-xl gap-1 text-xs"
+          >
+            <Activity className="h-4 w-4" />
+            <span className="hidden sm:inline">Em Andamento</span>
+          </Button>
+          {/* Sync all */}
+          {isGestorOrAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSyncAll}
+              disabled={refreshing}
+              className="h-10 rounded-xl gap-1 text-xs"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">Sync</span>
+            </Button>
+          )}
           <FiltersDrawer
             filters={filters}
             onFiltersChange={setFilters}
@@ -530,9 +600,9 @@ export const TelevendasModule = () => {
             size="icon" 
             onClick={() => { setRefreshing(true); fetchTelevendas(); }} 
             disabled={refreshing} 
-            className="h-12 w-12 rounded-xl"
+            className="h-10 w-10 rounded-xl"
           >
-            <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
           </Button>
         </div>
       </div>
@@ -553,6 +623,19 @@ export const TelevendasModule = () => {
         selectedStatus={filters.status !== "all" ? filters.status : undefined}
         isGestorOrAdmin={isGestorOrAdmin}
         dateMode={filters.dateMode}
+      />
+
+      {/* Banking Pipeline */}
+      <BankingPipeline
+        televendas={televendas}
+        onFilterByBankStatus={handleFilterByBankStatus}
+        selectedBankStatus={bankStatusFilter}
+      />
+
+      {/* Production Bar */}
+      <ProductionBar
+        televendas={televendas}
+        isGestorOrAdmin={isGestorOrAdmin}
       />
 
       {/* Tabs */}

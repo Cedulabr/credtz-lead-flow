@@ -3588,6 +3588,8 @@ export type Database = {
           data_venda: string
           edit_count: number | null
           id: string
+          last_sync_at: string | null
+          last_sync_by: string | null
           lead_id: string | null
           motivo_pendencia: string | null
           motivo_pendencia_descricao: string | null
@@ -3599,6 +3601,7 @@ export type Database = {
           simulation_data: Json | null
           simulation_file_url: string | null
           status: string
+          status_bancario: string | null
           status_proposta: string | null
           status_proposta_updated_at: string | null
           status_updated_at: string | null
@@ -3619,6 +3622,8 @@ export type Database = {
           data_venda: string
           edit_count?: number | null
           id?: string
+          last_sync_at?: string | null
+          last_sync_by?: string | null
           lead_id?: string | null
           motivo_pendencia?: string | null
           motivo_pendencia_descricao?: string | null
@@ -3630,6 +3635,7 @@ export type Database = {
           simulation_data?: Json | null
           simulation_file_url?: string | null
           status?: string
+          status_bancario?: string | null
           status_proposta?: string | null
           status_proposta_updated_at?: string | null
           status_updated_at?: string | null
@@ -3650,6 +3656,8 @@ export type Database = {
           data_venda?: string
           edit_count?: number | null
           id?: string
+          last_sync_at?: string | null
+          last_sync_by?: string | null
           lead_id?: string | null
           motivo_pendencia?: string | null
           motivo_pendencia_descricao?: string | null
@@ -3661,6 +3669,7 @@ export type Database = {
           simulation_data?: Json | null
           simulation_file_url?: string | null
           status?: string
+          status_bancario?: string | null
           status_proposta?: string | null
           status_proposta_updated_at?: string | null
           status_updated_at?: string | null
@@ -3843,6 +3852,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      televendas_status_bancario_history: {
+        Row: {
+          changed_at: string | null
+          changed_by: string | null
+          from_status: string | null
+          id: string
+          reason: string | null
+          televendas_id: string
+          to_status: string
+        }
+        Insert: {
+          changed_at?: string | null
+          changed_by?: string | null
+          from_status?: string | null
+          id?: string
+          reason?: string | null
+          televendas_id: string
+          to_status: string
+        }
+        Update: {
+          changed_at?: string | null
+          changed_by?: string | null
+          from_status?: string | null
+          id?: string
+          reason?: string | null
+          televendas_id?: string
+          to_status?: string
+        }
+        Relationships: []
       }
       televendas_status_history: {
         Row: {
