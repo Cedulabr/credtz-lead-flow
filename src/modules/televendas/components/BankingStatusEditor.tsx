@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
-import { BANKING_STATUS_CONFIG } from "./BankingPipeline";
+import { BANKING_STATUS_CONFIG, BANKING_STATUS_OPTIONS } from "./BankingPipeline";
 import { SyncIndicator } from "./SyncIndicator";
 import { Televenda } from "../types";
 

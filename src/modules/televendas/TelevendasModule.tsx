@@ -616,7 +616,7 @@ export const TelevendasModule = () => {
         placeholder="Buscar por nome, CPF, telefone ou ID..."
       />
 
-      {/* Dashboard Cards with clickable status filters */}
+      {/* BLOCO 1 — Visão Executiva */}
       <DashboardCards
         televendas={televendas}
         onFilterByStatus={handleFilterByStatus}
@@ -625,14 +625,14 @@ export const TelevendasModule = () => {
         dateMode={filters.dateMode}
       />
 
-      {/* Banking Pipeline */}
+      {/* BLOCO 2 — Pipeline Operacional */}
       <BankingPipeline
         televendas={televendas}
         onFilterByBankStatus={handleFilterByBankStatus}
         selectedBankStatus={bankStatusFilter}
       />
 
-      {/* Production Bar */}
+      {/* BLOCO 3 — Produção do Mês */}
       <ProductionBar
         televendas={televendas}
         isGestorOrAdmin={isGestorOrAdmin}
@@ -677,6 +677,7 @@ export const TelevendasModule = () => {
                   canEditLimited={canEditLimited}
                   canChangeStatus={canChangeStatus}
                   isGestorOrAdmin={isGestorOrAdmin}
+                  onRefresh={fetchTelevendas}
                 />
               </motion.div>
             )}
