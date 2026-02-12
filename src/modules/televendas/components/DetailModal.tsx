@@ -34,6 +34,7 @@ import { Televenda, StatusHistoryItem, STATUS_CONFIG, EditHistoryItem } from "..
 import { formatCPF, formatCurrency, formatPhone, formatDate, formatTimeAgo } from "../utils";
 import { StatusBadge } from "./StatusBadge";
 import { StatusPropostaEditor } from "./StatusPropostaEditor";
+import { BankingStatusEditor } from "./BankingStatusEditor";
 
 interface DetailModalProps {
   open: boolean;
@@ -348,6 +349,26 @@ export const DetailModal = ({ open, onOpenChange, televenda: initialTelevenda, i
               </h3>
               <div className="bg-muted/30 rounded-xl p-4">
                 <StatusPropostaEditor
+                  televenda={televenda}
+                  onUpdate={() => {
+                    fetchTelevendaDetails();
+                    onRefresh?.();
+                  }}
+                  isGestorOrAdmin={isGestorOrAdmin}
+                />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Banking Status Section */}
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                STATUS BANCÁRIO
+              </h3>
+              <div className="bg-muted/30 rounded-xl p-4">
+                <BankingStatusEditor
                   televenda={televenda}
                   onUpdate={() => {
                     fetchTelevendaDetails();
