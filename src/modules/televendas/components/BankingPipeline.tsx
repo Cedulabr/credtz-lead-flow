@@ -82,9 +82,35 @@ interface BankingPipelineProps {
 }
 
 export const BankingPipeline = ({ televendas, onFilterByBankStatus, selectedBankStatus }: BankingPipelineProps) => {
+  // Map commercial status to banking pipeline status
+  const mapToPipelineStatus = (tv: Televenda): string => {
+    // Use status_bancario if explicitly set
+    if (tv.status_bancario) return tv.status_bancario;
+    
+    // Otherwise map from commercial status
+    switch (tv.status) {
+      case "solicitar_digitacao":
+        return "aguardando_digitacao";
+      case "em_andamento":
+        return "em_andamento";
+      case "proposta_pendente":
+      case "devolvido":
+        return "pendente";
+      case "proposta_paga":
+      case "pago_aguardando":
+        return "pago_cliente";
+      case "proposta_cancelada":
+      case "cancelado_aguardando":
+      case "exclusao_aprovada":
+        return "cancelado_banco";
+      default:
+        return "aguardando_digitacao";
+    }
+  };
+
   const stats = useMemo(() => {
     const byStatus = televendas.reduce((acc, tv) => {
-      const status = (tv as any).status_bancario || "aguardando_digitacao";
+      const status = mapToPipelineStatus(tv);
       if (!acc[status]) acc[status] = { count: 0 };
       acc[status].count += 1;
       return acc;
