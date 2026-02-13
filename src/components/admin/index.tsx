@@ -5,6 +5,7 @@ import { AdminOperations } from './AdminOperations';
 import { AdminPeople } from './AdminPeople';
 import { AdminFinance } from './AdminFinance';
 import { AdminSystem } from './AdminSystem';
+import { AdminDatabase } from './AdminDatabase';
 import { supabase } from '@/integrations/supabase/client';
 
 export function AdminPanelNew() {
@@ -49,6 +50,8 @@ export function AdminPanelNew() {
         return <AdminFinance />;
       case 'system':
         return <AdminSystem />;
+      case 'database':
+        return <AdminDatabase />;
       default:
         return <AdminDashboard onNavigate={setActiveModule} />;
     }
@@ -71,3 +74,4 @@ export { AdminOperations } from './AdminOperations';
 export { AdminPeople } from './AdminPeople';
 export { AdminFinance } from './AdminFinance';
 export { AdminSystem } from './AdminSystem';
+export { AdminDatabase } from './AdminDatabase';
