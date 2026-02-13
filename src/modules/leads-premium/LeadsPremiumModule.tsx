@@ -432,6 +432,7 @@ export function LeadsPremiumModule() {
         <TabsContent value="pipeline" className="mt-6">
           <PipelineView 
             leads={leads}
+            users={users}
             isLoading={isLoading}
             onLeadSelect={handleLeadSelect}
             onStatusChange={(leadId, newStatus) => handleStatusChange(leadId, newStatus)}

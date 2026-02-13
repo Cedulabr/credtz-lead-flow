@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
-import { RefreshCcw, Inbox } from "lucide-react";
+import { RefreshCcw, Inbox, ChevronLeft, ChevronRight } from "lucide-react";
 import { startOfDay, startOfWeek, startOfMonth, subDays, isAfter } from "date-fns";
 
 interface LeadsListViewProps {
@@ -38,6 +38,9 @@ export function LeadsListView({
   const isMobile = useIsMobile();
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
+  
+  const ITEMS_PER_PAGE = 15;
+  const [currentPage, setCurrentPage] = useState(1);
   
   const [filters, setFilters] = useState<LeadFilters & { dateFilter?: string }>({
     search: "",
@@ -123,6 +126,21 @@ export function LeadsListView({
     });
   }, [leads, filters]);
 
+  // Reset page when filters change
+  const totalPages = Math.max(1, Math.ceil(filteredLeads.length / ITEMS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  
+  const paginatedLeads = useMemo(() => {
+    const start = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
+    return filteredLeads.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredLeads, safeCurrentPage]);
+
+  // Reset page on filter change
+  const handleFiltersChange = (newFilters: LeadFilters & { dateFilter?: string }) => {
+    setFilters(newFilters);
+    setCurrentPage(1);
+  };
+
   if (isLoading) {
     return (
       <div className="p-4 space-y-3">
@@ -142,7 +160,7 @@ export function LeadsListView({
           <div className="flex-1">
             <LeadsFiltersBar
               filters={filters}
-              onFiltersChange={setFilters}
+              onFiltersChange={handleFiltersChange}
               availableConvenios={availableConvenios}
               availableTags={availableTags}
               users={users}
@@ -158,11 +176,10 @@ export function LeadsListView({
             <RefreshCcw className="h-4 w-4" />
           </Button>
         </div>
-        {filteredLeads.length !== leads.length && (
-          <p className="text-xs text-muted-foreground mt-2">
-            Mostrando {filteredLeads.length} de {leads.length} leads
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground mt-2">
+          Mostrando {((safeCurrentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(safeCurrentPage * ITEMS_PER_PAGE, filteredLeads.length)} de {filteredLeads.length} leads
+          {filteredLeads.length !== leads.length && ` (filtrado de ${leads.length})`}
+        </p>
       </div>
 
       {/* List */}
@@ -183,7 +200,7 @@ export function LeadsListView({
               </CardContent>
             </Card>
           ) : (
-            filteredLeads.map((lead, index) => (
+            paginatedLeads.map((lead, index) => (
               <motion.div
                 key={lead.id}
                 initial={{ opacity: 0, y: 10 }}
@@ -200,6 +217,55 @@ export function LeadsListView({
                 />
               </motion.div>
             ))
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 py-4">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={safeCurrentPage <= 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Anterior
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                  let page: number;
+                  if (totalPages <= 7) {
+                    page = i + 1;
+                  } else if (safeCurrentPage <= 4) {
+                    page = i + 1;
+                  } else if (safeCurrentPage >= totalPages - 3) {
+                    page = totalPages - 6 + i;
+                  } else {
+                    page = safeCurrentPage - 3 + i;
+                  }
+                  return (
+                    <Button
+                      key={page}
+                      variant={page === safeCurrentPage ? "default" : "outline"}
+                      size="sm"
+                      className="w-9 h-9 p-0"
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </Button>
+                  );
+                })}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={safeCurrentPage >= totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              >
+                Próxima
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
           )}
         </div>
       </ScrollArea>

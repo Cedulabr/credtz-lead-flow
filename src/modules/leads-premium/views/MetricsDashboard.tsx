@@ -16,9 +16,11 @@ import {
   BarChart3,
   PieChart,
   ArrowUpRight,
-  User
+  User,
+  CalendarDays
 } from "lucide-react";
-import { subDays, isAfter } from "date-fns";
+import { subDays, subMonths, startOfMonth, endOfMonth, isAfter, isBefore, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface MetricsDashboardProps {
   leads: Lead[];
@@ -27,34 +29,88 @@ interface MetricsDashboardProps {
   users?: UserProfile[];
 }
 
+type DatePreset = "last_day" | "last_3_days" | "last_week" | "last_month" | "custom_month" | "all";
+
 export function MetricsDashboard({ leads, stats, userCredits, users = [] }: MetricsDashboardProps) {
   const [selectedUser, setSelectedUser] = useState("all");
+  const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [customMonth, setCustomMonth] = useState<string>("");
 
-  // Filter leads by selected user
+  // Generate last 12 months for custom month picker
+  const monthOptions = useMemo(() => {
+    const months: { value: string; label: string }[] = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = subMonths(now, i);
+      months.push({
+        value: format(d, "yyyy-MM"),
+        label: format(d, "MMMM yyyy", { locale: ptBR })
+      });
+    }
+    return months;
+  }, []);
+
+  // Filter leads by selected user AND date
   const filteredLeads = useMemo(() => {
-    if (selectedUser === "all") return leads;
-    return leads.filter(l => l.assigned_to === selectedUser || l.created_by === selectedUser);
-  }, [leads, selectedUser]);
+    let result = leads;
+    
+    if (selectedUser !== "all") {
+      result = result.filter(l => l.assigned_to === selectedUser || l.created_by === selectedUser);
+    }
+
+    if (datePreset !== "all") {
+      const now = new Date();
+      let start: Date;
+      let end: Date | null = null;
+
+      switch (datePreset) {
+        case "last_day":
+          start = subDays(now, 1);
+          break;
+        case "last_3_days":
+          start = subDays(now, 3);
+          break;
+        case "last_week":
+          start = subDays(now, 7);
+          break;
+        case "last_month":
+          start = subDays(now, 30);
+          break;
+        case "custom_month":
+          if (!customMonth) return result;
+          const [y, m] = customMonth.split("-").map(Number);
+          start = startOfMonth(new Date(y, m - 1));
+          end = endOfMonth(new Date(y, m - 1));
+          break;
+        default:
+          return result;
+      }
+
+      result = result.filter(l => {
+        const d = new Date(l.created_at);
+        if (!isAfter(d, start)) return false;
+        if (end && !isBefore(d, end)) return false;
+        return true;
+      });
+    }
+
+    return result;
+  }, [leads, selectedUser, datePreset, customMonth]);
 
   // Calculate metrics from filtered leads
   const metrics = useMemo(() => {
     const now = new Date();
     const last7Days = subDays(now, 7);
-    const last30Days = subDays(now, 30);
 
     const leadsLast7Days = filteredLeads.filter(l => isAfter(new Date(l.created_at), last7Days));
-
     const convertedLast7Days = leadsLast7Days.filter(l => l.status === 'cliente_fechado').length;
-
     const weeklyConversionRate = leadsLast7Days.length > 0 
-      ? (convertedLast7Days / leadsLast7Days.length) * 100 
-      : 0;
+      ? (convertedLast7Days / leadsLast7Days.length) * 100 : 0;
 
     const total = filteredLeads.length;
     const fechados = filteredLeads.filter(l => l.status === 'cliente_fechado').length;
     const conversionRate = total > 0 ? (fechados / total) * 100 : 0;
 
-    // Status distribution
     const statusCounts = filteredLeads.reduce((acc, lead) => {
       acc[lead.status] = (acc[lead.status] || 0) + 1;
       return acc;
@@ -62,8 +118,7 @@ export function MetricsDashboard({ leads, stats, userCredits, users = [] }: Metr
 
     const statusDistribution = Object.entries(statusCounts)
       .map(([status, count]) => ({
-        status,
-        count,
+        status, count,
         label: PIPELINE_STAGES[status]?.label || status,
         color: PIPELINE_STAGES[status]?.textColor || 'text-gray-600',
         bgColor: PIPELINE_STAGES[status]?.bgColor || 'bg-gray-50',
@@ -71,7 +126,6 @@ export function MetricsDashboard({ leads, stats, userCredits, users = [] }: Metr
       }))
       .sort((a, b) => b.count - a.count);
 
-    // Convenio distribution
     const convenioDistribution = filteredLeads.reduce((acc, lead) => {
       const conv = lead.convenio || 'Não informado';
       acc[conv] = (acc[conv] || 0) + 1;
@@ -84,28 +138,23 @@ export function MetricsDashboard({ leads, stats, userCredits, users = [] }: Metr
       .slice(0, 5);
 
     return {
-      total,
-      fechados,
-      conversionRate,
+      total, fechados, conversionRate,
       leadsLast7Days: leadsLast7Days.length,
-      convertedLast7Days,
-      weeklyConversionRate,
+      convertedLast7Days, weeklyConversionRate,
       novos: statusCounts['new_lead'] || 0,
       emAndamento: (statusCounts['em_andamento'] || 0) + (statusCounts['aguardando_retorno'] || 0),
       pendentes: (statusCounts['agendamento'] || 0) + (statusCounts['contato_futuro'] || 0),
       recusados: (statusCounts['recusou_oferta'] || 0) + (statusCounts['sem_interesse'] || 0),
-      statusDistribution,
-      topConvenios
+      statusDistribution, topConvenios
     };
   }, [filteredLeads]);
 
-  // Per-user breakdown
+  // Per-user breakdown (uses date-filtered leads)
   const userBreakdown = useMemo(() => {
     if (users.length === 0) return [];
-
     const userMap = new Map<string, { total: number; novos: number; fechados: number; emAndamento: number; recusados: number }>();
     
-    leads.forEach(lead => {
+    filteredLeads.forEach(lead => {
       const userId = lead.assigned_to || lead.created_by || 'unassigned';
       if (!userMap.has(userId)) {
         userMap.set(userId, { total: 0, novos: 0, fechados: 0, emAndamento: 0, recusados: 0 });
@@ -129,9 +178,8 @@ export function MetricsDashboard({ leads, stats, userCredits, users = [] }: Metr
         };
       })
       .sort((a, b) => b.fechados - a.fechados);
-  }, [leads, users]);
+  }, [filteredLeads, users]);
 
-  // Calculate avg time for filtered leads
   const avgTime = useMemo(() => {
     const convertedLeads = filteredLeads.filter(l => l.status === 'cliente_fechado' && l.updated_at);
     if (convertedLeads.length === 0) return 0;
@@ -144,28 +192,67 @@ export function MetricsDashboard({ leads, stats, userCredits, users = [] }: Metr
 
   return (
     <div className="p-4 space-y-6">
-      {/* User Filter */}
-      {users.length > 0 && (
-        <div className="flex items-center gap-3">
-          <User className="h-5 w-5 text-muted-foreground" />
-          <Select value={selectedUser} onValueChange={setSelectedUser}>
-            <SelectTrigger className="w-[250px]">
-              <SelectValue placeholder="Filtrar por usuário" />
+      {/* Filters Row */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {/* Date Filter */}
+        <CalendarDays className="h-5 w-5 text-muted-foreground" />
+        <Select value={datePreset} onValueChange={(v) => {
+          setDatePreset(v as DatePreset);
+          if (v !== "custom_month") setCustomMonth("");
+        }}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Período" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todo o período</SelectItem>
+            <SelectItem value="last_day">Último dia</SelectItem>
+            <SelectItem value="last_3_days">Últimos 3 dias</SelectItem>
+            <SelectItem value="last_week">Última semana</SelectItem>
+            <SelectItem value="last_month">Último mês</SelectItem>
+            <SelectItem value="custom_month">Escolher mês...</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {datePreset === "custom_month" && (
+          <Select value={customMonth} onValueChange={setCustomMonth}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Selecione o mês" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os Usuários</SelectItem>
-              {users.map((u) => (
-                <SelectItem key={u.id} value={u.id}>{u.name || u.email || 'Sem nome'}</SelectItem>
+              {monthOptions.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label.charAt(0).toUpperCase() + m.label.slice(1)}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {selectedUser !== "all" && (
-            <Badge variant="secondary">
-              {users.find(u => u.id === selectedUser)?.name || 'Usuário'}
-            </Badge>
-          )}
-        </div>
-      )}
+        )}
+
+        {/* User Filter */}
+        {users.length > 0 && (
+          <>
+            <div className="w-px h-6 bg-border" />
+            <User className="h-5 w-5 text-muted-foreground" />
+            <Select value={selectedUser} onValueChange={setSelectedUser}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Filtrar por usuário" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Usuários</SelectItem>
+                {users.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.name || u.email || 'Sem nome'}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
+
+        {(datePreset !== "all" || selectedUser !== "all") && (
+          <Badge variant="secondary" className="text-xs">
+            {filteredLeads.length} leads
+          </Badge>
+        )}
+      </div>
 
       {/* Header KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
