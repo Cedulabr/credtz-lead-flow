@@ -6,6 +6,7 @@ import {
   Users, 
   Wallet, 
   Building2,
+  Database,
   Bell,
   ChevronRight,
   X,
@@ -24,7 +25,8 @@ export type AdminModule =
   | 'operations' 
   | 'people' 
   | 'finance' 
-  | 'system';
+  | 'system'
+  | 'database';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -68,6 +70,13 @@ const modules = [
     icon: Building2,
     description: 'Avisos e Whitelabel',
     color: 'from-slate-500 to-slate-600'
+  },
+  { 
+    id: 'database' as AdminModule, 
+    label: 'Banco de Dados', 
+    icon: Database,
+    description: 'Conexão Supabase',
+    color: 'from-cyan-500 to-cyan-600'
   },
 ];
 
