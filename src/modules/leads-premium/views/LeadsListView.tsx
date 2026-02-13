@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/contexts/AuthContext";
 import { RefreshCcw, Inbox } from "lucide-react";
 import { startOfDay, startOfWeek, startOfMonth, subDays, isAfter } from "date-fns";
 
@@ -35,6 +36,9 @@ export function LeadsListView({
   canEditLead
 }: LeadsListViewProps) {
   const isMobile = useIsMobile();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+  
   const [filters, setFilters] = useState<LeadFilters & { dateFilter?: string }>({
     search: "",
     status: "all",
@@ -66,6 +70,13 @@ export function LeadsListView({
           lead.cpf?.includes(filters.search) ||
           lead.phone?.includes(filters.search);
         if (!matchesSearch) return false;
+      }
+
+      // User filter
+      if (filters.user !== "all") {
+        if (lead.assigned_to !== filters.user && lead.created_by !== filters.user) {
+          return false;
+        }
       }
 
       // Status filter
@@ -134,6 +145,8 @@ export function LeadsListView({
               onFiltersChange={setFilters}
               availableConvenios={availableConvenios}
               availableTags={availableTags}
+              users={users}
+              showUserFilter={isAdmin}
             />
           </div>
           <Button

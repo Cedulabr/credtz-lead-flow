@@ -287,6 +287,7 @@ export function LeadsPremiumModule() {
                   leads={leads}
                   stats={stats}
                   userCredits={userCredits}
+                  users={users}
                 />
               </motion.div>
             )}
@@ -433,6 +434,7 @@ export function LeadsPremiumModule() {
             leads={leads}
             isLoading={isLoading}
             onLeadSelect={handleLeadSelect}
+            onStatusChange={(leadId, newStatus) => handleStatusChange(leadId, newStatus)}
             stats={stats}
           />
         </TabsContent>
@@ -442,6 +444,7 @@ export function LeadsPremiumModule() {
             leads={leads}
             stats={stats}
             userCredits={userCredits}
+            users={users}
           />
         </TabsContent>
 
