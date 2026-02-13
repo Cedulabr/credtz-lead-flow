@@ -1,12 +1,13 @@
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Lead, LeadStats, PIPELINE_STAGES, STATUS_CATEGORIES } from "../types";
+import { Lead, LeadStats, PIPELINE_STAGES, UserProfile } from "../types";
 import { LeadMiniCard } from "../components/LeadMiniCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { 
   Sparkles, 
   TrendingUp, 
@@ -22,6 +23,7 @@ interface PipelineViewProps {
   leads: Lead[];
   isLoading: boolean;
   onLeadSelect: (lead: Lead) => void;
+  onStatusChange?: (leadId: string, newStatus: string) => Promise<boolean>;
   stats: LeadStats;
 }
 
@@ -33,16 +35,53 @@ const PIPELINE_COLUMNS = [
   { key: 'cliente_fechado', icon: CheckCircle, label: 'Fechados' },
 ];
 
-export function PipelineView({ leads, isLoading, onLeadSelect, stats }: PipelineViewProps) {
+export function PipelineView({ leads, isLoading, onLeadSelect, onStatusChange, stats }: PipelineViewProps) {
   const isMobile = useIsMobile();
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+  const [draggingLeadId, setDraggingLeadId] = useState<string | null>(null);
 
   const groupedLeads = useMemo(() => {
     const groups: Record<string, Lead[]> = {};
     PIPELINE_COLUMNS.forEach(col => {
-      groups[col.key] = leads.filter(l => l.status === col.key).slice(0, 20);
+      groups[col.key] = leads.filter(l => l.status === col.key).slice(0, 50);
     });
     return groups;
   }, [leads]);
+
+  const handleDragStart = useCallback((e: React.DragEvent, leadId: string) => {
+    e.dataTransfer.setData('text/plain', leadId);
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggingLeadId(leadId);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, columnKey: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverColumn(columnKey);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverColumn(null);
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent, targetStatus: string) => {
+    e.preventDefault();
+    const leadId = e.dataTransfer.getData('text/plain');
+    setDragOverColumn(null);
+    setDraggingLeadId(null);
+    
+    if (!leadId || !onStatusChange) return;
+    
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead || lead.status === targetStatus) return;
+    
+    await onStatusChange(leadId, targetStatus);
+  }, [leads, onStatusChange]);
+
+  const handleDragEnd = useCallback(() => {
+    setDragOverColumn(null);
+    setDraggingLeadId(null);
+  }, []);
 
   if (isLoading) {
     return (
@@ -147,7 +186,7 @@ export function PipelineView({ leads, isLoading, onLeadSelect, stats }: Pipeline
     );
   }
 
-  // Desktop Pipeline
+  // Desktop Pipeline with Drag & Drop
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
@@ -228,12 +267,13 @@ export function PipelineView({ leads, isLoading, onLeadSelect, stats }: Pipeline
         </Card>
       </div>
 
-      {/* Pipeline Columns */}
+      {/* Pipeline Columns with Drag & Drop */}
       <div className="grid grid-cols-5 gap-4">
         {PIPELINE_COLUMNS.map((column, colIndex) => {
           const config = PIPELINE_STAGES[column.key];
           const columnLeads = groupedLeads[column.key] || [];
           const Icon = column.icon;
+          const isOver = dragOverColumn === column.key;
 
           return (
             <motion.div
@@ -241,8 +281,14 @@ export function PipelineView({ leads, isLoading, onLeadSelect, stats }: Pipeline
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: colIndex * 0.05 }}
+              onDragOver={(e: any) => handleDragOver(e, column.key)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e: any) => handleDrop(e, column.key)}
             >
-              <Card className={`border-t-4 ${config.borderColor} h-[calc(100vh-400px)] min-h-[400px]`}>
+              <Card className={cn(
+                `border-t-4 ${config.borderColor} h-[calc(100vh-400px)] min-h-[400px] transition-all duration-200`,
+                isOver && "ring-2 ring-primary bg-primary/5 scale-[1.02]"
+              )}>
                 <CardHeader className="py-3 px-4 border-b">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -261,20 +307,39 @@ export function PipelineView({ leads, isLoading, onLeadSelect, stats }: Pipeline
                 <ScrollArea className="h-[calc(100%-60px)]">
                   <CardContent className="px-3 py-3 space-y-2">
                     {columnLeads.length === 0 ? (
-                      <div className="py-12 text-center text-muted-foreground text-sm">
-                        <div className={`w-12 h-12 mx-auto mb-3 rounded-full ${config.bgColor} flex items-center justify-center opacity-50`}>
-                          <Icon className={`h-6 w-6 ${config.textColor}`} />
-                        </div>
-                        Nenhum lead
+                      <div className={cn(
+                        "py-12 text-center text-muted-foreground text-sm transition-all",
+                        isOver && "py-6"
+                      )}>
+                        {isOver ? (
+                          <p className="text-primary font-medium">Solte aqui</p>
+                        ) : (
+                          <>
+                            <div className={`w-12 h-12 mx-auto mb-3 rounded-full ${config.bgColor} flex items-center justify-center opacity-50`}>
+                              <Icon className={`h-6 w-6 ${config.textColor}`} />
+                            </div>
+                            Nenhum lead
+                          </>
+                        )}
                       </div>
                     ) : (
                       columnLeads.map((lead, index) => (
-                        <LeadMiniCard
+                        <div
                           key={lead.id}
-                          lead={lead}
-                          onClick={() => onLeadSelect(lead)}
-                          index={index}
-                        />
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, lead.id)}
+                          onDragEnd={handleDragEnd}
+                          className={cn(
+                            "cursor-grab active:cursor-grabbing",
+                            draggingLeadId === lead.id && "opacity-50"
+                          )}
+                        >
+                          <LeadMiniCard
+                            lead={lead}
+                            onClick={() => onLeadSelect(lead)}
+                            index={index}
+                          />
+                        </div>
                       ))
                     )}
                   </CardContent>

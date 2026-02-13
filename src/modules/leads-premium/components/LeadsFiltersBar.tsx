@@ -4,8 +4,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Search, Filter, X, SlidersHorizontal, Calendar } from "lucide-react";
-import { LeadFilters, PIPELINE_STAGES } from "../types";
+import { Search, Filter, X, SlidersHorizontal, Calendar, User } from "lucide-react";
+import { LeadFilters, PIPELINE_STAGES, UserProfile } from "../types";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState } from "react";
 
@@ -14,6 +14,8 @@ interface LeadsFiltersBarProps {
   onFiltersChange: (filters: LeadFilters & { dateFilter?: string }) => void;
   availableConvenios: string[];
   availableTags: string[];
+  users?: UserProfile[];
+  showUserFilter?: boolean;
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
@@ -23,6 +25,8 @@ export function LeadsFiltersBar({
   onFiltersChange, 
   availableConvenios,
   availableTags,
+  users = [],
+  showUserFilter = false,
   isOpen: externalOpen,
   onOpenChange: externalOpenChange
 }: LeadsFiltersBarProps) {
@@ -35,12 +39,14 @@ export function LeadsFiltersBar({
   const hasActiveFilters = filters.status !== "all" || 
     filters.convenio !== "all" || 
     filters.tag !== "all" ||
+    filters.user !== "all" ||
     filters.dateFilter !== "all";
 
   const activeFilterCount = [
     filters.status !== "all",
     filters.convenio !== "all",
     filters.tag !== "all",
+    filters.user !== "all",
     filters.dateFilter !== "all"
   ].filter(Boolean).length;
 
@@ -138,6 +144,30 @@ export function LeadsFiltersBar({
               <SelectItem value="all">Todas Tags</SelectItem>
               {availableTags.map((tag) => (
                 <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* User Filter */}
+      {showUserFilter && users.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium flex items-center gap-2">
+            <User className="h-4 w-4" />
+            Usuário
+          </Label>
+          <Select 
+            value={filters.user} 
+            onValueChange={(value) => onFiltersChange({ ...filters, user: value })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Todos Usuários" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos Usuários</SelectItem>
+              {users.map((u) => (
+                <SelectItem key={u.id} value={u.id}>{u.name || u.email || 'Sem nome'}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -277,6 +307,25 @@ export function LeadsFiltersBar({
             <SelectItem value="all">Todas Tags</SelectItem>
             {availableTags.map((tag) => (
               <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
+      {/* User Filter - Desktop */}
+      {showUserFilter && users.length > 0 && (
+        <Select 
+          value={filters.user} 
+          onValueChange={(value) => onFiltersChange({ ...filters, user: value })}
+        >
+          <SelectTrigger className="w-[160px]">
+            <User className="h-4 w-4 mr-2" />
+            <SelectValue placeholder="Usuário" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos Usuários</SelectItem>
+            {users.map((u) => (
+              <SelectItem key={u.id} value={u.id}>{u.name || u.email || 'Sem nome'}</SelectItem>
             ))}
           </SelectContent>
         </Select>
