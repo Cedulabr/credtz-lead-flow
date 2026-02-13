@@ -4,8 +4,10 @@ import { Lead, LeadStats, PIPELINE_STAGES, UserProfile } from "../types";
 import { LeadMiniCard } from "../components/LeadMiniCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { 
@@ -16,11 +18,14 @@ import {
   CheckCircle, 
   XCircle,
   Users,
-  Target
+  Target,
+  User,
+  Filter
 } from "lucide-react";
 
 interface PipelineViewProps {
   leads: Lead[];
+  users: UserProfile[];
   isLoading: boolean;
   onLeadSelect: (lead: Lead) => void;
   onStatusChange?: (leadId: string, newStatus: string) => Promise<boolean>;
@@ -35,18 +40,47 @@ const PIPELINE_COLUMNS = [
   { key: 'cliente_fechado', icon: CheckCircle, label: 'Fechados' },
 ];
 
-export function PipelineView({ leads, isLoading, onLeadSelect, onStatusChange, stats }: PipelineViewProps) {
+export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusChange, stats }: PipelineViewProps) {
   const isMobile = useIsMobile();
+  const { profile } = useAuth();
+  const isAdminOrGestor = profile?.role === 'admin' || (profile?.role as string) === 'gestor';
+  
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [draggingLeadId, setDraggingLeadId] = useState<string | null>(null);
+  
+  // Pipeline filters
+  const [filterUser, setFilterUser] = useState("all");
+  const [filterConvenio, setFilterConvenio] = useState("all");
+  const [filterTag, setFilterTag] = useState("all");
+
+  // Extract unique convenios and tags
+  const availableConvenios = useMemo(() => {
+    const unique = [...new Set(leads.map(l => l.convenio).filter(Boolean))];
+    return unique.sort();
+  }, [leads]);
+
+  const availableTags = useMemo(() => {
+    const unique = [...new Set(leads.map(l => l.tag).filter(Boolean))] as string[];
+    return unique.sort();
+  }, [leads]);
+
+  // Filter leads
+  const filteredLeads = useMemo(() => {
+    return leads.filter(lead => {
+      if (filterUser !== "all" && lead.assigned_to !== filterUser && lead.created_by !== filterUser) return false;
+      if (filterConvenio !== "all" && lead.convenio !== filterConvenio) return false;
+      if (filterTag !== "all" && lead.tag !== filterTag) return false;
+      return true;
+    });
+  }, [leads, filterUser, filterConvenio, filterTag]);
 
   const groupedLeads = useMemo(() => {
     const groups: Record<string, Lead[]> = {};
     PIPELINE_COLUMNS.forEach(col => {
-      groups[col.key] = leads.filter(l => l.status === col.key).slice(0, 50);
+      groups[col.key] = filteredLeads.filter(l => l.status === col.key).slice(0, 50);
     });
     return groups;
-  }, [leads]);
+  }, [filteredLeads]);
 
   const handleDragStart = useCallback((e: React.DragEvent, leadId: string) => {
     e.dataTransfer.setData('text/plain', leadId);
@@ -91,18 +125,68 @@ export function PipelineView({ leads, isLoading, onLeadSelect, onStatusChange, s
             <Skeleton key={i} className="h-24 rounded-xl" />
           ))}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="space-y-2">
-              {[...Array(3)].map((_, j) => (
-                <Skeleton key={j} className="h-20 rounded-lg" />
-              ))}
-            </div>
-          ))}
-        </div>
       </div>
     );
   }
+
+  // Filters bar
+  const filtersBar = (
+    <div className="flex items-center gap-3 flex-wrap mb-4">
+      <Filter className="h-4 w-4 text-muted-foreground" />
+      
+      {/* User filter - only for admin/gestor */}
+      {isAdminOrGestor && users.length > 0 && (
+        <Select value={filterUser} onValueChange={setFilterUser}>
+          <SelectTrigger className="w-[180px] h-9">
+            <User className="h-3.5 w-3.5 mr-1.5" />
+            <SelectValue placeholder="Usuário" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos Usuários</SelectItem>
+            {users.map((u) => (
+              <SelectItem key={u.id} value={u.id}>{u.name || u.email || 'Sem nome'}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
+      {/* Convenio filter */}
+      {availableConvenios.length > 0 && (
+        <Select value={filterConvenio} onValueChange={setFilterConvenio}>
+          <SelectTrigger className="w-[160px] h-9">
+            <SelectValue placeholder="Convênio" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos Convênios</SelectItem>
+            {availableConvenios.map((conv) => (
+              <SelectItem key={conv} value={conv}>{conv}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
+      {/* Tag filter */}
+      {availableTags.length > 0 && (
+        <Select value={filterTag} onValueChange={setFilterTag}>
+          <SelectTrigger className="w-[140px] h-9">
+            <SelectValue placeholder="Tag" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas Tags</SelectItem>
+            {availableTags.map((tag) => (
+              <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
+      {(filterUser !== "all" || filterConvenio !== "all" || filterTag !== "all") && (
+        <Badge variant="secondary" className="text-xs">
+          {filteredLeads.length} leads
+        </Badge>
+      )}
+    </div>
+  );
 
   if (isMobile) {
     return (
@@ -126,6 +210,8 @@ export function PipelineView({ leads, isLoading, onLeadSelect, onStatusChange, s
             <p className="text-[10px] text-muted-foreground">Conversão</p>
           </div>
         </div>
+
+        <div className="px-4 pt-3">{filtersBar}</div>
 
         {/* Horizontal Scrollable Pipeline */}
         <ScrollArea className="flex-1">
@@ -188,7 +274,9 @@ export function PipelineView({ leads, isLoading, onLeadSelect, onStatusChange, s
 
   // Desktop Pipeline with Drag & Drop
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {filtersBar}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card className="border-l-4 border-l-blue-500">
