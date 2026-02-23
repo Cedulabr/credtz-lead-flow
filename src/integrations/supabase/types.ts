@@ -565,6 +565,53 @@ export type Database = {
         }
         Relationships: []
       }
+      app_users: {
+        Row: {
+          company_id: string | null
+          cpf: string
+          created_at: string | null
+          id: string
+          idade: number | null
+          nome: string | null
+          telefone: string
+          tipo_convenio: string | null
+          ultimo_acesso: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          cpf: string
+          created_at?: string | null
+          id?: string
+          idade?: number | null
+          nome?: string | null
+          telefone: string
+          tipo_convenio?: string | null
+          ultimo_acesso?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          cpf?: string
+          created_at?: string | null
+          id?: string
+          idade?: number | null
+          nome?: string | null
+          telefone?: string
+          tipo_convenio?: string | null
+          ultimo_acesso?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_users_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           id: string
@@ -1337,6 +1384,84 @@ export type Database = {
           },
         ]
       }
+      client_leads: {
+        Row: {
+          app_user_id: string | null
+          classificacao: string | null
+          company_id: string | null
+          cpf: string | null
+          created_at: string | null
+          data_nascimento: string | null
+          id: string
+          nome: string
+          parcelas_restantes: number | null
+          possui_emprestimo: boolean | null
+          potencial_valor: number | null
+          resultado_texto: string | null
+          score: number | null
+          status: string | null
+          telefone: string
+          tipo_beneficio: string | null
+          updated_at: string | null
+          valor_parcela: number | null
+        }
+        Insert: {
+          app_user_id?: string | null
+          classificacao?: string | null
+          company_id?: string | null
+          cpf?: string | null
+          created_at?: string | null
+          data_nascimento?: string | null
+          id?: string
+          nome: string
+          parcelas_restantes?: number | null
+          possui_emprestimo?: boolean | null
+          potencial_valor?: number | null
+          resultado_texto?: string | null
+          score?: number | null
+          status?: string | null
+          telefone: string
+          tipo_beneficio?: string | null
+          updated_at?: string | null
+          valor_parcela?: number | null
+        }
+        Update: {
+          app_user_id?: string | null
+          classificacao?: string | null
+          company_id?: string | null
+          cpf?: string | null
+          created_at?: string | null
+          data_nascimento?: string | null
+          id?: string
+          nome?: string
+          parcelas_restantes?: number | null
+          possui_emprestimo?: boolean | null
+          potencial_valor?: number | null
+          resultado_texto?: string | null
+          score?: number | null
+          status?: string | null
+          telefone?: string
+          tipo_beneficio?: string | null
+          updated_at?: string | null
+          valor_parcela?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_leads_app_user_id_fkey"
+            columns: ["app_user_id"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_leads_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_reuse_alerts: {
         Row: {
           alert_date: string
@@ -2002,30 +2127,51 @@ export type Database = {
       companies: {
         Row: {
           cnpj: string | null
+          cor_primaria: string | null
+          cor_secundaria: string | null
           created_at: string | null
           created_by: string | null
+          dominio: string | null
           id: string
+          instagram_handle: string | null
           is_active: boolean | null
+          logo_url: string | null
           name: string
+          nome_aplicativo: string | null
           updated_at: string | null
+          whatsapp_number: string | null
         }
         Insert: {
           cnpj?: string | null
+          cor_primaria?: string | null
+          cor_secundaria?: string | null
           created_at?: string | null
           created_by?: string | null
+          dominio?: string | null
           id?: string
+          instagram_handle?: string | null
           is_active?: boolean | null
+          logo_url?: string | null
           name: string
+          nome_aplicativo?: string | null
           updated_at?: string | null
+          whatsapp_number?: string | null
         }
         Update: {
           cnpj?: string | null
+          cor_primaria?: string | null
+          cor_secundaria?: string | null
           created_at?: string | null
           created_by?: string | null
+          dominio?: string | null
           id?: string
+          instagram_handle?: string | null
           is_active?: boolean | null
+          logo_url?: string | null
           name?: string
+          nome_aplicativo?: string | null
           updated_at?: string | null
+          whatsapp_number?: string | null
         }
         Relationships: []
       }
@@ -2206,6 +2352,56 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      education_content: {
+        Row: {
+          ativo: boolean | null
+          audio_url: string | null
+          categoria: string
+          company_id: string | null
+          created_at: string | null
+          descricao: string | null
+          id: string
+          ordem: number | null
+          titulo: string
+          updated_at: string | null
+          video_url: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          audio_url?: string | null
+          categoria: string
+          company_id?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          ordem?: number | null
+          titulo: string
+          updated_at?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          audio_url?: string | null
+          categoria?: string
+          company_id?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          ordem?: number | null
+          titulo?: string
+          updated_at?: string | null
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "education_content_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       financial_transactions: {
         Row: {
@@ -2622,6 +2818,41 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: true
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_qualification_scores: {
+        Row: {
+          created_at: string | null
+          id: string
+          lead_id: string
+          pergunta: string
+          pontos: number | null
+          resposta: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          lead_id: string
+          pergunta: string
+          pontos?: number | null
+          resposta?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          lead_id?: string
+          pergunta?: string
+          pontos?: number | null
+          resposta?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_qualification_scores_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "client_leads"
             referencedColumns: ["id"]
           },
         ]
@@ -4981,6 +5212,7 @@ export type Database = {
         }
         Returns: Json
       }
+      calculate_lead_score: { Args: { p_lead_id: string }; Returns: Json }
       calculate_worked_hours: {
         Args: { p_date: string; p_user_id: string }
         Returns: {
