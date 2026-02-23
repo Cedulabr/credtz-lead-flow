@@ -303,6 +303,13 @@ export const TelevendasModule = () => {
         status_updated_by: user?.id 
       };
 
+      // Auto-sync status_bancario when commercial status reaches a final state
+      if (newStatus === "proposta_paga") {
+        updateData.status_bancario = "pago_cliente";
+      } else if (newStatus === "proposta_cancelada") {
+        updateData.status_bancario = "cancelado_banco";
+      }
+
       // Add payment date if provided (for payment statuses)
       const isPaymentStatus = ["pago_aguardando", "proposta_paga"].includes(newStatus);
       const isCancellationStatus = newStatus === "proposta_cancelada";
@@ -534,6 +541,36 @@ export const TelevendasModule = () => {
   const handleApproveCancellation = (tv: Televenda) => handleStatusChange(tv, "proposta_cancelada");
   const handleRejectCancellation = (tv: Televenda) => handleStatusChange(tv, "devolvido");
 
+  // Bulk approve cancellations
+  const handleBulkApproveCancellation = async (items: Televenda[]) => {
+    try {
+      for (const tv of items) {
+        const updateData: Record<string, unknown> = {
+          status: "proposta_cancelada",
+          status_bancario: "cancelado_banco",
+          status_updated_at: new Date().toISOString(),
+          status_updated_by: user?.id,
+          data_cancelamento: new Date().toISOString().split("T")[0],
+        };
+
+        await supabase.from("televendas").update(updateData).eq("id", tv.id);
+        await supabase.from("televendas_status_history").insert({
+          televendas_id: tv.id,
+          from_status: tv.status,
+          to_status: "proposta_cancelada",
+          changed_by: user?.id,
+          reason: "Aprovação em massa de cancelamento",
+        });
+      }
+
+      toast({ title: "✅ Cancelamentos aprovados", description: `${items.length} propostas canceladas com sucesso` });
+      await fetchTelevendas();
+    } catch (error) {
+      console.error("Bulk cancellation error:", error);
+      toast({ title: "Erro", description: "Erro ao aprovar cancelamentos em massa", variant: "destructive" });
+    }
+  };
+
   // Permission checks
   const canEdit = (tv: Televenda) => isAdmin || (isGestor && userCompanyIds.includes(tv.company_id || ""));
   const canEditLimited = (tv: Televenda) => tv.user_id === user?.id && !isGestorOrAdmin;
@@ -683,6 +720,7 @@ export const TelevendasModule = () => {
                   canChangeStatus={canChangeStatus}
                   isGestorOrAdmin={isGestorOrAdmin}
                   onRefresh={fetchTelevendas}
+                  users={users}
                 />
               </motion.div>
             )}
@@ -707,6 +745,7 @@ export const TelevendasModule = () => {
                   onRejectExclusion={handleRejectExclusion}
                   onApproveCancellation={handleApproveCancellation}
                   onRejectCancellation={handleRejectCancellation}
+                  onBulkApproveCancellation={handleBulkApproveCancellation}
                 />
               </motion.div>
             )}
