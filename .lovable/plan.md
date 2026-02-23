@@ -1,119 +1,118 @@
 
-# Plano de Melhorias - Modulo Gestao de Televendas
 
-## Resumo dos Problemas Identificados
+# Plano: Melhorias no Modulo Gestao de Televendas
 
-1. **Aprovacao em massa de cancelamentos** - Nao existe opcao para aprovar todos de uma vez
-2. **Filtro de meses** - Atualmente mostra 12 meses; deve mostrar apenas 2 ultimos + seletor para meses anteriores
-3. **Bancos duplicados** - Dados no banco estao inconsistentes (ex: "RED", "RED ", "Facta", "FACTA", "Banco Facta", "BRB", "Banco BRB - RED"). O filtro puxa dos dados existentes em vez dos bancos cadastrados no Admin
-4. **Pipeline com dados inconsistentes** - 2 propostas canceladas com status_bancario = "aguardando_digitacao"
-5. **Botao Sync/Status Bancario** - Atualmente fica escondido no DetailModal. Deve ficar ao lado do nome na lista, e propostas ja atualizadas devem descer na ordenacao
+## 1. Aprovacao em massa de cancelamentos
 
----
+**Problema**: Gestor precisa aprovar cancelamentos um por um.
 
-## Tarefa 1: Aprovacao em massa de cancelamentos
+**Solucao**: Adicionar selecao em massa na secao "Solicitacoes de Cancelamento" da AprovacoesView.
 
 **Arquivo**: `src/modules/televendas/views/AprovacoesView.tsx`
-
-- Adicionar um checkbox "Selecionar todos" no cabecalho da secao "Solicitacoes de Cancelamento"
-- Adicionar checkbox individual em cada card de cancelamento
-- Botao "Aprovar Cancelamento em Massa" que aparece quando ha itens selecionados
-- Ao clicar, abre o StatusChangeModal com confirmacao para processar todos de uma vez
-- Nova prop `onBulkApproveCancellation` no componente para processar a lista
-
-**Arquivo**: `src/modules/televendas/TelevendasModule.tsx`
-
-- Criar handler `handleBulkApproveCancellation` que itera sobre os selecionados e aplica `proposta_cancelada` com historico para cada um
-
----
-
-## Tarefa 2: Filtro de meses - apenas 2 ultimos + seletor
-
-**Arquivo**: `src/modules/televendas/components/FiltersDrawer.tsx`
-
-- Alterar a geracao de `monthOptions`:
-  - Mostrar diretamente os 2 ultimos meses como botoes rapidos (mes atual e mes anterior)
-  - Adicionar opcao "Meses anteriores" que abre um `Select` com os meses de 3 a 12 meses atras
-- Manter a logica de filtragem existente inalterada
-
----
-
-## Tarefa 3: Bancos duplicados - usar bancos do Admin
+- Adicionar estado `selectedCancellations` (Set de IDs)
+- Checkbox "Selecionar todos" no header da secao cancelamentos
+- Checkbox individual em cada card de cancelamento
+- Botao "Aprovar Todos Selecionados" que aparece quando ha itens selecionados
+- Nova prop `onBulkApproveCancellation` que recebe array de Televenda
 
 **Arquivo**: `src/modules/televendas/TelevendasModule.tsx`
-
-- Substituir `availableBanks` (extraido dos dados) por `registeredBanks` (ja carregado do `useTelevendasBanks`) no `FiltersDrawer`
-- Passar `registeredBanks` em vez de `availableBanks` para o drawer
-
-**Arquivo**: `src/modules/televendas/components/FiltersDrawer.tsx`
-
-- O prop `availableBanks` passara a receber os bancos cadastrados no Admin
-
-**Migracao de dados (SQL)**: Normalizar os nomes duplicados existentes no banco:
-
-```text
-UPDATE televendas SET banco = 'BRB - 360' WHERE banco = '360';
-UPDATE televendas SET banco = 'Banco Banrisul' WHERE banco = 'banrisul';
-UPDATE televendas SET banco = 'Banco Facta' WHERE banco IN ('Facta', 'FACTA');
-UPDATE televendas SET banco = 'Banco Pic Pay' WHERE banco IN ('Pic Pay', 'PIC PAY');
-UPDATE televendas SET banco = 'Banco BRB - RED' WHERE banco IN ('RED', 'RED ');
-UPDATE televendas SET banco = 'Banco Daycoval' WHERE banco = 'Daycoval';
-UPDATE televendas SET banco = 'Finanto Bank' WHERE banco = ' FINANTO';
--- etc. Mapeamento completo dos 27 nomes para os 14 cadastrados
-```
+- Criar `handleBulkApproveCancellation(items: Televenda[])` que itera e aplica `proposta_cancelada` com historico para cada proposta
+- Passar a nova prop para AprovacoesView
 
 ---
 
-## Tarefa 4: Corrigir Pipeline - propostas canceladas com status errado
+## 2. Botao Sync visivel para todos os usuarios + registro de quem clicou
 
-**Migracao de dados (SQL)**:
-
-```text
-UPDATE televendas 
-SET status_bancario = 'cancelado_banco' 
-WHERE status = 'proposta_cancelada' 
-  AND status_bancario = 'aguardando_digitacao';
-```
-
-Isso corrige os 2 registros identificados.
-
----
-
-## Tarefa 5: Botao Sync ao lado do nome + ordenacao por atualizacao
+**Problema**: O botao Sync so aparece para gestores/admins e fica escondido. Deve ser visivel para todos e registrar quem atualizou.
 
 **Arquivo**: `src/modules/televendas/views/PropostasView.tsx`
 
-Mudancas no card de proposta:
-- Mover o botao de "Marcar como visto" (Eye/Sync) para ao lado do nome do cliente na Row 1
-- Ao clicar no Sync, atualizar `last_sync_at` (como ja funciona)
-- Adicionar ordenacao: propostas com `last_sync_at` mais recente vao para o final da lista; as que nunca foram verificadas ou estao desatualizadas ficam no topo
-- Usar `useMemo` para reordenar a lista antes de renderizar
+Mudancas:
+- Remover a condicao `isGestorOrAdmin` do botao Sync -- agora aparece para TODOS
+- Mover o botao para ficar ao lado do nome do cliente (Row 1), nao no lado direito
+- O `handleMarkAsSeen` ja grava `last_sync_by` com o `user.id` -- manter isso
+- Adicionar exibicao de quem fez o ultimo sync (nome do usuario) no tooltip ou sub-label
+- Precisamos buscar o nome do usuario que fez o sync: adicionar prop `users` com a lista de usuarios para mapear `last_sync_by` para nome
 
-Logica de ordenacao:
+**Arquivo**: `src/modules/televendas/TelevendasModule.tsx`
+- Passar prop `users` para PropostasView
+
+---
+
+## 3. Ordenacao: propostas atualizadas descem
+
+**Arquivo**: `src/modules/televendas/views/PropostasView.tsx`
+
+Adicionar `useMemo` para reordenar a lista antes de renderizar:
+
 ```text
-1. Propostas sem last_sync_at (nunca verificadas) - TOPO
-2. Propostas com last_sync_at antigo - MEIO  
-3. Propostas com last_sync_at recente - BASE
+Ordem de prioridade:
+1. Sem last_sync_at (nunca verificadas) -- TOPO
+2. last_sync_at antigo (mais de 2h) -- MEIO
+3. last_sync_at recente (menos de 2h) -- BASE
+Dentro de cada grupo, manter ordem por created_at desc
 ```
 
 ---
 
-## Sequencia de Implementacao
+## 4. Corrigir Pipeline Operacional -- dados inconsistentes
 
-1. Migracao SQL (normalizar bancos + corrigir status_bancario)
-2. Filtro de meses (FiltersDrawer)
-3. Bancos do Admin no filtro (TelevendasModule + FiltersDrawer)
-4. Botao Sync reposicionado + ordenacao (PropostasView)
-5. Aprovacao em massa de cancelamentos (AprovacoesView + TelevendasModule)
+**Problema detectado na analise**:
+
+| Status Comercial | Status Bancario | Quantidade | Acao |
+|---|---|---|---|
+| proposta_cancelada | aguardando_digitacao | 2 | Corrigir para cancelado_banco |
+| proposta_cancelada | em_andamento | 22 | Corrigir para cancelado_banco |
+| proposta_cancelada | pago_cliente | 1 | Corrigir para cancelado_banco |
+| proposta_paga | aguardando_digitacao | 1 | Corrigir para pago_cliente |
+| proposta_paga | em_andamento | 4 | Corrigir para pago_cliente |
+| proposta_paga | pendente | 1 | Corrigir para pago_cliente |
+
+Total: **31 registros inconsistentes** (mais do que os 2 inicialmente estimados).
+
+**SQL de correcao (via ferramenta de dados)**:
+```text
+UPDATE televendas SET status_bancario = 'cancelado_banco'
+WHERE status = 'proposta_cancelada' AND status_bancario NOT IN ('cancelado_banco');
+
+UPDATE televendas SET status_bancario = 'pago_cliente'
+WHERE status = 'proposta_paga' AND status_bancario NOT IN ('pago_cliente');
+```
+
+**Prevencao futura**: Adicionar logica no `confirmStatusChange` do TelevendasModule para auto-sincronizar o `status_bancario` quando o status comercial muda para um estado final (`proposta_paga` ou `proposta_cancelada`).
 
 ---
 
-## Arquivos Impactados
+## Sequencia de implementacao
 
-| Arquivo | Tipo de Alteracao |
+1. Correcao de dados no pipeline (SQL via ferramenta de dados)
+2. Prevencao de inconsistencias futuras no TelevendasModule (auto-sync status_bancario)
+3. Botao Sync visivel para todos + ao lado do nome + ordenacao (PropostasView)
+4. Aprovacao em massa de cancelamentos (AprovacoesView + TelevendasModule)
+
+---
+
+## Arquivos impactados
+
+| Arquivo | Alteracao |
 |---|---|
-| `src/modules/televendas/views/AprovacoesView.tsx` | Checkbox + aprovacao em massa |
-| `src/modules/televendas/views/PropostasView.tsx` | Reposicionar Sync + ordenacao |
-| `src/modules/televendas/components/FiltersDrawer.tsx` | Filtro de meses + bancos do Admin |
-| `src/modules/televendas/TelevendasModule.tsx` | Handler em massa + passar bancos Admin |
-| Migracao SQL | Normalizar bancos + corrigir status_bancario |
+| `src/modules/televendas/views/AprovacoesView.tsx` | Checkbox + selecao em massa + botao bulk approve |
+| `src/modules/televendas/views/PropostasView.tsx` | Sync para todos, ao lado do nome, ordenacao por last_sync_at, exibir quem sincronizou |
+| `src/modules/televendas/TelevendasModule.tsx` | Handler bulk approve, auto-sync status_bancario, passar users para PropostasView |
+| Correcao SQL (dados) | 31 registros com status_bancario inconsistente |
+
+---
+
+## Detalhes tecnicos
+
+### Auto-sync status_bancario (prevencao futura)
+No `confirmStatusChange`, ao detectar que `newStatus` e `proposta_paga`, automaticamente setar `status_bancario = 'pago_cliente'`. Ao detectar `proposta_cancelada`, setar `status_bancario = 'cancelado_banco'`. Isso evita que novas propostas fiquem com status bancario desalinhado.
+
+### Bulk approve flow
+1. Usuario seleciona cancelamentos via checkboxes
+2. Clica "Aprovar Todos"
+3. Sistema mostra confirmacao com quantidade
+4. Ao confirmar, itera sobre cada item chamando o mesmo fluxo do `handleApproveCancellation` individual
+5. Registra historico para cada proposta
+6. Refresh da lista ao final
+
