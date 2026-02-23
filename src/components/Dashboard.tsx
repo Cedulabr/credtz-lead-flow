@@ -592,9 +592,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       
       const statuses = data || [];
       const created = statuses.length;
-      const analyzing = statuses.filter(s => s.status === 'em_analise' || s.status === 'aguardando').length;
-      const paid = statuses.filter(s => s.status === 'pago').length;
-      const canceled = statuses.filter(s => s.status === 'cancelado').length;
+      const analyzing = statuses.filter(s => 
+        s.status === 'em_andamento' || s.status === 'solicitar_digitacao' || 
+        s.status === 'proposta_pendente' || s.status === 'pago_aguardando' ||
+        s.status === 'bloqueado'
+      ).length;
+      const paid = statuses.filter(s => s.status === 'proposta_paga').length;
+      const canceled = statuses.filter(s => s.status === 'proposta_cancelada' || s.status === 'exclusao_aprovada').length;
       
       setFunnelData([
         { name: 'Criadas', value: created, fill: 'hsl(var(--primary))' },
