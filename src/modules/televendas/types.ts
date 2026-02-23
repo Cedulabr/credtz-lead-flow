@@ -85,6 +85,7 @@ export interface TelevendasFilters {
 // Status que o OPERADOR pode definir
 export const OPERATOR_STATUSES = [
   "solicitar_digitacao",    // Solicitar Digitação
+  "bloqueado",              // Benefício Bloqueado
   "em_andamento",           // Em Andamento
   "pago_aguardando",        // Pago Aguardando Gestor
   "cancelado_aguardando",   // Solicitar Cancelamento (Aguardando Gestor)
@@ -135,6 +136,15 @@ export const STATUS_CONFIG: Record<string, {
     emoji: "📝",
     color: "text-purple-600",
     bgColor: "bg-purple-500/10 border-purple-300",
+    isOperational: true,
+    isFinal: false,
+  },
+  bloqueado: {
+    label: "Benefício Bloqueado",
+    shortLabel: "Bloqueado",
+    emoji: "🔒",
+    color: "text-red-700",
+    bgColor: "bg-red-500/10 border-red-300",
     isOperational: true,
     isFinal: false,
   },

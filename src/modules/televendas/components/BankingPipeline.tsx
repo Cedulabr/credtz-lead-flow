@@ -91,6 +91,8 @@ export const BankingPipeline = ({ televendas, onFilterByBankStatus, selectedBank
     switch (tv.status) {
       case "solicitar_digitacao":
         return "aguardando_digitacao";
+      case "bloqueado":
+        return "bloqueado";
       case "em_andamento":
         return "em_andamento";
       case "proposta_pendente":
