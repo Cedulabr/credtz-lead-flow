@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Inbox, Eye, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,12 @@ import { ActionMenu } from "../components/ActionMenu";
 import { BANKING_STATUS_CONFIG } from "../components/BankingPipeline";
 import { SyncIndicator } from "../components/SyncIndicator";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+interface User {
+  id: string;
+  name: string;
+}
 
 interface PropostasViewProps {
   televendas: Televenda[];
@@ -24,6 +30,7 @@ interface PropostasViewProps {
   canChangeStatus: (tv: Televenda) => boolean;
   isGestorOrAdmin: boolean;
   onRefresh?: () => void;
+  users?: User[];
 }
 
 const OPERATION_BADGE: Record<string, { emoji: string; color: string }> = {
@@ -32,6 +39,8 @@ const OPERATION_BADGE: Record<string, { emoji: string; color: string }> = {
   "Refinanciamento": { emoji: "🔁", color: "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700" },
   "Cartão": { emoji: "💳", color: "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700" },
 };
+
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
 export const PropostasView = ({
   televendas,
@@ -45,9 +54,35 @@ export const PropostasView = ({
   canChangeStatus,
   isGestorOrAdmin,
   onRefresh,
+  users = [],
 }: PropostasViewProps) => {
   const { user } = useAuth();
   const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  // Map user IDs to names for sync display
+  const usersMap = useMemo(() => {
+    const map = new Map<string, string>();
+    users.forEach((u) => map.set(u.id, u.name));
+    return map;
+  }, [users]);
+
+  // Sort: unseen at top, old sync in middle, recent sync at bottom
+  const sortedTelevendas = useMemo(() => {
+    return [...televendas].sort((a, b) => {
+      const now = Date.now();
+      const getGroup = (tv: Televenda) => {
+        if (!tv.last_sync_at) return 0; // never verified - TOP
+        const diff = now - new Date(tv.last_sync_at).getTime();
+        if (diff > TWO_HOURS_MS) return 1; // old - MIDDLE
+        return 2; // recent - BOTTOM
+      };
+      const groupA = getGroup(a);
+      const groupB = getGroup(b);
+      if (groupA !== groupB) return groupA - groupB;
+      // Within same group, sort by created_at desc
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [televendas]);
 
   const handleMarkAsSeen = async (e: React.MouseEvent, tv: Televenda) => {
     e.stopPropagation();
@@ -70,7 +105,7 @@ export const PropostasView = ({
     }
   };
 
-  if (televendas.length === 0) {
+  if (sortedTelevendas.length === 0) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -91,137 +126,148 @@ export const PropostasView = ({
   }
 
   return (
-    <div className="space-y-2">
-      <AnimatePresence mode="popLayout">
-        {televendas.map((tv, index) => {
-          const isAwaiting = tv.status === "pago_aguardando" || tv.status === "cancelado_aguardando";
-          const bankStatus = tv.status_bancario || "aguardando_digitacao";
-          const bankConfig = BANKING_STATUS_CONFIG[bankStatus];
-          const opBadge = OPERATION_BADGE[tv.tipo_operacao];
+    <TooltipProvider>
+      <div className="space-y-2">
+        <AnimatePresence mode="popLayout">
+          {sortedTelevendas.map((tv, index) => {
+            const isAwaiting = tv.status === "pago_aguardando" || tv.status === "cancelado_aguardando";
+            const opBadge = OPERATION_BADGE[tv.tipo_operacao];
+            const syncByName = tv.last_sync_by ? usersMap.get(tv.last_sync_by) : null;
 
-          return (
-            <motion.div
-              key={tv.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ delay: index * 0.015 }}
-              onClick={() => onView(tv)}
-              className={`
-                relative p-3 md:p-4 rounded-xl border cursor-pointer
-                bg-card hover:bg-muted/40 transition-all duration-150
-                hover:shadow-sm
-                ${isAwaiting && isGestorOrAdmin ? 'border-amber-300 bg-amber-500/5' : 'border-border/50'}
-              `}
-            >
-              <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-                {/* Client info */}
-                <div className="flex-1 min-w-0 space-y-1">
-                  {/* Row 1: Name + operation badge */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-sm md:text-base font-semibold truncate">
-                      {tv.nome}
-                    </h3>
-                    {opBadge && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${opBadge.color}`}>
-                        {opBadge.emoji} {tv.tipo_operacao}
-                      </span>
-                    )}
-                  </div>
+            return (
+              <motion.div
+                key={tv.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ delay: index * 0.015 }}
+                onClick={() => onView(tv)}
+                className={`
+                  relative p-3 md:p-4 rounded-xl border cursor-pointer
+                  bg-card hover:bg-muted/40 transition-all duration-150
+                  hover:shadow-sm
+                  ${isAwaiting && isGestorOrAdmin ? 'border-amber-300 bg-amber-500/5' : 'border-border/50'}
+                `}
+              >
+                <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
+                  {/* Client info */}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    {/* Row 1: Name + Sync button + operation badge */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm md:text-base font-semibold truncate">
+                        {tv.nome}
+                      </h3>
 
-                  {/* Row 2: Current status only */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <StatusBadge status={tv.status} size="sm" />
-                  </div>
+                      {/* Sync button - visible for ALL users */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 rounded-md hover:bg-primary/10"
+                            onClick={(e) => handleMarkAsSeen(e, tv)}
+                            disabled={syncingId === tv.id}
+                          >
+                            {syncingId === tv.id ? (
+                              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p>Marcar como visto</p>
+                          {syncByName && (
+                            <p className="text-[10px] text-muted-foreground">
+                              Último: {syncByName}
+                            </p>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
 
-                  {/* Row 3: Details */}
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground flex-wrap">
-                    <span className="font-mono">{formatCPF(tv.cpf)}</span>
-                    <span>•</span>
-                    <span>{tv.banco}</span>
-                    <span>•</span>
-                    <span>📅 {formatDate(tv.data_venda)}</span>
-                    {tv.tipo_operacao === "Portabilidade" && tv.previsao_saldo && (
-                      <>
-                        <span>•</span>
-                        <span className="text-amber-600">📆 Saldo: {formatDate(tv.previsao_saldo)}</span>
-                      </>
-                    )}
-                    {tv.data_pagamento && (
-                      <>
-                        <span>•</span>
-                        <span className="text-green-600">💰 {formatDate(tv.data_pagamento)}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
+                      {/* Sync indicator */}
+                      <SyncIndicator lastSyncAt={tv.last_sync_at} size="sm" />
 
-                {/* Right side: Values + Seen button + actions */}
-                <div className="flex items-center gap-2 md:gap-3">
-                  {/* Sync indicator */}
-                  <SyncIndicator lastSyncAt={tv.last_sync_at} size="sm" />
-
-                  <div className="text-right">
-                    <p className="text-base md:text-lg font-bold text-foreground">
-                      {formatCurrency(tv.parcela)}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {formatTimeAgo(tv.created_at)}
-                    </p>
-                  </div>
-
-                  {isGestorOrAdmin && tv.user?.name && (
-                    <div className="hidden md:block text-right min-w-[80px]">
-                      <p className="text-[10px] text-muted-foreground">Vendedor</p>
-                      <p className="text-xs font-medium truncate">{tv.user.name}</p>
-                    </div>
-                  )}
-
-                  {/* Mark as Seen button */}
-                  {isGestorOrAdmin && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 rounded-lg hover:bg-primary/10"
-                      onClick={(e) => handleMarkAsSeen(e, tv)}
-                      disabled={syncingId === tv.id}
-                      title="Marcar como visto"
-                    >
-                      {syncingId === tv.id ? (
-                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                      {opBadge && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${opBadge.color}`}>
+                          {opBadge.emoji} {tv.tipo_operacao}
+                        </span>
                       )}
-                    </Button>
-                  )}
+                    </div>
 
-                  <ActionMenu
-                    televenda={tv}
-                    onView={onView}
-                    onEdit={onEdit}
-                    onLimitedEdit={onLimitedEdit}
-                    onDelete={onDelete}
-                    onStatusChange={onStatusChange}
-                    canEdit={canEdit(tv)}
-                    canEditLimited={canEditLimited ? canEditLimited(tv) : false}
-                    canChangeStatus={canChangeStatus(tv)}
-                    isGestorOrAdmin={isGestorOrAdmin}
-                  />
-                </div>
-              </div>
+                    {/* Row 2: Current status only */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <StatusBadge status={tv.status} size="sm" />
+                    </div>
 
-              {/* Mobile vendedor */}
-              {isGestorOrAdmin && tv.user?.name && (
-                <div className="mt-1.5 md:hidden">
-                  <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full">
-                    👤 {tv.user.name}
-                  </span>
+                    {/* Row 3: Details */}
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground flex-wrap">
+                      <span className="font-mono">{formatCPF(tv.cpf)}</span>
+                      <span>•</span>
+                      <span>{tv.banco}</span>
+                      <span>•</span>
+                      <span>📅 {formatDate(tv.data_venda)}</span>
+                      {tv.tipo_operacao === "Portabilidade" && tv.previsao_saldo && (
+                        <>
+                          <span>•</span>
+                          <span className="text-amber-600">📆 Saldo: {formatDate(tv.previsao_saldo)}</span>
+                        </>
+                      )}
+                      {tv.data_pagamento && (
+                        <>
+                          <span>•</span>
+                          <span className="text-green-600">💰 {formatDate(tv.data_pagamento)}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right side: Values + actions */}
+                  <div className="flex items-center gap-2 md:gap-3">
+                    <div className="text-right">
+                      <p className="text-base md:text-lg font-bold text-foreground">
+                        {formatCurrency(tv.parcela)}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {formatTimeAgo(tv.created_at)}
+                      </p>
+                    </div>
+
+                    {isGestorOrAdmin && tv.user?.name && (
+                      <div className="hidden md:block text-right min-w-[80px]">
+                        <p className="text-[10px] text-muted-foreground">Vendedor</p>
+                        <p className="text-xs font-medium truncate">{tv.user.name}</p>
+                      </div>
+                    )}
+
+                    <ActionMenu
+                      televenda={tv}
+                      onView={onView}
+                      onEdit={onEdit}
+                      onLimitedEdit={onLimitedEdit}
+                      onDelete={onDelete}
+                      onStatusChange={onStatusChange}
+                      canEdit={canEdit(tv)}
+                      canEditLimited={canEditLimited ? canEditLimited(tv) : false}
+                      canChangeStatus={canChangeStatus(tv)}
+                      isGestorOrAdmin={isGestorOrAdmin}
+                    />
+                  </div>
                 </div>
-              )}
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
-    </div>
+
+                {/* Mobile vendedor */}
+                {isGestorOrAdmin && tv.user?.name && (
+                  <div className="mt-1.5 md:hidden">
+                    <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full">
+                      👤 {tv.user.name}
+                    </span>
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+    </TooltipProvider>
   );
 };

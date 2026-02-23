@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -32,6 +33,7 @@ interface AprovacoesViewProps {
   onRejectExclusion: (tv: Televenda) => void;
   onApproveCancellation: (tv: Televenda) => void;
   onRejectCancellation: (tv: Televenda) => void;
+  onBulkApproveCancellation?: (items: Televenda[]) => void;
 }
 
 export const AprovacoesView = ({
@@ -44,9 +46,12 @@ export const AprovacoesView = ({
   onRejectExclusion,
   onApproveCancellation,
   onRejectCancellation,
+  onBulkApproveCancellation,
 }: AprovacoesViewProps) => {
   const [bankFilter, setBankFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [selectedCancellations, setSelectedCancellations] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   // Type filter options
   const TYPE_FILTER_OPTIONS = [
@@ -60,11 +65,11 @@ export const AprovacoesView = ({
   const approvalItems = useMemo(() => {
     return televendas.filter((tv) =>
       [
-        "pago_aguardando",        // Aguardando aprovação de pagamento
-        "cancelado_aguardando",   // Aguardando aprovação de cancelamento
-        "solicitar_exclusao",     // Aguardando aprovação de exclusão
-        "proposta_pendente",      // Propostas pendentes
-        "devolvido",              // Devolvidos pelo gestor
+        "pago_aguardando",
+        "cancelado_aguardando",
+        "solicitar_exclusao",
+        "proposta_pendente",
+        "devolvido",
       ].includes(tv.status)
     );
   }, [televendas]);
@@ -88,26 +93,48 @@ export const AprovacoesView = ({
   // Filter by type and bank
   const filteredApprovalItems = useMemo(() => {
     let items = approvalItems;
-    
-    // Filter by type
     if (typeFilter !== "all") {
       items = items.filter((tv) => tv.status === typeFilter);
     }
-    
-    // Filter by bank
     if (bankFilter !== "all") {
       items = items.filter((tv) => tv.banco === bankFilter);
     }
-    
     return items;
   }, [approvalItems, bankFilter, typeFilter]);
 
-  // Group by status (using filtered items)
+  // Group by status
   const pagoAguardando = filteredApprovalItems.filter(tv => tv.status === "pago_aguardando");
   const canceladoAguardando = filteredApprovalItems.filter(tv => tv.status === "cancelado_aguardando");
   const solicitarExclusao = filteredApprovalItems.filter(tv => tv.status === "solicitar_exclusao");
   const pendentes = filteredApprovalItems.filter(tv => tv.status === "proposta_pendente");
   const devolvidos = filteredApprovalItems.filter(tv => tv.status === "devolvido");
+
+  // Bulk selection handlers
+  const toggleCancellation = (id: string) => {
+    setSelectedCancellations(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllCancellations = () => {
+    if (selectedCancellations.size === canceladoAguardando.length) {
+      setSelectedCancellations(new Set());
+    } else {
+      setSelectedCancellations(new Set(canceladoAguardando.map(tv => tv.id)));
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    if (!onBulkApproveCancellation || selectedCancellations.size === 0) return;
+    setBulkLoading(true);
+    const items = canceladoAguardando.filter(tv => selectedCancellations.has(tv.id));
+    await onBulkApproveCancellation(items);
+    setSelectedCancellations(new Set());
+    setBulkLoading(false);
+  };
 
   if (approvalItems.length === 0) {
     return (
@@ -131,10 +158,16 @@ export const AprovacoesView = ({
 
   const ApprovalCard = ({ 
     tv, 
-    type = "payment"
+    type = "payment",
+    showCheckbox = false,
+    isChecked = false,
+    onCheck,
   }: { 
     tv: Televenda; 
     type?: "payment" | "cancellation" | "exclusion" | "pending" | "returned";
+    showCheckbox?: boolean;
+    isChecked?: boolean;
+    onCheck?: () => void;
   }) => (
     <motion.div
       layout
@@ -145,33 +178,43 @@ export const AprovacoesView = ({
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         {/* Info */}
-        <div 
-          className="flex-1 min-w-0 cursor-pointer"
-          onClick={() => onView(tv)}
-        >
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <h4 className="font-semibold truncate">{tv.nome}</h4>
-            <StatusBadge status={tv.status} size="sm" />
-          </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
-            <span className="font-mono">{formatCPF(tv.cpf)}</span>
-            <span>•</span>
-            <span className="flex items-center gap-1">
-              <Building2 className="h-3 w-3" />
-              {tv.banco}
-            </span>
-            <span>•</span>
-            <span className="font-semibold">{formatCurrency(tv.parcela)}</span>
-          </div>
-          <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            <span>{formatTimeAgo(tv.created_at)}</span>
-            {tv.user?.name && (
-              <>
-                <span>•</span>
-                <span>👤 {tv.user.name}</span>
-              </>
-            )}
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          {showCheckbox && (
+            <Checkbox
+              checked={isChecked}
+              onCheckedChange={() => onCheck?.()}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-shrink-0"
+            />
+          )}
+          <div 
+            className="flex-1 min-w-0 cursor-pointer"
+            onClick={() => onView(tv)}
+          >
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <h4 className="font-semibold truncate">{tv.nome}</h4>
+              <StatusBadge status={tv.status} size="sm" />
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+              <span className="font-mono">{formatCPF(tv.cpf)}</span>
+              <span>•</span>
+              <span className="flex items-center gap-1">
+                <Building2 className="h-3 w-3" />
+                {tv.banco}
+              </span>
+              <span>•</span>
+              <span className="font-semibold">{formatCurrency(tv.parcela)}</span>
+            </div>
+            <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              <span>{formatTimeAgo(tv.created_at)}</span>
+              {tv.user?.name && (
+                <>
+                  <span>•</span>
+                  <span>👤 {tv.user.name}</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -179,100 +222,52 @@ export const AprovacoesView = ({
         <div className="flex items-center gap-2 flex-shrink-0">
           {type === "payment" && (
             <>
-              <Button
-                size="sm"
-                onClick={(e) => { e.stopPropagation(); onApprove(tv); }}
-                className="gap-1.5 bg-green-600 hover:bg-green-700 text-white h-10 px-4"
-              >
+              <Button size="sm" onClick={(e) => { e.stopPropagation(); onApprove(tv); }} className="gap-1.5 bg-green-600 hover:bg-green-700 text-white h-10 px-4">
                 <CheckCircle className="h-4 w-4" />
                 <span className="hidden sm:inline">Aprovar Pago</span>
               </Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={(e) => { e.stopPropagation(); onReject(tv); }}
-                className="gap-1.5 h-10 px-4"
-              >
+              <Button size="sm" variant="destructive" onClick={(e) => { e.stopPropagation(); onReject(tv); }} className="gap-1.5 h-10 px-4">
                 <XCircle className="h-4 w-4" />
                 <span className="hidden sm:inline">Cancelar</span>
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => { e.stopPropagation(); onReturn(tv); }}
-                className="gap-1.5 h-10 px-4"
-              >
+              <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onReturn(tv); }} className="gap-1.5 h-10 px-4">
                 <RotateCcw className="h-4 w-4" />
                 <span className="hidden sm:inline">Devolver</span>
               </Button>
             </>
           )}
-
           {type === "cancellation" && (
             <>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={(e) => { e.stopPropagation(); onApproveCancellation(tv); }}
-                className="gap-1.5 h-10 px-4"
-              >
+              <Button size="sm" variant="destructive" onClick={(e) => { e.stopPropagation(); onApproveCancellation(tv); }} className="gap-1.5 h-10 px-4">
                 <XCircle className="h-4 w-4" />
                 <span className="hidden sm:inline">Aprovar Cancelamento</span>
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => { e.stopPropagation(); onRejectCancellation(tv); }}
-                className="gap-1.5 h-10 px-4"
-              >
+              <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onRejectCancellation(tv); }} className="gap-1.5 h-10 px-4">
                 <RotateCcw className="h-4 w-4" />
                 <span className="hidden sm:inline">Rejeitar</span>
               </Button>
             </>
           )}
-          
           {type === "exclusion" && (
             <>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={(e) => { e.stopPropagation(); onApproveExclusion(tv); }}
-                className="gap-1.5 h-10 px-4"
-              >
+              <Button size="sm" variant="destructive" onClick={(e) => { e.stopPropagation(); onApproveExclusion(tv); }} className="gap-1.5 h-10 px-4">
                 <Trash2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Confirmar Exclusão</span>
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => { e.stopPropagation(); onRejectExclusion(tv); }}
-                className="gap-1.5 h-10 px-4"
-              >
+              <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onRejectExclusion(tv); }} className="gap-1.5 h-10 px-4">
                 <XCircle className="h-4 w-4" />
                 <span className="hidden sm:inline">Rejeitar</span>
               </Button>
             </>
           )}
-
           {type === "pending" && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={(e) => { e.stopPropagation(); onView(tv); }}
-              className="gap-1.5 h-10 px-4"
-            >
+            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onView(tv); }} className="gap-1.5 h-10 px-4">
               <Clock className="h-4 w-4" />
               <span className="hidden sm:inline">Ver Detalhes</span>
             </Button>
           )}
-
           {type === "returned" && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={(e) => { e.stopPropagation(); onView(tv); }}
-              className="gap-1.5 h-10 px-4"
-            >
+            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onView(tv); }} className="gap-1.5 h-10 px-4">
               <RotateCcw className="h-4 w-4" />
               <span className="hidden sm:inline">Ver Detalhes</span>
             </Button>
@@ -318,20 +313,17 @@ export const AprovacoesView = ({
               </span>
             </div>
             
-            {/* Bank filter */}
             {availableBanks.length > 1 && (
               <div className="flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-amber-600" />
                 <Select value={bankFilter} onValueChange={setBankFilter}>
-                  <SelectTrigger className="w-[180px] h-9 bg-white/80 border-amber-300">
+                  <SelectTrigger className="w-[180px] h-9 bg-background border-amber-300">
                     <SelectValue placeholder="Filtrar por banco" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os bancos</SelectItem>
                     {availableBanks.map((bank) => (
-                      <SelectItem key={bank} value={bank}>
-                        {bank}
-                      </SelectItem>
+                      <SelectItem key={bank} value={bank}>{bank}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -351,10 +343,7 @@ export const AprovacoesView = ({
               >
                 <span>{option.emoji}</span>
                 <span className="hidden sm:inline">{option.label}</span>
-                <Badge 
-                  variant="secondary" 
-                  className="ml-1 h-5 px-1.5 text-xs"
-                >
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
                   {option.count}
                 </Badge>
               </Button>
@@ -367,12 +356,7 @@ export const AprovacoesView = ({
         {/* Pago Aguardando Gestor */}
         {pagoAguardando.length > 0 && (
           <div>
-            <SectionHeader 
-              emoji="💰" 
-              title="Pago Aguardando Aprovação" 
-              count={pagoAguardando.length}
-              urgent
-            />
+            <SectionHeader emoji="💰" title="Pago Aguardando Aprovação" count={pagoAguardando.length} urgent />
             <div className="space-y-2">
               {pagoAguardando.map((tv) => (
                 <ApprovalCard key={tv.id} tv={tv} type="payment" />
@@ -381,18 +365,44 @@ export const AprovacoesView = ({
           </div>
         )}
 
-        {/* Cancelado Aguardando Gestor */}
+        {/* Cancelado Aguardando Gestor - with bulk selection */}
         {canceladoAguardando.length > 0 && (
           <div>
-            <SectionHeader 
-              emoji="❌" 
-              title="Solicitações de Cancelamento" 
-              count={canceladoAguardando.length}
-              urgent
-            />
+            <div className="flex items-center justify-between mb-3 mt-6 first:mt-0">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={selectedCancellations.size === canceladoAguardando.length && canceladoAguardando.length > 0}
+                  onCheckedChange={toggleAllCancellations}
+                />
+                <span className="text-xl">❌</span>
+                <h3 className="text-base font-semibold">Solicitações de Cancelamento</h3>
+                <Badge variant="destructive" className="animate-pulse">
+                  {canceladoAguardando.length}
+                </Badge>
+              </div>
+              {selectedCancellations.size > 0 && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={handleBulkApprove}
+                  disabled={bulkLoading}
+                  className="gap-1.5"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  Aprovar {selectedCancellations.size} selecionado{selectedCancellations.size > 1 ? 's' : ''}
+                </Button>
+              )}
+            </div>
             <div className="space-y-2">
               {canceladoAguardando.map((tv) => (
-                <ApprovalCard key={tv.id} tv={tv} type="cancellation" />
+                <ApprovalCard
+                  key={tv.id}
+                  tv={tv}
+                  type="cancellation"
+                  showCheckbox
+                  isChecked={selectedCancellations.has(tv.id)}
+                  onCheck={() => toggleCancellation(tv.id)}
+                />
               ))}
             </div>
           </div>
@@ -401,12 +411,7 @@ export const AprovacoesView = ({
         {/* Solicitar Exclusão */}
         {solicitarExclusao.length > 0 && (
           <div>
-            <SectionHeader 
-              emoji="🗑️" 
-              title="Solicitações de Exclusão" 
-              count={solicitarExclusao.length}
-              urgent
-            />
+            <SectionHeader emoji="🗑️" title="Solicitações de Exclusão" count={solicitarExclusao.length} urgent />
             <div className="space-y-2">
               {solicitarExclusao.map((tv) => (
                 <ApprovalCard key={tv.id} tv={tv} type="exclusion" />
@@ -418,11 +423,7 @@ export const AprovacoesView = ({
         {/* Pendentes */}
         {pendentes.length > 0 && (
           <div>
-            <SectionHeader 
-              emoji="⏳" 
-              title="Propostas Pendentes" 
-              count={pendentes.length}
-            />
+            <SectionHeader emoji="⏳" title="Propostas Pendentes" count={pendentes.length} />
             <div className="space-y-2">
               {pendentes.map((tv) => (
                 <ApprovalCard key={tv.id} tv={tv} type="pending" />
@@ -434,11 +435,7 @@ export const AprovacoesView = ({
         {/* Devolvidos */}
         {devolvidos.length > 0 && (
           <div>
-            <SectionHeader 
-              emoji="🔄" 
-              title="Devolvidos para Revisão" 
-              count={devolvidos.length}
-            />
+            <SectionHeader emoji="🔄" title="Devolvidos para Revisão" count={devolvidos.length} />
             <div className="space-y-2">
               {devolvidos.map((tv) => (
                 <ApprovalCard key={tv.id} tv={tv} type="returned" />
