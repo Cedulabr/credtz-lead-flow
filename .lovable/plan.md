@@ -1,118 +1,119 @@
 
+# Plano: Melhorias no Controle de Ponto (PDF Easyn) + Refatoracao do Dashboard Principal
 
-# Plano: Melhorias no Modulo Gestao de Televendas
+## Resumo
 
-## 1. Aprovacao em massa de cancelamentos
+Este plano cobre duas grandes areas:
 
-**Problema**: Gestor precisa aprovar cancelamentos um por um.
-
-**Solucao**: Adicionar selecao em massa na secao "Solicitacoes de Cancelamento" da AprovacoesView.
-
-**Arquivo**: `src/modules/televendas/views/AprovacoesView.tsx`
-- Adicionar estado `selectedCancellations` (Set de IDs)
-- Checkbox "Selecionar todos" no header da secao cancelamentos
-- Checkbox individual em cada card de cancelamento
-- Botao "Aprovar Todos Selecionados" que aparece quando ha itens selecionados
-- Nova prop `onBulkApproveCancellation` que recebe array de Televenda
-
-**Arquivo**: `src/modules/televendas/TelevendasModule.tsx`
-- Criar `handleBulkApproveCancellation(items: Televenda[])` que itera e aplica `proposta_cancelada` com historico para cada proposta
-- Passar a nova prop para AprovacoesView
+1. **PDF do Controle de Ponto** -- Personalizar com identidade visual Easyn (cores azul marinho #0A1F44, azul vibrante #3B82F6, logo Easyn), layout profissional com campo de assinatura do colaborador para fechamento mensal
+2. **Dashboard Principal (Consultor)** -- Substituir o conteudo atual por um painel focado em metricas operacionais especificas
 
 ---
 
-## 2. Botao Sync visivel para todos os usuarios + registro de quem clicou
+## Parte 1: PDF do Controle de Ponto -- Identidade Visual Easyn
 
-**Problema**: O botao Sync so aparece para gestores/admins e fica escondido. Deve ser visivel para todos e registrar quem atualizou.
+### Arquivo: `src/components/TimeClock/TimeClockPDF.tsx`
 
-**Arquivo**: `src/modules/televendas/views/PropostasView.tsx`
+**Mudancas no PDF Diario e Mensal:**
 
-Mudancas:
-- Remover a condicao `isGestorOrAdmin` do botao Sync -- agora aparece para TODOS
-- Mover o botao para ficar ao lado do nome do cliente (Row 1), nao no lado direito
-- O `handleMarkAsSeen` ja grava `last_sync_by` com o `user.id` -- manter isso
-- Adicionar exibicao de quem fez o ultimo sync (nome do usuario) no tooltip ou sub-label
-- Precisamos buscar o nome do usuario que fez o sync: adicionar prop `users` com a lista de usuarios para mapear `last_sync_by` para nome
+- Header com fundo azul marinho escuro (#0A1F44) em vez do azul atual (#3B82F6)
+- Adicionar logo Easyn no canto superior esquerdo do header (usando `src/assets/easyn-logo.png` convertido para base64 e embutido no jsPDF via `addImage`)
+- Texto "EASYN" ao lado do logo
+- Barra de resumo final com gradiente azul marinho para azul (#0A1F44 -> #3B82F6)
+- Cores de status ajustadas para o tema Easyn
+- Rodape com texto "Easyn -- Sistema de Gestao de Ponto" e data de geracao
+- **Campo de assinatura aprimorado** no espelho mensal:
+  - Linha de assinatura do colaborador com campo para data
+  - Linha de assinatura do gestor/responsavel com campo para data
+  - Texto legal: "Declaro que as informacoes acima sao verdadeiras e conferem com meu registro de ponto"
+  - Espaco para carimbo da empresa
+- Layout mais profissional com margens e espacamentos ajustados
+- Fontes e tamanhos padronizados para melhor legibilidade
 
-**Arquivo**: `src/modules/televendas/TelevendasModule.tsx`
-- Passar prop `users` para PropostasView
+### Copiar logo Easyn para uso no PDF
+
+- Copiar `user-uploads://90f5cd35-5f9d-45e5-8291-f7fcf4d2483b.png` para `src/assets/easyn-logo-dark.png` para uso no header do PDF (logo branco sobre fundo escuro)
 
 ---
 
-## 3. Ordenacao: propostas atualizadas descem
+## Parte 2: Refatoracao do Dashboard Principal (Consultor)
 
-**Arquivo**: `src/modules/televendas/views/PropostasView.tsx`
+### Arquivo: `src/components/ConsultorDashboard.tsx`
 
-Adicionar `useMemo` para reordenar a lista antes de renderizar:
+O dashboard sera completamente refeito para exibir **apenas** os seguintes indicadores:
+
+### Cards/Secoes do novo Dashboard:
+
+1. **Ranking de Vendedores (Propostas Pagas)**
+   - Reutilizar o componente `SalesRanking` ja existente que busca dados via RPC `get_televendas_sales_ranking`
+   - Exibir ranking do dia e do mes (propostas com status `proposta_paga`)
+
+2. **Clientes Premium Fechados**
+   - Query na tabela `leads` filtrando por `status = 'fechado'` (ou status equivalente de fechamento)
+   - Exibir quantidade total e lista dos ultimos 5
+
+3. **Leads Activate Fechados**
+   - Query na tabela `activate_leads` filtrando por `status = 'fechado'`
+   - Exibir quantidade total e lista dos ultimos 5
+
+4. **Absenteismo dos Colaboradores**
+   - Query na tabela `time_clock` cruzando com `profiles` para calcular faltas no mes
+   - Exibir card com total de faltas, atrasos e taxa de absenteismo (%)
+   - Lista dos colaboradores com mais faltas
+
+5. **Documentos Anexados (Quantidade)**
+   - Query na tabela `client_documents` contando registros no periodo
+   - Card simples com total de documentos
+
+6. **Clientes Indicados (Quantidade)**
+   - Query na tabela `leads_indicados` contando registros do usuario no periodo
+   - Card com total e breakdown por status (enviado, aprovado, pago)
+
+7. **Vendas Televendas Cadastradas (Quantidade)**
+   - Query na tabela `televendas` contando registros no periodo
+   - Card com total de vendas cadastradas
+
+### Layout do novo Dashboard:
 
 ```text
-Ordem de prioridade:
-1. Sem last_sync_at (nunca verificadas) -- TOPO
-2. last_sync_at antigo (mais de 2h) -- MEIO
-3. last_sync_at recente (menos de 2h) -- BASE
-Dentro de cada grupo, manter ordem por created_at desc
++------------------------------------------+
+|  Saudacao + Seletor de Mes + Refresh     |
++------------------------------------------+
+|  [Ranking Dia]    |  [Ranking Mes]       |
++------------------------------------------+
+| Premium  | Activate | Absenteismo        |
+| Fechados | Fechados |                    |
++------------------------------------------+
+| Docs     | Indicados | Vendas Televendas |
+| Anexados |           | Cadastradas       |
++------------------------------------------+
 ```
 
 ---
 
-## 4. Corrigir Pipeline Operacional -- dados inconsistentes
+## Detalhes Tecnicos
 
-**Problema detectado na analise**:
+### Queries do Dashboard:
 
-| Status Comercial | Status Bancario | Quantidade | Acao |
-|---|---|---|---|
-| proposta_cancelada | aguardando_digitacao | 2 | Corrigir para cancelado_banco |
-| proposta_cancelada | em_andamento | 22 | Corrigir para cancelado_banco |
-| proposta_cancelada | pago_cliente | 1 | Corrigir para cancelado_banco |
-| proposta_paga | aguardando_digitacao | 1 | Corrigir para pago_cliente |
-| proposta_paga | em_andamento | 4 | Corrigir para pago_cliente |
-| proposta_paga | pendente | 1 | Corrigir para pago_cliente |
+- **Ranking**: Reutiliza `SalesRanking` component (ja usa RPC otimizado)
+- **Premium fechados**: `supabase.from('leads').select('id').eq('assigned_to', userId).eq('status', 'fechado').gte('created_at', startISO)`
+- **Activate fechados**: `supabase.from('activate_leads').select('id').eq('assigned_to', userId).eq('status', 'fechado').gte('created_at', startISO)`
+- **Absenteismo**: Cruza `profiles` (ativos) com `time_clock` para dias sem entrada no periodo, considerando dias uteis
+- **Documentos**: `supabase.from('client_documents').select('id', { count: 'exact' }).gte('created_at', startISO)`
+- **Indicados**: `supabase.from('leads_indicados').select('id, status').eq('created_by', userId).gte('created_at', startISO)`
+- **Televendas**: `supabase.from('televendas').select('id', { count: 'exact' }).eq('user_id', userId).gte('data_venda', startStr)`
 
-Total: **31 registros inconsistentes** (mais do que os 2 inicialmente estimados).
+### PDF - Implementacao tecnica:
 
-**SQL de correcao (via ferramenta de dados)**:
-```text
-UPDATE televendas SET status_bancario = 'cancelado_banco'
-WHERE status = 'proposta_cancelada' AND status_bancario NOT IN ('cancelado_banco');
+- Converter a imagem do logo Easyn para base64 em tempo de build (import como asset)
+- Usar `doc.addImage(base64Logo, 'PNG', x, y, width, height)` no jsPDF
+- Cores Easyn: header `#0A1F44`, acentos `#3B82F6`, texto branco sobre header
+- Area de assinatura posicionada dinamicamente apos a tabela de registros
 
-UPDATE televendas SET status_bancario = 'pago_cliente'
-WHERE status = 'proposta_paga' AND status_bancario NOT IN ('pago_cliente');
-```
+### Arquivos modificados:
 
-**Prevencao futura**: Adicionar logica no `confirmStatusChange` do TelevendasModule para auto-sincronizar o `status_bancario` quando o status comercial muda para um estado final (`proposta_paga` ou `proposta_cancelada`).
-
----
-
-## Sequencia de implementacao
-
-1. Correcao de dados no pipeline (SQL via ferramenta de dados)
-2. Prevencao de inconsistencias futuras no TelevendasModule (auto-sync status_bancario)
-3. Botao Sync visivel para todos + ao lado do nome + ordenacao (PropostasView)
-4. Aprovacao em massa de cancelamentos (AprovacoesView + TelevendasModule)
-
----
-
-## Arquivos impactados
-
-| Arquivo | Alteracao |
-|---|---|
-| `src/modules/televendas/views/AprovacoesView.tsx` | Checkbox + selecao em massa + botao bulk approve |
-| `src/modules/televendas/views/PropostasView.tsx` | Sync para todos, ao lado do nome, ordenacao por last_sync_at, exibir quem sincronizou |
-| `src/modules/televendas/TelevendasModule.tsx` | Handler bulk approve, auto-sync status_bancario, passar users para PropostasView |
-| Correcao SQL (dados) | 31 registros com status_bancario inconsistente |
-
----
-
-## Detalhes tecnicos
-
-### Auto-sync status_bancario (prevencao futura)
-No `confirmStatusChange`, ao detectar que `newStatus` e `proposta_paga`, automaticamente setar `status_bancario = 'pago_cliente'`. Ao detectar `proposta_cancelada`, setar `status_bancario = 'cancelado_banco'`. Isso evita que novas propostas fiquem com status bancario desalinhado.
-
-### Bulk approve flow
-1. Usuario seleciona cancelamentos via checkboxes
-2. Clica "Aprovar Todos"
-3. Sistema mostra confirmacao com quantidade
-4. Ao confirmar, itera sobre cada item chamando o mesmo fluxo do `handleApproveCancellation` individual
-5. Registra historico para cada proposta
-6. Refresh da lista ao final
-
+| Arquivo | Tipo de mudanca |
+|---------|----------------|
+| `src/components/TimeClock/TimeClockPDF.tsx` | Refatoracao completa do layout PDF |
+| `src/components/ConsultorDashboard.tsx` | Refatoracao completa do dashboard |
+| `src/assets/easyn-logo-dark.png` | Novo arquivo (copia do logo enviado) |
