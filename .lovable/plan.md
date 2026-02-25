@@ -1,141 +1,77 @@
 
+# Plano: Correcoes SMS - Propostas Pagas, Deduplicacao por Telefone e Historico
 
-# Plano: Evolucao Disparos SMS - Exclusao, Creditos e Registro Real
+## Problemas Identificados
 
-## Resumo
+### 1. Propostas pagas continuam recebendo SMS
+O trigger `sms_sync_televendas_status` atualiza o campo `status_proposta` na fila, mas NAO desativa a automacao. Quando uma portabilidade e marcada como `proposta_paga`, a fila continua ativa.
 
-Corrigir campanhas travadas em "sending", adicionar exclusao de campanhas, implementar sistema de creditos SMS para colaboradores (igual leads premium), e garantir que o historico registra corretamente cada envio/falha.
+### 2. Cliente com multiplas propostas recebe SMS duplicado
+Confirmado no banco: existem clientes com 2, 3 e ate 4 entradas ativas na fila com o mesmo telefone. Exemplo: telefone `7187847804` tem 4 entradas ativas. Cada uma dispara um SMS independente.
 
----
-
-## Diagnostico dos Problemas Encontrados
-
-1. **Campanha travada em "sending"**: A campanha `24e9eddd` ficou com status "sending" permanentemente. Isso aconteceu antes da correcao do edge function. Precisa de um botao para corrigir campanhas antigas travadas.
-
-2. **Historico funciona**: A campanha `ac629c7b` (teste mais recente) JA registrou 2 mensagens no `sms_history` corretamente com status "sent" e `provider_message_id`. A correcao anterior do edge function resolveu o problema de registro.
-
-3. **Creditos SMS**: Nao existe sistema de creditos para SMS. Colaboradores podem disparar sem limite.
+### 3. Historico de envios manuais e campanhas
+O historico ja registra os envios, mas precisa de melhor visibilidade.
 
 ---
 
-## Fase 1: Migracao de Banco de Dados
+## Correcao 1: Desativar automacao quando proposta e paga
 
-### 1.1 Tabelas de Creditos SMS
-
-Criar tabelas espelhando o modelo de `user_credits` e `credits_history`, mas para SMS:
+Atualizar o trigger `sms_sync_televendas_status` para que, ao detectar mudanca para `proposta_paga` ou `proposta_cancelada`, desative automaticamente a automacao:
 
 ```text
-sms_credits
-+----------------------------+
-| id (uuid PK)               |
-| user_id (uuid FK UNIQUE)   |
-| credits_balance (integer)  |
-| created_at (timestamptz)   |
-| updated_at (timestamptz)   |
-+----------------------------+
-
-sms_credits_history
-+----------------------------+
-| id (uuid PK)               |
-| user_id (uuid FK)          |
-| admin_id (uuid FK)         |
-| action (text)              |
-| amount (integer)           |
-| balance_before (integer)   |
-| balance_after (integer)    |
-| reason (text)              |
-| created_at (timestamptz)   |
-+----------------------------+
+sms_sync_televendas_status():
+  IF NEW.status IN ('proposta_paga', 'proposta_cancelada') THEN
+    UPDATE sms_televendas_queue
+    SET status_proposta = NEW.status,
+        automacao_ativa = false,
+        automacao_status = 'finalizado'
+    WHERE televendas_id = NEW.id;
+  ELSE
+    UPDATE sms_televendas_queue
+    SET status_proposta = NEW.status
+    WHERE televendas_id = NEW.id;
+  END IF;
 ```
 
-### 1.2 Funcao RPC `admin_manage_sms_credits`
-
-Similar a `admin_manage_credits` existente - apenas admins podem adicionar/remover creditos SMS.
-
-### 1.3 Funcao RPC `get_user_sms_credits`
-
-Retorna saldo atual de creditos SMS do usuario.
-
-### 1.4 RLS Policies
-
-- Admin: acesso total a ambas tabelas
-- Usuario: leitura apenas do proprio saldo e historico
+Tambem executar limpeza imediata: desativar todas as entradas da fila que ja estao com status `proposta_paga` ou `proposta_cancelada`.
 
 ---
 
-## Fase 2: Edge Function `send-sms` - Verificacao de Creditos
+## Correcao 2: Deduplicacao por telefone na automacao
 
-Antes de enviar uma campanha, verificar:
-1. Se o usuario tem creditos SMS suficientes (total_recipients)
-2. Descontar creditos apos o envio (1 credito por SMS enviado com sucesso)
-3. Registrar consumo no `sms_credits_history`
-4. Admin pode ser isento da verificacao de creditos (configuravel)
+### 2.1 Edge Function `sms-automation-run`
 
----
+Antes de iterar sobre a fila, agrupar por `cliente_telefone` (normalizado). Para cada telefone, enviar apenas 1 SMS e marcar todas as entradas daquele telefone como enviadas.
 
-## Fase 3: Frontend - CampaignsView
+Logica:
+1. Buscar fila ativa
+2. Criar um Map de telefone -> lista de itens
+3. Para cada telefone unico, enviar 1 SMS
+4. Atualizar `dias_enviados` e `ultimo_envio_at` em TODAS as entradas daquele telefone
 
-### 3.1 Botao Excluir Campanha
+### 2.2 Limpeza de dados existentes
 
-Adicionar botao de exclusao (icone lixeira) com confirmacao via AlertDialog. Apenas admin pode excluir. Campanhas com status "sending" tambem podem ser excluidas (para limpar travadas).
-
-### 3.2 Corrigir Campanhas Travadas
-
-Adicionar acao para admin "Marcar como falhou" em campanhas com status "sending" que ficaram travadas.
-
-### 3.3 Mostrar Saldo de Creditos SMS
-
-Exibir saldo atual de creditos SMS do usuario no topo da pagina de Disparos, similar ao que existe no leads premium.
+Marcar como finalizado entradas duplicadas que ja foram processadas, mantendo apenas 1 por telefone ativo.
 
 ---
 
-## Fase 4: Gestao de Creditos SMS (Admin)
+## Correcao 3: Historico com mais detalhes
 
-### 4.1 Componente `AdminSmsCreditsManagement`
-
-Criar componente espelhando `AdminCreditsManagement` existente:
-- Lista de usuarios com saldo de creditos SMS
-- Botoes para adicionar/remover creditos
-- Historico de movimentacoes
-- Campo de motivo para cada operacao
-
-### 4.2 Integrar no AdminPanel
-
-Adicionar nova aba "Creditos SMS" no painel administrativo.
-
----
-
-## Fase 5: Historico Melhorado
-
-### 5.1 Vinculo com Campanha
-
-No HistoryView, mostrar o nome da campanha vinculada quando `campaign_id` esta presente.
-
-### 5.2 Botao Atualizar no Historico
-
-Adicionar botao de refresh no historico para recarregar registros apos disparos.
+O HistoryView ja funciona corretamente. Nenhuma mudanca necessaria - os envios manuais e automaticos ja aparecem com badges "Manual" e "Auto", e campanhas com badge "Campanha".
 
 ---
 
 ## Detalhes Tecnicos
 
-### Arquivos a criar:
-1. `supabase/migrations/xxx_sms_credits.sql` -- tabelas, RPCs, RLS
-2. `src/components/AdminSmsCreditsManagement.tsx` -- gestao de creditos admin
+### Migracao SQL:
+1. `CREATE OR REPLACE FUNCTION sms_sync_televendas_status()` - adicionar logica de desativacao para status finais
+2. `UPDATE sms_televendas_queue SET automacao_ativa = false, automacao_status = 'finalizado' WHERE status_proposta IN ('proposta_paga', 'proposta_cancelada')` - limpeza imediata
 
 ### Arquivos a modificar:
-1. `supabase/functions/send-sms/index.ts` -- verificacao de creditos antes do envio
-2. `src/modules/sms/views/CampaignsView.tsx` -- excluir campanha, corrigir travadas, mostrar saldo
-3. `src/modules/sms/views/HistoryView.tsx` -- nome da campanha, botao refresh
-4. `src/modules/sms/SmsModule.tsx` -- passar refreshHistory para HistoryView
-5. `src/components/AdminPanel.tsx` -- aba creditos SMS
-6. `src/components/admin/AdminOperations.tsx` -- secao creditos SMS
+1. `supabase/functions/sms-automation-run/index.ts` - deduplicacao por telefone antes de enviar
+2. `src/modules/sms/views/TelevendasSmsView.tsx` - mostrar indicador visual quando ha telefones duplicados na fila
 
 ### Ordem de execucao:
-1. Migracao de banco (tabelas + RPCs + RLS)
-2. Atualizar edge function send-sms com verificacao de creditos
-3. Criar componente AdminSmsCreditsManagement
-4. Atualizar CampaignsView (exclusao + saldo + corrigir travadas)
-5. Atualizar HistoryView (campanha vinculada + refresh)
-6. Integrar no AdminPanel
-
+1. Migracao SQL (trigger + limpeza)
+2. Atualizar edge function com deduplicacao + deploy
+3. Atualizar frontend para visibilidade
