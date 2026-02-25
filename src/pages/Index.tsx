@@ -34,6 +34,7 @@ import { PerformanceReport } from "@/components/PerformanceReport";
 import { Collaborative } from "@/components/Collaborative";
 import { MyData } from "@/components/MyData";
 import { TimeClock } from "@/components/TimeClock";
+import { SmsModule } from "@/modules/sms";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -210,6 +211,12 @@ const Index = () => {
       
       case "time-clock":
         return <TimeClock />;
+      
+      case "sms":
+        if (!hasPermission('can_access_sms')) {
+          return <BlockedAccess message="Acesso ao módulo SMS bloqueado pelo administrador" />;
+        }
+        return <SmsModule />;
       
       case "notifications":
         return <Notifications />;
