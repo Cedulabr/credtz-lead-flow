@@ -83,11 +83,9 @@ interface BankingPipelineProps {
 
 export const BankingPipeline = ({ televendas, onFilterByBankStatus, selectedBankStatus }: BankingPipelineProps) => {
   // Map commercial status to banking pipeline status
+  // Commercial status takes priority to avoid misclassification
   const mapToPipelineStatus = (tv: Televenda): string => {
-    // Use status_bancario if explicitly set
-    if (tv.status_bancario) return tv.status_bancario;
-    
-    // Otherwise map from commercial status
+    // Commercial status always takes priority
     switch (tv.status) {
       case "solicitar_digitacao":
         return "aguardando_digitacao";
@@ -106,6 +104,10 @@ export const BankingPipeline = ({ televendas, onFilterByBankStatus, selectedBank
       case "exclusao_aprovada":
         return "cancelado_banco";
       default:
+        // Fallback to status_bancario if set, otherwise em_andamento
+        if (tv.status_bancario && BANKING_STATUS_CONFIG[tv.status_bancario]) {
+          return tv.status_bancario;
+        }
         return "em_andamento";
     }
   };
