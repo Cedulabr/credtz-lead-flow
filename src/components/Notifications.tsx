@@ -210,7 +210,8 @@ export function Notifications() {
     user_data_rejection: { label: "Cadastro Reprovado", bgColor: "bg-red-500/10", icon: UserX },
     document_approval: { label: "Documento Aprovado", bgColor: "bg-green-500/10", icon: FileText },
     document_rejection: { label: "Documento Reprovado", bgColor: "bg-red-500/10", icon: FileText },
-    user_inactivity: { label: "Inatividade", bgColor: "bg-amber-500/10", icon: UserMinus }
+    user_inactivity: { label: "Inatividade", bgColor: "bg-amber-500/10", icon: UserMinus },
+    proposta_critica: { label: "Proposta Crítica", bgColor: "bg-red-500/10", icon: AlertCircle }
   };
 
   const getTimeAgo = (date: string) => {

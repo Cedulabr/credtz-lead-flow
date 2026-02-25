@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { DollarSign, FileText } from "lucide-react";
+import { DollarSign, FileText, AlertTriangle, AlertCircle } from "lucide-react";
 import { Televenda } from "../types";
 import { formatCurrency } from "../utils";
+import { calcDiasParado, getPriorityFromDays } from "./PriorityBadge";
 
 interface DashboardCardsProps {
   televendas: Televenda[];
@@ -21,9 +22,22 @@ export const DashboardCards = ({
     const paid = televendas.filter((tv) => tv.status === "proposta_paga");
     const totalBrutoPago = paid.reduce((sum, tv) => sum + (tv.saldo_devedor || 0), 0);
 
+    const finalStatuses = ["proposta_paga", "proposta_cancelada", "exclusao_aprovada"];
+    const active = televendas.filter((tv) => !finalStatuses.includes(tv.status));
+    
+    let criticos = 0;
+    let alertas = 0;
+    active.forEach((tv) => {
+      const priority = tv.prioridade_operacional || getPriorityFromDays(calcDiasParado(tv.updated_at));
+      if (priority === "critico") criticos++;
+      else if (priority === "alerta") alertas++;
+    });
+
     return {
       totalPropostas: televendas.length,
       totalBrutoPago,
+      criticos,
+      alertas,
     };
   }, [televendas]);
 
@@ -42,10 +56,24 @@ export const DashboardCards = ({
       gradient: "from-green-500 to-emerald-600",
       bg: "bg-green-500/10",
     },
+    ...(stats.criticos > 0 ? [{
+      label: "Propostas Críticas",
+      value: String(stats.criticos),
+      icon: AlertCircle,
+      gradient: "from-red-500 to-red-600",
+      bg: "bg-red-500/10",
+    }] : []),
+    ...(stats.alertas > 0 ? [{
+      label: "Propostas em Alerta",
+      value: String(stats.alertas),
+      icon: AlertTriangle,
+      gradient: "from-amber-500 to-amber-600",
+      bg: "bg-amber-500/10",
+    }] : []),
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className={`grid gap-3 ${cards.length <= 2 ? 'grid-cols-2' : cards.length === 3 ? 'grid-cols-3' : 'grid-cols-2 md:grid-cols-4'}`}>
       {cards.map((card, index) => {
         const Icon = card.icon;
         return (

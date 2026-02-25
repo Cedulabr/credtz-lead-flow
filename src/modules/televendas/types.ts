@@ -33,6 +33,8 @@ export interface Televenda {
   status_bancario?: string | null;
   last_sync_at?: string | null;
   last_sync_by?: string | null;
+  prioridade_operacional?: string;
+  updated_at?: string;
 }
 
 export interface EditHistoryItem {

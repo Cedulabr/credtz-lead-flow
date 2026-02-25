@@ -10,6 +10,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { ActionMenu } from "../components/ActionMenu";
 import { BANKING_STATUS_CONFIG } from "../components/BankingPipeline";
 import { SyncIndicator } from "../components/SyncIndicator";
+import { PriorityBadge, calcDiasParado, getPriorityFromDays } from "../components/PriorityBadge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -66,20 +67,26 @@ export const PropostasView = ({
     return map;
   }, [users]);
 
-  // Sort: unseen at top, old sync in middle, recent sync at bottom
+  // Sort: critical priority first, then unseen, then old sync, then recent
   const sortedTelevendas = useMemo(() => {
     return [...televendas].sort((a, b) => {
+      // Priority sorting first (critical > alert > normal)
+      const priorityOrder = { critico: 0, alerta: 1, normal: 2 };
+      const isFinal = (s: string) => ["proposta_paga", "proposta_cancelada", "exclusao_aprovada"].includes(s);
+      const prioA = isFinal(a.status) ? 2 : (priorityOrder[a.prioridade_operacional as keyof typeof priorityOrder] ?? 2);
+      const prioB = isFinal(b.status) ? 2 : (priorityOrder[b.prioridade_operacional as keyof typeof priorityOrder] ?? 2);
+      if (prioA !== prioB) return prioA - prioB;
+
       const now = Date.now();
       const getGroup = (tv: Televenda) => {
-        if (!tv.last_sync_at) return 0; // never verified - TOP
+        if (!tv.last_sync_at) return 0;
         const diff = now - new Date(tv.last_sync_at).getTime();
-        if (diff > TWO_HOURS_MS) return 1; // old - MIDDLE
-        return 2; // recent - BOTTOM
+        if (diff > TWO_HOURS_MS) return 1;
+        return 2;
       };
       const groupA = getGroup(a);
       const groupB = getGroup(b);
       if (groupA !== groupB) return groupA - groupB;
-      // Within same group, sort by created_at desc
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
   }, [televendas]);
@@ -133,6 +140,10 @@ export const PropostasView = ({
             const isAwaiting = tv.status === "pago_aguardando" || tv.status === "cancelado_aguardando";
             const opBadge = OPERATION_BADGE[tv.tipo_operacao];
             const syncByName = tv.last_sync_by ? usersMap.get(tv.last_sync_by) : null;
+            const isFinal = ["proposta_paga", "proposta_cancelada", "exclusao_aprovada"].includes(tv.status);
+            const diasParado = !isFinal ? calcDiasParado(tv.updated_at) : 0;
+            const priority = !isFinal ? (tv.prioridade_operacional || getPriorityFromDays(diasParado)) : "normal";
+            const isCritical = priority === "critico";
 
             return (
               <motion.div
@@ -146,7 +157,7 @@ export const PropostasView = ({
                   relative p-3 md:p-4 rounded-xl border cursor-pointer
                   bg-card hover:bg-muted/40 transition-all duration-150
                   hover:shadow-sm
-                  ${isAwaiting && isGestorOrAdmin ? 'border-amber-300 bg-amber-500/5' : 'border-border/50'}
+                  ${isCritical ? 'border-red-400 bg-red-500/5 dark:border-red-700 dark:bg-red-900/10' : isAwaiting && isGestorOrAdmin ? 'border-amber-300 bg-amber-500/5' : 'border-border/50'}
                 `}
               >
                 <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
@@ -192,6 +203,9 @@ export const PropostasView = ({
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${opBadge.color}`}>
                           {opBadge.emoji} {tv.tipo_operacao}
                         </span>
+                      )}
+                      {!isFinal && priority !== "normal" && (
+                        <PriorityBadge priority={priority} diasParado={diasParado} size="sm" />
                       )}
                     </div>
 
