@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Phone, Play, Pause, Send, RefreshCw, Loader2, Download, AlertTriangle } from "lucide-react";
+import { Phone, Play, Pause, Send, RefreshCw, Loader2, Download, AlertTriangle, CheckCircle, XCircle, CircleDollarSign, CircleDashed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserCompany } from "../hooks/useUserCompany";
 import { toast } from "sonner";
 
 interface QueueItem {
@@ -24,15 +25,59 @@ interface QueueItem {
   created_at: string;
 }
 
+interface SmsStatus {
+  status: string;
+  error_message: string | null;
+}
+
 const STATUS_BADGE: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   ativo: { label: "Ativo", variant: "default" },
   pausado: { label: "Pausado", variant: "secondary" },
   finalizado: { label: "Finalizado", variant: "outline" },
 };
 
+function SmsStatusBadge({ smsStatus }: { smsStatus?: SmsStatus }) {
+  if (!smsStatus) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+        <CircleDashed className="h-3 w-3" /> Sem envio
+      </span>
+    );
+  }
+  if (smsStatus.status === "sent" || smsStatus.status === "delivered") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] text-green-600">
+        <CheckCircle className="h-3 w-3" /> Enviado
+      </span>
+    );
+  }
+  if (smsStatus.status === "failed") {
+    const isCredit = smsStatus.error_message?.startsWith("CREDITO_INSUFICIENTE");
+    if (isCredit) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] text-amber-600" title={smsStatus.error_message || ""}>
+          <CircleDollarSign className="h-3 w-3" /> Sem crédito
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] text-destructive" title={smsStatus.error_message || ""}>
+        <XCircle className="h-3 w-3" /> Falhou
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+      <CircleDashed className="h-3 w-3" /> {smsStatus.status}
+    </span>
+  );
+}
+
 export const TelevendasSmsView = () => {
   const { user, profile } = useAuth();
+  const { companyId, isAdmin, loading: companyLoading } = useUserCompany();
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [smsStatuses, setSmsStatuses] = useState<Record<string, SmsStatus>>({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [sendingId, setSendingId] = useState<string | null>(null);
@@ -40,15 +85,40 @@ export const TelevendasSmsView = () => {
   const [importing, setImporting] = useState(false);
 
   const fetchQueue = useCallback(async () => {
+    if (companyLoading) return;
     setLoading(true);
     let query = supabase.from("sms_televendas_queue").select("*").order("created_at", { ascending: false });
     if (filter !== "all") query = query.eq("automacao_status", filter);
+    // Company isolation
+    if (!isAdmin && companyId) {
+      query = query.eq("company_id", companyId);
+    }
     const { data } = await query.limit(200);
-    setQueue((data as any[]) || []);
-    setLoading(false);
-  }, [filter]);
+    const items = (data as any[]) || [];
+    setQueue(items);
 
-  useEffect(() => { fetchQueue(); }, [fetchQueue]);
+    // Fetch last SMS status for each televendas_id
+    const tvIds = items.map((i: QueueItem) => i.televendas_id).filter(Boolean);
+    if (tvIds.length > 0) {
+      const { data: historyData } = await supabase
+        .from("sms_history")
+        .select("televendas_id, status, error_message")
+        .in("televendas_id", tvIds)
+        .order("created_at", { ascending: false });
+
+      const statusMap: Record<string, SmsStatus> = {};
+      ((historyData as any[]) || []).forEach((h: any) => {
+        if (h.televendas_id && !statusMap[h.televendas_id]) {
+          statusMap[h.televendas_id] = { status: h.status, error_message: h.error_message };
+        }
+      });
+      setSmsStatuses(statusMap);
+    }
+
+    setLoading(false);
+  }, [filter, isAdmin, companyId, companyLoading]);
+
+  useEffect(() => { if (!companyLoading) fetchQueue(); }, [fetchQueue, companyLoading]);
 
   const toggleAutomacao = async (item: QueueItem) => {
     setTogglingId(item.id);
@@ -89,6 +159,7 @@ export const TelevendasSmsView = () => {
       } else {
         toast.error("Falha no envio: " + (data?.error || "erro"));
       }
+      fetchQueue(); // refresh statuses
     } catch (e: any) {
       toast.error("Erro: " + e.message);
     } finally {
@@ -99,7 +170,6 @@ export const TelevendasSmsView = () => {
   const handlePullProposals = async () => {
     setImporting(true);
     try {
-      // Get configured days
       const { data: settingsData } = await supabase
         .from("sms_automation_settings")
         .select("setting_key, setting_value")
@@ -107,19 +177,23 @@ export const TelevendasSmsView = () => {
         .single();
       const dias = parseInt(settingsData?.setting_value || "5");
 
-      // Get existing televendas_ids in queue to avoid duplicates
       const { data: existingQueue } = await supabase
         .from("sms_televendas_queue")
         .select("televendas_id");
       const existingIds = new Set((existingQueue as any[] || []).map((q: any) => q.televendas_id));
 
-      // Fetch em_andamento proposals from televendas
-      const { data: proposals, error } = await supabase
+      let proposalsQuery = supabase
         .from("televendas")
         .select("id, nome, telefone, tipo_operacao, status, company_id, user_id")
         .in("status", ["em_andamento", "aguardando", "digitado", "solicitar_digitacao"])
         .limit(500);
 
+      // Company isolation on pull
+      if (!isAdmin && companyId) {
+        proposalsQuery = proposalsQuery.eq("company_id", companyId);
+      }
+
+      const { data: proposals, error } = await proposalsQuery;
       if (error) throw error;
 
       const toInsert = (proposals || [])
@@ -155,8 +229,6 @@ export const TelevendasSmsView = () => {
     }
   };
 
-  const isAdmin = profile?.role === "admin";
-
   // Calcular telefones duplicados na fila ativa
   const phoneCounts = new Map<string, number>();
   queue.forEach((item) => {
@@ -172,6 +244,9 @@ export const TelevendasSmsView = () => {
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Phone className="h-5 w-5 text-primary" />
           Notificação SMS Televendas
+          {!isAdmin && companyId && (
+            <Badge variant="outline" className="text-[10px]">Sua empresa</Badge>
+          )}
         </h2>
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={handlePullProposals} disabled={importing} className="gap-2 text-sm">
@@ -211,6 +286,7 @@ export const TelevendasSmsView = () => {
                 <TableHead>Operação</TableHead>
                 <TableHead>Status Proposta</TableHead>
                 <TableHead>Automação</TableHead>
+                <TableHead>Status Envio</TableHead>
                 <TableHead>Progresso</TableHead>
                 <TableHead>Último Envio</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -245,6 +321,9 @@ export const TelevendasSmsView = () => {
                     <TableCell className="text-xs">{item.status_proposta}</TableCell>
                     <TableCell>
                       <Badge variant={badge.variant} className="text-[10px]">{badge.label}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <SmsStatusBadge smsStatus={smsStatuses[item.televendas_id]} />
                     </TableCell>
                     <TableCell className="text-xs">
                       {item.dias_enviados}/{item.dias_envio_total} dias

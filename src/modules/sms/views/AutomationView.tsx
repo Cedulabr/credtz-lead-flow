@@ -9,14 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserCompany } from "../hooks/useUserCompany";
 import { toast } from "sonner";
-
-interface SettingRow {
-  id: string;
-  setting_key: string;
-  setting_value: string;
-  description: string | null;
-}
 
 interface QueueItem {
   id: string;
@@ -30,6 +24,7 @@ interface QueueItem {
 
 export const AutomationView = () => {
   const { profile } = useAuth();
+  const { companyId, isAdmin, loading: companyLoading } = useUserCompany();
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,14 +36,15 @@ export const AutomationView = () => {
     setLoading(true);
     const { data } = await supabase.from("sms_automation_settings").select("*");
     const map: Record<string, string> = {};
-    ((data as any[]) || []).forEach((s: SettingRow) => { map[s.setting_key] = s.setting_value; });
+    ((data as any[]) || []).forEach((s: any) => { map[s.setting_key] = s.setting_value; });
     setSettings(map);
     setLoading(false);
   }, []);
 
   const fetchNextSends = useCallback(async () => {
+    if (companyLoading) return;
     setLoadingNext(true);
-    const { data } = await supabase
+    let query = supabase
       .from("sms_televendas_queue")
       .select("id, cliente_nome, cliente_telefone, tipo_operacao, dias_enviados, dias_envio_total, ultimo_envio_at")
       .eq("automacao_ativa", true)
@@ -57,11 +53,16 @@ export const AutomationView = () => {
       .order("ultimo_envio_at", { ascending: true, nullsFirst: true })
       .limit(50);
 
-    // Filter client-side: dias_enviados < dias_envio_total
+    // Filter by company for non-admins
+    if (!isAdmin && companyId) {
+      query = query.eq("company_id", companyId);
+    }
+
+    const { data } = await query;
     const filtered = ((data as any[]) || []).filter((i: QueueItem) => i.dias_enviados < i.dias_envio_total);
     setNextSends(filtered);
     setLoadingNext(false);
-  }, []);
+  }, [isAdmin, companyId, companyLoading]);
 
   useEffect(() => { fetchSettings(); fetchNextSends(); }, [fetchSettings, fetchNextSends]);
 
@@ -90,7 +91,10 @@ export const AutomationView = () => {
     try {
       const { data, error } = await supabase.functions.invoke("sms-automation-run");
       if (error) throw error;
-      toast.success(`Automação executada: ${data?.sent || 0} enviados, ${data?.failed || 0} falhas, ${data?.skipped || 0} ignorados`);
+      const msg = data?.message
+        ? data.message
+        : `Automação executada: ${data?.sent || 0} enviados, ${data?.failed || 0} falhas, ${data?.skipped || 0} ignorados`;
+      toast.success(msg);
       fetchNextSends();
     } catch (e: any) {
       toast.error("Erro: " + e.message);
@@ -98,8 +102,6 @@ export const AutomationView = () => {
       setRunning(false);
     }
   };
-
-  const isAdmin = profile?.role === "admin";
 
   if (loading) {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
@@ -171,6 +173,38 @@ export const AutomationView = () => {
                 className="mt-1"
               />
             </div>
+            {/* Schedule hours */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs flex items-center gap-1">
+                  <Clock className="h-3 w-3" /> Horário Início
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={settings["automacao_horario_inicio"] || "8"}
+                  onChange={(e) => updateSetting("automacao_horario_inicio", e.target.value)}
+                  disabled={!isAdmin}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs flex items-center gap-1">
+                  <Clock className="h-3 w-3" /> Horário Fim
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={settings["automacao_horario_fim"] || "20"}
+                  onChange={(e) => updateSetting("automacao_horario_fim", e.target.value)}
+                  disabled={!isAdmin}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground">Envios automáticos só ocorrem dentro deste horário (fuso Brasília)</p>
             <div>
               <Label className="text-xs">Mensagem</Label>
               <Textarea
@@ -225,6 +259,9 @@ export const AutomationView = () => {
             <Users className="h-4 w-4 text-primary" />
             Próximos Envios — Clientes a Notificar
             <Badge variant="secondary" className="text-[10px]">{nextSends.length}</Badge>
+            {!isAdmin && companyId && (
+              <Badge variant="outline" className="text-[10px]">Sua empresa</Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
