@@ -1,119 +1,211 @@
 
-# Plano: Melhorias no Controle de Ponto (PDF Easyn) + Refatoracao do Dashboard Principal
+# Plano: Automacao SMS Televendas - Sistema Completo
 
 ## Resumo
 
-Este plano cobre duas grandes areas:
-
-1. **PDF do Controle de Ponto** -- Personalizar com identidade visual Easyn (cores azul marinho #0A1F44, azul vibrante #3B82F6, logo Easyn), layout profissional com campo de assinatura do colaborador para fechamento mensal
-2. **Dashboard Principal (Consultor)** -- Substituir o conteudo atual por um painel focado em metricas operacionais especificas
+Criar um sistema completo de automacao SMS integrado ao Televendas, com envio automatico por dias consecutivos, notificacao de propostas pagas, confirmacao real de status via Twilio, historico completo e controle total pelo admin/gestor.
 
 ---
 
-## Parte 1: PDF do Controle de Ponto -- Identidade Visual Easyn
+## Fase 1: Correcoes Criticas no Sistema Atual
 
-### Arquivo: `src/components/TimeClock/TimeClockPDF.tsx`
+### 1.1 Corrigir Edge Function `send-sms`
 
-**Mudancas no PDF Diario e Mensal:**
+O edge function atual insere colunas inexistentes na tabela `sms_history`:
+- Usa `contact_id` (nao existe) -- deve usar `contact_name`
+- Usa `message_content` (nao existe) -- deve usar `message`
+- Nao envia `sent_by` (NOT NULL) -- deve enviar o `user.id`
 
-- Header com fundo azul marinho escuro (#0A1F44) em vez do azul atual (#3B82F6)
-- Adicionar logo Easyn no canto superior esquerdo do header (usando `src/assets/easyn-logo.png` convertido para base64 e embutido no jsPDF via `addImage`)
-- Texto "EASYN" ao lado do logo
-- Barra de resumo final com gradiente azul marinho para azul (#0A1F44 -> #3B82F6)
-- Cores de status ajustadas para o tema Easyn
-- Rodape com texto "Easyn -- Sistema de Gestao de Ponto" e data de geracao
-- **Campo de assinatura aprimorado** no espelho mensal:
-  - Linha de assinatura do colaborador com campo para data
-  - Linha de assinatura do gestor/responsavel com campo para data
-  - Texto legal: "Declaro que as informacoes acima sao verdadeiras e conferem com meu registro de ponto"
-  - Espaco para carimbo da empresa
-- Layout mais profissional com margens e espacamentos ajustados
-- Fontes e tamanhos padronizados para melhor legibilidade
+Isso faz com que TODOS os inserts de historico falhem silenciosamente e o status fique travado em "enviando".
 
-### Copiar logo Easyn para uso no PDF
+**Correcao**: Atualizar o edge function para usar as colunas corretas e garantir que o status final da campanha seja sempre atualizado (completed/failed), nunca ficando em "sending".
 
-- Copiar `user-uploads://90f5cd35-5f9d-45e5-8291-f7fcf4d2483b.png` para `src/assets/easyn-logo-dark.png` para uso no header do PDF (logo branco sobre fundo escuro)
+### 1.2 Atualizar campo `sent_at` da campanha
+
+O edge function tenta gravar `sent_at` na tabela `sms_campaigns`, mas essa coluna nao existe. Deve usar `completed_at`.
 
 ---
 
-## Parte 2: Refatoracao do Dashboard Principal (Consultor)
+## Fase 2: Migracao de Banco de Dados
 
-### Arquivo: `src/components/ConsultorDashboard.tsx`
+### 2.1 Nova tabela `sms_televendas_queue`
 
-O dashboard sera completamente refeito para exibir **apenas** os seguintes indicadores:
-
-### Cards/Secoes do novo Dashboard:
-
-1. **Ranking de Vendedores (Propostas Pagas)**
-   - Reutilizar o componente `SalesRanking` ja existente que busca dados via RPC `get_televendas_sales_ranking`
-   - Exibir ranking do dia e do mes (propostas com status `proposta_paga`)
-
-2. **Clientes Premium Fechados**
-   - Query na tabela `leads` filtrando por `status = 'fechado'` (ou status equivalente de fechamento)
-   - Exibir quantidade total e lista dos ultimos 5
-
-3. **Leads Activate Fechados**
-   - Query na tabela `activate_leads` filtrando por `status = 'fechado'`
-   - Exibir quantidade total e lista dos ultimos 5
-
-4. **Absenteismo dos Colaboradores**
-   - Query na tabela `time_clock` cruzando com `profiles` para calcular faltas no mes
-   - Exibir card com total de faltas, atrasos e taxa de absenteismo (%)
-   - Lista dos colaboradores com mais faltas
-
-5. **Documentos Anexados (Quantidade)**
-   - Query na tabela `client_documents` contando registros no periodo
-   - Card simples com total de documentos
-
-6. **Clientes Indicados (Quantidade)**
-   - Query na tabela `leads_indicados` contando registros do usuario no periodo
-   - Card com total e breakdown por status (enviado, aprovado, pago)
-
-7. **Vendas Televendas Cadastradas (Quantidade)**
-   - Query na tabela `televendas` contando registros no periodo
-   - Card com total de vendas cadastradas
-
-### Layout do novo Dashboard:
+Tabela central que vincula clientes do televendas ao sistema de SMS automatico:
 
 ```text
-+------------------------------------------+
-|  Saudacao + Seletor de Mes + Refresh     |
-+------------------------------------------+
-|  [Ranking Dia]    |  [Ranking Mes]       |
-+------------------------------------------+
-| Premium  | Activate | Absenteismo        |
-| Fechados | Fechados |                    |
-+------------------------------------------+
-| Docs     | Indicados | Vendas Televendas |
-| Anexados |           | Cadastradas       |
-+------------------------------------------+
+sms_televendas_queue
++----------------------------+
+| id (uuid PK)               |
+| televendas_id (uuid FK)    |
+| cliente_nome (text)        |
+| cliente_telefone (text)    |
+| tipo_operacao (text)       |
+| status_proposta (text)     |
+| data_cadastro (timestamptz)|
+| automacao_status (text)    |
+|   -> ativo/pausado/finalizado
+| automacao_ativa (boolean)  |
+| dias_envio_total (int)     |
+| dias_enviados (int)        |
+| ultimo_envio_at (timestamptz)|
+| company_id (uuid)          |
+| user_id (uuid)             |
+| created_at (timestamptz)   |
+| updated_at (timestamptz)   |
++----------------------------+
 ```
+
+### 2.2 Nova tabela `sms_automation_settings`
+
+Configuracoes editaveis pelo admin:
+
+```text
+sms_automation_settings
++----------------------------+
+| id (uuid PK)               |
+| setting_key (text UNIQUE)  |
+| setting_value (text)       |
+| description (text)         |
+| updated_by (uuid)          |
+| updated_at (timestamptz)   |
++----------------------------+
+```
+
+Settings iniciais:
+- `automacao_em_andamento_ativa` = true
+- `automacao_em_andamento_dias` = 5
+- `automacao_em_andamento_intervalo_horas` = 24
+- `automacao_pago_ativa` = true
+- `msg_em_andamento` = "Ola {{nome}}, sua proposta de {{tipo_operacao}} da Credtz esta em andamento..."
+- `msg_pago_novo_emprestimo` = "Ola {{nome}}, seu emprestimo foi aprovado e pago com sucesso..."
+
+### 2.3 Adicionar colunas na `sms_history`
+
+- `televendas_id` (uuid, nullable) -- vincular ao registro de televendas
+- `send_type` (text, default 'manual') -- 'manual' ou 'automatico'
+
+### 2.4 Trigger no Televendas
+
+Criar trigger `after insert` na tabela `televendas` que automaticamente insere um registro na `sms_televendas_queue`.
+
+Criar trigger `after update` que detecta mudanca de status para `proposta_paga` + tipo_operacao = 'Novo emprestimo' e dispara SMS automatico.
+
+### 2.5 RLS Policies
+
+- Admin: acesso total
+- Gestor: acesso aos registros da mesma company
+- Colaborador: acesso apenas aos proprios registros
+
+---
+
+## Fase 3: Edge Functions
+
+### 3.1 Atualizar `send-sms`
+
+- Corrigir mapeamento de colunas (`message`, `contact_name`, `sent_by`)
+- Usar `completed_at` em vez de `sent_at`
+- Garantir tratamento de erro que nunca deixa status em "sending"
+- Aceitar envio individual (sem campaign, direto por telefone+mensagem) para automacoes
+
+### 3.2 Nova Edge Function `sms-automation-run`
+
+Funcao agendavel (via cron ou chamada manual) que:
+1. Busca registros em `sms_televendas_queue` com `automacao_ativa = true` e `dias_enviados < dias_envio_total`
+2. Verifica intervalo desde ultimo envio
+3. Envia SMS via Twilio usando template configurado
+4. Atualiza `dias_enviados` e `ultimo_envio_at`
+5. Quando `dias_enviados >= dias_envio_total`, marca `automacao_status = 'finalizado'`
+
+### 3.3 Nova Edge Function `sms-send-single`
+
+Para envios individuais (notificacao de proposta paga, reenvio manual):
+- Recebe: phone, message, televendas_id (opcional), send_type
+- Envia via Twilio
+- Registra em sms_history com status correto baseado na resposta da API
+
+---
+
+## Fase 4: Interface do Usuario
+
+### 4.1 Nova aba "Notificacao SMS Televendas"
+
+Nova view `TelevendasSmsView.tsx` com:
+- Tabela de clientes do televendas com colunas: cliente, telefone, proposta, tipo operacao, status automacao, status envio, data ultimo envio
+- Filtros por status de automacao (ativo/pausado/finalizado)
+- Botao para pausar/reativar automacao individual
+- Botao para reenviar manualmente
+- Botao para enviar SMS avulso
+
+### 4.2 Nova aba "Automacao"
+
+Nova view `AutomationView.tsx` com:
+- Painel de configuracoes editaveis (admin/gestor):
+  - Toggle ativar/desativar automacao em andamento
+  - Campo para quantidade de dias
+  - Campo para intervalo entre envios (horas)
+  - Toggle ativar/desativar notificacao de pago
+- Editor de mensagens com preview de variaveis
+- Botao para executar automacao manualmente (admin)
+- Dashboard de metricas: total enviados hoje, erros, taxa de entrega
+
+### 4.3 Atualizar tabs do SmsModule
+
+Expandir de 4 para 6 abas (ou usar sub-navegacao):
+
+```text
+| Televendas SMS | Automacao | Disparos | Templates | Historico | Contatos |
+```
+
+### 4.4 Melhorar HistoryView
+
+- Adicionar coluna "Proposta vinculada" (link para televendas_id)
+- Adicionar coluna "Tipo" (manual/automatico)
+- Adicionar filtros por tipo e status
+
+---
+
+## Fase 5: Integracao Automatica com Televendas
+
+### 5.1 Trigger de insercao automatica
+
+Quando novo registro e criado no televendas:
+- Trigger SQL insere automaticamente na `sms_televendas_queue`
+- Status de automacao inicia como "ativo"
+- dias_envio_total puxado da configuracao global
+
+### 5.2 Trigger de proposta paga
+
+Quando status muda para `proposta_paga` e tipo_operacao = 'Novo emprestimo':
+- Trigger chama edge function `sms-send-single` via pg_net
+- Mensagem usa template configurado em `sms_automation_settings`
+
+### 5.3 Sincronizacao de status
+
+Manter `sms_televendas_queue.status_proposta` sincronizado com `televendas.status` via trigger de update.
 
 ---
 
 ## Detalhes Tecnicos
 
-### Queries do Dashboard:
+### Arquivos a criar:
+1. `supabase/migrations/xxx_sms_automation.sql` -- tabelas, triggers, RLS
+2. `supabase/functions/sms-automation-run/index.ts` -- automacao agendada
+3. `supabase/functions/sms-send-single/index.ts` -- envio individual
+4. `src/modules/sms/views/TelevendasSmsView.tsx` -- aba Televendas SMS
+5. `src/modules/sms/views/AutomationView.tsx` -- aba Automacao
+6. `src/modules/sms/hooks/useSmsAutomation.ts` -- hook de dados
 
-- **Ranking**: Reutiliza `SalesRanking` component (ja usa RPC otimizado)
-- **Premium fechados**: `supabase.from('leads').select('id').eq('assigned_to', userId).eq('status', 'fechado').gte('created_at', startISO)`
-- **Activate fechados**: `supabase.from('activate_leads').select('id').eq('assigned_to', userId).eq('status', 'fechado').gte('created_at', startISO)`
-- **Absenteismo**: Cruza `profiles` (ativos) com `time_clock` para dias sem entrada no periodo, considerando dias uteis
-- **Documentos**: `supabase.from('client_documents').select('id', { count: 'exact' }).gte('created_at', startISO)`
-- **Indicados**: `supabase.from('leads_indicados').select('id, status').eq('created_by', userId).gte('created_at', startISO)`
-- **Televendas**: `supabase.from('televendas').select('id', { count: 'exact' }).eq('user_id', userId).gte('data_venda', startStr)`
+### Arquivos a modificar:
+1. `supabase/functions/send-sms/index.ts` -- corrigir colunas e status
+2. `src/modules/sms/SmsModule.tsx` -- adicionar novas abas
+3. `src/modules/sms/types.ts` -- novos tipos
+4. `src/modules/sms/hooks/useSmsData.ts` -- buscar novos dados
+5. `src/modules/sms/views/HistoryView.tsx` -- colunas extras
 
-### PDF - Implementacao tecnica:
-
-- Converter a imagem do logo Easyn para base64 em tempo de build (import como asset)
-- Usar `doc.addImage(base64Logo, 'PNG', x, y, width, height)` no jsPDF
-- Cores Easyn: header `#0A1F44`, acentos `#3B82F6`, texto branco sobre header
-- Area de assinatura posicionada dinamicamente apos a tabela de registros
-
-### Arquivos modificados:
-
-| Arquivo | Tipo de mudanca |
-|---------|----------------|
-| `src/components/TimeClock/TimeClockPDF.tsx` | Refatoracao completa do layout PDF |
-| `src/components/ConsultorDashboard.tsx` | Refatoracao completa do dashboard |
-| `src/assets/easyn-logo-dark.png` | Novo arquivo (copia do logo enviado) |
+### Ordem de execucao:
+1. Migracao de banco (tabelas + triggers + RLS)
+2. Corrigir edge function `send-sms`
+3. Criar edge functions novas
+4. Implementar views e hooks do frontend
+5. Atualizar SmsModule com novas abas
+6. Testar fluxo completo
