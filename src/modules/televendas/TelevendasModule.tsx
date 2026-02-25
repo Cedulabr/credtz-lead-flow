@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { calcDiasParado, getPriorityFromDays } from "./components/PriorityBadge";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -59,6 +60,7 @@ export const TelevendasModule = () => {
   const [activeTab, setActiveTab] = useState<TabType>("propostas");
   const [showActiveOnly, setShowActiveOnly] = useState(false);
   const [bankStatusFilter, setBankStatusFilter] = useState<string | undefined>();
+  const [priorityFilter, setPriorityFilter] = useState<string | undefined>();
   const [filters, setFilters] = useState<FiltersType>({
     search: "",
     status: "all",
@@ -214,9 +216,23 @@ export const TelevendasModule = () => {
       const matchesProduct = filters.product === "all" || tv.tipo_operacao === filters.product;
       const matchesBank = filters.bank === "all" || tv.banco === filters.bank;
       const matchesBankStatus = !bankStatusFilter || (tv.status_bancario || "aguardando_digitacao") === bankStatusFilter;
-      return matchesSearch && matchesStatus && matchesProduct && matchesBank && matchesBankStatus;
+      
+      // Priority filter
+      let matchesPriority = true;
+      if (priorityFilter) {
+        const finalStatuses = ["proposta_paga", "proposta_cancelada", "exclusao_aprovada"];
+        if (finalStatuses.includes(tv.status)) {
+          matchesPriority = false;
+        } else {
+          const dias = calcDiasParado(tv.updated_at);
+          const prio = tv.prioridade_operacional || getPriorityFromDays(dias);
+          matchesPriority = prio === priorityFilter;
+        }
+      }
+      
+      return matchesSearch && matchesStatus && matchesProduct && matchesBank && matchesBankStatus && matchesPriority;
     });
-  }, [televendas, filters, bankStatusFilter]);
+  }, [televendas, filters, bankStatusFilter, priorityFilter]);
 
   // Extract unique banks from televendas for filter
   const availableBanks = useMemo(() => {
@@ -251,6 +267,13 @@ export const TelevendasModule = () => {
 
   const handleFilterByBankStatus = (status: string) => {
     setBankStatusFilter(status === "all" ? undefined : status);
+    setPriorityFilter(undefined);
+    setActiveTab("propostas");
+  };
+
+  const handleFilterByPriority = (priority: string) => {
+    setPriorityFilter(priority === "all" ? undefined : priority);
+    setBankStatusFilter(undefined);
     setActiveTab("propostas");
   };
 
@@ -681,6 +704,8 @@ export const TelevendasModule = () => {
         televendas={televendas}
         onFilterByBankStatus={handleFilterByBankStatus}
         selectedBankStatus={bankStatusFilter}
+        onFilterByPriority={handleFilterByPriority}
+        selectedPriority={priorityFilter}
       />
 
       {/* BLOCO 3 — Produção do Mês */}
