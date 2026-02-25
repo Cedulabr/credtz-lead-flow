@@ -3778,6 +3778,233 @@ export type Database = {
           },
         ]
       }
+      sms_campaigns: {
+        Row: {
+          company_id: string | null
+          completed_at: string | null
+          contact_list_id: string | null
+          created_at: string
+          created_by: string
+          delivered_count: number | null
+          failed_count: number | null
+          id: string
+          message_content: string
+          name: string
+          scheduled_at: string | null
+          sent_count: number | null
+          started_at: string | null
+          status: string
+          template_id: string | null
+          total_recipients: number | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          completed_at?: string | null
+          contact_list_id?: string | null
+          created_at?: string
+          created_by: string
+          delivered_count?: number | null
+          failed_count?: number | null
+          id?: string
+          message_content: string
+          name: string
+          scheduled_at?: string | null
+          sent_count?: number | null
+          started_at?: string | null
+          status?: string
+          template_id?: string | null
+          total_recipients?: number | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          completed_at?: string | null
+          contact_list_id?: string | null
+          created_at?: string
+          created_by?: string
+          delivered_count?: number | null
+          failed_count?: number | null
+          id?: string
+          message_content?: string
+          name?: string
+          scheduled_at?: string | null
+          sent_count?: number | null
+          started_at?: string | null
+          status?: string
+          template_id?: string | null
+          total_recipients?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_campaigns_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_campaigns_contact_list_id_fkey"
+            columns: ["contact_list_id"]
+            isOneToOne: false
+            referencedRelation: "sms_contact_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_campaigns_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "sms_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_contact_lists: {
+        Row: {
+          company_id: string | null
+          contact_count: number | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          contact_count?: number | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          contact_count?: number | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_contact_lists_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_contacts: {
+        Row: {
+          created_at: string
+          id: string
+          list_id: string
+          metadata: Json | null
+          name: string | null
+          phone: string
+          source: string | null
+          source_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          list_id: string
+          metadata?: Json | null
+          name?: string | null
+          phone: string
+          source?: string | null
+          source_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          list_id?: string
+          metadata?: Json | null
+          name?: string | null
+          phone?: string
+          source?: string | null
+          source_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_contacts_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "sms_contact_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_history: {
+        Row: {
+          campaign_id: string | null
+          company_id: string | null
+          contact_name: string | null
+          created_at: string
+          delivered_at: string | null
+          error_message: string | null
+          id: string
+          message: string
+          phone: string
+          provider_message_id: string | null
+          sent_at: string | null
+          sent_by: string
+          status: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          company_id?: string | null
+          contact_name?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          message: string
+          phone: string
+          provider_message_id?: string | null
+          sent_at?: string | null
+          sent_by: string
+          status?: string
+        }
+        Update: {
+          campaign_id?: string | null
+          company_id?: string | null
+          contact_name?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          message?: string
+          phone?: string
+          provider_message_id?: string | null
+          sent_at?: string | null
+          sent_by?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_history_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sms_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_history_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sms_messages: {
         Row: {
           created_at: string
@@ -3807,6 +4034,50 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      sms_templates: {
+        Row: {
+          company_id: string | null
+          content: string
+          created_at: string
+          created_by: string
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+          variables: string[] | null
+        }
+        Insert: {
+          company_id?: string | null
+          content: string
+          created_at?: string
+          created_by: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+          variables?: string[] | null
+        }
+        Update: {
+          company_id?: string | null
+          content?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string
+          variables?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       televendas: {
         Row: {
