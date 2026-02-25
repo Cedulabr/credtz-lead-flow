@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Send, Rocket, FileText, Users, Zap } from "lucide-react";
+import { Plus, Send, Rocket, FileText, Users, Zap, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +38,7 @@ export const CampaignsView = ({
   const { user } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sendingCampaignId, setSendingCampaignId] = useState<string | null>(null);
 
   // Form state
   const [campaignName, setCampaignName] = useState("");
@@ -209,6 +210,23 @@ export const CampaignsView = ({
     setImportedCount(0);
   };
 
+  const handleSendCampaign = async (campaignId: string) => {
+    setSendingCampaignId(campaignId);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-sms", {
+        body: { campaign_id: campaignId },
+      });
+      if (error) throw error;
+      toast.success(`Disparo concluído: ${data.sent} enviados, ${data.failed} falhas`);
+      onRefresh();
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Erro ao disparar campanha: " + (e.message || "erro desconhecido"));
+    } finally {
+      setSendingCampaignId(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -251,8 +269,24 @@ export const CampaignsView = ({
                         {c.failed_count > 0 && <span className="text-red-500">❌ {c.failed_count} falhas</span>}
                       </div>
                     </div>
-                    <div className="text-right text-[11px] text-muted-foreground">
-                      {new Date(c.created_at).toLocaleDateString("pt-BR")}
+                    <div className="flex flex-col items-end gap-2">
+                      <span className="text-[11px] text-muted-foreground">
+                        {new Date(c.created_at).toLocaleDateString("pt-BR")}
+                      </span>
+                      {(c.status === "draft" || c.status === "scheduled") && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleSendCampaign(c.id)}
+                          disabled={sendingCampaignId === c.id}
+                          className="gap-1.5 text-xs"
+                        >
+                          {sendingCampaignId === c.id ? (
+                            <><Loader2 className="h-3 w-3 animate-spin" /> Enviando...</>
+                          ) : (
+                            <><Send className="h-3 w-3" /> Disparar</>
+                          )}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </motion.div>
