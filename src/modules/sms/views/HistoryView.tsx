@@ -113,6 +113,11 @@ export const HistoryView = ({ history, onRefresh }: HistoryViewProps) => {
                   {record.campaign_id && (
                     <Badge variant="secondary" className="text-[9px] h-4">Campanha</Badge>
                   )}
+                  {(record as any).provider && (
+                    <Badge variant="outline" className="text-[9px] h-4 gap-0.5">
+                      {(record as any).provider === "yup_chat" ? "💬 Yup" : "📱 Twilio"}
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground truncate">{record.message}</p>
                 {record.error_message && (

@@ -17,7 +17,8 @@ import {
   Trash2,
   Save,
   X,
-  Bell
+  Bell,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,8 +26,9 @@ import { useToast } from '@/hooks/use-toast';
 
 // Import existing components
 import { AdminWhitelabel } from '@/components/AdminWhitelabel';
+import { AdminSmsProviders } from '@/components/admin/AdminSmsProviders';
 
-type SystemSection = 'menu' | 'announcements' | 'whitelabel';
+type SystemSection = 'menu' | 'announcements' | 'whitelabel' | 'sms_providers';
 
 interface Announcement {
   id: number;
@@ -69,6 +71,14 @@ export function AdminSystem() {
       icon: Palette,
       color: 'text-violet-600',
       bgColor: 'bg-violet-100 dark:bg-violet-900/30',
+    },
+    {
+      id: 'sms_providers',
+      label: 'Provedores SMS',
+      description: 'Escolha o servidor de envio de SMS',
+      icon: MessageSquare,
+      color: 'text-emerald-600',
+      bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
     },
   ];
 
@@ -267,6 +277,8 @@ export function AdminSystem() {
         return renderAnnouncementsContent();
       case 'whitelabel':
         return <AdminWhitelabel />;
+      case 'sms_providers':
+        return <AdminSmsProviders />;
       default:
         return null;
     }
