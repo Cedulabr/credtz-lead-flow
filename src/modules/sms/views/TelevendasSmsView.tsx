@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Phone, Play, Pause, Send, RefreshCw, Loader2, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Phone, Play, Pause, Send, RefreshCw, Loader2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,6 +37,7 @@ export const TelevendasSmsView = () => {
   const [filter, setFilter] = useState("all");
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const fetchQueue = useCallback(async () => {
     setLoading(true);
@@ -95,6 +96,65 @@ export const TelevendasSmsView = () => {
     }
   };
 
+  const handlePullProposals = async () => {
+    setImporting(true);
+    try {
+      // Get configured days
+      const { data: settingsData } = await supabase
+        .from("sms_automation_settings")
+        .select("setting_key, setting_value")
+        .eq("setting_key", "automacao_em_andamento_dias")
+        .single();
+      const dias = parseInt(settingsData?.setting_value || "5");
+
+      // Get existing televendas_ids in queue to avoid duplicates
+      const { data: existingQueue } = await supabase
+        .from("sms_televendas_queue")
+        .select("televendas_id");
+      const existingIds = new Set((existingQueue as any[] || []).map((q: any) => q.televendas_id));
+
+      // Fetch em_andamento proposals from televendas
+      const { data: proposals, error } = await supabase
+        .from("televendas")
+        .select("id, nome, telefone, tipo_operacao, status, company_id, user_id")
+        .in("status", ["em_andamento", "aguardando", "digitado", "solicitar_digitacao"])
+        .limit(500);
+
+      if (error) throw error;
+
+      const toInsert = (proposals || [])
+        .filter((p: any) => !existingIds.has(p.id))
+        .map((p: any) => ({
+          televendas_id: p.id,
+          cliente_nome: p.nome,
+          cliente_telefone: p.telefone,
+          tipo_operacao: p.tipo_operacao,
+          status_proposta: p.status,
+          company_id: p.company_id,
+          user_id: p.user_id,
+          dias_envio_total: dias,
+        }));
+
+      if (toInsert.length === 0) {
+        toast.info("Nenhuma proposta nova para importar");
+        return;
+      }
+
+      const { error: insertError } = await supabase
+        .from("sms_televendas_queue")
+        .insert(toInsert as any);
+      if (insertError) throw insertError;
+
+      toast.success(`${toInsert.length} propostas importadas para a fila SMS`);
+      fetchQueue();
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Erro ao importar propostas: " + e.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const isAdmin = profile?.role === "admin";
 
   return (
@@ -105,6 +165,10 @@ export const TelevendasSmsView = () => {
           Notificação SMS Televendas
         </h2>
         <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={handlePullProposals} disabled={importing} className="gap-2 text-sm">
+            {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Puxar Propostas
+          </Button>
           <Select value={filter} onValueChange={setFilter}>
             <SelectTrigger className="w-36 h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -126,7 +190,7 @@ export const TelevendasSmsView = () => {
         <div className="text-center py-12 text-muted-foreground">
           <Phone className="h-10 w-10 mx-auto mb-3 opacity-50" />
           <p>Nenhum cliente na fila de SMS</p>
-          <p className="text-sm">Clientes serão adicionados automaticamente ao criar propostas no Televendas</p>
+          <p className="text-sm">Use "Puxar Propostas" para importar propostas em andamento ou crie novas no Televendas</p>
         </div>
       ) : (
         <div className="rounded-xl border overflow-x-auto">

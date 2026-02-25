@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { History, CheckCircle, XCircle, Clock, Send, Filter } from "lucide-react";
+import { History, CheckCircle, XCircle, Clock, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SmsHistoryRecord } from "../types";
 
@@ -19,12 +20,21 @@ const STATUS_ICON: Record<string, { icon: typeof Clock; color: string; label: st
 export const HistoryView = ({ history }: HistoryViewProps) => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("all");
 
-  const filtered = history.filter((r) => {
-    if (statusFilter !== "all" && r.status !== statusFilter) return false;
-    if (typeFilter !== "all" && (r.send_type || "manual") !== typeFilter) return false;
-    return true;
-  });
+  const filtered = useMemo(() => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekAgo = new Date(todayStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    return history.filter((r) => {
+      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (typeFilter !== "all" && (r.send_type || "manual") !== typeFilter) return false;
+      if (dateFilter === "today" && new Date(r.created_at) < todayStart) return false;
+      if (dateFilter === "7days" && new Date(r.created_at) < weekAgo) return false;
+      return true;
+    });
+  }, [history, statusFilter, typeFilter, dateFilter]);
 
   if (history.length === 0) {
     return (
@@ -40,7 +50,15 @@ export const HistoryView = ({ history }: HistoryViewProps) => {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-semibold">Histórico de Envios</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Select value={dateFilter} onValueChange={setDateFilter}>
+            <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas datas</SelectItem>
+              <SelectItem value="today">Hoje</SelectItem>
+              <SelectItem value="7days">7 dias</SelectItem>
+            </SelectContent>
+          </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -60,11 +78,16 @@ export const HistoryView = ({ history }: HistoryViewProps) => {
           </Select>
         </div>
       </div>
+
+      <div className="text-xs text-muted-foreground mb-1">
+        {filtered.length} registro(s) encontrado(s)
+      </div>
+
       <div className="space-y-2">
         {filtered.map((record, index) => {
           const statusConfig = STATUS_ICON[record.status] || STATUS_ICON.pending;
           const Icon = statusConfig.icon;
-          const sendType = (record as any).send_type || "manual";
+          const sendType = record.send_type || "manual";
           return (
             <motion.div
               key={record.id}

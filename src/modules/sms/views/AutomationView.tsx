@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { Settings, Save, Play, Loader2, Zap } from "lucide-react";
+import { Settings, Save, Play, Loader2, Zap, Users, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -17,12 +18,24 @@ interface SettingRow {
   description: string | null;
 }
 
+interface QueueItem {
+  id: string;
+  cliente_nome: string;
+  cliente_telefone: string;
+  tipo_operacao: string;
+  dias_enviados: number;
+  dias_envio_total: number;
+  ultimo_envio_at: string | null;
+}
+
 export const AutomationView = () => {
   const { profile } = useAuth();
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
+  const [nextSends, setNextSends] = useState<QueueItem[]>([]);
+  const [loadingNext, setLoadingNext] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -33,7 +46,24 @@ export const AutomationView = () => {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+  const fetchNextSends = useCallback(async () => {
+    setLoadingNext(true);
+    const { data } = await supabase
+      .from("sms_televendas_queue")
+      .select("id, cliente_nome, cliente_telefone, tipo_operacao, dias_enviados, dias_envio_total, ultimo_envio_at")
+      .eq("automacao_ativa", true)
+      .eq("automacao_status", "ativo")
+      .ilike("tipo_operacao", "%portabilidade%")
+      .order("ultimo_envio_at", { ascending: true, nullsFirst: true })
+      .limit(50);
+
+    // Filter client-side: dias_enviados < dias_envio_total
+    const filtered = ((data as any[]) || []).filter((i: QueueItem) => i.dias_enviados < i.dias_envio_total);
+    setNextSends(filtered);
+    setLoadingNext(false);
+  }, []);
+
+  useEffect(() => { fetchSettings(); fetchNextSends(); }, [fetchSettings, fetchNextSends]);
 
   const updateSetting = (key: string, value: string) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -61,6 +91,7 @@ export const AutomationView = () => {
       const { data, error } = await supabase.functions.invoke("sms-automation-run");
       if (error) throw error;
       toast.success(`Automação executada: ${data?.sent || 0} enviados, ${data?.failed || 0} falhas, ${data?.skipped || 0} ignorados`);
+      fetchNextSends();
     } catch (e: any) {
       toast.error("Erro: " + e.message);
     } finally {
@@ -101,10 +132,13 @@ export const AutomationView = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <Zap className="h-4 w-4 text-primary" />
-              Automação - Propostas em Andamento
+              Automação - Portabilidade em Andamento
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="p-2.5 rounded-lg bg-muted/50 text-xs text-muted-foreground">
+              <p>⚡ Apenas propostas de <strong>Portabilidade</strong> com status em andamento receberão mensagens automáticas.</p>
+            </div>
             <div className="flex items-center justify-between">
               <Label className="text-sm">Ativada</Label>
               <Switch
@@ -183,6 +217,47 @@ export const AutomationView = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Próximos Envios */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            Próximos Envios — Clientes a Notificar
+            <Badge variant="secondary" className="text-[10px]">{nextSends.length}</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingNext ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : nextSends.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">Nenhum cliente pendente de envio</p>
+          ) : (
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {nextSends.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-border/50 bg-card text-sm">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium truncate">{item.cliente_nome}</span>
+                      <span className="text-[10px] font-mono text-muted-foreground">{item.cliente_telefone}</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">{item.tipo_operacao}</p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="text-xs text-muted-foreground">{item.dias_enviados}/{item.dias_envio_total} dias</span>
+                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      {item.ultimo_envio_at
+                        ? new Date(item.ultimo_envio_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+                        : "Nunca"}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

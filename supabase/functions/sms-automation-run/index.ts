@@ -64,8 +64,14 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Only send for em_andamento status proposals
+        // Only send for em_andamento status proposals of Portabilidade
         if (!["em_andamento", "aguardando", "digitado", "solicitar_digitacao"].includes(item.status_proposta)) {
+          totalSkipped++;
+          continue;
+        }
+
+        // Filter: only Portabilidade proposals for em_andamento automation
+        if (!item.tipo_operacao?.toLowerCase().includes("portabilidade")) {
           totalSkipped++;
           continue;
         }
