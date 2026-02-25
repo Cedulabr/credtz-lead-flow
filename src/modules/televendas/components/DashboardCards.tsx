@@ -18,15 +18,12 @@ export const DashboardCards = ({
   televendas,
 }: DashboardCardsProps) => {
   const stats = useMemo(() => {
-    const nonCancelled = televendas.filter(
-      (tv) => tv.status !== "proposta_cancelada" && tv.status !== "exclusao_aprovada"
-    );
-
-    const totalBruto = nonCancelled.reduce((sum, tv) => sum + (tv.saldo_devedor || 0), 0);
+    const paid = televendas.filter((tv) => tv.status === "proposta_paga");
+    const totalBrutoPago = paid.reduce((sum, tv) => sum + (tv.saldo_devedor || 0), 0);
 
     return {
       totalPropostas: televendas.length,
-      totalBruto,
+      totalBrutoPago,
     };
   }, [televendas]);
 
@@ -39,11 +36,11 @@ export const DashboardCards = ({
       bg: "bg-blue-500/10",
     },
     {
-      label: "Total Bruto",
-      value: formatCurrency(stats.totalBruto),
+      label: "Total Bruto Pago",
+      value: formatCurrency(stats.totalBrutoPago),
       icon: DollarSign,
-      gradient: "from-indigo-500 to-indigo-600",
-      bg: "bg-indigo-500/10",
+      gradient: "from-green-500 to-emerald-600",
+      bg: "bg-green-500/10",
     },
   ];
 
