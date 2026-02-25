@@ -7,7 +7,50 @@ const corsHeaders = {
 };
 
 interface SendSmsBody {
-  campaign_id: string;
+  campaign_id?: string;
+  // Single send mode
+  phone?: string;
+  message?: string;
+  televendas_id?: string;
+  send_type?: string;
+  contact_name?: string;
+}
+
+async function sendViaTwilio(phone: string, message: string): Promise<{ ok: boolean; sid?: string; error?: string }> {
+  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID")!;
+  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN")!;
+  const messagingServiceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID")!;
+  const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+  const basicAuth = btoa(`${accountSid}:${authToken}`);
+
+  // Format phone to E.164
+  let formatted = phone.replace(/\D/g, "");
+  if (formatted.length <= 11) {
+    formatted = `+55${formatted}`;
+  } else if (!formatted.startsWith("+")) {
+    formatted = `+${formatted}`;
+  }
+
+  const params = new URLSearchParams({
+    To: formatted,
+    MessagingServiceSid: messagingServiceSid,
+    Body: message,
+  });
+
+  const res = await fetch(twilioUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basicAuth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params.toString(),
+  });
+
+  const data = await res.json();
+  if (res.ok) {
+    return { ok: true, sid: data.sid };
+  }
+  return { ok: false, error: data.message || "Unknown Twilio error" };
 }
 
 Deno.serve(async (req) => {
@@ -16,7 +59,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Auth check
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -39,15 +81,45 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { campaign_id } = (await req.json()) as SendSmsBody;
+    const body = (await req.json()) as SendSmsBody;
+
+    // ===== SINGLE SEND MODE =====
+    if (body.phone && body.message) {
+      const result = await sendViaTwilio(body.phone, body.message);
+
+      const serviceClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+
+      await serviceClient.from("sms_history").insert({
+        phone: body.phone,
+        contact_name: body.contact_name || null,
+        message: body.message,
+        status: result.ok ? "sent" : "failed",
+        provider_message_id: result.sid || null,
+        error_message: result.error || null,
+        sent_at: result.ok ? new Date().toISOString() : null,
+        sent_by: user.id,
+        televendas_id: body.televendas_id || null,
+        send_type: body.send_type || "manual",
+      });
+
+      return new Response(
+        JSON.stringify({ success: result.ok, error: result.error, sid: result.sid }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ===== CAMPAIGN SEND MODE =====
+    const { campaign_id } = body;
     if (!campaign_id) {
-      return new Response(JSON.stringify({ error: "campaign_id is required" }), {
+      return new Response(JSON.stringify({ error: "campaign_id or phone+message required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Fetch campaign
     const { data: campaign, error: campErr } = await supabase
       .from("sms_campaigns")
       .select("*")
@@ -68,22 +140,27 @@ Deno.serve(async (req) => {
       );
     }
 
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
     // Mark as sending
-    await supabase
+    await serviceClient
       .from("sms_campaigns")
-      .update({ status: "sending" })
+      .update({ status: "sending", started_at: new Date().toISOString() })
       .eq("id", campaign_id);
 
-    // Fetch contacts from the list
+    // Fetch contacts
     const { data: contacts } = await supabase
       .from("sms_contacts")
       .select("id, name, phone")
       .eq("list_id", campaign.contact_list_id);
 
     if (!contacts || contacts.length === 0) {
-      await supabase
+      await serviceClient
         .from("sms_campaigns")
-        .update({ status: "failed" })
+        .update({ status: "failed", completed_at: new Date().toISOString() })
         .eq("id", campaign_id);
       return new Response(JSON.stringify({ error: "No contacts in list" }), {
         status: 400,
@@ -91,89 +168,44 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Twilio credentials
-    const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID")!;
-    const authToken = Deno.env.get("TWILIO_AUTH_TOKEN")!;
-    const messagingServiceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID")!;
-    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
-    const basicAuth = btoa(`${accountSid}:${authToken}`);
-
     let sentCount = 0;
     let failedCount = 0;
 
-    // Use service client for history inserts
-    const serviceClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
     for (const contact of contacts) {
-      // Replace variables in message
-      let message = campaign.message_content;
-      message = message.replace(/\{\{nome\}\}/gi, contact.name || "");
+      let msg = campaign.message_content;
+      msg = msg.replace(/\{\{nome\}\}/gi, contact.name || "");
 
-      // Format phone to E.164
-      let phone = contact.phone.replace(/\D/g, "");
-      if (phone.length <= 11) {
-        phone = `+55${phone}`;
-      } else if (!phone.startsWith("+")) {
-        phone = `+${phone}`;
-      }
+      const result = await sendViaTwilio(contact.phone, msg);
 
-      try {
-        const params = new URLSearchParams({
-          To: phone,
-          MessagingServiceSid: messagingServiceSid,
-          Body: message,
+      if (result.ok) {
+        sentCount++;
+        await serviceClient.from("sms_history").insert({
+          campaign_id,
+          phone: contact.phone,
+          contact_name: contact.name || null,
+          message: msg,
+          status: "sent",
+          provider_message_id: result.sid || null,
+          sent_at: new Date().toISOString(),
+          sent_by: user.id,
+          send_type: "manual",
         });
-
-        const twilioRes = await fetch(twilioUrl, {
-          method: "POST",
-          headers: {
-            Authorization: `Basic ${basicAuth}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: params.toString(),
-        });
-
-        const twilioData = await twilioRes.json();
-
-        if (twilioRes.ok) {
-          sentCount++;
-          await serviceClient.from("sms_history").insert({
-            campaign_id: campaign_id,
-            contact_id: contact.id,
-            phone: phone,
-            message_content: message,
-            status: "sent",
-            provider_message_id: twilioData.sid,
-            sent_at: new Date().toISOString(),
-          });
-        } else {
-          failedCount++;
-          await serviceClient.from("sms_history").insert({
-            campaign_id: campaign_id,
-            contact_id: contact.id,
-            phone: phone,
-            message_content: message,
-            status: "failed",
-            error_message: twilioData.message || "Unknown error",
-          });
-        }
-      } catch (err) {
+      } else {
         failedCount++;
         await serviceClient.from("sms_history").insert({
-          campaign_id: campaign_id,
-          contact_id: contact.id,
-          phone: phone,
-          message_content: message,
+          campaign_id,
+          phone: contact.phone,
+          contact_name: contact.name || null,
+          message: msg,
           status: "failed",
-          error_message: String(err),
+          error_message: result.error || "Unknown error",
+          sent_by: user.id,
+          send_type: "manual",
         });
       }
     }
 
-    // Update campaign status
+    // Always update final status - never leave as "sending"
     const finalStatus = failedCount === contacts.length ? "failed" : "completed";
     await serviceClient
       .from("sms_campaigns")
@@ -181,17 +213,12 @@ Deno.serve(async (req) => {
         status: finalStatus,
         sent_count: sentCount,
         failed_count: failedCount,
-        sent_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
       })
       .eq("id", campaign_id);
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        sent: sentCount,
-        failed: failedCount,
-        total: contacts.length,
-      }),
+      JSON.stringify({ success: true, sent: sentCount, failed: failedCount, total: contacts.length }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {

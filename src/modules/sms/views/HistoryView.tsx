@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { History, CheckCircle, XCircle, Clock, Send } from "lucide-react";
+import { History, CheckCircle, XCircle, Clock, Send, Filter } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SmsHistoryRecord } from "../types";
 
 interface HistoryViewProps {
@@ -14,6 +17,15 @@ const STATUS_ICON: Record<string, { icon: typeof Clock; color: string; label: st
 };
 
 export const HistoryView = ({ history }: HistoryViewProps) => {
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+
+  const filtered = history.filter((r) => {
+    if (statusFilter !== "all" && r.status !== statusFilter) return false;
+    if (typeFilter !== "all" && (r.send_type || "manual") !== typeFilter) return false;
+    return true;
+  });
+
   if (history.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -26,11 +38,33 @@ export const HistoryView = ({ history }: HistoryViewProps) => {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Histórico de Envios</h2>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="text-lg font-semibold">Histórico de Envios</h2>
+        <div className="flex gap-2">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="sent">Enviado</SelectItem>
+              <SelectItem value="failed">Falhou</SelectItem>
+              <SelectItem value="pending">Pendente</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="manual">Manual</SelectItem>
+              <SelectItem value="automatico">Automático</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
       <div className="space-y-2">
-        {history.map((record, index) => {
+        {filtered.map((record, index) => {
           const statusConfig = STATUS_ICON[record.status] || STATUS_ICON.pending;
           const Icon = statusConfig.icon;
+          const sendType = (record as any).send_type || "manual";
           return (
             <motion.div
               key={record.id}
@@ -44,6 +78,9 @@ export const HistoryView = ({ history }: HistoryViewProps) => {
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium">{record.contact_name || record.phone}</span>
                   <span className="text-[10px] text-muted-foreground font-mono">{record.phone}</span>
+                  <Badge variant={sendType === "automatico" ? "default" : "outline"} className="text-[9px] h-4">
+                    {sendType === "automatico" ? "Auto" : "Manual"}
+                  </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground truncate">{record.message}</p>
               </div>
@@ -58,6 +95,9 @@ export const HistoryView = ({ history }: HistoryViewProps) => {
             </motion.div>
           );
         })}
+        {filtered.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground text-sm">Nenhum registro encontrado com os filtros</div>
+        )}
       </div>
     </div>
   );

@@ -66,9 +66,11 @@ export interface SmsHistoryRecord {
   sent_by: string;
   company_id: string | null;
   created_at: string;
+  televendas_id: string | null;
+  send_type: string;
 }
 
-export type SmsTab = "campaigns" | "templates" | "history" | "contacts";
+export type SmsTab = "televendas_sms" | "automation" | "campaigns" | "templates" | "history" | "contacts";
 
 export const LEAD_SOURCE_OPTIONS = [
   { value: "activate_leads", label: "Activate Leads", icon: "⚡" },
