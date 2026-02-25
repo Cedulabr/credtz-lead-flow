@@ -47,7 +47,7 @@ export const TelevendasModule = () => {
   
   // Fetch banks from televendas_banks table
   const { bankNames: registeredBanks } = useTelevendasBanks();
-  const { bankCalculationModel, bankCommissionRate } = useCommissionRules();
+  const { bankCalculationModel } = useCommissionRules();
 
   // Data states
   const [televendas, setTelevendas] = useState<Televenda[]>([]);
@@ -142,13 +142,25 @@ export const TelevendasModule = () => {
       if (showActiveOnly) {
         query = query.not("status", "in", '("proposta_paga","proposta_cancelada","exclusao_aprovada")');
       } else {
-        // Date range - use different date column based on dateMode
+        // Date range filtering:
+        // - Non-paid proposals use data_venda
+        // - Paid proposals (proposta_paga) use data_pagamento so they appear in the month they were paid
         const dateRange = getDateRange(filters.period, filters.month);
         if (dateRange) {
-          const dateColumn = filters.dateMode === "pagamento" ? "data_pagamento" : "data_venda";
-          query = query
-            .gte(dateColumn, dateRange.start.toISOString().split("T")[0])
-            .lte(dateColumn, dateRange.end.toISOString().split("T")[0]);
+          const startStr = dateRange.start.toISOString().split("T")[0];
+          const endStr = dateRange.end.toISOString().split("T")[0];
+          
+          if (filters.dateMode === "pagamento") {
+            // Payment mode: only show proposals with data_pagamento in range
+            query = query
+              .gte("data_pagamento", startStr)
+              .lte("data_pagamento", endStr);
+          } else {
+            // Default mode: proposals by data_venda OR paid proposals by data_pagamento
+            query = query.or(
+              `and(data_venda.gte.${startStr},data_venda.lte.${endStr}),and(status.eq.proposta_paga,data_pagamento.gte.${startStr},data_pagamento.lte.${endStr})`
+            );
+          }
         }
       }
 
@@ -662,8 +674,6 @@ export const TelevendasModule = () => {
         selectedStatus={filters.status !== "all" ? filters.status : undefined}
         isGestorOrAdmin={isGestorOrAdmin}
         dateMode={filters.dateMode}
-        bankCalculationModel={bankCalculationModel}
-        bankCommissionRate={bankCommissionRate}
       />
 
       {/* BLOCO 2 — Pipeline Operacional */}
@@ -677,7 +687,6 @@ export const TelevendasModule = () => {
       <ProductionBar
         televendas={televendas}
         isGestorOrAdmin={isGestorOrAdmin}
-        bankCalculationModel={bankCalculationModel}
       />
 
       {/* Tabs */}

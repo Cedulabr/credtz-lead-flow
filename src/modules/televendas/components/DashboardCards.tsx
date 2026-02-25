@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { DollarSign, FileText, Target, TrendingUp, Receipt } from "lucide-react";
-import { Televenda, DateMode } from "../types";
+import { DollarSign, FileText } from "lucide-react";
+import { Televenda } from "../types";
 import { formatCurrency } from "../utils";
 
 interface DashboardCardsProps {
@@ -9,59 +9,26 @@ interface DashboardCardsProps {
   onFilterByStatus: (status: string) => void;
   selectedStatus?: string;
   isGestorOrAdmin: boolean;
-  dateMode: DateMode;
+  dateMode: string;
   bankCalculationModel?: Record<string, string>;
   bankCommissionRate?: Record<string, number>;
 }
 
-/**
- * For portabilidade: use saldo_devedor or parcela depending on bank's calculation_model.
- * For other operations: always use parcela (valor liberado).
- */
-function getBaseValue(tv: Televenda, bankCalcModel: Record<string, string>): number {
-  if (tv.tipo_operacao === "Portabilidade") {
-    const model = bankCalcModel[tv.banco];
-    if (model === "saldo_devedor" && tv.saldo_devedor && tv.saldo_devedor > 0) {
-      return tv.saldo_devedor;
-    }
-    // Default to parcela (valor_bruto)
-    return tv.parcela || 0;
-  }
-  return tv.parcela || 0;
-}
-
-function getCommissionValue(tv: Televenda, bankCalcModel: Record<string, string>, bankCommRate: Record<string, number>): number {
-  const rate = bankCommRate[tv.banco];
-  if (!rate) return (tv.parcela || 0) * 0.08; // default 8%
-  
-  const base = getBaseValue(tv, bankCalcModel);
-  return base * (rate / 100);
-}
-
 export const DashboardCards = ({
   televendas,
-  bankCalculationModel = {},
-  bankCommissionRate = {},
 }: DashboardCardsProps) => {
   const stats = useMemo(() => {
     const nonCancelled = televendas.filter(
       (tv) => tv.status !== "proposta_cancelada" && tv.status !== "exclusao_aprovada"
     );
-    const approved = televendas.filter((tv) => tv.status === "proposta_paga");
-    
-    const totalBruto = nonCancelled.reduce((sum, tv) => sum + getBaseValue(tv, bankCalculationModel), 0);
-    const totalAprovado = approved.reduce((sum, tv) => sum + getBaseValue(tv, bankCalculationModel), 0);
-    const ticketMedio = nonCancelled.length > 0 ? totalBruto / nonCancelled.length : 0;
-    const comissaoPrevista = approved.reduce((sum, tv) => sum + getCommissionValue(tv, bankCalculationModel, bankCommissionRate), 0);
+
+    const totalBruto = nonCancelled.reduce((sum, tv) => sum + (tv.saldo_devedor || 0), 0);
 
     return {
       totalPropostas: televendas.length,
       totalBruto,
-      totalAprovado,
-      comissaoPrevista,
-      ticketMedio,
     };
-  }, [televendas, bankCalculationModel, bankCommissionRate]);
+  }, [televendas]);
 
   const cards = [
     {
@@ -78,31 +45,10 @@ export const DashboardCards = ({
       gradient: "from-indigo-500 to-indigo-600",
       bg: "bg-indigo-500/10",
     },
-    {
-      label: "Valor Aprovado",
-      value: formatCurrency(stats.totalAprovado),
-      icon: TrendingUp,
-      gradient: "from-green-500 to-emerald-600",
-      bg: "bg-green-500/10",
-    },
-    {
-      label: "Comissão Prevista",
-      value: formatCurrency(stats.comissaoPrevista),
-      icon: Receipt,
-      gradient: "from-amber-500 to-amber-600",
-      bg: "bg-amber-500/10",
-    },
-    {
-      label: "Ticket Médio",
-      value: formatCurrency(stats.ticketMedio),
-      icon: Target,
-      gradient: "from-purple-500 to-purple-600",
-      bg: "bg-purple-500/10",
-    },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 gap-3">
       {cards.map((card, index) => {
         const Icon = card.icon;
         return (
