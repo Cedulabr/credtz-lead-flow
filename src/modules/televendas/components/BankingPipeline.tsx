@@ -106,7 +106,7 @@ export const BankingPipeline = ({ televendas, onFilterByBankStatus, selectedBank
       case "exclusao_aprovada":
         return "cancelado_banco";
       default:
-        return "aguardando_digitacao";
+        return "em_andamento";
     }
   };
 
