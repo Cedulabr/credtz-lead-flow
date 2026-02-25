@@ -231,9 +231,14 @@ export const CampaignsView = ({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Campanhas SMS</h2>
-        <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="gap-2">
-          <Plus className="h-4 w-4" /> Nova Campanha
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onRefresh} className="gap-2 text-sm">
+            <RefreshCw className="h-4 w-4" /> Atualizar Status
+          </Button>
+          <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="gap-2">
+            <Plus className="h-4 w-4" /> Nova Campanha
+          </Button>
+        </div>
       </div>
 
       {campaigns.length === 0 ? (
