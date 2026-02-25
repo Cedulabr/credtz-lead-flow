@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Phone, Play, Pause, Send, RefreshCw, Loader2, Download } from "lucide-react";
+import { Phone, Play, Pause, Send, RefreshCw, Loader2, Download, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -157,6 +157,15 @@ export const TelevendasSmsView = () => {
 
   const isAdmin = profile?.role === "admin";
 
+  // Calcular telefones duplicados na fila ativa
+  const phoneCounts = new Map<string, number>();
+  queue.forEach((item) => {
+    if (item.automacao_status === "ativo") {
+      const phone = (item.cliente_telefone || "").replace(/\D/g, "");
+      if (phone) phoneCounts.set(phone, (phoneCounts.get(phone) || 0) + 1);
+    }
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -219,7 +228,19 @@ export const TelevendasSmsView = () => {
                     className="border-b transition-colors hover:bg-muted/50"
                   >
                     <TableCell className="font-medium text-sm">{item.cliente_nome}</TableCell>
-                    <TableCell className="text-xs font-mono text-muted-foreground">{item.cliente_telefone}</TableCell>
+                    <TableCell className="text-xs font-mono text-muted-foreground">
+                      {item.cliente_telefone}
+                      {(() => {
+                        const normalized = (item.cliente_telefone || "").replace(/\D/g, "");
+                        const count = phoneCounts.get(normalized) || 0;
+                        return count > 1 ? (
+                          <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-amber-600" title={`${count} propostas ativas com este telefone (receberá apenas 1 SMS)`}>
+                            <AlertTriangle className="h-3 w-3" />
+                            {count}x
+                          </span>
+                        ) : null;
+                      })()}
+                    </TableCell>
                     <TableCell className="text-xs">{item.tipo_operacao}</TableCell>
                     <TableCell className="text-xs">{item.status_proposta}</TableCell>
                     <TableCell>

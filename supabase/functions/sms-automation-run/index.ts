@@ -41,12 +41,16 @@ Deno.serve(async (req) => {
         .from("sms_televendas_queue")
         .select("*")
         .eq("automacao_ativa", true)
-        .eq("automacao_status", "ativo")
-        .lt("dias_enviados", serviceClient.rpc ? 999 : 999); // get all active
+        .eq("automacao_status", "ativo");
 
       const now = new Date();
 
+      // === DEDUPLICAÇÃO POR TELEFONE ===
+      // Agrupar itens por telefone normalizado para enviar apenas 1 SMS por cliente
+      const phoneGroups = new Map<string, any[]>();
+
       for (const item of (queue || [])) {
+        // Skip items that completed their cycle
         if (item.dias_enviados >= item.dias_envio_total) {
           await serviceClient.from("sms_televendas_queue")
             .update({ automacao_status: "finalizado", automacao_ativa: false })
@@ -54,7 +58,25 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Check interval
+        // Only send for em_andamento status proposals of Portabilidade
+        if (!["em_andamento", "aguardando", "digitado", "solicitar_digitacao"].includes(item.status_proposta)) {
+          totalSkipped++;
+          continue;
+        }
+
+        if (!item.tipo_operacao?.toLowerCase().includes("portabilidade")) {
+          totalSkipped++;
+          continue;
+        }
+
+        // Normalizar telefone (remover não-dígitos)
+        const normalizedPhone = (item.cliente_telefone || "").replace(/\D/g, "");
+        if (!normalizedPhone) {
+          totalSkipped++;
+          continue;
+        }
+
+        // Check interval - use the most recent ultimo_envio_at across the group
         if (item.ultimo_envio_at) {
           const lastSent = new Date(item.ultimo_envio_at);
           const hoursSince = (now.getTime() - lastSent.getTime()) / (1000 * 60 * 60);
@@ -64,51 +86,51 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Only send for em_andamento status proposals of Portabilidade
-        if (!["em_andamento", "aguardando", "digitado", "solicitar_digitacao"].includes(item.status_proposta)) {
-          totalSkipped++;
-          continue;
+        if (!phoneGroups.has(normalizedPhone)) {
+          phoneGroups.set(normalizedPhone, []);
         }
+        phoneGroups.get(normalizedPhone)!.push(item);
+      }
 
-        // Filter: only Portabilidade proposals for em_andamento automation
-        if (!item.tipo_operacao?.toLowerCase().includes("portabilidade")) {
-          totalSkipped++;
-          continue;
-        }
+      // Para cada telefone único, enviar apenas 1 SMS
+      for (const [phone, items] of phoneGroups) {
+        const representative = items[0]; // Usar o primeiro item como representante
 
         // Build message
         let message = msgTemplate;
-        message = message.replace(/\{\{nome\}\}/gi, item.cliente_nome || "");
-        message = message.replace(/\{\{tipo_operacao\}\}/gi, item.tipo_operacao || "");
+        message = message.replace(/\{\{nome\}\}/gi, representative.cliente_nome || "");
+        message = message.replace(/\{\{tipo_operacao\}\}/gi, representative.tipo_operacao || "");
 
-        // Send via Twilio
-        const result = await sendViaTwilio(item.cliente_telefone, message);
+        // Send via Twilio - apenas 1 SMS por telefone
+        const result = await sendViaTwilio(representative.cliente_telefone, message);
 
-        // Record in history
+        // Record in history (1 registro para o envio)
         await serviceClient.from("sms_history").insert({
-          phone: item.cliente_telefone,
-          contact_name: item.cliente_nome,
+          phone: representative.cliente_telefone,
+          contact_name: representative.cliente_nome,
           message,
           status: result.ok ? "sent" : "failed",
           provider_message_id: result.sid || null,
           error_message: result.error || null,
           sent_at: result.ok ? now.toISOString() : null,
-          sent_by: item.user_id,
-          televendas_id: item.televendas_id,
+          sent_by: representative.user_id,
+          televendas_id: representative.televendas_id,
           send_type: "automatico",
         });
 
-        // Update queue
-        const newDias = item.dias_enviados + 1;
-        const updates: Record<string, any> = {
-          dias_enviados: newDias,
-          ultimo_envio_at: now.toISOString(),
-        };
-        if (newDias >= item.dias_envio_total) {
-          updates.automacao_status = "finalizado";
-          updates.automacao_ativa = false;
+        // Update ALL queue items for this phone
+        for (const item of items) {
+          const newDias = item.dias_enviados + 1;
+          const updates: Record<string, any> = {
+            dias_enviados: newDias,
+            ultimo_envio_at: now.toISOString(),
+          };
+          if (newDias >= item.dias_envio_total) {
+            updates.automacao_status = "finalizado";
+            updates.automacao_ativa = false;
+          }
+          await serviceClient.from("sms_televendas_queue").update(updates).eq("id", item.id);
         }
-        await serviceClient.from("sms_televendas_queue").update(updates).eq("id", item.id);
 
         if (result.ok) totalSent++;
         else totalFailed++;
@@ -117,16 +139,28 @@ Deno.serve(async (req) => {
 
     // === AUTOMATION: proposta_paga notifications ===
     if (pagoAtiva) {
-      // Find items with status proposta_paga that haven't been notified yet
       const { data: pagoQueue } = await serviceClient
         .from("sms_televendas_queue")
         .select("*")
         .eq("status_proposta", "proposta_paga")
         .eq("automacao_status", "ativo");
 
+      // Deduplicar por telefone também para pago
+      const pagoPhoneGroups = new Map<string, any>();
+
       for (const item of (pagoQueue || [])) {
-        // Only for "Novo emprestimo" type
         if (!item.tipo_operacao?.toLowerCase().includes("novo")) continue;
+
+        const normalizedPhone = (item.cliente_telefone || "").replace(/\D/g, "");
+        if (!normalizedPhone || pagoPhoneGroups.has(normalizedPhone)) {
+          // Marcar duplicado como finalizado sem enviar
+          await serviceClient.from("sms_televendas_queue")
+            .update({ automacao_status: "finalizado", automacao_ativa: false })
+            .eq("id", item.id);
+          continue;
+        }
+
+        pagoPhoneGroups.set(normalizedPhone, item);
 
         let message = msgPago;
         message = message.replace(/\{\{nome\}\}/gi, item.cliente_nome || "");
@@ -146,7 +180,6 @@ Deno.serve(async (req) => {
           send_type: "automatico",
         });
 
-        // Mark as finalized
         await serviceClient.from("sms_televendas_queue")
           .update({ automacao_status: "finalizado", automacao_ativa: false })
           .eq("id", item.id);
