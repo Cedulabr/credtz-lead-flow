@@ -154,10 +154,14 @@ export const PropostasView = ({
                 transition={{ delay: index * 0.015 }}
                 onClick={() => onView(tv)}
                 className={`
-                  relative p-3 md:p-4 rounded-xl border cursor-pointer
+                  relative p-3 md:p-4 rounded-xl border-2 cursor-pointer
                   bg-card hover:bg-muted/40 transition-all duration-150
                   hover:shadow-sm
-                  ${isCritical ? 'border-red-400 bg-red-500/5 dark:border-red-700 dark:bg-red-900/10' : isAwaiting && isGestorOrAdmin ? 'border-amber-300 bg-amber-500/5' : 'border-border/50'}
+                  ${isCritical 
+                    ? 'border-red-500 bg-red-100/60 dark:border-red-500 dark:bg-red-900/30 shadow-[0_0_12px_rgba(239,68,68,0.25)] ring-1 ring-red-400/40' 
+                    : priority === "alerta" 
+                      ? 'border-amber-400 bg-amber-50/50 dark:border-amber-500 dark:bg-amber-900/20' 
+                      : isAwaiting && isGestorOrAdmin ? 'border-amber-300 bg-amber-500/5' : 'border-border/50'}
                 `}
               >
                 <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">

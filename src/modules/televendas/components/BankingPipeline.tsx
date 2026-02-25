@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Televenda } from "../types";
+import { calcDiasParado, getPriorityFromDays } from "./PriorityBadge";
 
 // Simplified 6-status pipeline matching the reference system
 export const BANKING_STATUS_CONFIG: Record<string, {
@@ -75,13 +76,34 @@ export const BANKING_STATUS_OPTIONS = Object.entries(BANKING_STATUS_CONFIG).map(
   emoji: config.emoji,
 }));
 
+const PRIORITY_FILTER_CONFIG = {
+  alerta: {
+    label: "Alerta",
+    emoji: "🟡",
+    color: "text-amber-700",
+    bgColor: "bg-amber-50 dark:bg-amber-900/20",
+    borderColor: "border-amber-200 dark:border-amber-700",
+    activeBg: "bg-amber-100 dark:bg-amber-800/40",
+  },
+  critico: {
+    label: "Crítico",
+    emoji: "🔴",
+    color: "text-red-700",
+    bgColor: "bg-red-50 dark:bg-red-900/20",
+    borderColor: "border-red-200 dark:border-red-700",
+    activeBg: "bg-red-100 dark:bg-red-800/40",
+  },
+};
+
 interface BankingPipelineProps {
   televendas: Televenda[];
   onFilterByBankStatus: (status: string) => void;
   selectedBankStatus?: string;
+  onFilterByPriority?: (priority: string) => void;
+  selectedPriority?: string;
 }
 
-export const BankingPipeline = ({ televendas, onFilterByBankStatus, selectedBankStatus }: BankingPipelineProps) => {
+export const BankingPipeline = ({ televendas, onFilterByBankStatus, selectedBankStatus, onFilterByPriority, selectedPriority }: BankingPipelineProps) => {
   // Map commercial status to banking pipeline status
   // Commercial status takes priority to avoid misclassification
   const mapToPipelineStatus = (tv: Televenda): string => {
@@ -127,19 +149,76 @@ export const BankingPipeline = ({ televendas, onFilterByBankStatus, selectedBank
     }));
   }, [televendas]);
 
+  // Priority counts for active proposals
+  const priorityCounts = useMemo(() => {
+    const finalStatuses = ["proposta_paga", "proposta_cancelada", "exclusao_aprovada"];
+    let alertas = 0;
+    let criticos = 0;
+    televendas.forEach((tv) => {
+      if (finalStatuses.includes(tv.status)) return;
+      const dias = calcDiasParado(tv.updated_at);
+      const prio = tv.prioridade_operacional || getPriorityFromDays(dias);
+      if (prio === "critico") criticos++;
+      else if (prio === "alerta") alertas++;
+    });
+    return { alerta: alertas, critico: criticos };
+  }, [televendas]);
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pipeline Operacional</span>
-        {selectedBankStatus && (
-          <button
-            onClick={() => onFilterByBankStatus("all")}
-            className="text-xs text-primary hover:underline"
-          >
-            Limpar filtro
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {(selectedBankStatus || selectedPriority) && (
+            <button
+              onClick={() => {
+                onFilterByBankStatus("all");
+                onFilterByPriority?.("all");
+              }}
+              className="text-xs text-primary hover:underline"
+            >
+              Limpar filtro
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Priority filter pills */}
+      {(priorityCounts.alerta > 0 || priorityCounts.critico > 0) && (
+        <div className="flex gap-2">
+          {(Object.entries(PRIORITY_FILTER_CONFIG) as [string, typeof PRIORITY_FILTER_CONFIG["alerta"]][]).map(([key, config]) => {
+            const count = priorityCounts[key as keyof typeof priorityCounts];
+            if (count === 0) return null;
+            const isSelected = selectedPriority === key;
+            return (
+              <motion.button
+                key={key}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                onClick={() => onFilterByPriority?.(isSelected ? "all" : key)}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold border transition-all",
+                  "cursor-pointer hover:shadow-sm active:scale-[0.98]",
+                  isSelected
+                    ? `${config.activeBg} ${config.borderColor} ring-2 ring-offset-1 ${key === "critico" ? "ring-red-400" : "ring-amber-400"} shadow-md`
+                    : `${config.bgColor} ${config.borderColor}`,
+                  key === "critico" && "animate-pulse"
+                )}
+              >
+                <span className="text-lg">{config.emoji}</span>
+                <span className={config.color}>{config.label}</span>
+                <span className={cn(
+                  "ml-1 px-2 py-0.5 rounded-full text-xs font-bold",
+                  key === "critico" ? "bg-red-200 text-red-800 dark:bg-red-800 dark:text-red-200" : "bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-200"
+                )}>
+                  {count}
+                </span>
+              </motion.button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
         {stats.map((item, index) => {
           const isSelected = selectedBankStatus === item.key;
