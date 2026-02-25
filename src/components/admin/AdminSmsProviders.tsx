@@ -56,15 +56,28 @@ export function AdminSmsProviders() {
   const handleActivate = async (providerId: string, providerName: string) => {
     setSwitching(providerId);
     try {
-      // Deactivate all
-      await supabase.from('sms_providers').update({ is_active: false, updated_at: new Date().toISOString() } as any).neq('id', '');
+      // Deactivate all providers first
+      const { error: deactError } = await supabase
+        .from('sms_providers')
+        .update({ is_active: false, updated_at: new Date().toISOString() } as any)
+        .neq('id', providerId);
+      if (deactError) {
+        console.error('Deactivate error:', deactError);
+        throw deactError;
+      }
       // Activate selected
-      const { error } = await supabase.from('sms_providers').update({ is_active: true, updated_at: new Date().toISOString() } as any).eq('id', providerId);
-      if (error) throw error;
+      const { error } = await supabase
+        .from('sms_providers')
+        .update({ is_active: true, updated_at: new Date().toISOString() } as any)
+        .eq('id', providerId);
+      if (error) {
+        console.error('Activate error:', error);
+        throw error;
+      }
       toast.success(`${providerName} ativado como provedor SMS principal`);
       fetchProviders();
-    } catch {
-      toast.error('Erro ao ativar provedor');
+    } catch (e: any) {
+      toast.error('Erro ao ativar provedor: ' + (e?.message || 'erro desconhecido'));
     } finally {
       setSwitching(null);
     }
