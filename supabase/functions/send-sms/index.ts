@@ -15,7 +15,27 @@ interface SendSmsBody {
   contact_name?: string;
 }
 
-async function sendViaTwilio(phone: string, message: string): Promise<{ ok: boolean; sid?: string; error?: string }> {
+interface SmsResult {
+  ok: boolean;
+  sid?: string;
+  messageId?: string;
+  error?: string;
+  provider: string;
+}
+
+// === Get active provider from DB ===
+async function getActiveProvider(serviceClient: any): Promise<string> {
+  const { data } = await serviceClient
+    .from("sms_providers")
+    .select("name")
+    .eq("is_active", true)
+    .limit(1)
+    .single();
+  return data?.name || "twilio";
+}
+
+// === TWILIO ===
+async function sendViaTwilio(phone: string, message: string): Promise<SmsResult> {
   const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID")!;
   const authToken = Deno.env.get("TWILIO_AUTH_TOKEN")!;
   const messagingServiceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID")!;
@@ -23,11 +43,8 @@ async function sendViaTwilio(phone: string, message: string): Promise<{ ok: bool
   const basicAuth = btoa(`${accountSid}:${authToken}`);
 
   let formatted = phone.replace(/\D/g, "");
-  if (formatted.length <= 11) {
-    formatted = `+55${formatted}`;
-  } else if (!formatted.startsWith("+")) {
-    formatted = `+${formatted}`;
-  }
+  if (formatted.length <= 11) formatted = `+55${formatted}`;
+  else if (!formatted.startsWith("+")) formatted = `+${formatted}`;
 
   const params = new URLSearchParams({
     To: formatted,
@@ -45,10 +62,101 @@ async function sendViaTwilio(phone: string, message: string): Promise<{ ok: bool
   });
 
   const data = await res.json();
-  if (res.ok) {
-    return { ok: true, sid: data.sid };
+  if (res.ok) return { ok: true, sid: data.sid, provider: "twilio" };
+  return { ok: false, error: data.message || "Unknown Twilio error", provider: "twilio" };
+}
+
+// === YUP CHAT ===
+async function sendViaYupChat(phone: string, message: string): Promise<SmsResult> {
+  const yupId = Deno.env.get("YUP_CHAT_ID");
+  const yupToken = Deno.env.get("YUP_CHAT_TOKEN");
+
+  if (!yupId || !yupToken) {
+    return { ok: false, error: "YUP_CHAT_ID ou YUP_CHAT_TOKEN não configurados", provider: "yup_chat" };
   }
-  return { ok: false, error: data.message || "Unknown Twilio error" };
+
+  let formatted = phone.replace(/\D/g, "");
+  if (formatted.length <= 11) formatted = `55${formatted}`;
+
+  const basicAuth = btoa(`${yupId}:${yupToken}`);
+
+  const res = await fetch("https://api.yup.chat/v1/sms/messages", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basicAuth}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messages: [{ to: formatted, body: message }],
+      default: { normalize: true },
+    }),
+  });
+
+  const data = await res.json();
+
+  if (res.ok && Array.isArray(data) && data.length > 0) {
+    const first = data[0];
+    if (first.status === "accepted" || first.status === "sent") {
+      return { ok: true, messageId: first.id, provider: "yup_chat" };
+    }
+    return { ok: false, error: first.error_message || `Status: ${first.status}`, provider: "yup_chat" };
+  }
+
+  return { ok: false, error: data.error || "Yup Chat error", provider: "yup_chat" };
+}
+
+// === YUP CHAT BATCH (up to 1000 messages per request) ===
+async function sendBatchViaYupChat(
+  contacts: { phone: string; message: string; name?: string }[]
+): Promise<{ results: { phone: string; ok: boolean; messageId?: string; error?: string }[] }> {
+  const yupId = Deno.env.get("YUP_CHAT_ID");
+  const yupToken = Deno.env.get("YUP_CHAT_TOKEN");
+
+  if (!yupId || !yupToken) {
+    return {
+      results: contacts.map((c) => ({ phone: c.phone, ok: false, error: "YUP_CHAT_ID ou YUP_CHAT_TOKEN não configurados" })),
+    };
+  }
+
+  const basicAuth = btoa(`${yupId}:${yupToken}`);
+
+  const messages = contacts.map((c) => {
+    let formatted = c.phone.replace(/\D/g, "");
+    if (formatted.length <= 11) formatted = `55${formatted}`;
+    return { to: formatted, body: c.message };
+  });
+
+  const res = await fetch("https://api.yup.chat/v1/sms/messages", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basicAuth}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ messages, default: { normalize: true } }),
+  });
+
+  const data = await res.json();
+
+  if (res.ok && Array.isArray(data)) {
+    return {
+      results: data.map((item: any, i: number) => ({
+        phone: contacts[i]?.phone || "",
+        ok: item.status === "accepted" || item.status === "sent",
+        messageId: item.id,
+        error: item.error_message || (item.status !== "accepted" && item.status !== "sent" ? `Status: ${item.status}` : undefined),
+      })),
+    };
+  }
+
+  return {
+    results: contacts.map((c) => ({ phone: c.phone, ok: false, error: data.error || "Yup Chat batch error" })),
+  };
+}
+
+// === Unified send function ===
+async function sendSms(phone: string, message: string, provider: string): Promise<SmsResult> {
+  if (provider === "yup_chat") return sendViaYupChat(phone, message);
+  return sendViaTwilio(phone, message);
 }
 
 Deno.serve(async (req) => {
@@ -86,7 +194,10 @@ Deno.serve(async (req) => {
 
     const body = (await req.json()) as SendSmsBody;
 
-    // Check if user is admin (admins bypass credit check)
+    // Get active provider
+    const activeProvider = await getActiveProvider(serviceClient);
+
+    // Check if user is admin
     const { data: profileData } = await serviceClient
       .from("profiles")
       .select("role")
@@ -96,7 +207,6 @@ Deno.serve(async (req) => {
 
     // ===== SINGLE SEND MODE =====
     if (body.phone && body.message) {
-      // Check credits for non-admin
       if (!isAdmin) {
         const { data: creditData } = await serviceClient
           .from("sms_credits")
@@ -112,22 +222,22 @@ Deno.serve(async (req) => {
         }
       }
 
-      const result = await sendViaTwilio(body.phone, body.message);
+      const result = await sendSms(body.phone, body.message, activeProvider);
 
       await serviceClient.from("sms_history").insert({
         phone: body.phone,
         contact_name: body.contact_name || null,
         message: body.message,
         status: result.ok ? "sent" : "failed",
-        provider_message_id: result.sid || null,
+        provider_message_id: result.sid || result.messageId || null,
         error_message: result.error || null,
         sent_at: result.ok ? new Date().toISOString() : null,
         sent_by: user.id,
         televendas_id: body.televendas_id || null,
         send_type: body.send_type || "manual",
+        provider: activeProvider,
       });
 
-      // Deduct 1 credit on success for non-admin
       if (result.ok && !isAdmin) {
         const { data: cur } = await serviceClient
           .from("sms_credits")
@@ -147,7 +257,7 @@ Deno.serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ success: result.ok, error: result.error, sid: result.sid }),
+        JSON.stringify({ success: result.ok, error: result.error, sid: result.sid, messageId: result.messageId, provider: activeProvider }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -181,7 +291,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch contacts to know count
     const { data: contacts } = await supabase
       .from("sms_contacts")
       .select("id, name, phone")
@@ -198,7 +307,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check credits for non-admin (need enough for all contacts)
+    // Check credits for non-admin
     let creditsBefore = 0;
     if (!isAdmin) {
       const { data: creditData } = await serviceClient
@@ -226,41 +335,65 @@ Deno.serve(async (req) => {
     let sentCount = 0;
     let failedCount = 0;
 
-    for (const contact of contacts) {
-      let msg = campaign.message_content;
-      msg = msg.replace(/\{\{nome\}\}/gi, contact.name || "");
+    // Use batch for Yup Chat, sequential for Twilio
+    if (activeProvider === "yup_chat") {
+      const batchContacts = contacts.map((contact) => {
+        let msg = campaign.message_content;
+        msg = msg.replace(/\{\{nome\}\}/gi, contact.name || "");
+        return { phone: contact.phone, message: msg, name: contact.name };
+      });
 
-      const result = await sendViaTwilio(contact.phone, msg);
+      const batchResult = await sendBatchViaYupChat(batchContacts);
 
-      if (result.ok) {
-        sentCount++;
-        await serviceClient.from("sms_history").insert({
-          campaign_id,
-          phone: contact.phone,
-          contact_name: contact.name || null,
-          message: msg,
-          status: "sent",
-          provider_message_id: result.sid || null,
-          sent_at: new Date().toISOString(),
-          sent_by: user.id,
-          send_type: "manual",
-        });
-      } else {
-        failedCount++;
-        await serviceClient.from("sms_history").insert({
-          campaign_id,
-          phone: contact.phone,
-          contact_name: contact.name || null,
-          message: msg,
-          status: "failed",
-          error_message: result.error || "Unknown error",
-          sent_by: user.id,
-          send_type: "manual",
-        });
+      for (let i = 0; i < batchResult.results.length; i++) {
+        const r = batchResult.results[i];
+        const contact = contacts[i];
+        if (r.ok) {
+          sentCount++;
+          await serviceClient.from("sms_history").insert({
+            campaign_id, phone: contact.phone, contact_name: contact.name || null,
+            message: batchContacts[i].message, status: "sent",
+            provider_message_id: r.messageId || null, sent_at: new Date().toISOString(),
+            sent_by: user.id, send_type: "manual", provider: "yup_chat",
+          });
+        } else {
+          failedCount++;
+          await serviceClient.from("sms_history").insert({
+            campaign_id, phone: contact.phone, contact_name: contact.name || null,
+            message: batchContacts[i].message, status: "failed",
+            error_message: r.error || "Unknown error", sent_by: user.id,
+            send_type: "manual", provider: "yup_chat",
+          });
+        }
+      }
+    } else {
+      // Twilio - sequential
+      for (const contact of contacts) {
+        let msg = campaign.message_content;
+        msg = msg.replace(/\{\{nome\}\}/gi, contact.name || "");
+
+        const result = await sendViaTwilio(contact.phone, msg);
+
+        if (result.ok) {
+          sentCount++;
+          await serviceClient.from("sms_history").insert({
+            campaign_id, phone: contact.phone, contact_name: contact.name || null,
+            message: msg, status: "sent", provider_message_id: result.sid || null,
+            sent_at: new Date().toISOString(), sent_by: user.id, send_type: "manual",
+            provider: "twilio",
+          });
+        } else {
+          failedCount++;
+          await serviceClient.from("sms_history").insert({
+            campaign_id, phone: contact.phone, contact_name: contact.name || null,
+            message: msg, status: "failed", error_message: result.error || "Unknown error",
+            sent_by: user.id, send_type: "manual", provider: "twilio",
+          });
+        }
       }
     }
 
-    // Deduct credits for successful sends (non-admin)
+    // Deduct credits
     if (!isAdmin && sentCount > 0) {
       const after = Math.max(0, creditsBefore - sentCount);
       await serviceClient.from("sms_credits")
@@ -273,20 +406,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Always update final status
     const finalStatus = failedCount === contacts.length ? "failed" : "completed";
     await serviceClient
       .from("sms_campaigns")
       .update({
-        status: finalStatus,
-        sent_count: sentCount,
-        failed_count: failedCount,
+        status: finalStatus, sent_count: sentCount, failed_count: failedCount,
         completed_at: new Date().toISOString(),
       })
       .eq("id", campaign_id);
 
     return new Response(
-      JSON.stringify({ success: true, sent: sentCount, failed: failedCount, total: contacts.length }),
+      JSON.stringify({ success: true, sent: sentCount, failed: failedCount, total: contacts.length, provider: activeProvider }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
