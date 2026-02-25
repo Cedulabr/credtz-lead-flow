@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { DollarSign, Clock, BarChart3 } from "lucide-react";
+import { DollarSign, BarChart3 } from "lucide-react";
 import { Televenda } from "../types";
 import { formatCurrency } from "../utils";
 
@@ -12,49 +12,28 @@ interface ProductionBarProps {
 
 export const ProductionBar = ({ televendas, isGestorOrAdmin }: ProductionBarProps) => {
   const production = useMemo(() => {
+    const paid = televendas.filter((tv) => tv.status === "proposta_paga");
+    const totalBrutoPago = paid.reduce((sum, tv) => sum + (tv.saldo_devedor || 0), 0);
+
+    // Ranking by user (all non-cancelled)
     const nonCancelled = televendas.filter(
       (tv) => tv.status !== "proposta_cancelada" && tv.status !== "exclusao_aprovada"
     );
-    
-    // Aguardando Saldo: portabilidade proposals with commercial status em_andamento
-    const awaitingBalance = televendas.filter(
-      (tv) => tv.tipo_operacao === "Portabilidade" && tv.status === "em_andamento"
-    );
 
-    const totalBruto = nonCancelled.reduce((sum, tv) => sum + (tv.saldo_devedor || 0), 0);
-    const totalAguardando = awaitingBalance.reduce((sum, tv) => sum + (tv.saldo_devedor || 0), 0);
-
-    // Ranking by user
     const ranking = nonCancelled.reduce((acc, tv) => {
       const name = tv.user?.name || "Sem nome";
-      if (!acc[name]) acc[name] = { count: 0, value: 0 };
+      if (!acc[name]) acc[name] = { count: 0 };
       acc[name].count += 1;
-      acc[name].value += (tv.saldo_devedor || 0);
       return acc;
-    }, {} as Record<string, { count: number; value: number }>);
+    }, {} as Record<string, { count: number }>);
 
     const topSellers = Object.entries(ranking)
       .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 3);
 
-    return { totalBruto, totalAguardando, topSellers, totalPropostas: nonCancelled.length, awaitingCount: awaitingBalance.length };
+    return { totalBrutoPago, topSellers, totalPropostas: nonCancelled.length, paidCount: paid.length };
   }, [televendas]);
-
-  const metrics = [
-    {
-      label: "Total Bruto",
-      value: formatCurrency(production.totalBruto),
-      icon: DollarSign,
-      color: "text-blue-600",
-    },
-    {
-      label: `Aguard. Saldo (${production.awaitingCount})`,
-      value: formatCurrency(production.totalAguardando),
-      icon: Clock,
-      color: "text-amber-600",
-    },
-  ];
 
   return (
     <div className="rounded-xl border border-border/50 bg-muted/30 p-4 space-y-3">
@@ -66,26 +45,17 @@ export const ProductionBar = ({ televendas, isGestorOrAdmin }: ProductionBarProp
         <span className="text-xs text-muted-foreground">({production.totalPropostas} propostas)</span>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        {metrics.map((m, i) => {
-          const Icon = m.icon;
-          return (
-            <motion.div
-              key={m.label}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
-              className="flex items-center gap-2"
-            >
-              <Icon className={`h-4 w-4 ${m.color} flex-shrink-0`} />
-              <div>
-                <span className="text-[10px] text-muted-foreground">{m.label}</span>
-                <p className="text-sm font-bold leading-tight">{m.value}</p>
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-2"
+      >
+        <DollarSign className="h-4 w-4 text-green-600 flex-shrink-0" />
+        <div>
+          <span className="text-[10px] text-muted-foreground">Total Bruto Pago ({production.paidCount})</span>
+          <p className="text-sm font-bold leading-tight">{formatCurrency(production.totalBrutoPago)}</p>
+        </div>
+      </motion.div>
 
       {/* Top sellers */}
       {isGestorOrAdmin && production.topSellers.length > 0 && (
