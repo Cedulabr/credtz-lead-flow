@@ -3828,6 +3828,7 @@ export type Database = {
           observacao: string | null
           parcela: number
           previsao_saldo: string | null
+          prioridade_operacional: string
           saldo_devedor: number | null
           simulation_data: Json | null
           simulation_file_url: string | null
@@ -3862,6 +3863,7 @@ export type Database = {
           observacao?: string | null
           parcela: number
           previsao_saldo?: string | null
+          prioridade_operacional?: string
           saldo_devedor?: number | null
           simulation_data?: Json | null
           simulation_file_url?: string | null
@@ -3896,6 +3898,7 @@ export type Database = {
           observacao?: string | null
           parcela?: number
           previsao_saldo?: string | null
+          prioridade_operacional?: string
           saldo_devedor?: number | null
           simulation_data?: Json | null
           simulation_file_url?: string | null
@@ -5394,6 +5397,7 @@ export type Database = {
       }
       normalize_cpf: { Args: { input_cpf: string }; Returns: string }
       normalize_phone: { Args: { phone_input: string }; Returns: string }
+      notify_critical_televendas: { Args: never; Returns: undefined }
       process_expired_future_contacts: { Args: never; Returns: number }
       release_expired_blacklisted_leads: { Args: never; Returns: Json }
       remove_baseoff_duplicates: { Args: never; Returns: number }
@@ -5543,6 +5547,7 @@ export type Database = {
         Args: { lead_id: string; new_cpf: string }
         Returns: Json
       }
+      update_televendas_prioridade: { Args: never; Returns: undefined }
       user_belongs_to_company: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
