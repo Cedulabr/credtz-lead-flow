@@ -4040,6 +4040,7 @@ export type Database = {
           id: string
           message: string
           phone: string
+          provider: string | null
           provider_message_id: string | null
           send_type: string
           sent_at: string | null
@@ -4057,6 +4058,7 @@ export type Database = {
           id?: string
           message: string
           phone: string
+          provider?: string | null
           provider_message_id?: string | null
           send_type?: string
           sent_at?: string | null
@@ -4074,6 +4076,7 @@ export type Database = {
           id?: string
           message?: string
           phone?: string
+          provider?: string | null
           provider_message_id?: string | null
           send_type?: string
           sent_at?: string | null
@@ -4132,6 +4135,36 @@ export type Database = {
           sent_at?: string | null
           status?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      sms_providers: {
+        Row: {
+          config: Json | null
+          created_at: string
+          display_name: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json | null
+          created_at?: string
+          display_name: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }
