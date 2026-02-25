@@ -14,6 +14,23 @@ interface SmsResult {
   provider: string;
 }
 
+function detectCreditError(error: string): boolean {
+  const creditKeywords = [
+    "insufficient", "balance", "credit", "saldo", "crédito", "credito",
+    "funds", "quota", "limit exceeded", "account balance",
+  ];
+  const lower = error.toLowerCase();
+  return creditKeywords.some((k) => lower.includes(k));
+}
+
+function formatErrorMessage(result: SmsResult): string | null {
+  if (!result.error) return null;
+  if (detectCreditError(result.error)) {
+    return `CREDITO_INSUFICIENTE: ${result.error}`;
+  }
+  return result.error;
+}
+
 async function getActiveProvider(serviceClient: any): Promise<string> {
   const { data } = await serviceClient
     .from("sms_providers")
@@ -125,6 +142,23 @@ Deno.serve(async (req) => {
     const config: Record<string, string> = {};
     (settings || []).forEach((s: any) => { config[s.setting_key] = s.setting_value; });
 
+    // === TIME CHECK (Brasilia UTC-3) ===
+    const horaInicio = parseInt(config["automacao_horario_inicio"] || "8");
+    const horaFim = parseInt(config["automacao_horario_fim"] || "20");
+    const nowUtc = new Date();
+    const brasiliaHour = (nowUtc.getUTCHours() - 3 + 24) % 24;
+
+    if (brasiliaHour < horaInicio || brasiliaHour >= horaFim) {
+      return new Response(
+        JSON.stringify({ 
+          success: true, sent: 0, failed: 0, skipped: 0, 
+          provider: activeProvider, 
+          message: `Fora do horário de envio (${horaInicio}h-${horaFim}h Brasília). Hora atual: ${brasiliaHour}h` 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const automacaoAtiva = config["automacao_em_andamento_ativa"] === "true";
     const intervaloHoras = parseInt(config["automacao_em_andamento_intervalo_horas"] || "24");
     const msgTemplate = config["msg_em_andamento"] || "Olá {{nome}}, sua proposta está em andamento.";
@@ -192,12 +226,13 @@ Deno.serve(async (req) => {
           message,
           status: result.ok ? "sent" : "failed",
           provider_message_id: result.sid || result.messageId || null,
-          error_message: result.error || null,
+          error_message: formatErrorMessage(result),
           sent_at: result.ok ? now.toISOString() : null,
           sent_by: representative.user_id,
           televendas_id: representative.televendas_id,
           send_type: "automatico",
           provider: activeProvider,
+          company_id: representative.company_id || null,
         });
 
         for (const item of items) {
@@ -252,12 +287,13 @@ Deno.serve(async (req) => {
           message,
           status: result.ok ? "sent" : "failed",
           provider_message_id: result.sid || result.messageId || null,
-          error_message: result.error || null,
+          error_message: formatErrorMessage(result),
           sent_at: result.ok ? new Date().toISOString() : null,
           sent_by: item.user_id,
           televendas_id: item.televendas_id,
           send_type: "automatico",
           provider: activeProvider,
+          company_id: item.company_id || null,
         });
 
         await serviceClient.from("sms_televendas_queue")

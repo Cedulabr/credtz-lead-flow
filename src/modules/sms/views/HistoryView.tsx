@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { History, CheckCircle, XCircle, Clock, Send, RefreshCw } from "lucide-react";
+import { History, CheckCircle, XCircle, Clock, Send, RefreshCw, CircleDollarSign } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -91,7 +91,10 @@ export const HistoryView = ({ history, onRefresh }: HistoryViewProps) => {
 
       <div className="space-y-2">
         {filtered.map((record, index) => {
-          const statusConfig = STATUS_ICON[record.status] || STATUS_ICON.pending;
+          const isCreditError = record.status === "failed" && record.error_message?.startsWith("CREDITO_INSUFICIENTE");
+          const statusConfig = isCreditError
+            ? { icon: CircleDollarSign, color: "text-amber-600", label: "Sem Crédito" }
+            : (STATUS_ICON[record.status] || STATUS_ICON.pending);
           const Icon = statusConfig.icon;
           const sendType = record.send_type || "manual";
           return (
@@ -100,7 +103,7 @@ export const HistoryView = ({ history, onRefresh }: HistoryViewProps) => {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.02 }}
-              className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-card"
+              className={`flex items-center gap-3 p-3 rounded-xl border bg-card ${isCreditError ? "border-amber-300/50" : "border-border/50"}`}
             >
               <Icon className={`h-4 w-4 flex-shrink-0 ${statusConfig.color}`} />
               <div className="flex-1 min-w-0">
@@ -118,10 +121,17 @@ export const HistoryView = ({ history, onRefresh }: HistoryViewProps) => {
                       {(record as any).provider === "yup_chat" ? "💬 Yup" : "📱 Twilio"}
                     </Badge>
                   )}
+                  {isCreditError && (
+                    <Badge variant="outline" className="text-[9px] h-4 gap-0.5 border-amber-400 text-amber-600">
+                      💰 Crédito API
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground truncate">{record.message}</p>
                 {record.error_message && (
-                  <p className="text-[10px] text-red-500 truncate mt-0.5">Erro: {record.error_message}</p>
+                  <p className="text-[10px] text-red-500 truncate mt-0.5">
+                    Erro: {isCreditError ? record.error_message.replace("CREDITO_INSUFICIENTE: ", "") : record.error_message}
+                  </p>
                 )}
               </div>
               <div className="text-right flex-shrink-0">

@@ -153,6 +153,23 @@ async function sendBatchViaYupChat(
   };
 }
 
+function detectCreditError(error: string): boolean {
+  const creditKeywords = [
+    "insufficient", "balance", "credit", "saldo", "crédito", "credito",
+    "funds", "quota", "limit exceeded", "account balance",
+  ];
+  const lower = error.toLowerCase();
+  return creditKeywords.some((k) => lower.includes(k));
+}
+
+function formatErrorMessage(result: SmsResult): string | null {
+  if (!result.error) return null;
+  if (detectCreditError(result.error)) {
+    return `CREDITO_INSUFICIENTE: ${result.error}`;
+  }
+  return result.error;
+}
+
 // === Unified send function ===
 async function sendSms(phone: string, message: string, provider: string): Promise<SmsResult> {
   if (provider === "yup_chat") return sendViaYupChat(phone, message);
@@ -230,7 +247,7 @@ Deno.serve(async (req) => {
         message: body.message,
         status: result.ok ? "sent" : "failed",
         provider_message_id: result.sid || result.messageId || null,
-        error_message: result.error || null,
+        error_message: formatErrorMessage(result),
         sent_at: result.ok ? new Date().toISOString() : null,
         sent_by: user.id,
         televendas_id: body.televendas_id || null,
