@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.send-sms]
 verify_jwt = false
+
+[functions.sms-automation-run]
+verify_jwt = false

@@ -3778,6 +3778,33 @@ export type Database = {
           },
         ]
       }
+      sms_automation_settings: {
+        Row: {
+          description: string | null
+          id: string
+          setting_key: string
+          setting_value: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          setting_key: string
+          setting_value: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          setting_key?: string
+          setting_value?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       sms_campaigns: {
         Row: {
           company_id: string | null
@@ -3954,9 +3981,11 @@ export type Database = {
           message: string
           phone: string
           provider_message_id: string | null
+          send_type: string
           sent_at: string | null
           sent_by: string
           status: string
+          televendas_id: string | null
         }
         Insert: {
           campaign_id?: string | null
@@ -3969,9 +3998,11 @@ export type Database = {
           message: string
           phone: string
           provider_message_id?: string | null
+          send_type?: string
           sent_at?: string | null
           sent_by: string
           status?: string
+          televendas_id?: string | null
         }
         Update: {
           campaign_id?: string | null
@@ -3984,9 +4015,11 @@ export type Database = {
           message?: string
           phone?: string
           provider_message_id?: string | null
+          send_type?: string
           sent_at?: string | null
           sent_by?: string
           status?: string
+          televendas_id?: string | null
         }
         Relationships: [
           {
@@ -4001,6 +4034,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_history_televendas_id_fkey"
+            columns: ["televendas_id"]
+            isOneToOne: false
+            referencedRelation: "televendas"
             referencedColumns: ["id"]
           },
         ]
@@ -4034,6 +4074,78 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      sms_televendas_queue: {
+        Row: {
+          automacao_ativa: boolean
+          automacao_status: string
+          cliente_nome: string
+          cliente_telefone: string
+          company_id: string | null
+          created_at: string
+          data_cadastro: string
+          dias_enviados: number
+          dias_envio_total: number
+          id: string
+          status_proposta: string
+          televendas_id: string
+          tipo_operacao: string
+          ultimo_envio_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          automacao_ativa?: boolean
+          automacao_status?: string
+          cliente_nome: string
+          cliente_telefone: string
+          company_id?: string | null
+          created_at?: string
+          data_cadastro?: string
+          dias_enviados?: number
+          dias_envio_total?: number
+          id?: string
+          status_proposta?: string
+          televendas_id: string
+          tipo_operacao: string
+          ultimo_envio_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          automacao_ativa?: boolean
+          automacao_status?: string
+          cliente_nome?: string
+          cliente_telefone?: string
+          company_id?: string | null
+          created_at?: string
+          data_cadastro?: string
+          dias_enviados?: number
+          dias_envio_total?: number
+          id?: string
+          status_proposta?: string
+          televendas_id?: string
+          tipo_operacao?: string
+          ultimo_envio_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_televendas_queue_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_televendas_queue_televendas_id_fkey"
+            columns: ["televendas_id"]
+            isOneToOne: true
+            referencedRelation: "televendas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sms_templates: {
         Row: {
