@@ -1,88 +1,141 @@
 
 
-# Plano: Cron Job SMS + Melhorias no Modulo SMS
+# Plano: Evolucao Disparos SMS - Exclusao, Creditos e Registro Real
 
 ## Resumo
 
-Configurar cron job automatico para a automacao SMS, adicionar botao para puxar propostas em andamento no Televendas SMS, restringir automacao "Em Andamento" apenas para Portabilidade, mostrar clientes que serao notificados, adicionar botao "Atualizar Status" nos Disparos, e garantir que o Historico mostra resultados dos envios.
+Corrigir campanhas travadas em "sending", adicionar exclusao de campanhas, implementar sistema de creditos SMS para colaboradores (igual leads premium), e garantir que o historico registra corretamente cada envio/falha.
 
 ---
 
-## 1. Cron Job via pg_cron + pg_net
+## Diagnostico dos Problemas Encontrados
 
-Ambas extensoes ja estao habilitadas. Criar cron job que executa a cada hora chamando a edge function `sms-automation-run`:
+1. **Campanha travada em "sending"**: A campanha `24e9eddd` ficou com status "sending" permanentemente. Isso aconteceu antes da correcao do edge function. Precisa de um botao para corrigir campanhas antigas travadas.
+
+2. **Historico funciona**: A campanha `ac629c7b` (teste mais recente) JA registrou 2 mensagens no `sms_history` corretamente com status "sent" e `provider_message_id`. A correcao anterior do edge function resolveu o problema de registro.
+
+3. **Creditos SMS**: Nao existe sistema de creditos para SMS. Colaboradores podem disparar sem limite.
+
+---
+
+## Fase 1: Migracao de Banco de Dados
+
+### 1.1 Tabelas de Creditos SMS
+
+Criar tabelas espelhando o modelo de `user_credits` e `credits_history`, mas para SMS:
 
 ```text
-cron.schedule('sms-automation-hourly', '0 * * * *', ...)
-  -> net.http_post(sms-automation-run)
+sms_credits
++----------------------------+
+| id (uuid PK)               |
+| user_id (uuid FK UNIQUE)   |
+| credits_balance (integer)  |
+| created_at (timestamptz)   |
+| updated_at (timestamptz)   |
++----------------------------+
+
+sms_credits_history
++----------------------------+
+| id (uuid PK)               |
+| user_id (uuid FK)          |
+| admin_id (uuid FK)         |
+| action (text)              |
+| amount (integer)           |
+| balance_before (integer)   |
+| balance_after (integer)    |
+| reason (text)              |
+| created_at (timestamptz)   |
++----------------------------+
 ```
 
-Sera inserido via SQL direto (insert tool), nao via migracao, pois contem dados especificos do projeto (URL + anon key).
+### 1.2 Funcao RPC `admin_manage_sms_credits`
+
+Similar a `admin_manage_credits` existente - apenas admins podem adicionar/remover creditos SMS.
+
+### 1.3 Funcao RPC `get_user_sms_credits`
+
+Retorna saldo atual de creditos SMS do usuario.
+
+### 1.4 RLS Policies
+
+- Admin: acesso total a ambas tabelas
+- Usuario: leitura apenas do proprio saldo e historico
 
 ---
 
-## 2. Botao "Puxar Propostas" no Televendas SMS
+## Fase 2: Edge Function `send-sms` - Verificacao de Creditos
 
-Adicionar botao na view `TelevendasSmsView.tsx` que busca propostas do televendas com status `em_andamento`, `aguardando`, `digitado`, `solicitar_digitacao` e insere na `sms_televendas_queue` (evitando duplicatas via `ON CONFLICT`).
-
-Isso permite popular a fila manualmente para propostas que ja existiam antes do trigger ser criado.
-
----
-
-## 3. Automacao "Em Andamento" apenas para Portabilidade
-
-### 3.1 Edge Function `sms-automation-run`
-
-Adicionar filtro `tipo_operacao ILIKE '%portabilidade%'` na query de propostas em andamento. Propostas de outros tipos serao ignoradas pela automacao de dias consecutivos.
-
-### 3.2 View de Automacao
-
-Atualizar titulo do card para "Automacao - Portabilidade em Andamento" e adicionar nota explicativa.
+Antes de enviar uma campanha, verificar:
+1. Se o usuario tem creditos SMS suficientes (total_recipients)
+2. Descontar creditos apos o envio (1 credito por SMS enviado com sucesso)
+3. Registrar consumo no `sms_credits_history`
+4. Admin pode ser isento da verificacao de creditos (configuravel)
 
 ---
 
-## 4. Visualizar Clientes que Serao Notificados
+## Fase 3: Frontend - CampaignsView
 
-Na aba Automacao (`AutomationView.tsx`), adicionar uma secao "Proximos Envios" que mostra os clientes da fila que atendem aos criterios:
-- `automacao_ativa = true`
-- `automacao_status = 'ativo'`
-- `tipo_operacao` contem 'portabilidade'
-- `dias_enviados < dias_envio_total`
+### 3.1 Botao Excluir Campanha
 
-Exibir lista com nome, telefone, dias enviados/total e ultimo envio.
+Adicionar botao de exclusao (icone lixeira) com confirmacao via AlertDialog. Apenas admin pode excluir. Campanhas com status "sending" tambem podem ser excluidas (para limpar travadas).
 
----
+### 3.2 Corrigir Campanhas Travadas
 
-## 5. Botao "Atualizar Status" nos Disparos
+Adicionar acao para admin "Marcar como falhou" em campanhas com status "sending" que ficaram travadas.
 
-Na `CampaignsView.tsx`, adicionar botao "Atualizar Status" para campanhas com status `sending` ou `completed`. O botao recarrega os dados da campanha e do historico para refletir o estado real.
+### 3.3 Mostrar Saldo de Creditos SMS
 
-Tambem adicionar contador de entregues vs falhos visivel no card da campanha.
+Exibir saldo atual de creditos SMS do usuario no topo da pagina de Disparos, similar ao que existe no leads premium.
 
 ---
 
-## 6. Historico mostrando resultados
+## Fase 4: Gestao de Creditos SMS (Admin)
 
-O `HistoryView.tsx` ja recebe e exibe os registros de `sms_history`. Verificar que:
-- Os filtros de tipo (manual/automatico) funcionam
-- Os registros das automacoes (send_type = 'automatico') aparecem
-- Os registros dos disparos em massa (campaign_id preenchido) aparecem
+### 4.1 Componente `AdminSmsCreditsManagement`
 
-Adicionar filtro por data (hoje/ultimos 7 dias) para facilitar a visualizacao dos resultados do dia.
+Criar componente espelhando `AdminCreditsManagement` existente:
+- Lista de usuarios com saldo de creditos SMS
+- Botoes para adicionar/remover creditos
+- Historico de movimentacoes
+- Campo de motivo para cada operacao
+
+### 4.2 Integrar no AdminPanel
+
+Adicionar nova aba "Creditos SMS" no painel administrativo.
+
+---
+
+## Fase 5: Historico Melhorado
+
+### 5.1 Vinculo com Campanha
+
+No HistoryView, mostrar o nome da campanha vinculada quando `campaign_id` esta presente.
+
+### 5.2 Botao Atualizar no Historico
+
+Adicionar botao de refresh no historico para recarregar registros apos disparos.
 
 ---
 
 ## Detalhes Tecnicos
 
+### Arquivos a criar:
+1. `supabase/migrations/xxx_sms_credits.sql` -- tabelas, RPCs, RLS
+2. `src/components/AdminSmsCreditsManagement.tsx` -- gestao de creditos admin
+
 ### Arquivos a modificar:
-1. **SQL Insert** (cron job) -- via insert tool, nao migracao
-2. `supabase/functions/sms-automation-run/index.ts` -- filtro portabilidade
-3. `src/modules/sms/views/TelevendasSmsView.tsx` -- botao puxar propostas
-4. `src/modules/sms/views/AutomationView.tsx` -- titulo + lista proximos envios
-5. `src/modules/sms/views/CampaignsView.tsx` -- botao atualizar status
-6. `src/modules/sms/views/HistoryView.tsx` -- filtro por data
+1. `supabase/functions/send-sms/index.ts` -- verificacao de creditos antes do envio
+2. `src/modules/sms/views/CampaignsView.tsx` -- excluir campanha, corrigir travadas, mostrar saldo
+3. `src/modules/sms/views/HistoryView.tsx` -- nome da campanha, botao refresh
+4. `src/modules/sms/SmsModule.tsx` -- passar refreshHistory para HistoryView
+5. `src/components/AdminPanel.tsx` -- aba creditos SMS
+6. `src/components/admin/AdminOperations.tsx` -- secao creditos SMS
 
 ### Ordem de execucao:
-1. Criar cron job SQL
-2. Atualizar edge function com filtro portabilidade + deploy
-3. Atualizar views do frontend (todas em paralelo)
+1. Migracao de banco (tabelas + RPCs + RLS)
+2. Atualizar edge function send-sms com verificacao de creditos
+3. Criar componente AdminSmsCreditsManagement
+4. Atualizar CampaignsView (exclusao + saldo + corrigir travadas)
+5. Atualizar HistoryView (campanha vinculada + refresh)
+6. Integrar no AdminPanel
+
