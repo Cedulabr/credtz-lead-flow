@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { History, CheckCircle, XCircle, Clock, Send } from "lucide-react";
+import { History, CheckCircle, XCircle, Clock, Send, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,6 +8,7 @@ import { SmsHistoryRecord } from "../types";
 
 interface HistoryViewProps {
   history: SmsHistoryRecord[];
+  onRefresh?: () => void;
 }
 
 const STATUS_ICON: Record<string, { icon: typeof Clock; color: string; label: string }> = {
@@ -17,7 +18,7 @@ const STATUS_ICON: Record<string, { icon: typeof Clock; color: string; label: st
   failed: { icon: XCircle, color: "text-red-600", label: "Falhou" },
 };
 
-export const HistoryView = ({ history }: HistoryViewProps) => {
+export const HistoryView = ({ history, onRefresh }: HistoryViewProps) => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
@@ -51,6 +52,11 @@ export const HistoryView = ({ history }: HistoryViewProps) => {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-semibold">Histórico de Envios</h2>
         <div className="flex gap-2 flex-wrap">
+          {onRefresh && (
+            <Button variant="outline" size="sm" onClick={onRefresh} className="gap-1.5 h-8 text-xs">
+              <RefreshCw className="h-3.5 w-3.5" /> Atualizar
+            </Button>
+          )}
           <Select value={dateFilter} onValueChange={setDateFilter}>
             <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -98,14 +104,20 @@ export const HistoryView = ({ history }: HistoryViewProps) => {
             >
               <Icon className={`h-4 w-4 flex-shrink-0 ${statusConfig.color}`} />
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium">{record.contact_name || record.phone}</span>
                   <span className="text-[10px] text-muted-foreground font-mono">{record.phone}</span>
                   <Badge variant={sendType === "automatico" ? "default" : "outline"} className="text-[9px] h-4">
                     {sendType === "automatico" ? "Auto" : "Manual"}
                   </Badge>
+                  {record.campaign_id && (
+                    <Badge variant="secondary" className="text-[9px] h-4">Campanha</Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground truncate">{record.message}</p>
+                {record.error_message && (
+                  <p className="text-[10px] text-red-500 truncate mt-0.5">Erro: {record.error_message}</p>
+                )}
               </div>
               <div className="text-right flex-shrink-0">
                 <span className={`text-xs font-medium ${statusConfig.color}`}>{statusConfig.label}</span>

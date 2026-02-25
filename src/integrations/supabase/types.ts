@@ -3969,6 +3969,66 @@ export type Database = {
           },
         ]
       }
+      sms_credits: {
+        Row: {
+          created_at: string
+          credits_balance: number
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_balance?: number
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_balance?: number
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sms_credits_history: {
+        Row: {
+          action: string
+          admin_id: string | null
+          amount: number
+          balance_after: number
+          balance_before: number
+          created_at: string
+          id: string
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          admin_id?: string | null
+          amount: number
+          balance_after?: number
+          balance_before?: number
+          created_at?: string
+          id?: string
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          admin_id?: string | null
+          amount?: number
+          balance_after?: number
+          balance_before?: number
+          created_at?: string
+          id?: string
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       sms_history: {
         Row: {
           campaign_id: string | null
@@ -5589,6 +5649,15 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_manage_sms_credits: {
+        Args: {
+          credit_action: string
+          credit_amount: number
+          credit_reason?: string
+          target_user_id: string
+        }
+        Returns: Json
+      }
       calculate_lead_priority: {
         Args: {
           lead_created_at: string
@@ -5748,6 +5817,10 @@ export type Database = {
       get_user_primary_company_id: {
         Args: { _user_id: string }
         Returns: string
+      }
+      get_user_sms_credits: {
+        Args: { target_user_id?: string }
+        Returns: number
       }
       has_role: {
         Args: {

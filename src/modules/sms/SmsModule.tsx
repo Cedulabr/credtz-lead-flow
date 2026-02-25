@@ -92,7 +92,7 @@ export const SmsModule = () => {
       {activeTab === "templates" && (
         <TemplatesView templates={templates} onRefresh={refreshTemplates} />
       )}
-      {activeTab === "history" && <HistoryView history={history} />}
+      {activeTab === "history" && <HistoryView history={history} onRefresh={refreshHistory} />}
       {activeTab === "contacts" && (
         <ContactsView contactLists={contactLists} onRefresh={refreshContactLists} />
       )}

@@ -11,7 +11,8 @@ import {
   AlertTriangle,
   ChevronRight,
   ArrowLeft,
-  Copy
+  Copy,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -23,10 +24,12 @@ import { AdminTelevendasBanks } from '@/components/AdminTelevendasBanks';
 import { AdminBankReuseSettings } from '@/components/AdminBankReuseSettings';
 import { AdminDuplicatesManager } from '@/components/AdminDuplicatesManager';
 import { AdminInactivitySettings } from '@/components/AdminInactivitySettings';
+import { AdminSmsCreditsManagement } from '@/components/AdminSmsCreditsManagement';
 
 type OperationSection = 
   | 'menu' 
   | 'credits' 
+  | 'sms-credits'
   | 'commission-rules' 
   | 'televendas-banks' 
   | 'bank-reuse' 
@@ -56,6 +59,14 @@ export function AdminOperations() {
       icon: Coins,
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
+    },
+    {
+      id: 'sms-credits' as OperationSection,
+      label: 'Créditos SMS',
+      description: 'Gerenciar créditos SMS dos colaboradores',
+      icon: MessageSquare,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-100 dark:bg-blue-900/30',
     },
     {
       id: 'commission-rules',
@@ -105,6 +116,8 @@ export function AdminOperations() {
     switch (activeSection) {
       case 'credits':
         return <AdminCreditsManagement />;
+      case 'sms-credits':
+        return <AdminSmsCreditsManagement />;
       case 'commission-rules':
         return <AdminCommissionRules />;
       case 'televendas-banks':

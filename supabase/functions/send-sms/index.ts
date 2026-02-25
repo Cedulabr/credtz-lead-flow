@@ -8,7 +8,6 @@ const corsHeaders = {
 
 interface SendSmsBody {
   campaign_id?: string;
-  // Single send mode
   phone?: string;
   message?: string;
   televendas_id?: string;
@@ -23,7 +22,6 @@ async function sendViaTwilio(phone: string, message: string): Promise<{ ok: bool
   const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
   const basicAuth = btoa(`${accountSid}:${authToken}`);
 
-  // Format phone to E.164
   let formatted = phone.replace(/\D/g, "");
   if (formatted.length <= 11) {
     formatted = `+55${formatted}`;
@@ -81,16 +79,40 @@ Deno.serve(async (req) => {
       });
     }
 
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
     const body = (await req.json()) as SendSmsBody;
+
+    // Check if user is admin (admins bypass credit check)
+    const { data: profileData } = await serviceClient
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    const isAdmin = profileData?.role === "admin";
 
     // ===== SINGLE SEND MODE =====
     if (body.phone && body.message) {
-      const result = await sendViaTwilio(body.phone, body.message);
+      // Check credits for non-admin
+      if (!isAdmin) {
+        const { data: creditData } = await serviceClient
+          .from("sms_credits")
+          .select("credits_balance")
+          .eq("user_id", user.id)
+          .single();
+        const balance = creditData?.credits_balance ?? 0;
+        if (balance < 1) {
+          return new Response(
+            JSON.stringify({ error: "Créditos SMS insuficientes. Solicite ao administrador." }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
 
-      const serviceClient = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
+      const result = await sendViaTwilio(body.phone, body.message);
 
       await serviceClient.from("sms_history").insert({
         phone: body.phone,
@@ -104,6 +126,25 @@ Deno.serve(async (req) => {
         televendas_id: body.televendas_id || null,
         send_type: body.send_type || "manual",
       });
+
+      // Deduct 1 credit on success for non-admin
+      if (result.ok && !isAdmin) {
+        const { data: cur } = await serviceClient
+          .from("sms_credits")
+          .select("credits_balance")
+          .eq("user_id", user.id)
+          .single();
+        const before = cur?.credits_balance ?? 0;
+        const after = Math.max(0, before - 1);
+        await serviceClient.from("sms_credits")
+          .update({ credits_balance: after, updated_at: new Date().toISOString() })
+          .eq("user_id", user.id);
+        await serviceClient.from("sms_credits_history").insert({
+          user_id: user.id, admin_id: user.id, action: "consume",
+          amount: 1, balance_before: before, balance_after: after,
+          reason: "Envio SMS individual",
+        });
+      }
 
       return new Response(
         JSON.stringify({ success: result.ok, error: result.error, sid: result.sid }),
@@ -140,18 +181,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const serviceClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
-    // Mark as sending
-    await serviceClient
-      .from("sms_campaigns")
-      .update({ status: "sending", started_at: new Date().toISOString() })
-      .eq("id", campaign_id);
-
-    // Fetch contacts
+    // Fetch contacts to know count
     const { data: contacts } = await supabase
       .from("sms_contacts")
       .select("id, name, phone")
@@ -167,6 +197,31 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Check credits for non-admin (need enough for all contacts)
+    let creditsBefore = 0;
+    if (!isAdmin) {
+      const { data: creditData } = await serviceClient
+        .from("sms_credits")
+        .select("credits_balance")
+        .eq("user_id", user.id)
+        .single();
+      creditsBefore = creditData?.credits_balance ?? 0;
+      if (creditsBefore < contacts.length) {
+        return new Response(
+          JSON.stringify({ 
+            error: `Créditos SMS insuficientes. Necessário: ${contacts.length}, disponível: ${creditsBefore}` 
+          }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Mark as sending
+    await serviceClient
+      .from("sms_campaigns")
+      .update({ status: "sending", started_at: new Date().toISOString() })
+      .eq("id", campaign_id);
 
     let sentCount = 0;
     let failedCount = 0;
@@ -205,7 +260,20 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Always update final status - never leave as "sending"
+    // Deduct credits for successful sends (non-admin)
+    if (!isAdmin && sentCount > 0) {
+      const after = Math.max(0, creditsBefore - sentCount);
+      await serviceClient.from("sms_credits")
+        .update({ credits_balance: after, updated_at: new Date().toISOString() })
+        .eq("user_id", user.id);
+      await serviceClient.from("sms_credits_history").insert({
+        user_id: user.id, admin_id: user.id, action: "consume",
+        amount: sentCount, balance_before: creditsBefore, balance_after: after,
+        reason: `Campanha SMS: ${campaign.name} (${sentCount} enviados)`,
+      });
+    }
+
+    // Always update final status
     const finalStatus = failedCount === contacts.length ? "failed" : "completed";
     await serviceClient
       .from("sms_campaigns")
