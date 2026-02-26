@@ -959,6 +959,9 @@ export function MyClientsList() {
     window.open(`https://wa.me/${phoneWithCountry}`, '_blank');
   };
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 15;
+
   // Filter logic
   const filteredClients = useMemo(() => {
     let filtered = clients;
@@ -1062,6 +1065,17 @@ export function MyClientsList() {
     
     return { total, byStatus, contactsToday, registeredToday, pendingProposals };
   }, [filteredClients, clients]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterStatus, filterConvenio, filterDateFrom, filterDateTo, filterFutureContact]);
+
+  const totalPages = Math.ceil(filteredClients.length / ITEMS_PER_PAGE);
+  const paginatedClients = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredClients.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredClients, currentPage]);
 
   if (loading) {
     return (
@@ -1412,7 +1426,7 @@ export function MyClientsList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredClients.length === 0 ? (
+                {paginatedClients.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-32">
                       <div className="flex flex-col items-center justify-center text-center">
@@ -1425,7 +1439,7 @@ export function MyClientsList() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredClients.map(client => {
+                  paginatedClients.map(client => {
                     const statusInfo = getStatusInfo(client.client_status);
                     const isOverdue = client.future_contact_date && client.future_contact_date < new Date().toISOString().split('T')[0] && client.client_status === "contato_futuro";
                     const hasPendingAlert = hasPendingProposalAlert(client);
@@ -1564,7 +1578,7 @@ export function MyClientsList() {
 
       {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
-        {filteredClients.length === 0 ? (
+        {paginatedClients.length === 0 ? (
           <Card className="p-8">
             <div className="flex flex-col items-center justify-center text-center">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-muted to-muted/50 flex items-center justify-center mb-4">
@@ -1575,7 +1589,7 @@ export function MyClientsList() {
             </div>
           </Card>
         ) : (
-          filteredClients.map(client => {
+          paginatedClients.map(client => {
             const statusInfo = getStatusInfo(client.client_status);
             const isExpanded = expandedRowId === client.id;
             const isOverdue = client.future_contact_date && client.future_contact_date < new Date().toISOString().split('T')[0] && client.client_status === "contato_futuro";
@@ -1700,6 +1714,55 @@ export function MyClientsList() {
           })
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+          <p className="text-sm text-muted-foreground">
+            Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredClients.length)} de {filteredClients.length} clientes
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Anterior
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+              .reduce((acc, p, idx, arr) => {
+                if (idx > 0 && p - arr[idx - 1] > 1) acc.push(-1);
+                acc.push(p);
+                return acc;
+              }, [] as number[])
+              .map((p, idx) =>
+                p === -1 ? (
+                  <span key={`ellipsis-${idx}`} className="px-2 text-muted-foreground">…</span>
+                ) : (
+                  <Button
+                    key={p}
+                    variant={currentPage === p ? "default" : "outline"}
+                    size="sm"
+                    className="min-w-[36px]"
+                    onClick={() => setCurrentPage(p)}
+                  >
+                    {p}
+                  </Button>
+                )
+              )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Próximo
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* New Client Dialog */}
       <Dialog open={isNewClientDialogOpen} onOpenChange={setIsNewClientDialogOpen}>
