@@ -85,16 +85,57 @@ export function ManagerDashboard() {
   const [selectedPhoto, setSelectedPhoto] = useState<{ url: string; name: string; time: string } | null>(null);
   const [users, setUsers] = useState<{ id: string; name: string; email: string }[]>([]);
 
+  // Company filter
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
+
+  // Load companies once
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('companies').select('id, name').order('name');
+      if (data) setCompanies(data);
+    })();
+  }, []);
+
   useEffect(() => {
     loadData();
-  }, [selectedDate]);
+  }, [selectedDate, selectedCompanyId]);
 
   const loadData = async () => {
     setLoading(true);
-    
+
+    // Get user IDs filtered by company
+    let filteredUserIds: string[] | null = null;
+    if (selectedCompanyId !== 'all') {
+      const { data: ucData } = await supabase
+        .from('user_companies')
+        .select('user_id')
+        .eq('company_id', selectedCompanyId)
+        .eq('is_active', true);
+      filteredUserIds = ucData?.map(d => d.user_id) || [];
+    }
+
+    let usersQuery = supabase.from('profiles').select('id, name, email').eq('is_active', true);
+    if (filteredUserIds !== null) {
+      if (filteredUserIds.length === 0) {
+        // No users in this company
+        setDailyOverview([]);
+        setUsers([]);
+        setStats({ total_employees: 0, present_today: 0, late_today: 0, absent_today: 0, pending_justifications: 0, unresolved_alerts: 0 });
+        setLoading(false);
+        return;
+      }
+      usersQuery = usersQuery.in('id', filteredUserIds);
+    }
+
+    let clocksQuery = supabase.from('time_clock').select('*').eq('clock_date', selectedDate);
+    if (filteredUserIds !== null) {
+      clocksQuery = clocksQuery.in('user_id', filteredUserIds);
+    }
+
     const [usersRes, clocksRes, alertsRes, justificationsRes] = await Promise.all([
-      supabase.from('profiles').select('id, name, email').eq('is_active', true),
-      supabase.from('time_clock').select('*').eq('clock_date', selectedDate),
+      usersQuery,
+      clocksQuery,
       supabase.from('time_clock_alerts')
         .select('*')
         .eq('is_resolved', false)
@@ -310,12 +351,25 @@ export function ManagerDashboard() {
                     Acompanhe os registros de ponto da equipe
                   </CardDescription>
                 </div>
-                <Input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-auto"
-                />
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Todas as empresas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as empresas</SelectItem>
+                      {companies.map(c => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="w-auto"
+                  />
+                </div>
               </div>
             </CardHeader>
             <CardContent>

@@ -114,7 +114,11 @@ export function TimeClock() {
         </TabsContent>
 
         <TabsContent value="history">
-          <MyHistory userId={user.id} userName={profile?.name || profile?.email || 'Usuário'} />
+          <MyHistory
+            userId={user.id}
+            userName={profile?.name || profile?.email || 'Usuário'}
+            isAdmin={canManage}
+          />
         </TabsContent>
 
         <TabsContent value="justifications">
