@@ -1,80 +1,59 @@
 
-
-## Melhorias no Modulo Comunicacao SMS
+## Evolucao do Modulo Controle de Ponto
 
 ### Problemas Identificados
 
-1. **Sem controle de horario**: O cron job roda a cada hora (`0 * * * *`), sem respeitar horarios comerciais configurados
-2. **Sem sinalizacao de falha por credito**: Clientes que nao receberam SMS por falta de credito na API nao tem indicador visual
-3. **Historico nao visivel corretamente**: O `useSmsData` busca `sms_history` sem filtrar por empresa -- todos veem tudo
-4. **Televendas SMS sem filtro de empresa**: `TelevendasSmsView` busca `sms_televendas_queue` sem filtrar por `company_id`, expondo clientes de outras empresas
-5. **Automacao sem filtro de empresa**: `AutomationView` busca proximos envios sem filtro de empresa
-6. **`sms-automation-run` nao grava `company_id`** no `sms_history`, quebrando a visibilidade por empresa
+1. **Historico (aba "Historico")**: Mostra apenas os registros do proprio usuario. Admin precisa ver todas as batidas de todos os usuarios com filtro por empresa.
+2. **PDF da folha de ponto**: Gera apenas para o usuario logado. Admin precisa selecionar qualquer colaborador e gerar o espelho de ponto mensal.
+3. **Batidas do Dia (aba "Painel")**: O ManagerDashboard busca todos os profiles sem filtro por empresa. Precisa de um filtro por empresa para controle por empresa.
 
 ---
 
 ### Plano de Implementacao
 
-#### 1. Configuracao de Horarios de Envio (Database + UI)
+#### 1. Historico com visao Admin (MyHistory.tsx)
 
-**Banco de dados**: Inserir novas settings na tabela `sms_automation_settings`:
-- `automacao_horario_inicio` (default `"08"`) -- hora de inicio (0-23)
-- `automacao_horario_fim` (default `"20"`) -- hora fim (0-23)
+- Adicionar props opcionais `isAdmin` e `allUsers` ao componente
+- Quando `isAdmin = true`:
+  - Exibir um Select de "Colaborador" para o admin escolher qual usuario visualizar
+  - Exibir um Select de "Empresa" para filtrar colaboradores por empresa
+  - Buscar registros do usuario selecionado (ou de todos, se "Todos" estiver selecionado)
+  - A tabela passa a exibir coluna "Colaborador" quando visualizando todos
+- O componente TimeClockPDF ja recebe `userId` e `userName` -- quando admin seleciona outro usuario, passa os dados desse usuario para gerar o PDF correto
 
-**Edge Function `sms-automation-run`**: Adicionar verificacao de horario no inicio da execucao. Se a hora atual (fuso Brasilia, UTC-3) estiver fora do intervalo configurado, retornar imediatamente sem processar.
+**Alteracao em `index.tsx`**: Na aba "history", quando `canManage`, passar `isAdmin={true}` e nao fixar o userId do usuario logado.
 
-**UI `AutomationView.tsx`**: Adicionar dois campos de input (hora inicio e hora fim) no card de configuracoes.
+#### 2. PDF preciso por colaborador selecionado
 
-#### 2. Sinalizacao de Falha por Credito Insuficiente
+- O TimeClockPDF ja suporta `userId` e `userName` como props -- basta que o MyHistory passe os dados do colaborador selecionado pelo admin
+- Buscar a empresa do colaborador selecionado para preencher `companyName` e `companyCNPJ` no PDF
+- Nenhuma alteracao no TimeClockPDF em si e necessaria, apenas no MyHistory que alimenta as props
 
-**Edge Function `sms-automation-run`**: Quando o envio falhar com erro relacionado a credito/saldo insuficiente da API (Twilio ou Yup Chat), gravar `error_message` com prefixo padronizado como `"CREDITO_INSUFICIENTE: ..."` e status `"failed"`.
+#### 3. Filtro por empresa no Painel (ManagerDashboard.tsx)
 
-**Edge Function `send-sms`**: Mesmo tratamento para envios manuais.
-
-**UI `TelevendasSmsView.tsx`**: Na coluna da tabela, adicionar uma coluna "Status Envio" que consulta o ultimo registro de `sms_history` para aquele `televendas_id`. Mostrar badges:
-- Verde: Enviado com sucesso
-- Vermelho: Falhou
-- Amarelo com icone de moeda: Falha por credito insuficiente
-- Cinza: Nunca enviado
-
-**UI `HistoryView.tsx`**: Adicionar badge especial quando `error_message` contem `"CREDITO_INSUFICIENTE"`.
-
-#### 3. Historico Visivel por Empresa
-
-**`useSmsData.ts`**: Modificar `fetchHistory` para utilizar o `company_id` do usuario logado. Para admins, buscar todos. Para gestores/colaboradores, filtrar pelo `company_id` do usuario via `user_companies`.
-
-**Edge Function `sms-automation-run`**: Ao inserir em `sms_history`, incluir o `company_id` do item da fila (`representative.company_id` e `item.company_id`). Isso corrige o problema de historico sem empresa.
-
-#### 4. Isolamento por Empresa no Televendas SMS e Automacao
-
-**`TelevendasSmsView.tsx`**:
-- Obter o `company_id` do usuario logado via hook `useAuth` e tabela `user_companies`
-- Filtrar a query de `sms_televendas_queue` adicionando `.eq("company_id", userCompanyId)` para gestores/colaboradores
-- Admins continuam vendo tudo
-
-**`AutomationView.tsx`**:
-- Mesmo padrao: filtrar "Proximos Envios" por `company_id` do usuario
-- Admins veem todos
-
-**Observacao**: As politicas RLS ja implementadas ja fazem essa restricao no banco (`Gestor company access` e `Colaborador own access`), porem o frontend precisa explicitamente passar o filtro para evitar erros silenciosos de query vazia.
+- Buscar lista de empresas da tabela `companies`
+- Adicionar Select de "Empresa" ao lado do campo de data no card "Batidas do Dia"
+- Quando uma empresa for selecionada:
+  - Filtrar profiles pelos usuarios que pertencem aquela empresa (via `user_companies`)
+  - Filtrar `time_clock` registros apenas de usuarios daquela empresa
+- Admins veem todas as empresas; gestores veem apenas sua empresa (pre-selecionada)
+- Atualizar os cards de estatisticas para refletir o filtro
 
 ---
 
-### Resumo Tecnico dos Arquivos a Editar
+### Arquivos a Editar
 
 | Arquivo | Alteracao |
 |---|---|
-| **Database migration** | Inserir 2 novas settings de horario |
-| `supabase/functions/sms-automation-run/index.ts` | Verificacao de horario, gravar `company_id` no historico, detectar erro de credito |
-| `src/modules/sms/views/AutomationView.tsx` | Campos de horario inicio/fim, filtro por empresa |
-| `src/modules/sms/views/TelevendasSmsView.tsx` | Filtro por empresa, coluna de status do ultimo envio |
-| `src/modules/sms/views/HistoryView.tsx` | Badge de credito insuficiente |
-| `src/modules/sms/hooks/useSmsData.ts` | Filtro de historico por empresa |
+| `src/components/TimeClock/MyHistory.tsx` | Adicionar modo admin com selects de empresa e colaborador, buscar registros de qualquer usuario |
+| `src/components/TimeClock/index.tsx` | Passar props de admin para MyHistory quando `canManage` |
+| `src/components/TimeClock/ManagerDashboard.tsx` | Adicionar filtro de empresa no card "Batidas do Dia" e filtrar dados por empresa |
 
-### Fluxo de Seguranca
+### Fluxo do Admin
 
-- Gestores so veem dados da propria empresa
-- Colaboradores so veem seus proprios registros na fila
-- Admins veem tudo
-- As RLS policies existentes ja suportam isso -- as mudancas sao no frontend para alinhar as queries
-
+1. Admin abre aba "Historico" -- ve select de empresa e colaborador
+2. Seleciona empresa -- lista de colaboradores filtra para aquela empresa
+3. Seleciona colaborador (ou "Todos") -- tabela mostra registros
+4. Clica em "Gerar PDF" -- gera espelho de ponto do colaborador selecionado com dados da empresa correta
+5. Admin abre aba "Painel" -- ve select de empresa ao lado da data
+6. Seleciona empresa -- cards e tabela de batidas filtram para aquela empresa
