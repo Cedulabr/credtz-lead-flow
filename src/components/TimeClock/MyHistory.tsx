@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Calendar, Clock, MapPin, Loader2 } from 'lucide-react';
 import { useTimeClock } from '@/hooks/useTimeClock';
@@ -15,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface MyHistoryProps {
   userId: string;
   userName: string;
+  isAdmin?: boolean;
 }
 
 interface DailyGroup {
@@ -22,30 +24,85 @@ interface DailyGroup {
   records: TimeClock[];
   totalMinutes: number;
   status: TimeClockStatus;
+  userName?: string;
 }
 
-export function MyHistory({ userId, userName }: MyHistoryProps) {
+export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps) {
   const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
   const [history, setHistory] = useState<TimeClock[]>([]);
   const [loading, setLoading] = useState(false);
   const [companyData, setCompanyData] = useState<{ name: string; cnpj: string | null }>({ name: '', cnpj: null });
 
-  const { getUserHistory } = useTimeClock(userId);
+  // Admin filters
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
+  const [companyUsers, setCompanyUsers] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>('all');
+
+  const activeUserId = isAdmin && selectedUserId !== 'all' ? selectedUserId : userId;
+  const activeUserName = isAdmin && selectedUserId !== 'all'
+    ? companyUsers.find(u => u.id === selectedUserId)?.name || userName
+    : userName;
+
+  const { getUserHistory } = useTimeClock(activeUserId);
   const { companyName: whitelabelName } = useWhitelabel();
+
+  // Load companies for admin
+  useEffect(() => {
+    if (!isAdmin) return;
+    (async () => {
+      const { data } = await supabase.from('companies').select('id, name').order('name');
+      if (data) setCompanies(data);
+    })();
+  }, [isAdmin]);
+
+  // Load users for selected company
+  useEffect(() => {
+    if (!isAdmin) return;
+    (async () => {
+      let query = supabase
+        .from('user_companies')
+        .select('user_id, profiles:user_id(id, name, email)')
+        .eq('is_active', true);
+
+      if (selectedCompanyId !== 'all') {
+        query = query.eq('company_id', selectedCompanyId);
+      }
+
+      const { data } = await query;
+      if (data) {
+        const mapped = data
+          .map((d: any) => d.profiles)
+          .filter(Boolean)
+          .map((p: any) => ({ id: p.id, name: p.name || p.email?.split('@')[0] || 'Sem nome', email: p.email }));
+        // deduplicate
+        const unique = Array.from(new Map(mapped.map((u: any) => [u.id, u])).values());
+        setCompanyUsers(unique as any);
+      }
+    })();
+  }, [isAdmin, selectedCompanyId]);
+
+  // Reset user selection when company changes
+  useEffect(() => {
+    setSelectedUserId('all');
+  }, [selectedCompanyId]);
 
   useEffect(() => {
     loadHistory();
+  }, [startDate, endDate, activeUserId, selectedUserId, isAdmin]);
+
+  useEffect(() => {
     loadCompanyData();
-  }, [startDate, endDate, userId]);
+  }, [activeUserId]);
 
   const loadCompanyData = async () => {
     try {
-      // Buscar empresa do usuário
+      const targetUserId = isAdmin && selectedUserId !== 'all' ? selectedUserId : userId;
       const { data: userCompany } = await supabase
         .from('user_companies')
         .select('company_id')
-        .eq('user_id', userId)
+        .eq('user_id', targetUserId)
         .eq('is_active', true)
         .single();
 
@@ -67,20 +124,58 @@ export function MyHistory({ userId, userName }: MyHistoryProps) {
 
   const loadHistory = async () => {
     setLoading(true);
-    const data = await getUserHistory(startDate, endDate);
-    setHistory(data);
+
+    if (isAdmin && selectedUserId === 'all') {
+      // Load all users' records (filtered by company if selected)
+      const targetUserIds = selectedCompanyId !== 'all'
+        ? companyUsers.map(u => u.id)
+        : companyUsers.map(u => u.id);
+
+      if (targetUserIds.length === 0) {
+        setHistory([]);
+        setLoading(false);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('time_clock')
+        .select('*')
+        .in('user_id', targetUserIds)
+        .gte('clock_date', startDate)
+        .lte('clock_date', endDate)
+        .order('clock_date', { ascending: false })
+        .order('clock_time', { ascending: true });
+
+      setHistory(data || []);
+    } else {
+      const data = await getUserHistory(startDate, endDate);
+      setHistory(data);
+    }
     setLoading(false);
   };
 
+  // Map user_id -> name for "all" view
+  const userNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    companyUsers.forEach(u => { map[u.id] = u.name; });
+    return map;
+  }, [companyUsers]);
+
+  const showAllUsers = isAdmin && selectedUserId === 'all';
+
   const groupByDate = (): DailyGroup[] => {
+    const groupKey = (record: TimeClock) =>
+      showAllUsers ? `${record.clock_date}__${record.user_id}` : record.clock_date;
+
     const groups: Record<string, TimeClock[]> = {};
     history.forEach((record) => {
-      const date = record.clock_date;
-      if (!groups[date]) groups[date] = [];
-      groups[date].push(record);
+      const key = groupKey(record);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(record);
     });
 
-    return Object.entries(groups).map(([date, records]) => {
+    return Object.entries(groups).map(([key, records]) => {
+      const date = records[0].clock_date;
       const entrada = records.find((r) => r.clock_type === 'entrada');
       const saida = records.find((r) => r.clock_type === 'saida');
       const pausaInicio = records.find((r) => r.clock_type === 'pausa_inicio');
@@ -101,7 +196,13 @@ export function MyHistory({ userId, userName }: MyHistoryProps) {
         status = 'incompleto';
       }
 
-      return { date, records, totalMinutes, status };
+      return {
+        date,
+        records,
+        totalMinutes,
+        status,
+        userName: showAllUsers ? (userNameMap[records[0].user_id] || 'Desconhecido') : undefined,
+      };
     }).sort((a, b) => b.date.localeCompare(a.date));
   };
 
@@ -113,6 +214,9 @@ export function MyHistory({ userId, userName }: MyHistoryProps) {
 
   const groups = groupByDate();
 
+  // PDF should only show when a single user is selected
+  const showPdf = !showAllUsers;
+
   return (
     <Card>
       <CardHeader>
@@ -120,19 +224,58 @@ export function MyHistory({ userId, userName }: MyHistoryProps) {
           <div>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Meu Histórico
+              {isAdmin ? 'Histórico de Ponto' : 'Meu Histórico'}
             </CardTitle>
-            <CardDescription>Visualize seus registros de ponto</CardDescription>
+            <CardDescription>
+              {isAdmin ? 'Visualize registros de ponto dos colaboradores' : 'Visualize seus registros de ponto'}
+            </CardDescription>
           </div>
-          <TimeClockPDF 
-            userId={userId} 
-            userName={userName} 
-            companyName={companyData.name || whitelabelName}
-            companyCNPJ={companyData.cnpj || undefined}
-          />
+          {showPdf && (
+            <TimeClockPDF
+              userId={activeUserId}
+              userName={activeUserName}
+              companyName={companyData.name || whitelabelName}
+              companyCNPJ={companyData.cnpj || undefined}
+            />
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Admin filters */}
+        {isAdmin && (
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 min-w-[180px]">
+              <label className="text-sm text-muted-foreground mb-1 block">Empresa</label>
+              <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas as empresas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as empresas</SelectItem>
+                  {companies.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1 min-w-[180px]">
+              <label className="text-sm text-muted-foreground mb-1 block">Colaborador</label>
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos os colaboradores" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {companyUsers.map(u => (
+                    <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        {/* Date filters */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">De:</span>
@@ -169,6 +312,7 @@ export function MyHistory({ userId, userName }: MyHistoryProps) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Data</TableHead>
+                  {showAllUsers && <TableHead>Colaborador</TableHead>}
                   <TableHead>Entrada</TableHead>
                   <TableHead>Pausa</TableHead>
                   <TableHead>Retorno</TableHead>
@@ -178,17 +322,20 @@ export function MyHistory({ userId, userName }: MyHistoryProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {groups.map((group) => {
+                {groups.map((group, idx) => {
                   const entrada = group.records.find((r) => r.clock_type === 'entrada');
                   const pausa = group.records.find((r) => r.clock_type === 'pausa_inicio');
                   const retorno = group.records.find((r) => r.clock_type === 'pausa_fim');
                   const saida = group.records.find((r) => r.clock_type === 'saida');
 
                   return (
-                    <TableRow key={group.date}>
+                    <TableRow key={`${group.date}-${idx}`}>
                       <TableCell className="font-medium">
                         {format(parseISO(group.date), 'dd/MM/yyyy')}
                       </TableCell>
+                      {showAllUsers && (
+                        <TableCell className="font-medium">{group.userName}</TableCell>
+                      )}
                       <TableCell>
                         {entrada ? (
                           <div className="flex items-center gap-1">
