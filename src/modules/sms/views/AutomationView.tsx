@@ -1,14 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
-import { Settings, Save, Play, Loader2, Zap, Users, Clock, CalendarDays } from "lucide-react";
+import { Settings, Save, Play, Loader2, Zap, Users, Clock, CalendarDays, ChevronDown, Sparkles, Send, Ban } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserCompany } from "../hooks/useUserCompany";
@@ -34,15 +36,24 @@ const WEEKDAYS = [
   { value: "0", label: "Dom" },
 ];
 
+const SECTION_COLORS = {
+  portabilidade: { border: "border-l-blue-500", bg: "bg-blue-500/5", icon: "text-blue-500", badge: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300" },
+  pago: { border: "border-l-emerald-500", bg: "bg-emerald-500/5", icon: "text-emerald-500", badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" },
+  remarketing: { border: "border-l-violet-500", bg: "bg-violet-500/5", icon: "text-violet-500", badge: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" },
+  contato_futuro: { border: "border-l-amber-500", bg: "bg-amber-500/5", icon: "text-amber-500", badge: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300" },
+};
+
 export const AutomationView = () => {
   const { profile } = useAuth();
   const { companyId, isAdmin, loading: companyLoading } = useUserCompany();
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [running, setRunning] = useState(false);
+  const [runningAll, setRunningAll] = useState(false);
+  const [runningSection, setRunningSection] = useState<string | null>(null);
   const [nextSends, setNextSends] = useState<QueueItem[]>([]);
   const [loadingNext, setLoadingNext] = useState(false);
+  const [msgsOpen, setMsgsOpen] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -97,20 +108,23 @@ export const AutomationView = () => {
     }
   };
 
-  const handleRunNow = async () => {
-    setRunning(true);
+  const handleRunNow = async (section?: string) => {
+    if (section) setRunningSection(section);
+    else setRunningAll(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sms-automation-run");
+      const body = section ? { section } : {};
+      const { data, error } = await supabase.functions.invoke("sms-automation-run", { body });
       if (error) throw error;
       const msg = data?.message
         ? data.message
-        : `Automação executada: ${data?.sent || 0} enviados, ${data?.failed || 0} falhas, ${data?.skipped || 0} ignorados`;
+        : `${section ? "Seção executada" : "Automação executada"}: ${data?.sent || 0} enviados, ${data?.failed || 0} falhas, ${data?.skipped || 0} ignorados`;
       toast.success(msg);
       fetchNextSends();
     } catch (e: any) {
       toast.error("Erro: " + e.message);
     } finally {
-      setRunning(false);
+      setRunningAll(false);
+      setRunningSection(null);
     }
   };
 
@@ -127,39 +141,70 @@ export const AutomationView = () => {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   }
 
+  const SectionTriggerButton = ({ section, label }: { section: string; label: string }) => (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => handleRunNow(section)}
+      disabled={!!runningSection || runningAll}
+      className="gap-1.5 text-xs h-8"
+    >
+      {runningSection === section ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+      Disparar Agora
+    </Button>
+  );
+
+  const StatusBadge = ({ active, colors }: { active: boolean; colors: string }) => (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${colors}`}>
+      {active ? "● Ativa" : "○ Inativa"}
+    </span>
+  );
+
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Settings className="h-5 w-5 text-primary" />
-          Configurações de Automação
-        </h2>
-        <div className="flex gap-2">
-          {isAdmin && (
-            <Button variant="outline" onClick={handleRunNow} disabled={running} className="gap-2">
-              {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              Executar Agora
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border p-5">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl bg-primary/15 flex items-center justify-center">
+              <Sparkles className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold">Central de Automações</h2>
+              <p className="text-xs text-muted-foreground">Configure e dispare automações SMS por seção</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {isAdmin && (
+              <Button variant="outline" onClick={() => handleRunNow()} disabled={runningAll || !!runningSection} className="gap-2">
+                {runningAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                Executar Todas
+              </Button>
+            )}
+            <Button onClick={handleSave} disabled={saving} className="gap-2">
+              <Save className="h-4 w-4" />
+              {saving ? "Salvando..." : "Salvar"}
             </Button>
-          )}
-          <Button onClick={handleSave} disabled={saving} className="gap-2">
-            <Save className="h-4 w-4" />
-            {saving ? "Salvando..." : "Salvar"}
-          </Button>
+          </div>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Em Andamento Automation */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" />
-              Automação - Portabilidade em Andamento
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-2.5 rounded-lg bg-muted/50 text-xs text-muted-foreground">
-              <p>⚡ Apenas propostas de <strong>Portabilidade</strong> com status em andamento receberão mensagens automáticas.</p>
+        {/* ─── Portabilidade em Andamento ─── */}
+        <Card className={`border-l-4 ${SECTION_COLORS.portabilidade.border} overflow-hidden`}>
+          <div className={`px-5 py-3.5 ${SECTION_COLORS.portabilidade.bg} flex items-center justify-between`}>
+            <div className="flex items-center gap-2">
+              <Zap className={`h-4 w-4 ${SECTION_COLORS.portabilidade.icon}`} />
+              <span className="text-sm font-semibold">Portabilidade em Andamento</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <StatusBadge active={settings["automacao_em_andamento_ativa"] === "true"} colors={SECTION_COLORS.portabilidade.badge} />
+              {isAdmin && <SectionTriggerButton section="portabilidade" label="Disparar" />}
+            </div>
+          </div>
+          <CardContent className="p-5 space-y-4">
+            <div className="p-2.5 rounded-lg bg-muted/40 text-xs text-muted-foreground">
+              ⚡ Apenas propostas de <strong>Portabilidade</strong> com status em andamento receberão mensagens automáticas.
             </div>
             <div className="flex items-center justify-between">
               <Label className="text-sm">Ativada</Label>
@@ -169,83 +214,48 @@ export const AutomationView = () => {
                 disabled={!isAdmin}
               />
             </div>
-            <div>
-              <Label className="text-xs">Quantidade de dias</Label>
-              <Input
-                type="number"
-                min={1}
-                max={30}
-                value={settings["automacao_em_andamento_dias"] || "5"}
-                onChange={(e) => updateSetting("automacao_em_andamento_dias", e.target.value)}
-                disabled={!isAdmin}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Intervalo entre envios (horas)</Label>
-              <Input
-                type="number"
-                min={1}
-                max={168}
-                value={settings["automacao_em_andamento_intervalo_horas"] || "24"}
-                onChange={(e) => updateSetting("automacao_em_andamento_intervalo_horas", e.target.value)}
-                disabled={!isAdmin}
-                className="mt-1"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Quantidade de dias</Label>
+                <Input type="number" min={1} max={30} value={settings["automacao_em_andamento_dias"] || "5"} onChange={(e) => updateSetting("automacao_em_andamento_dias", e.target.value)} disabled={!isAdmin} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs">Intervalo (horas)</Label>
+                <Input type="number" min={1} max={168} value={settings["automacao_em_andamento_intervalo_horas"] || "24"} onChange={(e) => updateSetting("automacao_em_andamento_intervalo_horas", e.target.value)} disabled={!isAdmin} className="mt-1" />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs flex items-center gap-1">
-                  <Clock className="h-3 w-3" /> Horário Início
-                </Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={23}
-                  value={settings["automacao_horario_inicio"] || "8"}
-                  onChange={(e) => updateSetting("automacao_horario_inicio", e.target.value)}
-                  disabled={!isAdmin}
-                  className="mt-1"
-                />
+                <Label className="text-xs flex items-center gap-1"><Clock className="h-3 w-3" /> Horário Início</Label>
+                <Input type="number" min={0} max={23} value={settings["automacao_horario_inicio"] || "8"} onChange={(e) => updateSetting("automacao_horario_inicio", e.target.value)} disabled={!isAdmin} className="mt-1" />
               </div>
               <div>
-                <Label className="text-xs flex items-center gap-1">
-                  <Clock className="h-3 w-3" /> Horário Fim
-                </Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={23}
-                  value={settings["automacao_horario_fim"] || "20"}
-                  onChange={(e) => updateSetting("automacao_horario_fim", e.target.value)}
-                  disabled={!isAdmin}
-                  className="mt-1"
-                />
+                <Label className="text-xs flex items-center gap-1"><Clock className="h-3 w-3" /> Horário Fim</Label>
+                <Input type="number" min={0} max={23} value={settings["automacao_horario_fim"] || "20"} onChange={(e) => updateSetting("automacao_horario_fim", e.target.value)} disabled={!isAdmin} className="mt-1" />
               </div>
             </div>
             <p className="text-[10px] text-muted-foreground">Envios automáticos só ocorrem dentro deste horário (fuso Brasília)</p>
             <div>
               <Label className="text-xs">Mensagem</Label>
-              <Textarea
-                value={settings["msg_em_andamento"] || ""}
-                onChange={(e) => updateSetting("msg_em_andamento", e.target.value)}
-                rows={3}
-                className="mt-1 text-sm"
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">Variáveis: {"{{nome}}"}, {"{{tipo_operacao}}"}</p>
+              <Textarea value={settings["msg_em_andamento"] || ""} onChange={(e) => updateSetting("msg_em_andamento", e.target.value)} rows={3} className="mt-1 text-sm" />
+              <p className="text-[10px] text-muted-foreground mt-1">Variáveis: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code> (primeiro nome), <code className="bg-muted px-1 py-0.5 rounded">{"{{tipo_operacao}}"}</code></p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Pago Notification */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" />
-              Notificação - Propostas Pagas
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        {/* ─── Propostas Pagas ─── */}
+        <Card className={`border-l-4 ${SECTION_COLORS.pago.border} overflow-hidden`}>
+          <div className={`px-5 py-3.5 ${SECTION_COLORS.pago.bg} flex items-center justify-between`}>
+            <div className="flex items-center gap-2">
+              <Zap className={`h-4 w-4 ${SECTION_COLORS.pago.icon}`} />
+              <span className="text-sm font-semibold">Notificação — Propostas Pagas</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <StatusBadge active={settings["automacao_pago_ativa"] === "true"} colors={SECTION_COLORS.pago.badge} />
+              {isAdmin && <SectionTriggerButton section="pago" label="Disparar" />}
+            </div>
+          </div>
+          <CardContent className="p-5 space-y-4">
             <div className="flex items-center justify-between">
               <Label className="text-sm">Ativada</Label>
               <Switch
@@ -256,33 +266,32 @@ export const AutomationView = () => {
             </div>
             <div>
               <Label className="text-xs">Mensagem</Label>
-              <Textarea
-                value={settings["msg_pago_novo_emprestimo"] || ""}
-                onChange={(e) => updateSetting("msg_pago_novo_emprestimo", e.target.value)}
-                rows={3}
-                className="mt-1 text-sm"
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">Variáveis: {"{{nome}}"}</p>
+              <Textarea value={settings["msg_pago_novo_emprestimo"] || ""} onChange={(e) => updateSetting("msg_pago_novo_emprestimo", e.target.value)} rows={3} className="mt-1 text-sm" />
+              <p className="text-[10px] text-muted-foreground mt-1">Variáveis: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code> (primeiro nome)</p>
             </div>
-            <div className="p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground">
-              <p>Esta mensagem é enviada automaticamente quando uma proposta de <strong>Novo Empréstimo</strong> é marcada como <strong>Paga</strong>.</p>
+            <div className="p-2.5 rounded-lg bg-muted/40 text-xs text-muted-foreground">
+              Esta mensagem é enviada automaticamente quando uma proposta de <strong>Novo Empréstimo</strong> é marcada como <strong>Paga</strong>.
             </div>
           </CardContent>
         </Card>
 
-        {/* Remarketing Multi-Módulo — EXPANDED */}
-        <Card className="md:col-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" />
-              Remarketing — Multi-Módulo
+        {/* ─── Remarketing Multi-Módulo ─── */}
+        <Card className={`md:col-span-2 border-l-4 ${SECTION_COLORS.remarketing.border} overflow-hidden`}>
+          <div className={`px-5 py-3.5 ${SECTION_COLORS.remarketing.bg} flex items-center justify-between`}>
+            <div className="flex items-center gap-2">
+              <Zap className={`h-4 w-4 ${SECTION_COLORS.remarketing.icon}`} />
+              <span className="text-sm font-semibold">Remarketing — Multi-Módulo</span>
               <Badge variant="secondary" className="text-[10px]">5 mensagens</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="p-2.5 rounded-lg bg-muted/50 text-xs text-muted-foreground">
-              <p>🔄 Envia ofertas automáticas para clientes com status <strong>aguardando retorno</strong> (Meus Clientes), <strong>em andamento</strong> (Leads Premium, Activate Leads).</p>
-              <p className="mt-1">💡 Use <code className="bg-background px-1 py-0.5 rounded text-[10px]">{"{{nome}}"}</code> nas mensagens — o sistema puxa automaticamente apenas o <strong>primeiro nome</strong> do cliente.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <StatusBadge active={settings["remarketing_ativa"] === "true"} colors={SECTION_COLORS.remarketing.badge} />
+              {isAdmin && <SectionTriggerButton section="remarketing" label="Disparar" />}
+            </div>
+          </div>
+          <CardContent className="p-5 space-y-5">
+            <div className="p-2.5 rounded-lg bg-muted/40 text-xs text-muted-foreground">
+              🔄 Envia ofertas automáticas para clientes com status <strong>aguardando retorno</strong> (Meus Clientes), <strong>em andamento</strong> (Leads Premium, Activate Leads).<br />
+              💡 Use <code className="bg-background px-1 py-0.5 rounded text-[10px]">{"{{nome}}"}</code> — puxa apenas o <strong>primeiro nome</strong> do cliente.
             </div>
 
             <div className="flex items-center justify-between">
@@ -297,135 +306,118 @@ export const AutomationView = () => {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Quantidade de dias</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={30}
-                  value={settings["remarketing_dias"] || "5"}
-                  onChange={(e) => updateSetting("remarketing_dias", e.target.value)}
-                  disabled={!isAdmin}
-                  className="mt-1"
-                />
+                <Input type="number" min={1} max={30} value={settings["remarketing_dias"] || "5"} onChange={(e) => updateSetting("remarketing_dias", e.target.value)} disabled={!isAdmin} className="mt-1" />
               </div>
               <div>
-                <Label className="text-xs">Intervalo entre envios (horas)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={168}
-                  value={settings["remarketing_intervalo_horas"] || "24"}
-                  onChange={(e) => updateSetting("remarketing_intervalo_horas", e.target.value)}
-                  disabled={!isAdmin}
-                  className="mt-1"
-                />
+                <Label className="text-xs">Intervalo (horas)</Label>
+                <Input type="number" min={1} max={168} value={settings["remarketing_intervalo_horas"] || "24"} onChange={(e) => updateSetting("remarketing_intervalo_horas", e.target.value)} disabled={!isAdmin} className="mt-1" />
               </div>
             </div>
 
-            {/* 5 Message fields */}
-            <div className="space-y-3">
-              <Label className="text-xs font-medium flex items-center gap-1.5">
-                📝 Mensagens por dia da sequência
-              </Label>
-              {[1, 2, 3, 4, 5].map((day) => (
-                <div key={day}>
-                  <Label className="text-[11px] text-muted-foreground">Dia {day}</Label>
-                  <Textarea
-                    value={settings[`msg_remarketing_dia_${day}`] || ""}
-                    onChange={(e) => updateSetting(`msg_remarketing_dia_${day}`, e.target.value)}
-                    rows={2}
-                    className="mt-0.5 text-sm"
-                    disabled={!isAdmin}
-                    placeholder={`Mensagem para o dia ${day} da sequência...`}
-                  />
+            {/* 5 Messages in Collapsible */}
+            <Collapsible open={msgsOpen} onOpenChange={setMsgsOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full justify-between h-9 px-3 text-xs font-medium border border-border/50 rounded-lg hover:bg-muted/50">
+                  <span className="flex items-center gap-1.5">📝 Mensagens por dia da sequência (1-5)</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${msgsOpen ? "rotate-180" : ""}`} />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="space-y-3 mt-3">
+                  {[1, 2, 3, 4, 5].map((day) => (
+                    <div key={day}>
+                      <Label className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                        <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${SECTION_COLORS.remarketing.badge}`}>{day}</span>
+                        Dia {day}
+                      </Label>
+                      <Textarea
+                        value={settings[`msg_remarketing_dia_${day}`] || ""}
+                        onChange={(e) => updateSetting(`msg_remarketing_dia_${day}`, e.target.value)}
+                        rows={2}
+                        className="mt-0.5 text-sm"
+                        disabled={!isAdmin}
+                        placeholder={`Mensagem para o dia ${day} da sequência...`}
+                      />
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-muted-foreground">
+                    Variável: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code> = primeiro nome. Se ultrapassar 5 dias, as mensagens se repetem ciclicamente.
+                  </p>
                 </div>
-              ))}
-              <p className="text-[10px] text-muted-foreground">
-                Variável disponível: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code> = primeiro nome do cliente. Se a sequência ultrapassar 5 dias, as mensagens se repetem ciclicamente.
-              </p>
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
 
             {/* Scheduling */}
             <div className="space-y-3 border-t pt-4">
               <Label className="text-xs font-medium flex items-center gap-1.5">
                 <CalendarDays className="h-3.5 w-3.5" /> Agenda de Envio
               </Label>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-[11px] text-muted-foreground">Modo de dias</Label>
-                  <Select
-                    value={settings["remarketing_modo_dias"] || "todos"}
-                    onValueChange={(v) => updateSetting("remarketing_modo_dias", v)}
-                    disabled={!isAdmin}
-                  >
-                    <SelectTrigger className="mt-0.5 h-9">
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={settings["remarketing_modo_dias"] || "todos"} onValueChange={(v) => updateSetting("remarketing_modo_dias", v)} disabled={!isAdmin}>
+                    <SelectTrigger className="mt-0.5 h-9"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">📅 Todos os dias</SelectItem>
-                      <SelectItem value="intercalado">🔀 Intercalado (dia sim, dia não)</SelectItem>
-                      <SelectItem value="aleatorio">🎲 Aleatório (50% chance/dia)</SelectItem>
-                      <SelectItem value="personalizado">✏️ Dias personalizados</SelectItem>
+                      <SelectItem value="intercalado">🔀 Intercalado</SelectItem>
+                      <SelectItem value="aleatorio">🎲 Aleatório (50%)</SelectItem>
+                      <SelectItem value="personalizado">✏️ Personalizado</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-[11px] text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" /> Horário de envio
-                  </Label>
-                  <Input
-                    type="time"
-                    value={settings["remarketing_horario_envio"] || "09:00"}
-                    onChange={(e) => updateSetting("remarketing_horario_envio", e.target.value)}
-                    disabled={!isAdmin}
-                    className="mt-0.5 h-9"
-                  />
+                  <Label className="text-[11px] text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Horário</Label>
+                  <Input type="time" value={settings["remarketing_horario_envio"] || "09:00"} onChange={(e) => updateSetting("remarketing_horario_envio", e.target.value)} disabled={!isAdmin} className="mt-0.5 h-9" />
                 </div>
               </div>
 
               {settings["remarketing_modo_dias"] === "personalizado" && (
                 <div>
-                  <Label className="text-[11px] text-muted-foreground mb-2 block">Selecione os dias da semana</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {WEEKDAYS.map((wd) => (
-                      <label
-                        key={wd.value}
-                        className="flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Checkbox
-                          checked={selectedDays.includes(wd.value)}
-                          onCheckedChange={() => toggleWeekday(wd.value)}
+                  <Label className="text-[11px] text-muted-foreground mb-2 block">Dias da semana</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WEEKDAYS.map((wd) => {
+                      const isSelected = selectedDays.includes(wd.value);
+                      return (
+                        <button
+                          key={wd.value}
+                          onClick={() => toggleWeekday(wd.value)}
                           disabled={!isAdmin}
-                        />
-                        <span className="text-xs">{wd.label}</span>
-                      </label>
-                    ))}
+                          className={`h-8 w-10 rounded-lg text-xs font-semibold transition-all border ${isSelected ? "bg-violet-500 text-white border-violet-500 shadow-sm" : "bg-background border-border text-muted-foreground hover:bg-muted"}`}
+                        >
+                          {wd.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
-              <div className="p-2.5 rounded-lg bg-muted/50 text-[10px] text-muted-foreground space-y-1">
-                <p><strong>Todos os dias:</strong> envia 1 SMS por dia dentro do intervalo configurado.</p>
-                <p><strong>Intercalado:</strong> envia em dias alternados (1º, 3º, 5º dia...).</p>
-                <p><strong>Aleatório:</strong> cada dia há 50% de chance de envio — simula naturalidade.</p>
-                <p><strong>Personalizado:</strong> envia apenas nos dias da semana marcados acima.</p>
+              <div className="p-2.5 rounded-lg bg-muted/40 text-[10px] text-muted-foreground space-y-0.5">
+                <p><strong>Todos:</strong> 1 SMS/dia no intervalo configurado.</p>
+                <p><strong>Intercalado:</strong> dias alternados (1º, 3º, 5º...).</p>
+                <p><strong>Aleatório:</strong> 50% de chance/dia — simula naturalidade.</p>
+                <p><strong>Personalizado:</strong> apenas nos dias marcados acima.</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Contato Futuro */}
-        <Card className="md:col-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Clock className="h-4 w-4 text-primary" />
-              Contato Futuro — Agendado
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-2.5 rounded-lg bg-muted/50 text-xs text-muted-foreground">
-              <p>📅 Envia 1 SMS com oferta no dia agendado para clientes marcados como <strong>contato futuro</strong>.</p>
-              <p className="mt-1">💡 Use <code className="bg-background px-1 py-0.5 rounded text-[10px]">{"{{nome}}"}</code> — puxa apenas o <strong>primeiro nome</strong> do cliente.</p>
+        {/* ─── Contato Futuro ─── */}
+        <Card className={`md:col-span-2 border-l-4 ${SECTION_COLORS.contato_futuro.border} overflow-hidden`}>
+          <div className={`px-5 py-3.5 ${SECTION_COLORS.contato_futuro.bg} flex items-center justify-between`}>
+            <div className="flex items-center gap-2">
+              <CalendarDays className={`h-4 w-4 ${SECTION_COLORS.contato_futuro.icon}`} />
+              <span className="text-sm font-semibold">Contato Futuro — Agendado</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <StatusBadge active={settings["contato_futuro_ativa"] === "true"} colors={SECTION_COLORS.contato_futuro.badge} />
+              {isAdmin && <SectionTriggerButton section="contato_futuro" label="Disparar" />}
+            </div>
+          </div>
+          <CardContent className="p-5 space-y-4">
+            <div className="p-2.5 rounded-lg bg-muted/40 text-xs text-muted-foreground">
+              📅 Envia 1 SMS no dia agendado para clientes marcados como <strong>contato futuro</strong>.<br />
+              💡 Use <code className="bg-background px-1 py-0.5 rounded text-[10px]">{"{{nome}}"}</code> — puxa apenas o <strong>primeiro nome</strong>.
             </div>
             <div className="flex items-center justify-between">
               <Label className="text-sm">Ativada</Label>
@@ -437,48 +429,52 @@ export const AutomationView = () => {
             </div>
             <div>
               <Label className="text-xs">Mensagem</Label>
-              <Textarea
-                value={settings["msg_contato_futuro"] || ""}
-                onChange={(e) => updateSetting("msg_contato_futuro", e.target.value)}
-                rows={3}
-                className="mt-1 text-sm"
-              />
+              <Textarea value={settings["msg_contato_futuro"] || ""} onChange={(e) => updateSetting("msg_contato_futuro", e.target.value)} rows={3} className="mt-1 text-sm" />
               <p className="text-[10px] text-muted-foreground mt-1">Variáveis: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code> (primeiro nome)</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Próximos Envios */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
+      {/* ─── Próximos Envios ─── */}
+      <Card className="border overflow-hidden">
+        <div className="px-5 py-3.5 bg-muted/30 flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-primary" />
-            Próximos Envios — Clientes a Notificar
+            <span className="text-sm font-semibold">Próximos Envios — Clientes a Notificar</span>
             <Badge variant="secondary" className="text-[10px]">{nextSends.length}</Badge>
-            {!isAdmin && companyId && (
-              <Badge variant="outline" className="text-[10px]">Sua empresa</Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+            {!isAdmin && companyId && <Badge variant="outline" className="text-[10px]">Sua empresa</Badge>}
+          </div>
+        </div>
+        <CardContent className="p-5">
           {loadingNext ? (
             <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : nextSends.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">Nenhum cliente pendente de envio</p>
+            <div className="text-center py-6 text-muted-foreground">
+              <Ban className="h-8 w-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">Nenhum cliente pendente de envio</p>
+            </div>
           ) : (
             <div className="space-y-2 max-h-[300px] overflow-y-auto">
-              {nextSends.map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-border/50 bg-card text-sm">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{item.cliente_nome}</span>
+              {nextSends.map((item, i) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.02 }}
+                  className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-border/50 bg-card text-sm hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center text-xs font-bold text-blue-600">
+                      {(item.cliente_nome || "?")[0].toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <span className="font-medium truncate block text-sm">{item.cliente_nome}</span>
                       <span className="text-[10px] font-mono text-muted-foreground">{item.cliente_telefone}</span>
                     </div>
-                    <p className="text-[11px] text-muted-foreground">{item.tipo_operacao}</p>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-xs text-muted-foreground">{item.dias_enviados}/{item.dias_envio_total} dias</span>
+                    <span className="text-xs text-muted-foreground">{item.dias_enviados}/{item.dias_envio_total}</span>
                     <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                       <Clock className="h-3 w-3" />
                       {item.ultimo_envio_at
@@ -486,7 +482,7 @@ export const AutomationView = () => {
                         : "Nunca"}
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           )}
