@@ -14,6 +14,7 @@ import { PortabilidadeStep } from "./components/PortabilidadeStep";
 import { ConfirmStep } from "./components/ConfirmStep";
 import { DocumentUploadModal } from "./components/DocumentUploadModal";
 import { InitialStatusDialog } from "./components/InitialStatusDialog";
+import { SmsNotifyDialog } from "./components/SmsNotifyDialog";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Steps padrão (não-portabilidade)
@@ -41,7 +42,9 @@ export function SalesWizard() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
-  const [savedClientData, setSavedClientData] = useState<{ name: string; cpf: string } | null>(null);
+  const [showSmsNotify, setShowSmsNotify] = useState(false);
+  const [smsNotifyEnabled, setSmsNotifyEnabled] = useState(false);
+  const [savedClientData, setSavedClientData] = useState<{ name: string; cpf: string; phone: string } | null>(null);
   
   const [wizardData, setWizardData] = useState<Partial<SalesWizardData>>({
     data_venda: new Date().toISOString().split('T')[0],
@@ -84,7 +87,7 @@ export function SalesWizard() {
       return;
     }
     // Save client data and show status dialog
-    setSavedClientData({ name: wizardData.nome || "", cpf: wizardData.cpf || "" });
+    setSavedClientData({ name: wizardData.nome || "", cpf: wizardData.cpf || "", phone: wizardData.telefone || "" });
     setShowStatusDialog(true);
   };
 
@@ -148,9 +151,26 @@ export function SalesWizard() {
       setShowSuccess(true);
       toast({ title: "🎉 Venda cadastrada!", description: "A venda foi registrada com sucesso." });
 
+      // Check if SMS notification is enabled
+      let smsEnabled = false;
+      try {
+        const { data: smsSettings } = await (supabase as any)
+          .from("sms_automation_settings")
+          .select("setting_value")
+          .eq("setting_key", "proposta_sms_ativa")
+          .maybeSingle();
+        smsEnabled = smsSettings?.setting_value === "true";
+      } catch { smsEnabled = false; }
+
+      const hasPhone = !!(wizardData.telefone?.replace(/\D/g, ""));
+
       setTimeout(() => {
         setShowSuccess(false);
-        setShowDocumentModal(true);
+        if (smsEnabled && hasPhone) {
+          setShowSmsNotify(true);
+        } else {
+          setShowDocumentModal(true);
+        }
       }, 2000);
 
     } catch (error) {
@@ -237,6 +257,19 @@ export function SalesWizard() {
         onSelect={handleStatusSelected}
         clientName={wizardData.nome || ""}
       />
+
+      {/* Dialog SMS Notification */}
+      {savedClientData && (
+        <SmsNotifyDialog
+          open={showSmsNotify}
+          onComplete={() => {
+            setShowSmsNotify(false);
+            setShowDocumentModal(true);
+          }}
+          clientName={savedClientData.name}
+          clientPhone={savedClientData.phone}
+        />
+      )}
 
       {/* Modal de Upload de Documentos */}
       {savedClientData && (

@@ -491,6 +491,55 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ================================================
+    // SECTION 5: Proposal Notifications (scheduled)
+    // ================================================
+    const propostaAtiva = config["proposta_sms_ativa"] === "true";
+    const msgPropostaTemplate = config["msg_proposta_criada"] || "Confira a proposta do consultor {{consultor}}.";
+
+    if (propostaAtiva && (!sectionFilter || sectionFilter === "proposta")) {
+      const now = new Date();
+      const { data: propostaQueue } = await serviceClient
+        .from("sms_proposal_notifications")
+        .select("*")
+        .eq("sent", false)
+        .lte("scheduled_at", now.toISOString());
+
+      for (const item of (propostaQueue || [])) {
+        const normalizedPhone = (item.cliente_telefone || "").replace(/\D/g, "");
+        if (!normalizedPhone) { totalSkipped++; continue; }
+
+        let message = msgPropostaTemplate;
+        message = message.replace(/\{\{nome\}\}/gi, getFirstName(item.cliente_nome));
+        message = message.replace(/\{\{consultor\}\}/gi, item.consultor_nome || "");
+        message = message.replace(/\{\{empresa\}\}/gi, item.empresa_nome || "");
+
+        const result = await sendSms(normalizedPhone, message, activeProvider);
+
+        await serviceClient.from("sms_history").insert({
+          phone: item.cliente_telefone,
+          contact_name: item.cliente_nome,
+          message,
+          status: result.ok ? "sent" : "failed",
+          provider_message_id: result.sid || result.messageId || null,
+          error_message: formatErrorMessage(result),
+          sent_at: result.ok ? now.toISOString() : null,
+          sent_by: item.user_id,
+          televendas_id: item.televendas_id || null,
+          send_type: "automatico",
+          provider: activeProvider,
+          company_id: item.company_id || null,
+        });
+
+        await serviceClient.from("sms_proposal_notifications")
+          .update({ sent: true, sent_at: now.toISOString() })
+          .eq("id", item.id);
+
+        if (result.ok) totalSent++;
+        else totalFailed++;
+      }
+    }
+
     return new Response(
       JSON.stringify({ success: true, sent: totalSent, failed: totalFailed, skipped: totalSkipped, provider: activeProvider }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
