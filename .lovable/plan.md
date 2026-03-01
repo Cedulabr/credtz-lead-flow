@@ -1,43 +1,60 @@
 
-## Evolucao do Modulo Controle de Ponto
+## Refazer Dashboard Principal - Admin/Gestor vs Colaborador
 
-### Problemas Identificados
+### Resumo
 
-1. **Historico (aba "Historico")**: Mostra apenas os registros do proprio usuario. Admin precisa ver todas as batidas de todos os usuarios com filtro por empresa.
-2. **PDF da folha de ponto**: Gera apenas para o usuario logado. Admin precisa selecionar qualquer colaborador e gerar o espelho de ponto mensal.
-3. **Batidas do Dia (aba "Painel")**: O ManagerDashboard busca todos os profiles sem filtro por empresa. Precisa de um filtro por empresa para controle por empresa.
+O Dashboard sera completamente reescrito com duas visoes distintas:
+
+1. **Admin/Gestor**: Visao gerencial com metricas de equipe (leads trabalhados, contatos futuros, fechados, documentacoes)
+2. **Colaborador**: Visao motivacional com metas diarias (50 leads premium, recontatos, documentacoes, propostas pagas)
 
 ---
 
-### Plano de Implementacao
+### Dashboard Admin/Gestor
 
-#### 1. Historico com visao Admin (MyHistory.tsx)
+**Cards principais (grid 2x3 ou 3x2)**:
 
-- Adicionar props opcionais `isAdmin` e `allUsers` ao componente
-- Quando `isAdmin = true`:
-  - Exibir um Select de "Colaborador" para o admin escolher qual usuario visualizar
-  - Exibir um Select de "Empresa" para filtrar colaboradores por empresa
-  - Buscar registros do usuario selecionado (ou de todos, se "Todos" estiver selecionado)
-  - A tabela passa a exibir coluna "Colaborador" quando visualizando todos
-- O componente TimeClockPDF ja recebe `userId` e `userName` -- quando admin seleciona outro usuario, passa os dados desse usuario para gerar o PDF correto
+| Card | Dados | Fonte |
+|---|---|---|
+| Leads Premium Trabalhados | Total vs Trabalhados (status != 'new_lead') | tabela `leads` filtrada por empresa/mes |
+| Activate Leads Trabalhados | Total vs Trabalhados (status != 'novo') | tabela `activate_leads` filtrada por empresa/mes |
+| Meus Clientes Trabalhados | Total propostas criadas no periodo | tabela `propostas` filtrada por empresa/mes |
+| Contato Futuro (3 modulos) | Leads Premium com status `contato_futuro` + Activate com `contato_futuro` + Propostas com status `contato_futuro` | 3 tabelas |
+| Fechados (3 modulos) | Premium `cliente_fechado` + Activate `fechado` + Propostas pipeline `aceitou_proposta` | 3 tabelas |
+| Documentacoes Salvas | Total de documentos salvos no periodo | tabela `client_documents` |
 
-**Alteracao em `index.tsx`**: Na aba "history", quando `canManage`, passar `isAdmin={true}` e nao fixar o userId do usuario logado.
+**Secoes adicionais (mantidas)**:
+- Ranking de vendedores (SalesRanking)
+- Grafico de vendas por periodo
+- Funil de televendas
+- Resumo financeiro
+- Top vendedores
+- Acoes rapidas
 
-#### 2. PDF preciso por colaborador selecionado
+**Filtros**: Mes + Empresa (mantidos como estao hoje)
 
-- O TimeClockPDF ja suporta `userId` e `userName` como props -- basta que o MyHistory passe os dados do colaborador selecionado pelo admin
-- Buscar a empresa do colaborador selecionado para preencher `companyName` e `companyCNPJ` no PDF
-- Nenhuma alteracao no TimeClockPDF em si e necessaria, apenas no MyHistory que alimenta as props
+---
 
-#### 3. Filtro por empresa no Painel (ManagerDashboard.tsx)
+### Dashboard Colaborador
 
-- Buscar lista de empresas da tabela `companies`
-- Adicionar Select de "Empresa" ao lado do campo de data no card "Batidas do Dia"
-- Quando uma empresa for selecionada:
-  - Filtrar profiles pelos usuarios que pertencem aquela empresa (via `user_companies`)
-  - Filtrar `time_clock` registros apenas de usuarios daquela empresa
-- Admins veem todas as empresas; gestores veem apenas sua empresa (pre-selecionada)
-- Atualizar os cards de estatisticas para refletir o filtro
+**Foco motivacional com metas diarias e barras de progresso**:
+
+| Metrica | Meta Diaria | Dados |
+|---|---|---|
+| Leads Premium Trabalhados Hoje | 50 por dia | `leads` do usuario, status != 'new_lead', criados hoje |
+| Recontatos Premium | Sem meta fixa, mostrar pendentes | `leads` com `contato_futuro` e `future_contact_date <= hoje` |
+| Recontatos Activate | Sem meta fixa, mostrar pendentes | `activate_leads` com `contato_futuro` do usuario |
+| Recontatos Meus Clientes | Sem meta fixa, mostrar pendentes | `propostas` com status `contato_futuro` |
+| Documentacoes Salvas Hoje | 10 por dia | `client_documents` do usuario, criados hoje |
+| Propostas Pagas Hoje | Mostrar contagem | `televendas` status `pago`, data_venda = hoje |
+
+**Layout motivacional**:
+- Saudacao com nome + frase motivacional
+- Card de meta diaria de leads com barra de progresso circular/linear e porcentagem
+- Cards de recontatos pendentes com botoes de acao rapida
+- Cards de documentacoes e propostas pagas com indicadores visuais
+- Ranking de vendedores (mantido)
+- Acoes rapidas (Nova Venda, Meus Leads, Indicar Cliente)
 
 ---
 
@@ -45,15 +62,22 @@
 
 | Arquivo | Alteracao |
 |---|---|
-| `src/components/TimeClock/MyHistory.tsx` | Adicionar modo admin com selects de empresa e colaborador, buscar registros de qualquer usuario |
-| `src/components/TimeClock/index.tsx` | Passar props de admin para MyHistory quando `canManage` |
-| `src/components/TimeClock/ManagerDashboard.tsx` | Adicionar filtro de empresa no card "Batidas do Dia" e filtrar dados por empresa |
+| `src/components/Dashboard.tsx` | Refazer secao de leads do admin/gestor com os 6 cards novos (Premium trabalhados, Activate trabalhados, Meus Clientes trabalhados, Contato Futuro consolidado, Fechados consolidado, Documentacoes). Atualizar `fetchLeadsData` para buscar contato_futuro e fechados dos 3 modulos |
+| `src/components/ConsultorDashboard.tsx` | Reescrever completamente com foco motivacional: meta de 50 leads diarios, recontatos pendentes dos 3 modulos, documentacoes salvas hoje, propostas pagas hoje. Layout com barras de progresso e indicadores visuais de meta |
 
-### Fluxo do Admin
+### Detalhes Tecnicos
 
-1. Admin abre aba "Historico" -- ve select de empresa e colaborador
-2. Seleciona empresa -- lista de colaboradores filtra para aquela empresa
-3. Seleciona colaborador (ou "Todos") -- tabela mostra registros
-4. Clica em "Gerar PDF" -- gera espelho de ponto do colaborador selecionado com dados da empresa correta
-5. Admin abre aba "Painel" -- ve select de empresa ao lado da data
-6. Seleciona empresa -- cards e tabela de batidas filtram para aquela empresa
+**fetchLeadsData (Dashboard.tsx)** - Adicionar queries:
+- `leads` com `status = 'contato_futuro'` para contar contatos futuros premium
+- `leads` com `status = 'cliente_fechado'` para contar fechados premium
+- `activate_leads` com `status = 'contato_futuro'` e `status = 'fechado'`
+- `propostas` com `status = 'contato_futuro'` e `pipeline_stage = 'aceitou_proposta'`
+- `client_documents` count para documentacoes
+
+**ConsultorDashboard** - Novas queries diarias:
+- `leads` do usuario com `assigned_to = user.id`, status != 'new_lead', created_at = hoje (meta 50)
+- `leads` com `status = 'contato_futuro'` e `assigned_to = user.id` (recontatos pendentes)
+- `activate_leads` com `status = 'contato_futuro'` e `assigned_to = user.id`
+- `propostas` com `status = 'contato_futuro'` e `created_by_id = user.id`
+- `client_documents` do usuario criados hoje
+- `televendas` com `status = 'pago'` e `data_venda = hoje` e `user_id = user.id`
