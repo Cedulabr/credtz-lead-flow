@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Settings, Save, Play, Loader2, Zap, Users, Clock, CalendarDays, ChevronDown, Sparkles, Send, Ban } from "lucide-react";
+import { Settings, Save, Play, Loader2, Zap, Users, Clock, CalendarDays, ChevronDown, Sparkles, Send, Ban, Search, Hash } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserCompany } from "../hooks/useUserCompany";
@@ -44,6 +46,222 @@ const SECTION_COLORS = {
   proposta: { border: "border-l-teal-500", bg: "bg-teal-500/5", icon: "text-teal-500", badge: "bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300" },
 };
 
+// ─── High-Contrast Automation Toggle ───
+const AutomationToggle = ({ checked, onCheckedChange, disabled }: { checked: boolean; onCheckedChange: (v: boolean) => void; disabled?: boolean }) => (
+  <div className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all ${checked ? "bg-emerald-500/15 border border-emerald-500/30" : "bg-destructive/10 border border-destructive/20"}`}>
+    <span className={`text-xs font-bold tracking-wide ${checked ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+      {checked ? "ATIVADA" : "DESATIVADA"}
+    </span>
+    <Switch checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} />
+  </div>
+);
+
+// ─── Status Badge (high contrast) ───
+const StatusBadge = ({ active }: { active: boolean }) => (
+  <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border ${active ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40" : "bg-destructive/15 text-destructive border-destructive/30"}`}>
+    <span className={`h-2 w-2 rounded-full ${active ? "bg-emerald-500 animate-pulse" : "bg-destructive"}`} />
+    {active ? "Ativa" : "Inativa"}
+  </span>
+);
+
+// ─── Manual Dispatch Dialog ───
+interface DispatchClient {
+  id: string;
+  cliente_nome: string;
+  cliente_telefone: string;
+}
+
+const ManualDispatchDialog = ({
+  open,
+  onOpenChange,
+  section,
+  isAdmin,
+  companyId,
+  settings,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  section: string;
+  isAdmin: boolean;
+  companyId: string | null;
+  settings: Record<string, string>;
+}) => {
+  const [mode, setMode] = useState<"all" | "quantity" | "specific">("all");
+  const [quantity, setQuantity] = useState(10);
+  const [search, setSearch] = useState("");
+  const [clients, setClients] = useState<DispatchClient[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [searching, setSearching] = useState(false);
+  const [dispatching, setDispatching] = useState(false);
+  const [totalQueue, setTotalQueue] = useState(0);
+
+  const tableName = section === "remarketing" || section === "contato_futuro" ? "sms_remarketing_queue" : section === "proposta" ? "sms_proposal_notifications" : "sms_televendas_queue";
+
+  const fetchClients = useCallback(async (searchTerm: string) => {
+    setSearching(true);
+    try {
+      let query: any;
+      if (tableName === "sms_proposal_notifications") {
+        query = supabase.from(tableName).select("id, cliente_nome, cliente_telefone").eq("sent", false);
+        if (!isAdmin && companyId) query = query.eq("company_id", companyId);
+        if (searchTerm) query = query.or(`cliente_nome.ilike.%${searchTerm}%,cliente_telefone.ilike.%${searchTerm}%`);
+      } else {
+        query = supabase.from(tableName).select("id, cliente_nome, cliente_telefone").eq("automacao_ativa", true).eq("automacao_status", "ativo");
+        if (!isAdmin && companyId) query = query.eq("company_id", companyId);
+        if (section === "portabilidade") query = query.ilike("tipo_operacao", "%portabilidade%");
+        if (section === "remarketing") query = query.eq("queue_type", "remarketing");
+        if (section === "contato_futuro") query = query.eq("queue_type", "contato_futuro");
+        if (searchTerm) query = query.or(`cliente_nome.ilike.%${searchTerm}%,cliente_telefone.ilike.%${searchTerm}%`);
+      }
+      const { data } = await query.limit(100);
+      const items = (data as DispatchClient[]) || [];
+      setClients(items);
+      if (!searchTerm) setTotalQueue(items.length);
+    } finally {
+      setSearching(false);
+    }
+  }, [tableName, isAdmin, companyId, section]);
+
+  useEffect(() => {
+    if (open) {
+      setMode("all");
+      setSearch("");
+      setSelectedIds(new Set());
+      fetchClients("");
+    }
+  }, [open, fetchClients]);
+
+  useEffect(() => {
+    if (mode === "specific" && search.length >= 2) {
+      const t = setTimeout(() => fetchClients(search), 300);
+      return () => clearTimeout(t);
+    }
+  }, [search, mode, fetchClients]);
+
+  const toggleClient = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleDispatch = async () => {
+    setDispatching(true);
+    try {
+      if (mode === "all") {
+        const { data, error } = await supabase.functions.invoke("sms-automation-run", { body: { section } });
+        if (error) throw error;
+        toast.success(`Disparado: ${data?.sent || 0} enviados, ${data?.failed || 0} falhas`);
+      } else {
+        let targets: DispatchClient[] = [];
+        if (mode === "quantity") {
+          targets = clients.slice(0, quantity);
+        } else {
+          targets = clients.filter((c) => selectedIds.has(c.id));
+        }
+        if (targets.length === 0) { toast.error("Nenhum cliente selecionado"); return; }
+
+        let sent = 0, failed = 0;
+        const templateKey = section === "contato_futuro" ? "msg_contato_futuro" : section === "remarketing" ? "msg_remarketing_dia_1" : section === "proposta" ? "msg_proposta_criada" : "msg_em_andamento";
+        const template = settings[templateKey] || "Olá {{nome}}, temos uma oferta para você!";
+
+        for (const t of targets) {
+          const firstName = (t.cliente_nome || "").trim().split(" ")[0];
+          const message = template.replace(/\{\{nome\}\}/gi, firstName);
+          try {
+            const { data, error } = await supabase.functions.invoke("send-sms", { body: { phone: t.cliente_telefone, message, send_type: "manual", contact_name: t.cliente_nome } });
+            if (error || !data?.success) { failed++; } else { sent++; }
+          } catch { failed++; }
+        }
+        toast.success(`${sent} enviados, ${failed} falhas`);
+      }
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error("Erro: " + e.message);
+    } finally {
+      setDispatching(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Zap className="h-4 w-4 text-primary" /> Disparar Agora
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <RadioGroup value={mode} onValueChange={(v) => setMode(v as any)} className="space-y-2">
+            <div className="flex items-center gap-2 p-2.5 rounded-lg border hover:bg-muted/30 cursor-pointer">
+              <RadioGroupItem value="all" id="d-all" />
+              <Label htmlFor="d-all" className="flex-1 cursor-pointer">
+                <span className="text-sm font-medium">Disparar para todos</span>
+                <span className="text-[10px] text-muted-foreground block">{totalQueue} clientes na fila</span>
+              </Label>
+            </div>
+            <div className="flex items-center gap-2 p-2.5 rounded-lg border hover:bg-muted/30 cursor-pointer">
+              <RadioGroupItem value="quantity" id="d-qty" />
+              <Label htmlFor="d-qty" className="flex-1 cursor-pointer">
+                <span className="text-sm font-medium">Selecionar quantidade</span>
+                <span className="text-[10px] text-muted-foreground block">Dispara para os primeiros N da fila</span>
+              </Label>
+            </div>
+            <div className="flex items-center gap-2 p-2.5 rounded-lg border hover:bg-muted/30 cursor-pointer">
+              <RadioGroupItem value="specific" id="d-spec" />
+              <Label htmlFor="d-spec" className="flex-1 cursor-pointer">
+                <span className="text-sm font-medium">Buscar cliente específico</span>
+                <span className="text-[10px] text-muted-foreground block">Busque por nome ou telefone</span>
+              </Label>
+            </div>
+          </RadioGroup>
+
+          {mode === "quantity" && (
+            <div className="flex items-center gap-2">
+              <Hash className="h-4 w-4 text-muted-foreground" />
+              <Input type="number" min={1} max={totalQueue || 100} value={quantity} onChange={(e) => setQuantity(parseInt(e.target.value) || 1)} className="w-24" />
+              <span className="text-xs text-muted-foreground">de {totalQueue} disponíveis</span>
+            </div>
+          )}
+
+          {mode === "specific" && (
+            <div className="space-y-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar por nome ou telefone..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1 border rounded-lg p-1.5">
+                {searching ? (
+                  <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" /></div>
+                ) : clients.length === 0 ? (
+                  <p className="text-xs text-center text-muted-foreground py-4">Nenhum cliente encontrado</p>
+                ) : (
+                  clients.map((c) => (
+                    <label key={c.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/40 cursor-pointer text-sm">
+                      <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggleClient(c.id)} />
+                      <span className="font-medium truncate flex-1">{c.cliente_nome}</span>
+                      <span className="text-[10px] font-mono text-muted-foreground">{c.cliente_telefone}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+              {selectedIds.size > 0 && <p className="text-xs text-primary font-medium">{selectedIds.size} selecionado(s)</p>}
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={handleDispatch} disabled={dispatching || (mode === "specific" && selectedIds.size === 0)} className="gap-1.5">
+            {dispatching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+            Confirmar Disparo
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 export const AutomationView = () => {
   const { profile } = useAuth();
   const { companyId, isAdmin, loading: companyLoading } = useUserCompany();
@@ -55,6 +273,7 @@ export const AutomationView = () => {
   const [nextSends, setNextSends] = useState<QueueItem[]>([]);
   const [loadingNext, setLoadingNext] = useState(false);
   const [msgsOpen, setMsgsOpen] = useState(false);
+  const [dispatchSection, setDispatchSection] = useState<string | null>(null);
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -142,11 +361,11 @@ export const AutomationView = () => {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   }
 
-  const SectionTriggerButton = ({ section, label }: { section: string; label: string }) => (
+  const SectionTriggerButton = ({ section }: { section: string }) => (
     <Button
       variant="outline"
       size="sm"
-      onClick={() => handleRunNow(section)}
+      onClick={() => setDispatchSection(section)}
       disabled={!!runningSection || runningAll}
       className="gap-1.5 text-xs h-8"
     >
@@ -155,14 +374,24 @@ export const AutomationView = () => {
     </Button>
   );
 
-  const StatusBadge = ({ active, colors }: { active: boolean; colors: string }) => (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${colors}`}>
-      {active ? "● Ativa" : "○ Inativa"}
-    </span>
+  const FirstNameHint = () => (
+    <p className="text-[10px] text-muted-foreground mt-1">
+      Variáveis: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code> <span className="text-emerald-600 dark:text-emerald-400 font-semibold">(primeiro nome)</span>
+    </p>
   );
 
   return (
     <div className="space-y-6">
+      {/* Manual Dispatch Dialog */}
+      <ManualDispatchDialog
+        open={!!dispatchSection}
+        onOpenChange={(v) => { if (!v) setDispatchSection(null); }}
+        section={dispatchSection || ""}
+        isAdmin={isAdmin}
+        companyId={companyId}
+        settings={settings}
+      />
+
       {/* Header */}
       <div className="rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border p-5">
         <div className="flex items-center justify-between flex-wrap gap-3">
@@ -199,8 +428,8 @@ export const AutomationView = () => {
               <span className="text-sm font-semibold">Portabilidade em Andamento</span>
             </div>
             <div className="flex items-center gap-2">
-              <StatusBadge active={settings["automacao_em_andamento_ativa"] === "true"} colors={SECTION_COLORS.portabilidade.badge} />
-              {isAdmin && <SectionTriggerButton section="portabilidade" label="Disparar" />}
+              <StatusBadge active={settings["automacao_em_andamento_ativa"] === "true"} />
+              {isAdmin && <SectionTriggerButton section="portabilidade" />}
             </div>
           </div>
           <CardContent className="p-5 space-y-4">
@@ -208,8 +437,8 @@ export const AutomationView = () => {
               ⚡ Apenas propostas de <strong>Portabilidade</strong> com status em andamento receberão mensagens automáticas.
             </div>
             <div className="flex items-center justify-between">
-              <Label className="text-sm">Ativada</Label>
-              <Switch
+              <Label className="text-sm">Automação</Label>
+              <AutomationToggle
                 checked={settings["automacao_em_andamento_ativa"] === "true"}
                 onCheckedChange={(v) => updateSetting("automacao_em_andamento_ativa", v ? "true" : "false")}
                 disabled={!isAdmin}
@@ -239,7 +468,8 @@ export const AutomationView = () => {
             <div>
               <Label className="text-xs">Mensagem</Label>
               <Textarea value={settings["msg_em_andamento"] || ""} onChange={(e) => updateSetting("msg_em_andamento", e.target.value)} rows={3} className="mt-1 text-sm" />
-              <p className="text-[10px] text-muted-foreground mt-1">Variáveis: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code> (primeiro nome), <code className="bg-muted px-1 py-0.5 rounded">{"{{tipo_operacao}}"}</code></p>
+              <FirstNameHint />
+              <p className="text-[10px] text-muted-foreground">Também: <code className="bg-muted px-1 py-0.5 rounded">{"{{tipo_operacao}}"}</code></p>
             </div>
           </CardContent>
         </Card>
@@ -252,14 +482,14 @@ export const AutomationView = () => {
               <span className="text-sm font-semibold">Notificação — Propostas Pagas</span>
             </div>
             <div className="flex items-center gap-2">
-              <StatusBadge active={settings["automacao_pago_ativa"] === "true"} colors={SECTION_COLORS.pago.badge} />
-              {isAdmin && <SectionTriggerButton section="pago" label="Disparar" />}
+              <StatusBadge active={settings["automacao_pago_ativa"] === "true"} />
+              {isAdmin && <SectionTriggerButton section="pago" />}
             </div>
           </div>
           <CardContent className="p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <Label className="text-sm">Ativada</Label>
-              <Switch
+              <Label className="text-sm">Automação</Label>
+              <AutomationToggle
                 checked={settings["automacao_pago_ativa"] === "true"}
                 onCheckedChange={(v) => updateSetting("automacao_pago_ativa", v ? "true" : "false")}
                 disabled={!isAdmin}
@@ -268,7 +498,7 @@ export const AutomationView = () => {
             <div>
               <Label className="text-xs">Mensagem</Label>
               <Textarea value={settings["msg_pago_novo_emprestimo"] || ""} onChange={(e) => updateSetting("msg_pago_novo_emprestimo", e.target.value)} rows={3} className="mt-1 text-sm" />
-              <p className="text-[10px] text-muted-foreground mt-1">Variáveis: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code> (primeiro nome)</p>
+              <FirstNameHint />
             </div>
             <div className="p-2.5 rounded-lg bg-muted/40 text-xs text-muted-foreground">
               Esta mensagem é enviada automaticamente quando uma proposta de <strong>Novo Empréstimo</strong> é marcada como <strong>Paga</strong>.
@@ -285,8 +515,8 @@ export const AutomationView = () => {
               <Badge variant="secondary" className="text-[10px]">5 mensagens</Badge>
             </div>
             <div className="flex items-center gap-2">
-              <StatusBadge active={settings["remarketing_ativa"] === "true"} colors={SECTION_COLORS.remarketing.badge} />
-              {isAdmin && <SectionTriggerButton section="remarketing" label="Disparar" />}
+              <StatusBadge active={settings["remarketing_ativa"] === "true"} />
+              {isAdmin && <SectionTriggerButton section="remarketing" />}
             </div>
           </div>
           <CardContent className="p-5 space-y-5">
@@ -296,8 +526,8 @@ export const AutomationView = () => {
             </div>
 
             <div className="flex items-center justify-between">
-              <Label className="text-sm">Ativada</Label>
-              <Switch
+              <Label className="text-sm">Automação</Label>
+              <AutomationToggle
                 checked={settings["remarketing_ativa"] === "true"}
                 onCheckedChange={(v) => updateSetting("remarketing_ativa", v ? "true" : "false")}
                 disabled={!isAdmin}
@@ -342,7 +572,7 @@ export const AutomationView = () => {
                     </div>
                   ))}
                   <p className="text-[10px] text-muted-foreground">
-                    Variável: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code> = primeiro nome. Se ultrapassar 5 dias, as mensagens se repetem ciclicamente.
+                    Variável: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code> = <span className="text-emerald-600 dark:text-emerald-400 font-semibold">primeiro nome</span>. Se ultrapassar 5 dias, as mensagens se repetem ciclicamente.
                   </p>
                 </div>
               </CollapsibleContent>
@@ -411,8 +641,8 @@ export const AutomationView = () => {
               <span className="text-sm font-semibold">Notificação de Proposta</span>
             </div>
             <div className="flex items-center gap-2">
-              <StatusBadge active={settings["proposta_sms_ativa"] === "true"} colors={SECTION_COLORS.proposta.badge} />
-              {isAdmin && <SectionTriggerButton section="proposta" label="Disparar" />}
+              <StatusBadge active={settings["proposta_sms_ativa"] === "true"} />
+              {isAdmin && <SectionTriggerButton section="proposta" />}
             </div>
           </div>
           <CardContent className="p-5 space-y-4">
@@ -420,8 +650,8 @@ export const AutomationView = () => {
               📋 Quando o consultor criar uma proposta, poderá notificar o cliente via SMS. O envio ocorre <strong>2 horas</strong> após a criação.
             </div>
             <div className="flex items-center justify-between">
-              <Label className="text-sm">Ativada</Label>
-              <Switch
+              <Label className="text-sm">Automação</Label>
+              <AutomationToggle
                 checked={settings["proposta_sms_ativa"] === "true"}
                 onCheckedChange={(v) => updateSetting("proposta_sms_ativa", v ? "true" : "false")}
                 disabled={!isAdmin}
@@ -440,7 +670,7 @@ export const AutomationView = () => {
               />
               <div className="flex items-center justify-between mt-1">
                 <p className="text-[10px] text-muted-foreground">
-                  Variáveis: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code>, <code className="bg-muted px-1 py-0.5 rounded">{"{{consultor}}"}</code>, <code className="bg-muted px-1 py-0.5 rounded">{"{{empresa}}"}</code>
+                  Variáveis: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code> <span className="text-emerald-600 dark:text-emerald-400 font-semibold">(primeiro nome)</span>, <code className="bg-muted px-1 py-0.5 rounded">{"{{consultor}}"}</code>, <code className="bg-muted px-1 py-0.5 rounded">{"{{empresa}}"}</code>
                 </p>
                 <span className={`text-[10px] font-mono ${(settings["msg_proposta_criada"] || "").length > 150 ? "text-destructive" : "text-muted-foreground"}`}>
                   {(settings["msg_proposta_criada"] || "").length}/160
@@ -458,18 +688,17 @@ export const AutomationView = () => {
               <span className="text-sm font-semibold">Contato Futuro — Agendado</span>
             </div>
             <div className="flex items-center gap-2">
-              <StatusBadge active={settings["contato_futuro_ativa"] === "true"} colors={SECTION_COLORS.contato_futuro.badge} />
-              {isAdmin && <SectionTriggerButton section="contato_futuro" label="Disparar" />}
+              <StatusBadge active={settings["contato_futuro_ativa"] === "true"} />
+              {isAdmin && <SectionTriggerButton section="contato_futuro" />}
             </div>
           </div>
           <CardContent className="p-5 space-y-4">
             <div className="p-2.5 rounded-lg bg-muted/40 text-xs text-muted-foreground">
-              📅 Envia 1 SMS no dia agendado para clientes marcados como <strong>contato futuro</strong>.<br />
-              💡 Use <code className="bg-background px-1 py-0.5 rounded text-[10px]">{"{{nome}}"}</code> — puxa apenas o <strong>primeiro nome</strong>.
+              📅 Envia 1 SMS no dia agendado para clientes marcados como <strong>contato futuro</strong>.
             </div>
             <div className="flex items-center justify-between">
-              <Label className="text-sm">Ativada</Label>
-              <Switch
+              <Label className="text-sm">Automação</Label>
+              <AutomationToggle
                 checked={settings["contato_futuro_ativa"] === "true"}
                 onCheckedChange={(v) => updateSetting("contato_futuro_ativa", v ? "true" : "false")}
                 disabled={!isAdmin}
@@ -478,7 +707,7 @@ export const AutomationView = () => {
             <div>
               <Label className="text-xs">Mensagem</Label>
               <Textarea value={settings["msg_contato_futuro"] || ""} onChange={(e) => updateSetting("msg_contato_futuro", e.target.value)} rows={3} className="mt-1 text-sm" />
-              <p className="text-[10px] text-muted-foreground mt-1">Variáveis: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code> (primeiro nome)</p>
+              <FirstNameHint />
             </div>
           </CardContent>
         </Card>
