@@ -41,6 +41,7 @@ const SECTION_COLORS = {
   pago: { border: "border-l-emerald-500", bg: "bg-emerald-500/5", icon: "text-emerald-500", badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" },
   remarketing: { border: "border-l-violet-500", bg: "bg-violet-500/5", icon: "text-violet-500", badge: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" },
   contato_futuro: { border: "border-l-amber-500", bg: "bg-amber-500/5", icon: "text-amber-500", badge: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300" },
+  proposta: { border: "border-l-teal-500", bg: "bg-teal-500/5", icon: "text-teal-500", badge: "bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300" },
 };
 
 export const AutomationView = () => {
@@ -397,6 +398,53 @@ export const AutomationView = () => {
                 <p><strong>Intercalado:</strong> dias alternados (1º, 3º, 5º...).</p>
                 <p><strong>Aleatório:</strong> 50% de chance/dia — simula naturalidade.</p>
                 <p><strong>Personalizado:</strong> apenas nos dias marcados acima.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ─── Notificação de Proposta ─── */}
+        <Card className={`border-l-4 ${SECTION_COLORS.proposta.border} overflow-hidden`}>
+          <div className={`px-5 py-3.5 ${SECTION_COLORS.proposta.bg} flex items-center justify-between`}>
+            <div className="flex items-center gap-2">
+              <Send className={`h-4 w-4 ${SECTION_COLORS.proposta.icon}`} />
+              <span className="text-sm font-semibold">Notificação de Proposta</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <StatusBadge active={settings["proposta_sms_ativa"] === "true"} colors={SECTION_COLORS.proposta.badge} />
+              {isAdmin && <SectionTriggerButton section="proposta" label="Disparar" />}
+            </div>
+          </div>
+          <CardContent className="p-5 space-y-4">
+            <div className="p-2.5 rounded-lg bg-muted/40 text-xs text-muted-foreground">
+              📋 Quando o consultor criar uma proposta, poderá notificar o cliente via SMS. O envio ocorre <strong>2 horas</strong> após a criação.
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Ativada</Label>
+              <Switch
+                checked={settings["proposta_sms_ativa"] === "true"}
+                onCheckedChange={(v) => updateSetting("proposta_sms_ativa", v ? "true" : "false")}
+                disabled={!isAdmin}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Mensagem</Label>
+              <Textarea
+                value={settings["msg_proposta_criada"] || ""}
+                onChange={(e) => {
+                  if (e.target.value.length <= 160) updateSetting("msg_proposta_criada", e.target.value);
+                }}
+                rows={3}
+                className="mt-1 text-sm"
+                disabled={!isAdmin}
+              />
+              <div className="flex items-center justify-between mt-1">
+                <p className="text-[10px] text-muted-foreground">
+                  Variáveis: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code>, <code className="bg-muted px-1 py-0.5 rounded">{"{{consultor}}"}</code>, <code className="bg-muted px-1 py-0.5 rounded">{"{{empresa}}"}</code>
+                </p>
+                <span className={`text-[10px] font-mono ${(settings["msg_proposta_criada"] || "").length > 150 ? "text-destructive" : "text-muted-foreground"}`}>
+                  {(settings["msg_proposta_criada"] || "").length}/160
+                </span>
               </div>
             </div>
           </CardContent>

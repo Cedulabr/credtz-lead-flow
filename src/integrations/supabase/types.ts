@@ -4138,6 +4138,66 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_proposal_notifications: {
+        Row: {
+          cliente_nome: string
+          cliente_telefone: string
+          company_id: string | null
+          consultor_nome: string
+          created_at: string
+          empresa_nome: string
+          id: string
+          scheduled_at: string
+          sent: boolean
+          sent_at: string | null
+          televendas_id: string | null
+          user_id: string
+        }
+        Insert: {
+          cliente_nome: string
+          cliente_telefone: string
+          company_id?: string | null
+          consultor_nome: string
+          created_at?: string
+          empresa_nome: string
+          id?: string
+          scheduled_at: string
+          sent?: boolean
+          sent_at?: string | null
+          televendas_id?: string | null
+          user_id: string
+        }
+        Update: {
+          cliente_nome?: string
+          cliente_telefone?: string
+          company_id?: string | null
+          consultor_nome?: string
+          created_at?: string
+          empresa_nome?: string
+          id?: string
+          scheduled_at?: string
+          sent?: boolean
+          sent_at?: string | null
+          televendas_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_proposal_notifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_proposal_notifications_televendas_id_fkey"
+            columns: ["televendas_id"]
+            isOneToOne: false
+            referencedRelation: "televendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sms_providers: {
         Row: {
           config: Json | null
