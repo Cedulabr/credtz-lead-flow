@@ -43,7 +43,7 @@ export function SalesWizard() {
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [showSmsNotify, setShowSmsNotify] = useState(false);
-  const [smsNotifyEnabled, setSmsNotifyEnabled] = useState(false);
+  const [savedTelevendasId, setSavedTelevendasId] = useState<string | null>(null);
   const [savedClientData, setSavedClientData] = useState<{ name: string; cpf: string; phone: string } | null>(null);
   
   const [wizardData, setWizardData] = useState<Partial<SalesWizardData>>({
@@ -130,7 +130,7 @@ export function SalesWizard() {
           : portabilidadeInfo;
       }
 
-      const { error } = await (supabase as any).from("televendas").insert({
+      const { data: insertedData, error } = await (supabase as any).from("televendas").insert({
         user_id: user!.id,
         company_id: companyId,
         nome: wizardData.nome,
@@ -144,9 +144,12 @@ export function SalesWizard() {
         tipo_operacao: wizardData.tipo_operacao,
         observacao: observacaoFinal || null,
         status: initialStatus,
-      });
+      }).select("id").single();
 
       if (error) throw error;
+
+      const televendasId = insertedData?.id || null;
+      setSavedTelevendasId(televendasId);
 
       setShowSuccess(true);
       toast({ title: "🎉 Venda cadastrada!", description: "A venda foi registrada com sucesso." });
@@ -154,7 +157,7 @@ export function SalesWizard() {
       // Check if SMS notification is enabled
       let smsEnabled = false;
       try {
-        const { data: smsSettings } = await (supabase as any)
+        const { data: smsSettings } = await supabase
           .from("sms_automation_settings")
           .select("setting_value")
           .eq("setting_key", "proposta_sms_ativa")
@@ -268,6 +271,7 @@ export function SalesWizard() {
           }}
           clientName={savedClientData.name}
           clientPhone={savedClientData.phone}
+          televendasId={savedTelevendasId || undefined}
         />
       )}
 
