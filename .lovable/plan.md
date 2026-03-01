@@ -1,110 +1,79 @@
 
-## Remarketing SMS Multi-Modulo + Contato Futuro Agendado
 
-### Resumo
+## Remarketing SMS - Correcoes e Evolucao Completa
 
-Expandir o modulo Comunicacao SMS para capturar automaticamente clientes dos modulos **Leads Premium**, **Activate Leads** e **Meus Clientes** (propostas), alem do Televendas existente. Dois fluxos distintos:
+### Problemas Identificados
 
-1. **Remarketing (em andamento)**: Clientes com status "em_andamento" recebem sequencia de SMS automaticos (igual ao Televendas hoje)
-2. **Contato Futuro**: Clientes marcados como "contato_futuro" recebem 1 SMS com oferta no dia agendado
-
-Tambem corrigir o uso do nome completo -- substituir por apenas o primeiro nome em todos os envios.
+1. **Status errado para Meus Clientes**: O trigger e o sync estao buscando `pipeline_stage IN ('proposta_enviada', 'proposta_digitada')` para remarketing, mas o status correto e `aguardando_retorno`.
+2. **Apenas 1 campo de mensagem** para remarketing -- o usuario precisa de 5 mensagens diferentes (uma para cada dia de envio).
+3. **Falta configuracao de horario e dias de envio** com opcoes de dias especificos, aleatorios ou intercalados.
 
 ---
 
-### 1. Nova tabela: `sms_remarketing_queue`
+### Plano de Implementacao
 
-Tabela separada da `sms_televendas_queue` para nao misturar com o fluxo existente de portabilidade do Televendas. A FK de `televendas_id` impede reutilizar a tabela para outros modulos.
+#### 1. Corrigir status de captura do Meus Clientes (SQL Migration)
 
-| Coluna | Tipo | Descricao |
-|---|---|---|
-| id | uuid PK | |
-| source_module | text NOT NULL | 'leads_premium', 'activate_leads', 'meus_clientes' |
-| source_id | text NOT NULL | ID do registro original |
-| cliente_nome | text NOT NULL | Nome completo do cliente |
-| cliente_telefone | text NOT NULL | Telefone |
-| status_original | text | Status no modulo de origem |
-| queue_type | text NOT NULL | 'remarketing' ou 'contato_futuro' |
-| scheduled_date | date | Data agendada (para contato_futuro) |
-| automacao_status | text DEFAULT 'ativo' | ativo/pausado/finalizado |
-| automacao_ativa | boolean DEFAULT true | |
-| dias_envio_total | integer DEFAULT 5 | |
-| dias_enviados | integer DEFAULT 0 | |
-| ultimo_envio_at | timestamptz | |
-| company_id | uuid FK | |
-| user_id | uuid NOT NULL | |
-| created_at, updated_at | timestamptz | |
+Atualizar a funcao trigger `sms_remarketing_enqueue_propostas()`:
+- Trocar `pipeline_stage IN ('proposta_enviada', 'proposta_digitada')` por `status = 'aguardando_retorno'`
 
-**UNIQUE constraint**: (source_module, source_id, queue_type) -- evita duplicatas.
+Atualizar o sync manual no `RemarketingSmsView.tsx`:
+- Trocar a query de propostas para buscar `status.eq.aguardando_retorno` ao inves de `pipeline_stage.in.(proposta_enviada,proposta_digitada)`
 
-### 2. Nova aba no SMS Module: "Remarketing"
+#### 2. Criar 5 campos de mensagem (SQL + UI)
 
-Criar `src/modules/sms/views/RemarketingSmsView.tsx` -- aba separada no modulo SMS para o gestor acompanhar:
+Adicionar 5 settings novos no banco:
+- `msg_remarketing_dia_1` ate `msg_remarketing_dia_5`
 
-- **Filtros**: Modulo de origem (Premium/Activate/Clientes) + Tipo (Remarketing/Contato Futuro) + Status (ativo/pausado/finalizado)
-- **Tabela**: Cliente, Telefone, Modulo, Tipo, Status Automacao, Progresso, Data Agendada, Ultimo Envio, Acoes
-- **Badge de agrupamento por telefone** (igual ao Televendas)
-- **Botao "Sincronizar"** como fallback para importar registros antigos
+Cada mensagem sera usada no dia correspondente da sequencia. Se o `dias_envio_total` for maior que 5, o sistema cicla de volta (dia 6 usa msg do dia 1).
 
-### 3. Triggers para auto-enqueue
+#### 3. Configuracao de agenda de envio (SQL + UI)
 
-Tres triggers no banco de dados, um para cada tabela:
+Adicionar settings para controle de dias:
+- `remarketing_modo_dias`: `todos`, `aleatorio`, `intercalado`, `personalizado`
+- `remarketing_dias_semana`: string com dias da semana selecionados (ex: `1,3,5` para seg/qua/sex)
+- `remarketing_horario_envio`: horario especifico de envio (ex: `09:00`)
 
-**a) Trigger em `leads` (Leads Premium)**:
-- INSERT/UPDATE: Se `status = 'em_andamento'` -> enfileirar como remarketing
-- INSERT/UPDATE: Se `status = 'contato_futuro'` e `future_contact_date IS NOT NULL` -> enfileirar como contato_futuro com scheduled_date
-- Se status muda para final (cliente_fechado, recusou_oferta, sem_interesse, nao_e_cliente) -> finalizar na fila
+#### 4. Atualizar AutomationView.tsx
 
-**b) Trigger em `activate_leads`**:
-- INSERT/UPDATE: Se `status = 'em_andamento'` -> remarketing
-- INSERT/UPDATE: Se `status = 'contato_futuro'` e `data_proxima_operacao IS NOT NULL` -> contato_futuro
-- Status final (fechado, sem_interesse, nao_e_cliente, fora_do_perfil) -> finalizar
+Substituir o card de "Remarketing Multi-Modulo" atual por uma versao expandida:
+- 5 campos Textarea para as mensagens (Mensagem Dia 1, Dia 2... Dia 5)
+- Indicacao clara de que `{{nome}}` puxa apenas o primeiro nome
+- Seletor de modo de dias (Todos os dias / Aleatorio / Intercalado / Dias personalizados)
+- Quando "Dias personalizados", mostrar checkboxes para seg a dom
+- Campo de horario de envio (hora e minuto)
 
-**c) Trigger em `propostas` (Meus Clientes)**:
-- INSERT/UPDATE: Se `status = 'contato_futuro'` e `future_contact_date IS NOT NULL` -> contato_futuro
-- Pipeline `proposta_enviada` ou `proposta_digitada` -> remarketing (oferta em andamento)
-- Status final -> finalizar
+#### 5. Atualizar Edge Function `sms-automation-run`
 
-### 4. Atualizar Edge Function `sms-automation-run`
+Na SECTION 3 (Remarketing multi-module):
+- Selecionar a mensagem correta baseada no `dias_enviados` (dia 1 = `msg_remarketing_dia_1`, etc.)
+- Verificar o modo de dias antes de enviar:
+  - `todos`: envia normalmente
+  - `intercalado`: envia apenas em dias pares ou impares desde o enqueue
+  - `aleatorio`: usa probabilidade de 50% para decidir envio no dia
+  - `personalizado`: verifica se o dia da semana atual esta na lista
 
-Adicionar nova secao apos o processamento do Televendas:
+#### 6. Atualizar RemarketingSmsView.tsx
 
-**Remarketing**: Processar `sms_remarketing_queue` onde `queue_type = 'remarketing'`, mesma logica de deduplicacao por telefone, usando template configuravel `msg_remarketing`.
-
-**Contato Futuro**: Processar `sms_remarketing_queue` onde `queue_type = 'contato_futuro'` e `scheduled_date <= hoje`, enviar 1 SMS e finalizar.
-
-### 5. Corrigir nome: usar apenas primeiro nome
-
-Em **todos os pontos** de envio (edge function `sms-automation-run`, envio manual em `TelevendasSmsView`, e o novo fluxo), aplicar:
-
-```text
-primeiroNome = nomeCompleto.split(' ')[0]
-```
-
-Antes de substituir `{{nome}}` no template.
-
-### 6. Configuracoes de Automacao (AutomationView)
-
-Adicionar 2 novos cards na tela de automacao:
-- **Remarketing Multi-Modulo**: ativado/desativado, dias de envio, mensagem template `msg_remarketing`
-- **Contato Futuro**: ativado/desativado, mensagem template `msg_contato_futuro`
-
-Inserir settings iniciais na migracao.
-
-### 7. Atualizar SmsModule (tabs)
-
-Adicionar nova tab "Remarketing" com icone dedicado. Atualizar o tipo `SmsTab` para incluir `"remarketing"`. Grid de tabs passa de 6 para 7 colunas.
+- Corrigir sync de Meus Clientes para usar `status = 'aguardando_retorno'`
 
 ---
 
-### Arquivos a editar/criar
+### Arquivos a Editar/Criar
 
 | Arquivo | Alteracao |
 |---|---|
-| Migracao SQL | Criar tabela `sms_remarketing_queue`, 3 triggers (leads, activate_leads, propostas), inserir settings iniciais |
-| `src/modules/sms/views/RemarketingSmsView.tsx` | **Novo** - Tela de acompanhamento remarketing + contato futuro |
-| `src/modules/sms/SmsModule.tsx` | Adicionar tab "Remarketing" e importar novo componente |
-| `src/modules/sms/types.ts` | Adicionar 'remarketing' ao tipo SmsTab |
-| `supabase/functions/sms-automation-run/index.ts` | Adicionar processamento de remarketing e contato_futuro + correcao primeiro nome |
-| `src/modules/sms/views/TelevendasSmsView.tsx` | Corrigir uso do primeiro nome no envio manual |
-| `src/modules/sms/views/AutomationView.tsx` | Adicionar cards de configuracao remarketing e contato futuro |
+| Migracao SQL | Atualizar trigger `sms_remarketing_enqueue_propostas`, inserir 5 msg settings + settings de agenda |
+| `src/modules/sms/views/AutomationView.tsx` | Expandir card Remarketing com 5 campos de msg, seletor de dias, horario |
+| `src/modules/sms/views/RemarketingSmsView.tsx` | Corrigir sync de Meus Clientes para `aguardando_retorno` |
+| `supabase/functions/sms-automation-run/index.ts` | Usar msg por dia, verificar modo de dias antes de enviar |
+
+### Resultado Esperado
+
+1. Clientes de Meus Clientes com status "aguardando_retorno" sao capturados automaticamente para remarketing
+2. O gestor configura 5 mensagens diferentes, uma para cada dia da sequencia
+3. Cada mensagem indica claramente que usa o primeiro nome (variavel `{{nome}}`)
+4. O gestor escolhe o modo de envio: todos os dias, intercalado, aleatorio ou dias especificos da semana
+5. O gestor configura horario exato de envio
+6. A edge function respeita todas essas configuracoes ao processar a fila
+
