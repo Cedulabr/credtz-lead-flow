@@ -1,50 +1,110 @@
 
+## Remarketing SMS Multi-Modulo + Contato Futuro Agendado
 
-## Evolucao do Modulo SMS - Auto-Enqueue de Portabilidade
+### Resumo
 
-### Situacao Atual
+Expandir o modulo Comunicacao SMS para capturar automaticamente clientes dos modulos **Leads Premium**, **Activate Leads** e **Meus Clientes** (propostas), alem do Televendas existente. Dois fluxos distintos:
 
-Ja existe um trigger `trg_sms_auto_enqueue_televendas` que dispara apos cada INSERT na tabela `televendas` e chama a funcao `sms_auto_enqueue_televendas()`. Porem, essa funcao enfileira **todas** as propostas indiscriminadamente, enquanto a automacao de envio (edge function `sms-automation-run`) so processa propostas de **Portabilidade**. Isso gera registros inuteis na fila para propostas que nunca serao notificadas.
+1. **Remarketing (em andamento)**: Clientes com status "em_andamento" recebem sequencia de SMS automaticos (igual ao Televendas hoje)
+2. **Contato Futuro**: Clientes marcados como "contato_futuro" recebem 1 SMS com oferta no dia agendado
 
-Alem disso, o botao "Puxar Propostas" importa propostas de todos os tipos, sem filtrar por portabilidade.
+Tambem corrigir o uso do nome completo -- substituir por apenas o primeiro nome em todos os envios.
 
-### Plano de Implementacao
+---
 
-#### 1. Atualizar trigger para filtrar apenas Portabilidade (Migracao SQL)
+### 1. Nova tabela: `sms_remarketing_queue`
 
-Reescrever a funcao `sms_auto_enqueue_televendas()` para que so insira na fila quando `NEW.tipo_operacao ILIKE '%portabilidade%'`. Propostas de outros tipos serao ignoradas automaticamente.
+Tabela separada da `sms_televendas_queue` para nao misturar com o fluxo existente de portabilidade do Televendas. A FK de `televendas_id` impede reutilizar a tabela para outros modulos.
+
+| Coluna | Tipo | Descricao |
+|---|---|---|
+| id | uuid PK | |
+| source_module | text NOT NULL | 'leads_premium', 'activate_leads', 'meus_clientes' |
+| source_id | text NOT NULL | ID do registro original |
+| cliente_nome | text NOT NULL | Nome completo do cliente |
+| cliente_telefone | text NOT NULL | Telefone |
+| status_original | text | Status no modulo de origem |
+| queue_type | text NOT NULL | 'remarketing' ou 'contato_futuro' |
+| scheduled_date | date | Data agendada (para contato_futuro) |
+| automacao_status | text DEFAULT 'ativo' | ativo/pausado/finalizado |
+| automacao_ativa | boolean DEFAULT true | |
+| dias_envio_total | integer DEFAULT 5 | |
+| dias_enviados | integer DEFAULT 0 | |
+| ultimo_envio_at | timestamptz | |
+| company_id | uuid FK | |
+| user_id | uuid NOT NULL | |
+| created_at, updated_at | timestamptz | |
+
+**UNIQUE constraint**: (source_module, source_id, queue_type) -- evita duplicatas.
+
+### 2. Nova aba no SMS Module: "Remarketing"
+
+Criar `src/modules/sms/views/RemarketingSmsView.tsx` -- aba separada no modulo SMS para o gestor acompanhar:
+
+- **Filtros**: Modulo de origem (Premium/Activate/Clientes) + Tipo (Remarketing/Contato Futuro) + Status (ativo/pausado/finalizado)
+- **Tabela**: Cliente, Telefone, Modulo, Tipo, Status Automacao, Progresso, Data Agendada, Ultimo Envio, Acoes
+- **Badge de agrupamento por telefone** (igual ao Televendas)
+- **Botao "Sincronizar"** como fallback para importar registros antigos
+
+### 3. Triggers para auto-enqueue
+
+Tres triggers no banco de dados, um para cada tabela:
+
+**a) Trigger em `leads` (Leads Premium)**:
+- INSERT/UPDATE: Se `status = 'em_andamento'` -> enfileirar como remarketing
+- INSERT/UPDATE: Se `status = 'contato_futuro'` e `future_contact_date IS NOT NULL` -> enfileirar como contato_futuro com scheduled_date
+- Se status muda para final (cliente_fechado, recusou_oferta, sem_interesse, nao_e_cliente) -> finalizar na fila
+
+**b) Trigger em `activate_leads`**:
+- INSERT/UPDATE: Se `status = 'em_andamento'` -> remarketing
+- INSERT/UPDATE: Se `status = 'contato_futuro'` e `data_proxima_operacao IS NOT NULL` -> contato_futuro
+- Status final (fechado, sem_interesse, nao_e_cliente, fora_do_perfil) -> finalizar
+
+**c) Trigger em `propostas` (Meus Clientes)**:
+- INSERT/UPDATE: Se `status = 'contato_futuro'` e `future_contact_date IS NOT NULL` -> contato_futuro
+- Pipeline `proposta_enviada` ou `proposta_digitada` -> remarketing (oferta em andamento)
+- Status final -> finalizar
+
+### 4. Atualizar Edge Function `sms-automation-run`
+
+Adicionar nova secao apos o processamento do Televendas:
+
+**Remarketing**: Processar `sms_remarketing_queue` onde `queue_type = 'remarketing'`, mesma logica de deduplicacao por telefone, usando template configuravel `msg_remarketing`.
+
+**Contato Futuro**: Processar `sms_remarketing_queue` onde `queue_type = 'contato_futuro'` e `scheduled_date <= hoje`, enviar 1 SMS e finalizar.
+
+### 5. Corrigir nome: usar apenas primeiro nome
+
+Em **todos os pontos** de envio (edge function `sms-automation-run`, envio manual em `TelevendasSmsView`, e o novo fluxo), aplicar:
 
 ```text
-CREATE OR REPLACE FUNCTION sms_auto_enqueue_televendas()
-  - IF NEW.tipo_operacao ILIKE '%portabilidade%' THEN
-    - INSERT INTO sms_televendas_queue ... ON CONFLICT DO NOTHING
-  - END IF
+primeiroNome = nomeCompleto.split(' ')[0]
 ```
 
-Isso garante que toda proposta de portabilidade cadastrada no Televendas apareca automaticamente na fila SMS.
+Antes de substituir `{{nome}}` no template.
 
-#### 2. Atualizar "Puxar Propostas" para filtrar Portabilidade (TelevendasSmsView.tsx)
+### 6. Configuracoes de Automacao (AutomationView)
 
-O botao continuara existindo como fallback para importar propostas antigas, mas a query sera filtrada:
-- Adicionar `.ilike('tipo_operacao', '%portabilidade%')` na busca de propostas
+Adicionar 2 novos cards na tela de automacao:
+- **Remarketing Multi-Modulo**: ativado/desativado, dias de envio, mensagem template `msg_remarketing`
+- **Contato Futuro**: ativado/desativado, mensagem template `msg_contato_futuro`
 
-#### 3. Agrupar a visao por telefone (TelevendasSmsView.tsx)
+Inserir settings iniciais na migracao.
 
-Melhorar a visualizacao para que o gestor/admin entenda que um cliente com multiplas propostas recebe apenas 1 SMS:
-- Adicionar uma indicacao visual mais clara quando o mesmo telefone tem multiplas propostas (ex: "13 propostas - 1 SMS")
-- Manter a tabela individual mas com badge de agrupamento destacado
+### 7. Atualizar SmsModule (tabs)
 
-### Arquivos a Editar
+Adicionar nova tab "Remarketing" com icone dedicado. Atualizar o tipo `SmsTab` para incluir `"remarketing"`. Grid de tabs passa de 6 para 7 colunas.
+
+---
+
+### Arquivos a editar/criar
 
 | Arquivo | Alteracao |
 |---|---|
-| Migracao SQL | Reescrever funcao `sms_auto_enqueue_televendas()` com filtro de portabilidade |
-| `src/modules/sms/views/TelevendasSmsView.tsx` | Filtrar "Puxar Propostas" para portabilidade; melhorar indicacao visual de agrupamento por telefone |
-
-### Resultado Esperado
-
-1. Toda proposta de portabilidade cadastrada no Televendas aparece automaticamente na fila SMS (sem clicar em nada)
-2. Propostas de outros tipos nao poluem a fila
-3. O gestor/admin ve claramente que clientes com multiplas propostas recebem apenas 1 SMS
-4. O botao "Puxar Propostas" permanece como fallback para propostas antigas, ja filtrado para portabilidade
-
+| Migracao SQL | Criar tabela `sms_remarketing_queue`, 3 triggers (leads, activate_leads, propostas), inserir settings iniciais |
+| `src/modules/sms/views/RemarketingSmsView.tsx` | **Novo** - Tela de acompanhamento remarketing + contato futuro |
+| `src/modules/sms/SmsModule.tsx` | Adicionar tab "Remarketing" e importar novo componente |
+| `src/modules/sms/types.ts` | Adicionar 'remarketing' ao tipo SmsTab |
+| `supabase/functions/sms-automation-run/index.ts` | Adicionar processamento de remarketing e contato_futuro + correcao primeiro nome |
+| `src/modules/sms/views/TelevendasSmsView.tsx` | Corrigir uso do primeiro nome no envio manual |
+| `src/modules/sms/views/AutomationView.tsx` | Adicionar cards de configuracao remarketing e contato futuro |
