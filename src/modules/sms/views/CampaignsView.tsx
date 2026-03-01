@@ -221,11 +221,14 @@ export const CampaignsView = ({
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+            <Rocket className="h-5 w-5 text-emerald-500" />
+          </div>
           <h2 className="text-lg font-semibold">Campanhas SMS</h2>
           {smsCredits !== null && (
             <Badge variant="outline" className="gap-1.5 text-sm">
               <MessageSquare className="h-3.5 w-3.5" />
-              {isAdmin ? '∞' : smsCredits} créditos SMS
+              {isAdmin ? '∞' : smsCredits} créditos
             </Badge>
           )}
         </div>
@@ -240,9 +243,11 @@ export const CampaignsView = ({
       </div>
 
       {campaigns.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <Rocket className="h-10 w-10 mx-auto mb-3 opacity-50" />
-          <p>Nenhuma campanha criada</p>
+        <div className="text-center py-16 text-muted-foreground">
+          <div className="h-16 w-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
+            <Rocket className="h-8 w-8 opacity-40" />
+          </div>
+          <p className="font-medium">Nenhuma campanha criada</p>
         </div>
       ) : (
         <div className="space-y-2">

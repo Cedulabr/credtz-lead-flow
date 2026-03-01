@@ -160,6 +160,12 @@ Deno.serve(async (req) => {
   }
 
   try {
+    let sectionFilter: string | undefined;
+    try {
+      const body = await req.json();
+      sectionFilter = body?.section;
+    } catch { /* no body or invalid JSON, run all */ }
+
     const serviceClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -212,7 +218,7 @@ Deno.serve(async (req) => {
     // ================================================
     // SECTION 1: Televendas em_andamento (portabilidade)
     // ================================================
-    if (automacaoAtiva) {
+    if (automacaoAtiva && (!sectionFilter || sectionFilter === "portabilidade")) {
       const { data: queue } = await serviceClient
         .from("sms_televendas_queue")
         .select("*")
@@ -298,7 +304,7 @@ Deno.serve(async (req) => {
     // ================================================
     // SECTION 2: Televendas proposta_paga notifications
     // ================================================
-    if (pagoAtiva) {
+    if (pagoAtiva && (!sectionFilter || sectionFilter === "pago")) {
       const { data: pagoQueue } = await serviceClient
         .from("sms_televendas_queue")
         .select("*")
@@ -352,7 +358,7 @@ Deno.serve(async (req) => {
     // ================================================
     // SECTION 3: Remarketing multi-module
     // ================================================
-    if (remarketingAtiva) {
+    if (remarketingAtiva && (!sectionFilter || sectionFilter === "remarketing")) {
       const { data: rmQueue } = await serviceClient
         .from("sms_remarketing_queue")
         .select("*")
@@ -434,7 +440,7 @@ Deno.serve(async (req) => {
     // ================================================
     // SECTION 4: Contato Futuro (scheduled date)
     // ================================================
-    if (contatoFuturoAtiva) {
+    if (contatoFuturoAtiva && (!sectionFilter || sectionFilter === "contato_futuro")) {
       const todayStr = new Date().toISOString().split("T")[0];
       const { data: cfQueue } = await serviceClient
         .from("sms_remarketing_queue")
