@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Send, Rocket, Users, Zap, Loader2, RefreshCw, Trash2, AlertTriangle, MessageSquare } from "lucide-react";
+import { Plus, Send, Rocket, Users, Zap, Loader2, RefreshCw, Trash2, AlertTriangle, MessageSquare, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +42,7 @@ export const CampaignsView = ({
   const [saving, setSaving] = useState(false);
   const [sendingCampaignId, setSendingCampaignId] = useState<string | null>(null);
   const [smsCredits, setSmsCredits] = useState<number | null>(null);
+  const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
 
   // Delete state
   const [deleteTarget, setDeleteTarget] = useState<SmsCampaign | null>(null);
@@ -217,6 +218,46 @@ export const CampaignsView = ({
     } catch { toast.error("Erro ao atualizar"); }
   };
 
+  const STATUS_PT: Record<string, string> = { delivered: "Entregue", sent: "Enviado", failed: "Falhou", pending: "Pendente" };
+  const STATUS_ORDER: Record<string, number> = { delivered: 0, sent: 1, pending: 2, failed: 3 };
+
+  const handleDownloadReport = async (campaignId: string, campaignName: string) => {
+    setDownloadingReportId(campaignId);
+    try {
+      const { data, error } = await supabase
+        .from("sms_history")
+        .select("contact_name, phone, status, error_message, send_type, sent_at, created_at")
+        .eq("campaign_id", campaignId)
+        .order("status");
+      if (error) throw error;
+      if (!data || data.length === 0) { toast.info("Nenhum registro encontrado"); return; }
+
+      const sorted = [...data].sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9));
+      const header = "Nome;Telefone;Status;Erro;Provedor;Data Envio";
+      const rows = sorted.map((h) => {
+        const dt = h.sent_at || h.created_at;
+        return [
+          h.contact_name || "",
+          h.phone,
+          STATUS_PT[h.status] || h.status,
+          (h.error_message || "").replace(/;/g, ","),
+          h.send_type || "",
+          dt ? new Date(dt).toLocaleString("pt-BR") : "",
+        ].join(";");
+      });
+      const csv = "\uFEFF" + header + "\n" + rows.join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeName = campaignName.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 40);
+      a.href = url;
+      a.download = `relatorio-${safeName}-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Relatório com ${data.length} registros baixado`);
+    } catch { toast.error("Erro ao gerar relatório"); } finally { setDownloadingReportId(null); }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -290,13 +331,23 @@ export const CampaignsView = ({
                             )}
                           </Button>
                         )}
+                        {(c.status === "completed" || c.status === "failed" || c.status === "sending") && (
+                          <Button size="sm" variant="outline" onClick={() => handleDownloadReport(c.id, c.name)} disabled={downloadingReportId === c.id} className="gap-1.5 text-xs">
+                            {downloadingReportId === c.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Download className="h-3 w-3" />
+                            )}
+                            Relatório
+                          </Button>
+                        )}
                         {c.status === "sending" && isAdmin && (
                           <Button size="sm" variant="outline" onClick={() => setMarkFailedTarget(c)} className="gap-1 text-xs text-amber-600 border-amber-300">
                             <AlertTriangle className="h-3 w-3" /> Marcar Falhou
                           </Button>
                         )}
                         {isAdmin && (
-                          <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(c)} className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0">
+                          <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(c)} className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
