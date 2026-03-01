@@ -105,7 +105,28 @@ export const RemarketingSmsView = () => {
       { let q = supabase.from("activate_leads").select("id, nome, telefone, status, data_proxima_operacao, company_id, assigned_to, created_by").in("status", ["em_andamento", "contato_futuro"]); if (!isAdmin && companyId) q = q.eq("company_id", companyId); const { data: aLeads } = await q.limit(500); const toInsert = (aLeads || []).flatMap((l: any) => { const items: any[] = []; const userId = l.assigned_to || l.created_by || profile?.id; if (l.status === "em_andamento") items.push({ source_module: "activate_leads", source_id: l.id, cliente_nome: l.nome, cliente_telefone: l.telefone, status_original: l.status, queue_type: "remarketing", company_id: l.company_id, user_id: userId, dias_envio_total: dias }); if (l.status === "contato_futuro" && l.data_proxima_operacao) items.push({ source_module: "activate_leads", source_id: l.id, cliente_nome: l.nome, cliente_telefone: l.telefone, status_original: l.status, queue_type: "contato_futuro", scheduled_date: l.data_proxima_operacao, company_id: l.company_id, user_id: userId, dias_envio_total: 1 }); return items; }); if (toInsert.length > 0) { const { error } = await supabase.from("sms_remarketing_queue").upsert(toInsert as any, { onConflict: "source_module,source_id,queue_type" }); if (!error) inserted += toInsert.length; } }
 
       // Sync Propostas (Meus Clientes)
-      { let q = supabase.from("propostas").select("id, \"Nome do cliente\", telefone, whatsapp, status, future_contact_date, company_id, created_by_id").or("status.eq.contato_futuro,status.eq.aguardando_retorno"); if (!isAdmin && companyId) q = q.eq("company_id", companyId); const { data: props } = await q.limit(500); const toInsert = (props || []).flatMap((p: any) => { const items: any[] = []; const nome = p["Nome do cliente"]; const tel = p.telefone || p.whatsapp; if (!nome || !tel) return []; const userId = p.created_by_id || profile?.id; if (p.status === "contato_futuro" && p.future_contact_date) items.push({ source_module: "meus_clientes", source_id: String(p.id), cliente_nome: nome, cliente_telefone: tel, status_original: p.status, queue_type: "contato_futuro", scheduled_date: p.future_contact_date, company_id: p.company_id, user_id: userId, dias_envio_total: 1 }); if (p.status === "aguardando_retorno") items.push({ source_module: "meus_clientes", source_id: String(p.id), cliente_nome: nome, cliente_telefone: tel, status_original: p.status, queue_type: "remarketing", company_id: p.company_id, user_id: userId, dias_envio_total: dias }); return items; }); if (toInsert.length > 0) { const { error } = await supabase.from("sms_remarketing_queue").upsert(toInsert as any, { onConflict: "source_module,source_id,queue_type" }); if (!error) inserted += toInsert.length; } }
+      {
+        let q = supabase.from("propostas").select("id, \"Nome do cliente\", telefone, whatsapp, status, future_contact_date, company_id, created_by_id");
+        q = q.in("status", ["contato_futuro", "aguardando_retorno"]);
+        if (!isAdmin && companyId) q = q.eq("company_id", companyId);
+        const { data: props } = await q.limit(500);
+        let skippedNoPhone = 0;
+        const toInsert = (props || []).flatMap((p: any) => {
+          const items: any[] = [];
+          const nome = p["Nome do cliente"];
+          const tel = p.telefone || p.whatsapp;
+          if (!nome || !tel) { skippedNoPhone++; return []; }
+          const userId = p.created_by_id || profile?.id;
+          if (p.status === "contato_futuro" && p.future_contact_date) items.push({ source_module: "meus_clientes", source_id: String(p.id), cliente_nome: nome, cliente_telefone: tel, status_original: p.status, queue_type: "contato_futuro", scheduled_date: p.future_contact_date, company_id: p.company_id, user_id: userId, dias_envio_total: 1 });
+          if (p.status === "aguardando_retorno") items.push({ source_module: "meus_clientes", source_id: String(p.id), cliente_nome: nome, cliente_telefone: tel, status_original: p.status, queue_type: "remarketing", company_id: p.company_id, user_id: userId, dias_envio_total: dias });
+          return items;
+        });
+        if (skippedNoPhone > 0) toast.info(`${skippedNoPhone} propostas sem telefone foram ignoradas`);
+        if (toInsert.length > 0) {
+          const { error } = await supabase.from("sms_remarketing_queue").upsert(toInsert as any, { onConflict: "source_module,source_id,queue_type" });
+          if (!error) inserted += toInsert.length;
+        }
+      }
 
       if (inserted > 0) toast.success(`${inserted} registros sincronizados`);
       else toast.info("Nenhum registro novo para sincronizar");
