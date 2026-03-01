@@ -70,7 +70,7 @@ export interface SmsHistoryRecord {
   send_type: string;
 }
 
-export type SmsTab = "televendas_sms" | "automation" | "campaigns" | "templates" | "history" | "contacts";
+export type SmsTab = "televendas_sms" | "automation" | "remarketing" | "campaigns" | "templates" | "history" | "contacts";
 
 export const LEAD_SOURCE_OPTIONS = [
   { value: "activate_leads", label: "Activate Leads", icon: "⚡" },

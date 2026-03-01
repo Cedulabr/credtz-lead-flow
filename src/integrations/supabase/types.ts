@@ -4168,6 +4168,74 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_remarketing_queue: {
+        Row: {
+          automacao_ativa: boolean
+          automacao_status: string
+          cliente_nome: string
+          cliente_telefone: string
+          company_id: string | null
+          created_at: string
+          dias_enviados: number
+          dias_envio_total: number
+          id: string
+          queue_type: string
+          scheduled_date: string | null
+          source_id: string
+          source_module: string
+          status_original: string | null
+          ultimo_envio_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          automacao_ativa?: boolean
+          automacao_status?: string
+          cliente_nome: string
+          cliente_telefone: string
+          company_id?: string | null
+          created_at?: string
+          dias_enviados?: number
+          dias_envio_total?: number
+          id?: string
+          queue_type?: string
+          scheduled_date?: string | null
+          source_id: string
+          source_module: string
+          status_original?: string | null
+          ultimo_envio_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          automacao_ativa?: boolean
+          automacao_status?: string
+          cliente_nome?: string
+          cliente_telefone?: string
+          company_id?: string | null
+          created_at?: string
+          dias_enviados?: number
+          dias_envio_total?: number
+          id?: string
+          queue_type?: string
+          scheduled_date?: string | null
+          source_id?: string
+          source_module?: string
+          status_original?: string | null
+          ultimo_envio_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_remarketing_queue_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sms_televendas_queue: {
         Row: {
           automacao_ativa: boolean

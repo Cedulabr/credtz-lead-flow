@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RefreshCw, MessageSquare, FileText, History, Users, Phone, Settings } from "lucide-react";
+import { RefreshCw, MessageSquare, FileText, History, Users, Phone, Settings, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSmsData } from "./hooks/useSmsData";
@@ -9,6 +9,7 @@ import { HistoryView } from "./views/HistoryView";
 import { ContactsView } from "./views/ContactsView";
 import { TelevendasSmsView } from "./views/TelevendasSmsView";
 import { AutomationView } from "./views/AutomationView";
+import { RemarketingSmsView } from "./views/RemarketingSmsView";
 import { SmsTab } from "./types";
 
 export const SmsModule = () => {
@@ -49,10 +50,14 @@ export const SmsModule = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as SmsTab)} className="w-full">
-        <TabsList className="w-full h-14 p-1.5 bg-muted rounded-xl grid grid-cols-6">
+        <TabsList className="w-full h-14 p-1.5 bg-muted rounded-xl grid grid-cols-7">
           <TabsTrigger value="televendas_sms" className="h-full text-[11px] sm:text-sm font-semibold gap-1 rounded-lg data-[state=active]:shadow-md">
             <Phone className="h-4 w-4" />
             <span className="hidden sm:inline">Televendas</span>
+          </TabsTrigger>
+          <TabsTrigger value="remarketing" className="h-full text-[11px] sm:text-sm font-semibold gap-1 rounded-lg data-[state=active]:shadow-md">
+            <Megaphone className="h-4 w-4" />
+            <span className="hidden sm:inline">Remarketing</span>
           </TabsTrigger>
           <TabsTrigger value="automation" className="h-full text-[11px] sm:text-sm font-semibold gap-1 rounded-lg data-[state=active]:shadow-md">
             <Settings className="h-4 w-4" />
@@ -79,6 +84,7 @@ export const SmsModule = () => {
 
       {/* Content */}
       {activeTab === "televendas_sms" && <TelevendasSmsView />}
+      {activeTab === "remarketing" && <RemarketingSmsView />}
       {activeTab === "automation" && <AutomationView />}
       {activeTab === "campaigns" && (
         <CampaignsView
