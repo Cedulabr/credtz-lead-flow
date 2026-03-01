@@ -36,6 +36,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import { useAuth } from "@/contexts/AuthContext";
+import { SmsNotifyDialog } from "@/modules/sales-wizard/components/SmsNotifyDialog";
 
 interface Contract {
   id: string;
@@ -113,6 +114,9 @@ export function ProposalGenerator() {
   const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  
+  // SMS notification state
+  const [showSmsNotify, setShowSmsNotify] = useState(false);
   
   // Filters state
   const [filterUser, setFilterUser] = useState<string>("all");
@@ -598,6 +602,21 @@ export function ProposalGenerator() {
     // Salvar automaticamente ao gerar a proposta
     if (user && !editingProposalId) {
       await saveProposalAuto();
+    }
+
+    // Check if SMS notification is enabled and client has phone
+    const clientPhone = proposalData.clientPhone?.replace(/\D/g, "");
+    if (clientPhone && clientPhone.length >= 10) {
+      try {
+        const { data: smsSettings } = await supabase
+          .from("sms_automation_settings")
+          .select("setting_value")
+          .eq("setting_key", "proposta_sms_ativa")
+          .maybeSingle();
+        if (smsSettings?.setting_value === "true") {
+          setShowSmsNotify(true);
+        }
+      } catch { /* ignore */ }
     }
   };
   
@@ -1621,6 +1640,14 @@ export function ProposalGenerator() {
           </div>
         </div>
       )}
+
+      {/* SMS Notification Dialog */}
+      <SmsNotifyDialog
+        open={showSmsNotify}
+        onComplete={() => setShowSmsNotify(false)}
+        clientName={proposalData.clientName}
+        clientPhone={proposalData.clientPhone?.replace(/\D/g, "")}
+      />
     </div>
   );
 }
