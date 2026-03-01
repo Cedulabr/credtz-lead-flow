@@ -124,6 +124,36 @@ async function sendSms(phone: string, message: string, provider: string): Promis
   return sendViaTwilio(phone, message);
 }
 
+function shouldSendToday(modoDias: string, diasSemana: string, diasEnviados: number): boolean {
+  const now = new Date();
+  const brasiliaOffset = -3;
+  const brasiliaDate = new Date(now.getTime() + (brasiliaOffset * 60 + now.getTimezoneOffset()) * 60000);
+  const dayOfWeek = brasiliaDate.getDay(); // 0=Sun, 1=Mon...
+
+  switch (modoDias) {
+    case "todos":
+      return true;
+    case "intercalado":
+      // Send on odd sequence days (1st, 3rd, 5th...)
+      return diasEnviados % 2 === 0;
+    case "aleatorio":
+      return Math.random() < 0.5;
+    case "personalizado": {
+      const allowedDays = diasSemana.split(",").map((d) => parseInt(d.trim()));
+      return allowedDays.includes(dayOfWeek);
+    }
+    default:
+      return true;
+  }
+}
+
+function getMessageForDay(config: Record<string, string>, diasEnviados: number): string {
+  // dias_enviados is 0-indexed (0 = first send), map to dia_1..dia_5
+  const dayIndex = (diasEnviados % 5) + 1;
+  const key = `msg_remarketing_dia_${dayIndex}`;
+  return config[key] || config["msg_remarketing"] || "Olá {{nome}}, temos uma oferta especial para você!";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -170,7 +200,8 @@ Deno.serve(async (req) => {
     // Remarketing settings
     const remarketingAtiva = config["remarketing_ativa"] === "true";
     const remarketingIntervalo = parseInt(config["remarketing_intervalo_horas"] || "24");
-    const msgRemarketing = config["msg_remarketing"] || "Olá {{nome}}, temos uma oferta especial para você!";
+    const remarketingModoDias = config["remarketing_modo_dias"] || "todos";
+    const remarketingDiasSemana = config["remarketing_dias_semana"] || "1,2,3,4,5";
     const contatoFuturoAtiva = config["contato_futuro_ativa"] === "true";
     const msgContatoFuturo = config["msg_contato_futuro"] || "Olá {{nome}}, conforme combinado, temos uma proposta para você.";
 
@@ -340,6 +371,12 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // Check scheduling mode
+        if (!shouldSendToday(remarketingModoDias, remarketingDiasSemana, item.dias_enviados)) {
+          totalSkipped++;
+          continue;
+        }
+
         const normalizedPhone = (item.cliente_telefone || "").replace(/\D/g, "");
         if (!normalizedPhone) { totalSkipped++; continue; }
 
@@ -355,7 +392,9 @@ Deno.serve(async (req) => {
 
       for (const [_phone, items] of rmPhoneGroups) {
         const representative = items[0];
-        let message = msgRemarketing;
+        
+        // Select message based on day sequence
+        let message = getMessageForDay(config, representative.dias_enviados);
         message = message.replace(/\{\{nome\}\}/gi, getFirstName(representative.cliente_nome));
 
         const result = await sendSms(representative.cliente_telefone, message, activeProvider);

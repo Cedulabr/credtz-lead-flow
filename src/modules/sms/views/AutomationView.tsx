@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Settings, Save, Play, Loader2, Zap, Users, Clock } from "lucide-react";
+import { Settings, Save, Play, Loader2, Zap, Users, Clock, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserCompany } from "../hooks/useUserCompany";
@@ -21,6 +23,16 @@ interface QueueItem {
   dias_envio_total: number;
   ultimo_envio_at: string | null;
 }
+
+const WEEKDAYS = [
+  { value: "1", label: "Seg" },
+  { value: "2", label: "Ter" },
+  { value: "3", label: "Qua" },
+  { value: "4", label: "Qui" },
+  { value: "5", label: "Sex" },
+  { value: "6", label: "Sáb" },
+  { value: "0", label: "Dom" },
+];
 
 export const AutomationView = () => {
   const { profile } = useAuth();
@@ -53,7 +65,6 @@ export const AutomationView = () => {
       .order("ultimo_envio_at", { ascending: true, nullsFirst: true })
       .limit(50);
 
-    // Filter by company for non-admins
     if (!isAdmin && companyId) {
       query = query.eq("company_id", companyId);
     }
@@ -101,6 +112,15 @@ export const AutomationView = () => {
     } finally {
       setRunning(false);
     }
+  };
+
+  const selectedDays = (settings["remarketing_dias_semana"] || "1,2,3,4,5").split(",").filter(Boolean);
+
+  const toggleWeekday = (day: string) => {
+    const current = new Set(selectedDays);
+    if (current.has(day)) current.delete(day);
+    else current.add(day);
+    updateSetting("remarketing_dias_semana", Array.from(current).sort().join(","));
   };
 
   if (loading) {
@@ -173,7 +193,6 @@ export const AutomationView = () => {
                 className="mt-1"
               />
             </div>
-            {/* Schedule hours */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs flex items-center gap-1">
@@ -251,18 +270,21 @@ export const AutomationView = () => {
           </CardContent>
         </Card>
 
-        {/* Remarketing Multi-Módulo */}
-        <Card>
+        {/* Remarketing Multi-Módulo — EXPANDED */}
+        <Card className="md:col-span-2">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <Zap className="h-4 w-4 text-primary" />
               Remarketing — Multi-Módulo
+              <Badge variant="secondary" className="text-[10px]">5 mensagens</Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5">
             <div className="p-2.5 rounded-lg bg-muted/50 text-xs text-muted-foreground">
-              <p>🔄 Envia ofertas automáticas para clientes <strong>em andamento</strong> dos módulos Leads Premium, Activate Leads e Meus Clientes.</p>
+              <p>🔄 Envia ofertas automáticas para clientes com status <strong>aguardando retorno</strong> (Meus Clientes), <strong>em andamento</strong> (Leads Premium, Activate Leads).</p>
+              <p className="mt-1">💡 Use <code className="bg-background px-1 py-0.5 rounded text-[10px]">{"{{nome}}"}</code> nas mensagens — o sistema puxa automaticamente apenas o <strong>primeiro nome</strong> do cliente.</p>
             </div>
+
             <div className="flex items-center justify-between">
               <Label className="text-sm">Ativada</Label>
               <Switch
@@ -271,45 +293,129 @@ export const AutomationView = () => {
                 disabled={!isAdmin}
               />
             </div>
-            <div>
-              <Label className="text-xs">Quantidade de dias</Label>
-              <Input
-                type="number"
-                min={1}
-                max={30}
-                value={settings["remarketing_dias"] || "5"}
-                onChange={(e) => updateSetting("remarketing_dias", e.target.value)}
-                disabled={!isAdmin}
-                className="mt-1"
-              />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Quantidade de dias</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={settings["remarketing_dias"] || "5"}
+                  onChange={(e) => updateSetting("remarketing_dias", e.target.value)}
+                  disabled={!isAdmin}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Intervalo entre envios (horas)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={168}
+                  value={settings["remarketing_intervalo_horas"] || "24"}
+                  onChange={(e) => updateSetting("remarketing_intervalo_horas", e.target.value)}
+                  disabled={!isAdmin}
+                  className="mt-1"
+                />
+              </div>
             </div>
-            <div>
-              <Label className="text-xs">Intervalo entre envios (horas)</Label>
-              <Input
-                type="number"
-                min={1}
-                max={168}
-                value={settings["remarketing_intervalo_horas"] || "24"}
-                onChange={(e) => updateSetting("remarketing_intervalo_horas", e.target.value)}
-                disabled={!isAdmin}
-                className="mt-1"
-              />
+
+            {/* 5 Message fields */}
+            <div className="space-y-3">
+              <Label className="text-xs font-medium flex items-center gap-1.5">
+                📝 Mensagens por dia da sequência
+              </Label>
+              {[1, 2, 3, 4, 5].map((day) => (
+                <div key={day}>
+                  <Label className="text-[11px] text-muted-foreground">Dia {day}</Label>
+                  <Textarea
+                    value={settings[`msg_remarketing_dia_${day}`] || ""}
+                    onChange={(e) => updateSetting(`msg_remarketing_dia_${day}`, e.target.value)}
+                    rows={2}
+                    className="mt-0.5 text-sm"
+                    disabled={!isAdmin}
+                    placeholder={`Mensagem para o dia ${day} da sequência...`}
+                  />
+                </div>
+              ))}
+              <p className="text-[10px] text-muted-foreground">
+                Variável disponível: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code> = primeiro nome do cliente. Se a sequência ultrapassar 5 dias, as mensagens se repetem ciclicamente.
+              </p>
             </div>
-            <div>
-              <Label className="text-xs">Mensagem</Label>
-              <Textarea
-                value={settings["msg_remarketing"] || ""}
-                onChange={(e) => updateSetting("msg_remarketing", e.target.value)}
-                rows={3}
-                className="mt-1 text-sm"
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">Variáveis: {"{{nome}}"} (primeiro nome)</p>
+
+            {/* Scheduling */}
+            <div className="space-y-3 border-t pt-4">
+              <Label className="text-xs font-medium flex items-center gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5" /> Agenda de Envio
+              </Label>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-[11px] text-muted-foreground">Modo de dias</Label>
+                  <Select
+                    value={settings["remarketing_modo_dias"] || "todos"}
+                    onValueChange={(v) => updateSetting("remarketing_modo_dias", v)}
+                    disabled={!isAdmin}
+                  >
+                    <SelectTrigger className="mt-0.5 h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">📅 Todos os dias</SelectItem>
+                      <SelectItem value="intercalado">🔀 Intercalado (dia sim, dia não)</SelectItem>
+                      <SelectItem value="aleatorio">🎲 Aleatório (50% chance/dia)</SelectItem>
+                      <SelectItem value="personalizado">✏️ Dias personalizados</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-[11px] text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3" /> Horário de envio
+                  </Label>
+                  <Input
+                    type="time"
+                    value={settings["remarketing_horario_envio"] || "09:00"}
+                    onChange={(e) => updateSetting("remarketing_horario_envio", e.target.value)}
+                    disabled={!isAdmin}
+                    className="mt-0.5 h-9"
+                  />
+                </div>
+              </div>
+
+              {settings["remarketing_modo_dias"] === "personalizado" && (
+                <div>
+                  <Label className="text-[11px] text-muted-foreground mb-2 block">Selecione os dias da semana</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {WEEKDAYS.map((wd) => (
+                      <label
+                        key={wd.value}
+                        className="flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={selectedDays.includes(wd.value)}
+                          onCheckedChange={() => toggleWeekday(wd.value)}
+                          disabled={!isAdmin}
+                        />
+                        <span className="text-xs">{wd.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="p-2.5 rounded-lg bg-muted/50 text-[10px] text-muted-foreground space-y-1">
+                <p><strong>Todos os dias:</strong> envia 1 SMS por dia dentro do intervalo configurado.</p>
+                <p><strong>Intercalado:</strong> envia em dias alternados (1º, 3º, 5º dia...).</p>
+                <p><strong>Aleatório:</strong> cada dia há 50% de chance de envio — simula naturalidade.</p>
+                <p><strong>Personalizado:</strong> envia apenas nos dias da semana marcados acima.</p>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Contato Futuro */}
-        <Card>
+        <Card className="md:col-span-2">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <Clock className="h-4 w-4 text-primary" />
@@ -319,6 +425,7 @@ export const AutomationView = () => {
           <CardContent className="space-y-4">
             <div className="p-2.5 rounded-lg bg-muted/50 text-xs text-muted-foreground">
               <p>📅 Envia 1 SMS com oferta no dia agendado para clientes marcados como <strong>contato futuro</strong>.</p>
+              <p className="mt-1">💡 Use <code className="bg-background px-1 py-0.5 rounded text-[10px]">{"{{nome}}"}</code> — puxa apenas o <strong>primeiro nome</strong> do cliente.</p>
             </div>
             <div className="flex items-center justify-between">
               <Label className="text-sm">Ativada</Label>
@@ -336,7 +443,7 @@ export const AutomationView = () => {
                 rows={3}
                 className="mt-1 text-sm"
               />
-              <p className="text-[10px] text-muted-foreground mt-1">Variáveis: {"{{nome}}"} (primeiro nome)</p>
+              <p className="text-[10px] text-muted-foreground mt-1">Variáveis: <code className="bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code> (primeiro nome)</p>
             </div>
           </CardContent>
         </Card>

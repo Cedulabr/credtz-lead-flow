@@ -197,8 +197,8 @@ export const RemarketingSmsView = () => {
       // Sync Propostas (Meus Clientes)
       {
         let q = supabase.from("propostas")
-          .select("id, \"Nome do cliente\", telefone, whatsapp, status, pipeline_stage, future_contact_date, company_id, created_by_id")
-          .or("status.eq.contato_futuro,pipeline_stage.in.(proposta_enviada,proposta_digitada)");
+          .select("id, \"Nome do cliente\", telefone, whatsapp, status, future_contact_date, company_id, created_by_id")
+          .or("status.eq.contato_futuro,status.eq.aguardando_retorno");
         if (!isAdmin && companyId) q = q.eq("company_id", companyId);
         const { data: props } = await q.limit(500);
         const toInsert = (props || []).flatMap((p: any) => {
@@ -214,10 +214,10 @@ export const RemarketingSmsView = () => {
               scheduled_date: p.future_contact_date, company_id: p.company_id, user_id: userId, dias_envio_total: 1,
             });
           }
-          if (["proposta_enviada", "proposta_digitada"].includes(p.pipeline_stage)) {
+          if (p.status === "aguardando_retorno") {
             items.push({
               source_module: "meus_clientes", source_id: String(p.id), cliente_nome: nome,
-              cliente_telefone: tel, status_original: p.pipeline_stage || p.status, queue_type: "remarketing",
+              cliente_telefone: tel, status_original: p.status, queue_type: "remarketing",
               company_id: p.company_id, user_id: userId, dias_envio_total: dias,
             });
           }
