@@ -141,7 +141,8 @@ export const TelevendasSmsView = () => {
         .single();
 
       let message = settings?.setting_value || "Olá {{nome}}, sua proposta está em andamento.";
-      message = message.replace(/\{\{nome\}\}/gi, item.cliente_nome || "");
+      const firstName = (item.cliente_nome || "").trim().split(" ")[0];
+      message = message.replace(/\{\{nome\}\}/gi, firstName);
       message = message.replace(/\{\{tipo_operacao\}\}/gi, item.tipo_operacao || "");
 
       const { data, error } = await supabase.functions.invoke("send-sms", {

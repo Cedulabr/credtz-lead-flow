@@ -250,6 +250,96 @@ export const AutomationView = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Remarketing Multi-Módulo */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Zap className="h-4 w-4 text-primary" />
+              Remarketing — Multi-Módulo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-2.5 rounded-lg bg-muted/50 text-xs text-muted-foreground">
+              <p>🔄 Envia ofertas automáticas para clientes <strong>em andamento</strong> dos módulos Leads Premium, Activate Leads e Meus Clientes.</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Ativada</Label>
+              <Switch
+                checked={settings["remarketing_ativa"] === "true"}
+                onCheckedChange={(v) => updateSetting("remarketing_ativa", v ? "true" : "false")}
+                disabled={!isAdmin}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Quantidade de dias</Label>
+              <Input
+                type="number"
+                min={1}
+                max={30}
+                value={settings["remarketing_dias"] || "5"}
+                onChange={(e) => updateSetting("remarketing_dias", e.target.value)}
+                disabled={!isAdmin}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Intervalo entre envios (horas)</Label>
+              <Input
+                type="number"
+                min={1}
+                max={168}
+                value={settings["remarketing_intervalo_horas"] || "24"}
+                onChange={(e) => updateSetting("remarketing_intervalo_horas", e.target.value)}
+                disabled={!isAdmin}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Mensagem</Label>
+              <Textarea
+                value={settings["msg_remarketing"] || ""}
+                onChange={(e) => updateSetting("msg_remarketing", e.target.value)}
+                rows={3}
+                className="mt-1 text-sm"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Variáveis: {"{{nome}}"} (primeiro nome)</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Contato Futuro */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" />
+              Contato Futuro — Agendado
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-2.5 rounded-lg bg-muted/50 text-xs text-muted-foreground">
+              <p>📅 Envia 1 SMS com oferta no dia agendado para clientes marcados como <strong>contato futuro</strong>.</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Ativada</Label>
+              <Switch
+                checked={settings["contato_futuro_ativa"] === "true"}
+                onCheckedChange={(v) => updateSetting("contato_futuro_ativa", v ? "true" : "false")}
+                disabled={!isAdmin}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Mensagem</Label>
+              <Textarea
+                value={settings["msg_contato_futuro"] || ""}
+                onChange={(e) => updateSetting("msg_contato_futuro", e.target.value)}
+                rows={3}
+                className="mt-1 text-sm"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Variáveis: {"{{nome}}"} (primeiro nome)</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Próximos Envios */}

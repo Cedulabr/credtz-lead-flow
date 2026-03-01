@@ -14,6 +14,10 @@ interface SmsResult {
   provider: string;
 }
 
+function getFirstName(fullName: string): string {
+  return (fullName || "").trim().split(" ")[0] || "";
+}
+
 function detectCreditError(error: string): boolean {
   const creditKeywords = [
     "insufficient", "balance", "credit", "saldo", "crédito", "credito",
@@ -131,10 +135,8 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Get active provider
     const activeProvider = await getActiveProvider(serviceClient);
 
-    // Get automation settings
     const { data: settings } = await serviceClient
       .from("sms_automation_settings")
       .select("setting_key, setting_value");
@@ -165,11 +167,20 @@ Deno.serve(async (req) => {
     const pagoAtiva = config["automacao_pago_ativa"] === "true";
     const msgPago = config["msg_pago_novo_emprestimo"] || "Olá {{nome}}, seu empréstimo foi pago com sucesso.";
 
+    // Remarketing settings
+    const remarketingAtiva = config["remarketing_ativa"] === "true";
+    const remarketingIntervalo = parseInt(config["remarketing_intervalo_horas"] || "24");
+    const msgRemarketing = config["msg_remarketing"] || "Olá {{nome}}, temos uma oferta especial para você!";
+    const contatoFuturoAtiva = config["contato_futuro_ativa"] === "true";
+    const msgContatoFuturo = config["msg_contato_futuro"] || "Olá {{nome}}, conforme combinado, temos uma proposta para você.";
+
     let totalSent = 0;
     let totalFailed = 0;
     let totalSkipped = 0;
 
-    // === AUTOMATION: em_andamento proposals ===
+    // ================================================
+    // SECTION 1: Televendas em_andamento (portabilidade)
+    // ================================================
     if (automacaoAtiva) {
       const { data: queue } = await serviceClient
         .from("sms_televendas_queue")
@@ -215,7 +226,7 @@ Deno.serve(async (req) => {
         const representative = items[0];
 
         let message = msgTemplate;
-        message = message.replace(/\{\{nome\}\}/gi, representative.cliente_nome || "");
+        message = message.replace(/\{\{nome\}\}/gi, getFirstName(representative.cliente_nome));
         message = message.replace(/\{\{tipo_operacao\}\}/gi, representative.tipo_operacao || "");
 
         const result = await sendSms(representative.cliente_telefone, message, activeProvider);
@@ -253,7 +264,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // === AUTOMATION: proposta_paga notifications ===
+    // ================================================
+    // SECTION 2: Televendas proposta_paga notifications
+    // ================================================
     if (pagoAtiva) {
       const { data: pagoQueue } = await serviceClient
         .from("sms_televendas_queue")
@@ -277,7 +290,7 @@ Deno.serve(async (req) => {
         pagoPhoneGroups.set(normalizedPhone, item);
 
         let message = msgPago;
-        message = message.replace(/\{\{nome\}\}/gi, item.cliente_nome || "");
+        message = message.replace(/\{\{nome\}\}/gi, getFirstName(item.cliente_nome));
 
         const result = await sendSms(item.cliente_telefone, message, activeProvider);
 
@@ -298,6 +311,134 @@ Deno.serve(async (req) => {
 
         await serviceClient.from("sms_televendas_queue")
           .update({ automacao_status: "finalizado", automacao_ativa: false })
+          .eq("id", item.id);
+
+        if (result.ok) totalSent++;
+        else totalFailed++;
+      }
+    }
+
+    // ================================================
+    // SECTION 3: Remarketing multi-module
+    // ================================================
+    if (remarketingAtiva) {
+      const { data: rmQueue } = await serviceClient
+        .from("sms_remarketing_queue")
+        .select("*")
+        .eq("automacao_ativa", true)
+        .eq("automacao_status", "ativo")
+        .eq("queue_type", "remarketing");
+
+      const now = new Date();
+      const rmPhoneGroups = new Map<string, any[]>();
+
+      for (const item of (rmQueue || [])) {
+        if (item.dias_enviados >= item.dias_envio_total) {
+          await serviceClient.from("sms_remarketing_queue")
+            .update({ automacao_status: "finalizado", automacao_ativa: false })
+            .eq("id", item.id);
+          continue;
+        }
+
+        const normalizedPhone = (item.cliente_telefone || "").replace(/\D/g, "");
+        if (!normalizedPhone) { totalSkipped++; continue; }
+
+        if (item.ultimo_envio_at) {
+          const lastSent = new Date(item.ultimo_envio_at);
+          const hoursSince = (now.getTime() - lastSent.getTime()) / (1000 * 60 * 60);
+          if (hoursSince < remarketingIntervalo) { totalSkipped++; continue; }
+        }
+
+        if (!rmPhoneGroups.has(normalizedPhone)) rmPhoneGroups.set(normalizedPhone, []);
+        rmPhoneGroups.get(normalizedPhone)!.push(item);
+      }
+
+      for (const [_phone, items] of rmPhoneGroups) {
+        const representative = items[0];
+        let message = msgRemarketing;
+        message = message.replace(/\{\{nome\}\}/gi, getFirstName(representative.cliente_nome));
+
+        const result = await sendSms(representative.cliente_telefone, message, activeProvider);
+
+        await serviceClient.from("sms_history").insert({
+          phone: representative.cliente_telefone,
+          contact_name: representative.cliente_nome,
+          message,
+          status: result.ok ? "sent" : "failed",
+          provider_message_id: result.sid || result.messageId || null,
+          error_message: formatErrorMessage(result),
+          sent_at: result.ok ? now.toISOString() : null,
+          sent_by: representative.user_id,
+          send_type: "automatico",
+          provider: activeProvider,
+          company_id: representative.company_id || null,
+        });
+
+        for (const item of items) {
+          const newDias = item.dias_enviados + 1;
+          const updates: Record<string, any> = {
+            dias_enviados: newDias,
+            ultimo_envio_at: now.toISOString(),
+          };
+          if (newDias >= item.dias_envio_total) {
+            updates.automacao_status = "finalizado";
+            updates.automacao_ativa = false;
+          }
+          await serviceClient.from("sms_remarketing_queue").update(updates).eq("id", item.id);
+        }
+
+        if (result.ok) totalSent++;
+        else totalFailed++;
+      }
+    }
+
+    // ================================================
+    // SECTION 4: Contato Futuro (scheduled date)
+    // ================================================
+    if (contatoFuturoAtiva) {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const { data: cfQueue } = await serviceClient
+        .from("sms_remarketing_queue")
+        .select("*")
+        .eq("automacao_ativa", true)
+        .eq("automacao_status", "ativo")
+        .eq("queue_type", "contato_futuro")
+        .lte("scheduled_date", todayStr);
+
+      const cfPhoneGroups = new Map<string, any>();
+
+      for (const item of (cfQueue || [])) {
+        const normalizedPhone = (item.cliente_telefone || "").replace(/\D/g, "");
+        if (!normalizedPhone || cfPhoneGroups.has(normalizedPhone)) {
+          await serviceClient.from("sms_remarketing_queue")
+            .update({ automacao_status: "finalizado", automacao_ativa: false })
+            .eq("id", item.id);
+          continue;
+        }
+
+        cfPhoneGroups.set(normalizedPhone, item);
+
+        let message = msgContatoFuturo;
+        message = message.replace(/\{\{nome\}\}/gi, getFirstName(item.cliente_nome));
+
+        const result = await sendSms(item.cliente_telefone, message, activeProvider);
+
+        await serviceClient.from("sms_history").insert({
+          phone: item.cliente_telefone,
+          contact_name: item.cliente_nome,
+          message,
+          status: result.ok ? "sent" : "failed",
+          provider_message_id: result.sid || result.messageId || null,
+          error_message: formatErrorMessage(result),
+          sent_at: result.ok ? new Date().toISOString() : null,
+          sent_by: item.user_id,
+          send_type: "automatico",
+          provider: activeProvider,
+          company_id: item.company_id || null,
+        });
+
+        await serviceClient.from("sms_remarketing_queue")
+          .update({ automacao_status: "finalizado", automacao_ativa: false, dias_enviados: 1, ultimo_envio_at: new Date().toISOString() })
           .eq("id", item.id);
 
         if (result.ok) totalSent++;
