@@ -151,7 +151,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     activatedWorked: 0,
     conversionRate: 0,
     activeClients: 0,
-    newClients: 0
+    newClients: 0,
+    // New fields
+    meusClientes: 0,
+    meusClientesTrabalhados: 0,
+    contatoFuturoPremium: 0,
+    contatoFuturoActivate: 0,
+    contatoFuturoClientes: 0,
+    fechadosPremium: 0,
+    fechadosActivate: 0,
+    fechadosClientes: 0,
+    documentacoesSalvas: 0,
   });
   
   // Commissions table
@@ -502,58 +512,56 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     try {
       const { startDate, endDate } = getDateRange();
       const companyFilter = getCompanyFilter();
+      const startISO = startDate.toISOString();
+      const endISO = endDate.toISOString();
       
-      // Leads Premium (tabela leads)
-      let premiumQuery = supabase
-        .from('leads')
-        .select('*')
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString());
-      
-      if (!isAdmin && !isGestor) {
-        premiumQuery = premiumQuery.eq('assigned_to', user?.id);
-      } else if (companyFilter) {
-        premiumQuery = premiumQuery.in('company_id', companyFilter);
-      }
-      
-      const { data: premiumData } = await premiumQuery;
-      const premiumLeads = premiumData || [];
-      const premiumWorked = premiumLeads.filter(l => l.status && l.status !== 'novo').length;
-      
-      // Activate Leads (tabela activate_leads)
-      let activateQuery = supabase
-        .from('activate_leads')
-        .select('*')
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString());
-      
-      if (!isAdmin && !isGestor) {
-        activateQuery = activateQuery.eq('assigned_to', user?.id);
-      } else if (companyFilter) {
-        activateQuery = activateQuery.in('company_id', companyFilter);
-      }
-      
-      const { data: activateData } = await activateQuery;
-      const activateLeads = activateData || [];
+      const buildFilter = (query: any, userField = 'assigned_to') => {
+        if (!isAdmin && !isGestor) {
+          return query.eq(userField, user?.id);
+        } else if (companyFilter) {
+          return query.in('company_id', companyFilter);
+        }
+        return query;
+      };
+
+      // Parallel queries
+      const [
+        premiumRes, activateRes, propostasRes,
+        premiumFuturoRes, activateFuturoRes, propostasFuturoRes,
+        premiumFechadosRes, activateFechadosRes, propostasFechadosRes,
+        docsRes
+      ] = await Promise.all([
+        // Premium leads
+        buildFilter(supabase.from('leads').select('id, status').gte('created_at', startISO).lte('created_at', endISO)),
+        // Activate leads
+        buildFilter(supabase.from('activate_leads').select('id, status').gte('created_at', startISO).lte('created_at', endISO)),
+        // Meus Clientes (propostas)
+        buildFilter(supabase.from('propostas').select('id, status, pipeline_stage').gte('created_at', startISO).lte('created_at', endISO), 'created_by_id'),
+        // Contato Futuro - Premium
+        buildFilter(supabase.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'contato_futuro').gte('created_at', startISO).lte('created_at', endISO)),
+        // Contato Futuro - Activate
+        buildFilter(supabase.from('activate_leads').select('id', { count: 'exact', head: true }).eq('status', 'contato_futuro').gte('created_at', startISO).lte('created_at', endISO)),
+        // Contato Futuro - Propostas
+        buildFilter(supabase.from('propostas').select('id', { count: 'exact', head: true }).eq('status', 'contato_futuro').gte('created_at', startISO).lte('created_at', endISO), 'created_by_id'),
+        // Fechados - Premium
+        buildFilter(supabase.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'cliente_fechado').gte('created_at', startISO).lte('created_at', endISO)),
+        // Fechados - Activate
+        buildFilter(supabase.from('activate_leads').select('id', { count: 'exact', head: true }).eq('status', 'fechado').gte('created_at', startISO).lte('created_at', endISO)),
+        // Fechados - Propostas (aceitou_proposta)
+        buildFilter(supabase.from('propostas').select('id', { count: 'exact', head: true }).eq('pipeline_stage', 'aceitou_proposta').gte('created_at', startISO).lte('created_at', endISO), 'created_by_id'),
+        // Documentações salvas
+        buildFilter(supabase.from('client_documents').select('id', { count: 'exact', head: true }).gte('created_at', startISO).lte('created_at', endISO), 'uploaded_by'),
+      ]);
+
+      const premiumLeads = premiumRes.data || [];
+      const activateLeads = activateRes.data || [];
+      const propostas = propostasRes.data || [];
+      const premiumWorked = premiumLeads.filter(l => l.status && l.status !== 'new_lead').length;
       const activatedWorked = activateLeads.filter(l => l.status && l.status !== 'novo').length;
-      
-      // Active clients (from propostas)
-      let propostasQuery = supabase
-        .from('propostas')
-        .select('id')
-        .eq('pipeline_stage', 'aceitou_proposta');
-      
-      if (!isAdmin && !isGestor) {
-        propostasQuery = propostasQuery.eq('created_by_id', user?.id);
-      } else if (companyFilter) {
-        propostasQuery = propostasQuery.in('company_id', companyFilter);
-      }
-      
-      const { data: activeData } = await propostasQuery;
-      
-      // Conversões
+      const meusClientesTrabalhados = propostas.length;
+
       const totalLeads = premiumLeads.length + activateLeads.length;
-      const converted = premiumLeads.filter(l => l.status === 'convertido' || l.status === 'fechado').length +
+      const converted = premiumLeads.filter(l => l.status === 'convertido' || l.status === 'cliente_fechado').length +
                        activateLeads.filter(l => l.status === 'convertido' || l.status === 'fechado').length;
       
       setLeadsStats({
@@ -562,8 +570,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         activated: activateLeads.length,
         activatedWorked,
         conversionRate: totalLeads > 0 ? (converted / totalLeads) * 100 : 0,
-        activeClients: activeData?.length || 0,
-        newClients: converted
+        activeClients: (propostasFechadosRes.count || 0),
+        newClients: converted,
+        meusClientes: propostas.length,
+        meusClientesTrabalhados,
+        contatoFuturoPremium: premiumFuturoRes.count || 0,
+        contatoFuturoActivate: activateFuturoRes.count || 0,
+        contatoFuturoClientes: propostasFuturoRes.count || 0,
+        fechadosPremium: premiumFechadosRes.count || 0,
+        fechadosActivate: activateFechadosRes.count || 0,
+        fechadosClientes: propostasFechadosRes.count || 0,
+        documentacoesSalvas: docsRes.count || 0,
       });
       
     } catch (error) {
@@ -1043,77 +1060,109 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           )}
         </div>
 
-        {/* Leads Section - SEPARADOS */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Leads Premium */}
-          <Card className="border-2 border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-transparent">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <div className="h-8 w-8 bg-amber-500/20 rounded-xl flex items-center justify-center">
-                    <Star className="h-4 w-4 text-amber-500" />
-                  </div>
-                  Leads Premium
-                </CardTitle>
-                <Button variant="ghost" size="sm" className="h-8" onClick={() => onNavigate('leads')}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+        {/* Leads Section - 6 Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+          {/* Leads Premium Trabalhados */}
+          <Card className="border border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-transparent cursor-pointer hover:shadow-lg transition-all" onClick={() => onNavigate('leads')}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 bg-amber-500/20 rounded-xl flex items-center justify-center">
+                  <Star className="h-4 w-4 text-amber-500" />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground">Leads Premium</span>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="text-center p-4 bg-amber-500/10 rounded-2xl">
-                  <p className="text-3xl font-bold text-amber-500">{leadsStats.premium}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Total</p>
-                </div>
-                <div className="text-center p-4 bg-success/10 rounded-2xl">
-                  <p className="text-3xl font-bold text-success">{leadsStats.premiumWorked}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Trabalhados</p>
-                </div>
+              <div className="flex items-baseline gap-1.5 mb-2">
+                <span className="text-2xl font-bold">{leadsStats.premiumWorked}</span>
+                <span className="text-sm text-muted-foreground">/ {leadsStats.premium}</span>
               </div>
-              <div className="mt-3">
-                <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                  <span>Progresso</span>
-                  <span>{leadsStats.premium > 0 ? ((leadsStats.premiumWorked / leadsStats.premium) * 100).toFixed(0) : 0}%</span>
+              <Progress value={leadsStats.premium > 0 ? (leadsStats.premiumWorked / leadsStats.premium) * 100 : 0} className="h-1.5" />
+              <p className="text-[10px] text-muted-foreground mt-1">Trabalhados no período</p>
+            </CardContent>
+          </Card>
+
+          {/* Activate Leads Trabalhados */}
+          <Card className="border border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-transparent cursor-pointer hover:shadow-lg transition-all" onClick={() => onNavigate('activate-leads')}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 bg-cyan-500/20 rounded-xl flex items-center justify-center">
+                  <Zap className="h-4 w-4 text-cyan-500" />
                 </div>
-                <Progress value={leadsStats.premium > 0 ? (leadsStats.premiumWorked / leadsStats.premium) * 100 : 0} className="h-2" />
+                <span className="text-xs font-medium text-muted-foreground">Activate Leads</span>
+              </div>
+              <div className="flex items-baseline gap-1.5 mb-2">
+                <span className="text-2xl font-bold">{leadsStats.activatedWorked}</span>
+                <span className="text-sm text-muted-foreground">/ {leadsStats.activated}</span>
+              </div>
+              <Progress value={leadsStats.activated > 0 ? (leadsStats.activatedWorked / leadsStats.activated) * 100 : 0} className="h-1.5" />
+              <p className="text-[10px] text-muted-foreground mt-1">Trabalhados no período</p>
+            </CardContent>
+          </Card>
+
+          {/* Meus Clientes Trabalhados */}
+          <Card className="border border-indigo-500/20 bg-gradient-to-br from-indigo-500/5 to-transparent cursor-pointer hover:shadow-lg transition-all" onClick={() => onNavigate('meus-clientes')}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 bg-indigo-500/20 rounded-xl flex items-center justify-center">
+                  <Users className="h-4 w-4 text-indigo-500" />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground">Meus Clientes</span>
+              </div>
+              <p className="text-2xl font-bold">{leadsStats.meusClientes}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">Propostas no período</p>
+            </CardContent>
+          </Card>
+
+          {/* Contato Futuro (3 módulos) */}
+          <Card className="border border-orange-500/20 bg-gradient-to-br from-orange-500/5 to-transparent">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 bg-orange-500/20 rounded-xl flex items-center justify-center">
+                  <Clock className="h-4 w-4 text-orange-500" />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground">Contato Futuro</span>
+              </div>
+              <p className="text-2xl font-bold text-orange-500">
+                {leadsStats.contatoFuturoPremium + leadsStats.contatoFuturoActivate + leadsStats.contatoFuturoClientes}
+              </p>
+              <div className="flex flex-wrap gap-1 mt-2">
+                <Badge variant="outline" className="text-[9px] px-1.5 bg-amber-500/10 border-amber-500/30 text-amber-600">P: {leadsStats.contatoFuturoPremium}</Badge>
+                <Badge variant="outline" className="text-[9px] px-1.5 bg-cyan-500/10 border-cyan-500/30 text-cyan-600">A: {leadsStats.contatoFuturoActivate}</Badge>
+                <Badge variant="outline" className="text-[9px] px-1.5 bg-indigo-500/10 border-indigo-500/30 text-indigo-600">C: {leadsStats.contatoFuturoClientes}</Badge>
               </div>
             </CardContent>
           </Card>
 
-          {/* Activate Leads */}
-          <Card className="border-2 border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 to-transparent">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <div className="h-8 w-8 bg-cyan-500/20 rounded-xl flex items-center justify-center">
-                    <Zap className="h-4 w-4 text-cyan-500" />
-                  </div>
-                  Activate Leads
-                </CardTitle>
-                <Button variant="ghost" size="sm" className="h-8" onClick={() => onNavigate('activate-leads')}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="text-center p-4 bg-cyan-500/10 rounded-2xl">
-                  <p className="text-3xl font-bold text-cyan-500">{leadsStats.activated}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Total</p>
+          {/* Fechados (3 módulos) */}
+          <Card className="border border-success/20 bg-gradient-to-br from-success/5 to-transparent">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 bg-success/20 rounded-xl flex items-center justify-center">
+                  <CheckCircle className="h-4 w-4 text-success" />
                 </div>
-                <div className="text-center p-4 bg-success/10 rounded-2xl">
-                  <p className="text-3xl font-bold text-success">{leadsStats.activatedWorked}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Trabalhados</p>
-                </div>
+                <span className="text-xs font-medium text-muted-foreground">Fechados</span>
               </div>
-              <div className="mt-3">
-                <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                  <span>Progresso</span>
-                  <span>{leadsStats.activated > 0 ? ((leadsStats.activatedWorked / leadsStats.activated) * 100).toFixed(0) : 0}%</span>
-                </div>
-                <Progress value={leadsStats.activated > 0 ? (leadsStats.activatedWorked / leadsStats.activated) * 100 : 0} className="h-2" />
+              <p className="text-2xl font-bold text-success">
+                {leadsStats.fechadosPremium + leadsStats.fechadosActivate + leadsStats.fechadosClientes}
+              </p>
+              <div className="flex flex-wrap gap-1 mt-2">
+                <Badge variant="outline" className="text-[9px] px-1.5 bg-amber-500/10 border-amber-500/30 text-amber-600">P: {leadsStats.fechadosPremium}</Badge>
+                <Badge variant="outline" className="text-[9px] px-1.5 bg-cyan-500/10 border-cyan-500/30 text-cyan-600">A: {leadsStats.fechadosActivate}</Badge>
+                <Badge variant="outline" className="text-[9px] px-1.5 bg-indigo-500/10 border-indigo-500/30 text-indigo-600">C: {leadsStats.fechadosClientes}</Badge>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Documentações Salvas */}
+          <Card className="border border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent cursor-pointer hover:shadow-lg transition-all" onClick={() => onNavigate('documents')}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                  <FileText className="h-4 w-4 text-purple-500" />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground">Documentações</span>
+              </div>
+              <p className="text-2xl font-bold">{leadsStats.documentacoesSalvas}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">Salvas no período</p>
             </CardContent>
           </Card>
         </div>
