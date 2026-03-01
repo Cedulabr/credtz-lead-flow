@@ -1,53 +1,44 @@
 
 
-## Importacao Inteligente de Contatos SMS
+## Relatorio CSV por Campanha (Disparos)
 
 ### O que sera feito
 
-1. **Botao "Baixar Modelo"** -- gera e baixa um arquivo CSV modelo com as colunas `nome;telefone` ja preenchidas com 2 exemplos para o usuario entender o formato.
+Na aba **Disparos** (CampaignsView), cada campanha com status `completed` ou `failed` recebera um botao **"Baixar Relatorio"** (icone Download). Ao clicar, o sistema:
 
-2. **Importacao com validacao completa** -- ao importar CSV ou Excel:
-   - Le o arquivo e extrai nome + telefone
-   - Limpa telefones (remove caracteres nao numericos)
-   - Valida formato (10 ou 11 digitos brasileiros)
-   - Detecta telefones duplicados dentro do proprio arquivo
-   - Detecta telefones que ja existem na lista de destino (consulta banco)
-   - Separa em: validos, invalidos e duplicados
-
-3. **Relatorio pos-importacao** -- Dialog com resumo visual:
-   - Total de linhas lidas
-   - Contatos validos importados (verde)
-   - Telefones invalidos ignorados com lista dos numeros (vermelho)
-   - Telefones duplicados ignorados com lista (amarelo)
-   - Feedback claro ao usuario com cores e icones
-
----
+1. Consulta todos os registros de `sms_history` vinculados aquele `campaign_id`
+2. Gera um arquivo CSV detalhado com as colunas:
+   - Nome do contato
+   - Telefone
+   - Status (Entregue / Enviado / Falhou / Pendente)
+   - Mensagem de erro (se houver)
+   - Provedor (Yup Chat / Twilio)
+   - Data/hora do envio
+3. O CSV sera organizado com os entregues primeiro, depois enviados, pendentes e por ultimo os que falharam -- facilitando a analise
+4. Dispara o download automatico no navegador do usuario
 
 ### Detalhes Tecnicos
 
-**Arquivo: `src/modules/sms/views/ContactsView.tsx`**
+**Arquivo: `src/modules/sms/views/CampaignsView.tsx`**
 
-Alteracoes:
-- Adicionar funcao `downloadTemplate()` que cria um CSV com header `nome;telefone` e 2 linhas de exemplo, e dispara download via `Blob` + `URL.createObjectURL`
-- Botao "Baixar Modelo" ao lado de cada lista (icone Download)
-- Reescrever `handleCsvImport` para:
-  1. Aceitar `.csv` e `.xlsx`
-  2. Ler arquivo (CSV via `text()`, XLSX via `xlsx` lib ja instalada)
-  3. Normalizar telefones com `replace(/\D/g, "")`
-  4. Validar: `phone.length === 10 || phone.length === 11`
-  5. Detectar duplicados internos com `Set`
-  6. Consultar `sms_contacts` da lista para encontrar telefones ja existentes
-  7. Inserir apenas os validos e nao duplicados
-  8. Abrir Dialog de relatorio com os resultados
+- Adicionar funcao `handleDownloadReport(campaignId, campaignName)`:
+  1. Busca `sms_history` com `campaign_id = X`, ordenado por status (delivered, sent, pending, failed)
+  2. Monta CSV com separador `;` (padrao brasileiro para abrir no Excel)
+  3. Colunas: `Nome;Telefone;Status;Erro;Provedor;Data Envio`
+  4. Status traduzido: delivered=Entregue, sent=Enviado, failed=Falhou, pending=Pendente
+  5. Gera download via `Blob` + `URL.createObjectURL`
+  6. Nome do arquivo: `relatorio-{nome-campanha}-{data}.csv`
 
-- Novo state para o Dialog de relatorio: `importReport` com campos `{ total, imported, invalid, duplicatesInternal, duplicatesExisting, invalidPhones, duplicatePhones }`
+- Adicionar botao "Baixar Relatorio" (icone `Download`) ao lado dos botoes existentes de cada campanha, visivel para campanhas que ja foram disparadas (status `completed`, `failed`, ou `sending`)
 
-**Nenhuma alteracao de banco de dados necessaria** -- a tabela `sms_contacts` ja existe com as colunas necessarias.
+- State `downloadingReportId` para loading indicator no botao
+
+**Nenhuma alteracao de banco de dados necessaria** -- os dados ja existem em `sms_history` com a coluna `campaign_id`.
 
 ### Resultado Esperado
 
-1. Usuario clica "Baixar Modelo" e recebe CSV pronto para preencher
-2. Ao importar, o sistema valida todos os telefones automaticamente
-3. Ao concluir, um relatorio visual mostra exatamente quantos foram importados, quantos tinham problemas e quais eram os numeros com erro
-4. Apenas contatos validos e unicos sao inseridos na lista
+1. Gestor/Admin clica em "Baixar Relatorio" em qualquer campanha ja disparada
+2. Recebe CSV limpo e organizado com todos os destinatarios
+3. Pode filtrar no Excel por status para ver rapidamente o que foi entregue vs. o que falhou
+4. Interface fica menos poluida pois os detalhes ficam no arquivo, nao na tela
 
