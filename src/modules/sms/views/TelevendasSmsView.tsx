@@ -186,6 +186,7 @@ export const TelevendasSmsView = () => {
         .from("televendas")
         .select("id, nome, telefone, tipo_operacao, status, company_id, user_id")
         .in("status", ["em_andamento", "aguardando", "digitado", "solicitar_digitacao"])
+        .ilike("tipo_operacao", "%portabilidade%")
         .limit(500);
 
       // Company isolation on pull
@@ -310,10 +311,9 @@ export const TelevendasSmsView = () => {
                         const normalized = (item.cliente_telefone || "").replace(/\D/g, "");
                         const count = phoneCounts.get(normalized) || 0;
                         return count > 1 ? (
-                          <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-amber-600" title={`${count} propostas ativas com este telefone (receberá apenas 1 SMS)`}>
-                            <AlertTriangle className="h-3 w-3" />
-                            {count}x
-                          </span>
+                          <Badge variant="outline" className="ml-1.5 text-[9px] px-1.5 py-0 border-amber-400 text-amber-700 bg-amber-50 font-medium" title={`${count} propostas ativas com este telefone — receberá apenas 1 SMS`}>
+                            {count} propostas · 1 SMS
+                          </Badge>
                         ) : null;
                       })()}
                     </TableCell>
