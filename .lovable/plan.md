@@ -1,84 +1,50 @@
 
 
-## Refazer Dashboard - Resumo por Empresa e Modulo
+## Evolucao do Modulo SMS - Auto-Enqueue de Portabilidade
 
-### O que sera removido (indicadores antigos)
+### Situacao Atual
 
-Todos os seguintes serao eliminados do Dashboard admin/gestor:
-- Cards de Vendas Pagas, Faturamento, Comissoes, Top Vendedor/Conversao
-- Secao de 6 cards de leads (Premium, Activate, Meus Clientes, Contato Futuro, Fechados, Documentacoes)
-- Grafico de Vendas por Periodo (AreaChart)
-- Funil de Televendas (PieChart)
-- Resumo Financeiro (contas vencidas/vencendo)
-- Top Vendedores
-- Acoes Rapidas
-- Vendas por Produto (PieChart)
-- SalesRanking
-- Alertas de financa
+Ja existe um trigger `trg_sms_auto_enqueue_televendas` que dispara apos cada INSERT na tabela `televendas` e chama a funcao `sms_auto_enqueue_televendas()`. Porem, essa funcao enfileira **todas** as propostas indiscriminadamente, enquanto a automacao de envio (edge function `sms-automation-run`) so processa propostas de **Portabilidade**. Isso gera registros inuteis na fila para propostas que nunca serao notificadas.
 
-### Nova estrutura do Dashboard Admin/Gestor
+Alem disso, o botao "Puxar Propostas" importa propostas de todos os tipos, sem filtrar por portabilidade.
 
-O dashboard tera uma visao focada em **resumo de atividades dos usuarios por empresa**, cobrindo apenas os 6 modulos solicitados.
+### Plano de Implementacao
 
-**Filtros (mantidos):** Mes + Empresa
+#### 1. Atualizar trigger para filtrar apenas Portabilidade (Migracao SQL)
 
-**Layout: Tabela de resumo por usuario, agrupada por empresa**
+Reescrever a funcao `sms_auto_enqueue_televendas()` para que so insira na fila quando `NEW.tipo_operacao ILIKE '%portabilidade%'`. Propostas de outros tipos serao ignoradas automaticamente.
 
-Para cada empresa visivel ao gestor/admin, exibir uma secao com o nome da empresa e uma tabela com colunas:
+```text
+CREATE OR REPLACE FUNCTION sms_auto_enqueue_televendas()
+  - IF NEW.tipo_operacao ILIKE '%portabilidade%' THEN
+    - INSERT INTO sms_televendas_queue ... ON CONFLICT DO NOTHING
+  - END IF
+```
 
-| Colaborador | Leads Premium | Activate Leads | Televendas | Gestao TV | Gerador Proposta | SMS |
-|---|---|---|---|---|---|---|
-| Joao | 45 trab. | 20 trab. | 8 vendas | 12 propostas | 3 geradas | 15 enviados |
-| Maria | 30 trab. | 15 trab. | 5 vendas | 9 propostas | 1 gerada | 8 enviados |
+Isso garante que toda proposta de portabilidade cadastrada no Televendas apareca automaticamente na fila SMS.
 
-Detalhes de cada coluna:
-- **Leads Premium**: count de `leads` com `status != 'new_lead'` e `assigned_to = user_id` no periodo
-- **Activate Leads**: count de `activate_leads` com `status != 'novo'` e `assigned_to = user_id` no periodo
-- **Televendas**: count de `televendas` com `status = 'pago'` e `user_id = user_id` no periodo (vendas pagas)
-- **Gestao Televendas**: count de `televendas` criadas pelo usuario no periodo (total propostas)
-- **Gerador Proposta**: count de `propostas` com `created_by_id = user_id` no periodo
-- **SMS**: count de `sms_history` com `user_id = user_id` e `status = 'sent'` no periodo
+#### 2. Atualizar "Puxar Propostas" para filtrar Portabilidade (TelevendasSmsView.tsx)
 
-**Cards resumo no topo (por empresa selecionada):**
-6 cards compactos, um por modulo, com o total consolidado da empresa.
+O botao continuara existindo como fallback para importar propostas antigas, mas a query sera filtrada:
+- Adicionar `.ilike('tipo_operacao', '%portabilidade%')` na busca de propostas
 
-**Regras de acesso:**
-- Admin: ve todas as empresas, pode filtrar por empresa
-- Gestor: ve apenas sua empresa (pre-selecionada, sem opcao "Todas")
-- Colaborador: continua vendo o ConsultorDashboard motivacional (sem alteracao)
+#### 3. Agrupar a visao por telefone (TelevendasSmsView.tsx)
 
-### Dashboard Colaborador
+Melhorar a visualizacao para que o gestor/admin entenda que um cliente com multiplas propostas recebe apenas 1 SMS:
+- Adicionar uma indicacao visual mais clara quando o mesmo telefone tem multiplas propostas (ex: "13 propostas - 1 SMS")
+- Manter a tabela individual mas com badge de agrupamento destacado
 
-Sem alteracao -- mantem o ConsultorDashboard.tsx atual com metas diarias e recontatos.
-
-### Arquivos a editar
+### Arquivos a Editar
 
 | Arquivo | Alteracao |
 |---|---|
-| `src/components/Dashboard.tsx` | Reescrever completamente: remover todos os indicadores antigos, remover imports de recharts/SalesRanking/finance. Novo layout com tabela de atividades por usuario agrupada por empresa, 6 cards resumo dos modulos. |
-| `src/components/ConsultorDashboard.tsx` | Nenhuma alteracao |
+| Migracao SQL | Reescrever funcao `sms_auto_enqueue_televendas()` com filtro de portabilidade |
+| `src/modules/sms/views/TelevendasSmsView.tsx` | Filtrar "Puxar Propostas" para portabilidade; melhorar indicacao visual de agrupamento por telefone |
 
-### Detalhes tecnicos
+### Resultado Esperado
 
-**Queries necessarias (Dashboard.tsx):**
-
-Para cada empresa visivel, buscar usuarios via `user_companies`, depois para cada usuario fazer queries paralelas:
-
-```text
-1. user_companies -> listar usuarios da empresa
-2. leads (assigned_to IN userIds, status != 'new_lead', periodo) -> agrupar por assigned_to
-3. activate_leads (assigned_to IN userIds, status != 'novo', periodo) -> agrupar por assigned_to
-4. televendas (user_id IN userIds, status = 'pago', periodo) -> agrupar por user_id
-5. televendas (user_id IN userIds, periodo) -> total propostas por user_id
-6. propostas (created_by_id IN userIds, periodo) -> agrupar por created_by_id
-7. sms_history (user_id IN userIds, status = 'sent', periodo) -> agrupar por user_id
-```
-
-Todas as queries usam `.in('field', userIds)` e agrupamento no frontend via Map/reduce.
-
-**Estrutura do componente:**
-- Header com filtros (mes + empresa) -- simplificado
-- 6 cards resumo no topo (totais por modulo)
-- Tabela responsiva com dados por colaborador
-- Em mobile: cards em vez de tabela
+1. Toda proposta de portabilidade cadastrada no Televendas aparece automaticamente na fila SMS (sem clicar em nada)
+2. Propostas de outros tipos nao poluem a fila
+3. O gestor/admin ve claramente que clientes com multiplas propostas recebem apenas 1 SMS
+4. O botao "Puxar Propostas" permanece como fallback para propostas antigas, ja filtrado para portabilidade
 
