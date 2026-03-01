@@ -1,83 +1,84 @@
 
-## Refazer Dashboard Principal - Admin/Gestor vs Colaborador
 
-### Resumo
+## Refazer Dashboard - Resumo por Empresa e Modulo
 
-O Dashboard sera completamente reescrito com duas visoes distintas:
+### O que sera removido (indicadores antigos)
 
-1. **Admin/Gestor**: Visao gerencial com metricas de equipe (leads trabalhados, contatos futuros, fechados, documentacoes)
-2. **Colaborador**: Visao motivacional com metas diarias (50 leads premium, recontatos, documentacoes, propostas pagas)
+Todos os seguintes serao eliminados do Dashboard admin/gestor:
+- Cards de Vendas Pagas, Faturamento, Comissoes, Top Vendedor/Conversao
+- Secao de 6 cards de leads (Premium, Activate, Meus Clientes, Contato Futuro, Fechados, Documentacoes)
+- Grafico de Vendas por Periodo (AreaChart)
+- Funil de Televendas (PieChart)
+- Resumo Financeiro (contas vencidas/vencendo)
+- Top Vendedores
+- Acoes Rapidas
+- Vendas por Produto (PieChart)
+- SalesRanking
+- Alertas de financa
 
----
+### Nova estrutura do Dashboard Admin/Gestor
 
-### Dashboard Admin/Gestor
+O dashboard tera uma visao focada em **resumo de atividades dos usuarios por empresa**, cobrindo apenas os 6 modulos solicitados.
 
-**Cards principais (grid 2x3 ou 3x2)**:
+**Filtros (mantidos):** Mes + Empresa
 
-| Card | Dados | Fonte |
-|---|---|---|
-| Leads Premium Trabalhados | Total vs Trabalhados (status != 'new_lead') | tabela `leads` filtrada por empresa/mes |
-| Activate Leads Trabalhados | Total vs Trabalhados (status != 'novo') | tabela `activate_leads` filtrada por empresa/mes |
-| Meus Clientes Trabalhados | Total propostas criadas no periodo | tabela `propostas` filtrada por empresa/mes |
-| Contato Futuro (3 modulos) | Leads Premium com status `contato_futuro` + Activate com `contato_futuro` + Propostas com status `contato_futuro` | 3 tabelas |
-| Fechados (3 modulos) | Premium `cliente_fechado` + Activate `fechado` + Propostas pipeline `aceitou_proposta` | 3 tabelas |
-| Documentacoes Salvas | Total de documentos salvos no periodo | tabela `client_documents` |
+**Layout: Tabela de resumo por usuario, agrupada por empresa**
 
-**Secoes adicionais (mantidas)**:
-- Ranking de vendedores (SalesRanking)
-- Grafico de vendas por periodo
-- Funil de televendas
-- Resumo financeiro
-- Top vendedores
-- Acoes rapidas
+Para cada empresa visivel ao gestor/admin, exibir uma secao com o nome da empresa e uma tabela com colunas:
 
-**Filtros**: Mes + Empresa (mantidos como estao hoje)
+| Colaborador | Leads Premium | Activate Leads | Televendas | Gestao TV | Gerador Proposta | SMS |
+|---|---|---|---|---|---|---|
+| Joao | 45 trab. | 20 trab. | 8 vendas | 12 propostas | 3 geradas | 15 enviados |
+| Maria | 30 trab. | 15 trab. | 5 vendas | 9 propostas | 1 gerada | 8 enviados |
 
----
+Detalhes de cada coluna:
+- **Leads Premium**: count de `leads` com `status != 'new_lead'` e `assigned_to = user_id` no periodo
+- **Activate Leads**: count de `activate_leads` com `status != 'novo'` e `assigned_to = user_id` no periodo
+- **Televendas**: count de `televendas` com `status = 'pago'` e `user_id = user_id` no periodo (vendas pagas)
+- **Gestao Televendas**: count de `televendas` criadas pelo usuario no periodo (total propostas)
+- **Gerador Proposta**: count de `propostas` com `created_by_id = user_id` no periodo
+- **SMS**: count de `sms_history` com `user_id = user_id` e `status = 'sent'` no periodo
+
+**Cards resumo no topo (por empresa selecionada):**
+6 cards compactos, um por modulo, com o total consolidado da empresa.
+
+**Regras de acesso:**
+- Admin: ve todas as empresas, pode filtrar por empresa
+- Gestor: ve apenas sua empresa (pre-selecionada, sem opcao "Todas")
+- Colaborador: continua vendo o ConsultorDashboard motivacional (sem alteracao)
 
 ### Dashboard Colaborador
 
-**Foco motivacional com metas diarias e barras de progresso**:
+Sem alteracao -- mantem o ConsultorDashboard.tsx atual com metas diarias e recontatos.
 
-| Metrica | Meta Diaria | Dados |
-|---|---|---|
-| Leads Premium Trabalhados Hoje | 50 por dia | `leads` do usuario, status != 'new_lead', criados hoje |
-| Recontatos Premium | Sem meta fixa, mostrar pendentes | `leads` com `contato_futuro` e `future_contact_date <= hoje` |
-| Recontatos Activate | Sem meta fixa, mostrar pendentes | `activate_leads` com `contato_futuro` do usuario |
-| Recontatos Meus Clientes | Sem meta fixa, mostrar pendentes | `propostas` com status `contato_futuro` |
-| Documentacoes Salvas Hoje | 10 por dia | `client_documents` do usuario, criados hoje |
-| Propostas Pagas Hoje | Mostrar contagem | `televendas` status `pago`, data_venda = hoje |
-
-**Layout motivacional**:
-- Saudacao com nome + frase motivacional
-- Card de meta diaria de leads com barra de progresso circular/linear e porcentagem
-- Cards de recontatos pendentes com botoes de acao rapida
-- Cards de documentacoes e propostas pagas com indicadores visuais
-- Ranking de vendedores (mantido)
-- Acoes rapidas (Nova Venda, Meus Leads, Indicar Cliente)
-
----
-
-### Arquivos a Editar
+### Arquivos a editar
 
 | Arquivo | Alteracao |
 |---|---|
-| `src/components/Dashboard.tsx` | Refazer secao de leads do admin/gestor com os 6 cards novos (Premium trabalhados, Activate trabalhados, Meus Clientes trabalhados, Contato Futuro consolidado, Fechados consolidado, Documentacoes). Atualizar `fetchLeadsData` para buscar contato_futuro e fechados dos 3 modulos |
-| `src/components/ConsultorDashboard.tsx` | Reescrever completamente com foco motivacional: meta de 50 leads diarios, recontatos pendentes dos 3 modulos, documentacoes salvas hoje, propostas pagas hoje. Layout com barras de progresso e indicadores visuais de meta |
+| `src/components/Dashboard.tsx` | Reescrever completamente: remover todos os indicadores antigos, remover imports de recharts/SalesRanking/finance. Novo layout com tabela de atividades por usuario agrupada por empresa, 6 cards resumo dos modulos. |
+| `src/components/ConsultorDashboard.tsx` | Nenhuma alteracao |
 
-### Detalhes Tecnicos
+### Detalhes tecnicos
 
-**fetchLeadsData (Dashboard.tsx)** - Adicionar queries:
-- `leads` com `status = 'contato_futuro'` para contar contatos futuros premium
-- `leads` com `status = 'cliente_fechado'` para contar fechados premium
-- `activate_leads` com `status = 'contato_futuro'` e `status = 'fechado'`
-- `propostas` com `status = 'contato_futuro'` e `pipeline_stage = 'aceitou_proposta'`
-- `client_documents` count para documentacoes
+**Queries necessarias (Dashboard.tsx):**
 
-**ConsultorDashboard** - Novas queries diarias:
-- `leads` do usuario com `assigned_to = user.id`, status != 'new_lead', created_at = hoje (meta 50)
-- `leads` com `status = 'contato_futuro'` e `assigned_to = user.id` (recontatos pendentes)
-- `activate_leads` com `status = 'contato_futuro'` e `assigned_to = user.id`
-- `propostas` com `status = 'contato_futuro'` e `created_by_id = user.id`
-- `client_documents` do usuario criados hoje
-- `televendas` com `status = 'pago'` e `data_venda = hoje` e `user_id = user.id`
+Para cada empresa visivel, buscar usuarios via `user_companies`, depois para cada usuario fazer queries paralelas:
+
+```text
+1. user_companies -> listar usuarios da empresa
+2. leads (assigned_to IN userIds, status != 'new_lead', periodo) -> agrupar por assigned_to
+3. activate_leads (assigned_to IN userIds, status != 'novo', periodo) -> agrupar por assigned_to
+4. televendas (user_id IN userIds, status = 'pago', periodo) -> agrupar por user_id
+5. televendas (user_id IN userIds, periodo) -> total propostas por user_id
+6. propostas (created_by_id IN userIds, periodo) -> agrupar por created_by_id
+7. sms_history (user_id IN userIds, status = 'sent', periodo) -> agrupar por user_id
+```
+
+Todas as queries usam `.in('field', userIds)` e agrupamento no frontend via Map/reduce.
+
+**Estrutura do componente:**
+- Header com filtros (mes + empresa) -- simplificado
+- 6 cards resumo no topo (totais por modulo)
+- Tabela responsiva com dados por colaborador
+- Em mobile: cards em vez de tabela
+
