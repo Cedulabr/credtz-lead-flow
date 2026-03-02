@@ -11,6 +11,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   FileText, 
   Download, 
@@ -19,7 +21,9 @@ import {
   User,
   CheckCircle,
   Building2,
-  Wallet
+  Wallet,
+  MessageCircle,
+  Send
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { BaseOffClient, BaseOffContract } from '../types';
@@ -27,6 +31,7 @@ import { formatCurrency, formatDate, formatCPF, formatPhone } from '../utils';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { TrocoSimulation } from './TrocoCalculator';
+import { useWhatsApp } from '@/hooks/useWhatsApp';
 
 interface ProfessionalProposalPDFProps {
   isOpen: boolean;
@@ -75,6 +80,12 @@ export function ProfessionalProposalPDF({
 }: ProfessionalProposalPDFProps) {
   const [selectedContracts, setSelectedContracts] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+  const [showWhatsAppSend, setShowWhatsAppSend] = useState(false);
+  const [whatsAppMessage, setWhatsAppMessage] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+
+  const { sendMediaMessage, hasInstances, sending, instances, loadingInstances } = useWhatsApp();
 
   // Sync with external selection if provided
   useEffect(() => {
@@ -436,8 +447,14 @@ export function ProfessionalProposalPDF({
       const fileName = `proposta_refinanciamento_${cleanCPF}_${Date.now()}.pdf`;
       doc.save(fileName);
 
-      toast.success('Proposta profissional gerada com sucesso!');
-      onClose();
+      // Capture base64 for WhatsApp
+      const base64 = doc.output('datauristring').split(',')[1];
+      setPdfBase64(base64);
+      setPhoneNumber(client.tel_cel_1?.replace(/\D/g, '') || '');
+      setWhatsAppMessage(`Olá ${client.nome?.split(' ')[0] || ''}, segue sua proposta de refinanciamento. Qualquer dúvida estou à disposição!`);
+      setShowWhatsAppSend(true);
+
+      toast.success('PDF gerado! Agora você pode enviar via WhatsApp.');
 
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -447,149 +464,259 @@ export function ProfessionalProposalPDF({
     }
   };
 
+  const handleSendWhatsApp = async () => {
+    if (!pdfBase64) return;
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      toast.error('Número de telefone inválido');
+      return;
+    }
+    const fullPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    const fileName = `proposta_${client.cpf?.replace(/\D/g, '') || 'cliente'}.pdf`;
+    
+    const success = await sendMediaMessage(fullPhone, pdfBase64, fileName, whatsAppMessage, client.nome);
+    if (success) {
+      handleCloseAll();
+    }
+  };
+
+  const handleCloseAll = () => {
+    setShowWhatsAppSend(false);
+    setPdfBase64(null);
+    onClose();
+  };
+
   // Calculate totals for display
   const selectedContractsList = contracts.filter(c => selectedContracts.includes(c.id));
   const totalSaldo = selectedContractsList.reduce((sum, c) => sum + (c.saldo || 0), 0);
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleCloseAll}>
       <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" />
-            Gerar Proposta Profissional
+            {showWhatsAppSend ? (
+              <>
+                <MessageCircle className="w-5 h-5 text-green-600" />
+                Enviar Proposta via WhatsApp
+              </>
+            ) : (
+              <>
+                <FileText className="w-5 h-5 text-primary" />
+                Gerar Proposta Profissional
+              </>
+            )}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col space-y-4 py-4">
-          {/* Client Info */}
-          <Card className="p-4 bg-muted/50 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <User className="w-6 h-6 text-primary" />
+        {showWhatsAppSend ? (
+          /* ===== WhatsApp Send Screen ===== */
+          <div className="flex-1 overflow-hidden flex flex-col space-y-4 py-4">
+            <Card className="p-4 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-green-700 dark:text-green-400">PDF gerado com sucesso!</p>
+                  <p className="text-sm text-muted-foreground">O download já foi realizado. Deseja enviar via WhatsApp?</p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-bold text-lg truncate">{client.nome}</p>
-                <p className="text-sm text-muted-foreground">
-                  CPF: {formatCPF(client.cpf)} • NB: {client.nb || 'N/I'}
-                </p>
+            </Card>
+
+            <Card className="p-4 bg-muted/50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <User className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-bold">{client.nome}</p>
+                  <p className="text-sm text-muted-foreground">CPF: {formatCPF(client.cpf)}</p>
+                </div>
+              </div>
+            </Card>
+
+            <div className="space-y-3">
+              <div>
+                <Label className="text-sm font-medium">Telefone (com DDD)</Label>
+                <Input
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="Ex: 71999999999"
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium">Mensagem</Label>
+                <Textarea
+                  value={whatsAppMessage}
+                  onChange={(e) => setWhatsAppMessage(e.target.value)}
+                  rows={3}
+                  className="mt-1"
+                  placeholder="Digite a mensagem que acompanhará o PDF..."
+                />
               </div>
             </div>
-          </Card>
 
-          {/* Troco Simulation Summary (if available) */}
-          {trocoSimulation && trocoSimulation.troco > 0 && (
-            <Card className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20 border-emerald-200 dark:border-emerald-800 shrink-0">
+            {!hasInstances && !loadingInstances && (
+              <Card className="p-3 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 shrink-0">
+                <p className="text-sm text-amber-700 dark:text-amber-400">
+                  ⚠️ Nenhuma instância WhatsApp configurada. Configure em Configurações WhatsApp.
+                </p>
+              </Card>
+            )}
+
+            <div className="flex gap-3 pt-2 shrink-0">
+              <Button variant="outline" onClick={handleCloseAll} className="flex-1">
+                Fechar
+              </Button>
+              <Button 
+                onClick={handleSendWhatsApp}
+                disabled={!hasInstances || sending || !phoneNumber.trim()}
+                className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white"
+              >
+                {sending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                API WhatsApp
+              </Button>
+            </div>
+          </div>
+        ) : (
+          /* ===== Contract Selection Screen (original) ===== */
+          <div className="flex-1 overflow-hidden flex flex-col space-y-4 py-4">
+            {/* Client Info */}
+            <Card className="p-4 bg-muted/50 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                  <Wallet className="w-5 h-5 text-emerald-600" />
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <User className="w-6 h-6 text-primary" />
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm text-emerald-700 dark:text-emerald-400">Troco Calculado</p>
-                  <p className="text-2xl font-bold text-emerald-600">
-                    {formatCurrency(trocoSimulation.troco)}
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-lg truncate">{client.nome}</p>
+                  <p className="text-sm text-muted-foreground">
+                    CPF: {formatCPF(client.cpf)} • NB: {client.nb || 'N/I'}
                   </p>
                 </div>
-                <div className="text-right text-sm">
-                  <p className="text-muted-foreground">{trocoSimulation.bancoLabel}</p>
-                  <p className="text-muted-foreground">{trocoSimulation.taxa}% • {trocoSimulation.prazo}x</p>
+              </div>
+            </Card>
+
+            {/* Troco Simulation Summary (if available) */}
+            {trocoSimulation && trocoSimulation.troco > 0 && (
+              <Card className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20 border-emerald-200 dark:border-emerald-800 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                    <Wallet className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-emerald-700 dark:text-emerald-400">Troco Calculado</p>
+                    <p className="text-2xl font-bold text-emerald-600">
+                      {formatCurrency(trocoSimulation.troco)}
+                    </p>
+                  </div>
+                  <div className="text-right text-sm">
+                    <p className="text-muted-foreground">{trocoSimulation.bancoLabel}</p>
+                    <p className="text-muted-foreground">{trocoSimulation.taxa}% • {trocoSimulation.prazo}x</p>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          )}
+              </Card>
+            )}
 
-          {/* Contract Selection */}
-          <div className="flex items-center justify-between shrink-0">
-            <Label className="text-base font-semibold flex items-center gap-2">
-              <CreditCard className="w-4 h-4" />
-              Selecione os Contratos
-            </Label>
-            <Button variant="ghost" size="sm" onClick={selectAll}>
-              {selectedContracts.length === contracts.length ? 'Desmarcar todos' : 'Selecionar todos'}
-            </Button>
-          </div>
-
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="space-y-2 pr-2">
-              {contracts.length === 0 ? (
-                <Card className="p-6 text-center">
-                  <FileText className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-muted-foreground">Nenhum contrato disponível</p>
-                </Card>
-              ) : (
-                contracts.map(contract => (
-                  <Card
-                    key={contract.id}
-                    className={cn(
-                      "p-4 cursor-pointer transition-all",
-                      selectedContracts.includes(contract.id) 
-                        ? "border-2 border-primary bg-primary/5" 
-                        : "hover:bg-muted/50"
-                    )}
-                    onClick={() => toggleContract(contract.id)}
-                  >
-                    <div className="flex items-center gap-4">
-                      <Checkbox
-                        checked={selectedContracts.includes(contract.id)}
-                        onCheckedChange={() => toggleContract(contract.id)}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                          <span className="font-semibold truncate">{contract.banco_emprestimo || 'N/I'}</span>
-                          <Badge variant="outline" className="text-xs shrink-0">
-                            {contract.tipo_emprestimo || 'Empréstimo'}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground truncate">
-                          Nº {contract.contrato} • Parcela: {formatCurrency(contract.vl_parcela)}
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-bold">{formatCurrency(contract.saldo)}</p>
-                        <p className="text-xs text-muted-foreground">Saldo</p>
-                      </div>
-                    </div>
-                  </Card>
-                ))
-              )}
+            {/* Contract Selection */}
+            <div className="flex items-center justify-between shrink-0">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <CreditCard className="w-4 h-4" />
+                Selecione os Contratos
+              </Label>
+              <Button variant="ghost" size="sm" onClick={selectAll}>
+                {selectedContracts.length === contracts.length ? 'Desmarcar todos' : 'Selecionar todos'}
+              </Button>
             </div>
-          </ScrollArea>
 
-          {/* Summary */}
-          {selectedContracts.length > 0 && (
-            <Card className="p-3 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 shrink-0">
-              <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-                <CheckCircle className="w-4 h-4" />
-                <span className="text-sm font-medium">
-                  {selectedContracts.length} contrato(s) • Saldo total: {formatCurrency(totalSaldo)}
-                  {trocoSimulation && trocoSimulation.troco > 0 && (
-                    <span className="ml-2 font-bold">• Troco: {formatCurrency(trocoSimulation.troco)}</span>
-                  )}
-                </span>
+            <ScrollArea className="flex-1 -mx-6 px-6">
+              <div className="space-y-2 pr-2">
+                {contracts.length === 0 ? (
+                  <Card className="p-6 text-center">
+                    <FileText className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-muted-foreground">Nenhum contrato disponível</p>
+                  </Card>
+                ) : (
+                  contracts.map(contract => (
+                    <Card
+                      key={contract.id}
+                      className={cn(
+                        "p-4 cursor-pointer transition-all",
+                        selectedContracts.includes(contract.id) 
+                          ? "border-2 border-primary bg-primary/5" 
+                          : "hover:bg-muted/50"
+                      )}
+                      onClick={() => toggleContract(contract.id)}
+                    >
+                      <div className="flex items-center gap-4">
+                        <Checkbox
+                          checked={selectedContracts.includes(contract.id)}
+                          onCheckedChange={() => toggleContract(contract.id)}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <span className="font-semibold truncate">{contract.banco_emprestimo || 'N/I'}</span>
+                            <Badge variant="outline" className="text-xs shrink-0">
+                              {contract.tipo_emprestimo || 'Empréstimo'}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate">
+                            Nº {contract.contrato} • Parcela: {formatCurrency(contract.vl_parcela)}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-bold">{formatCurrency(contract.saldo)}</p>
+                          <p className="text-xs text-muted-foreground">Saldo</p>
+                        </div>
+                      </div>
+                    </Card>
+                  ))
+                )}
               </div>
-            </Card>
-          )}
+            </ScrollArea>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-2 shrink-0">
-            <Button variant="outline" onClick={onClose} className="flex-1">
-              Cancelar
-            </Button>
-            <Button 
-              onClick={generatePDF} 
-              disabled={selectedContracts.length === 0 || isGenerating}
-              className="flex-1 gap-2"
-            >
-              {isGenerating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4" />
-              )}
-              Gerar PDF
-            </Button>
+            {/* Summary */}
+            {selectedContracts.length > 0 && (
+              <Card className="p-3 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 shrink-0">
+                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle className="w-4 h-4" />
+                  <span className="text-sm font-medium">
+                    {selectedContracts.length} contrato(s) • Saldo total: {formatCurrency(totalSaldo)}
+                    {trocoSimulation && trocoSimulation.troco > 0 && (
+                      <span className="ml-2 font-bold">• Troco: {formatCurrency(trocoSimulation.troco)}</span>
+                    )}
+                  </span>
+                </div>
+              </Card>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-2 shrink-0">
+              <Button variant="outline" onClick={handleCloseAll} className="flex-1">
+                Cancelar
+              </Button>
+              <Button 
+                onClick={generatePDF} 
+                disabled={selectedContracts.length === 0 || isGenerating}
+                className="flex-1 gap-2"
+              >
+                {isGenerating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                Gerar PDF
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );
