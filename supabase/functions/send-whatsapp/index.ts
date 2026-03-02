@@ -3,8 +3,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+const TICKETZ_URL = "https://chat.easyn.digital:443/backend/api/messages/send";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -39,21 +41,73 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { apiToken, number, message, mediaBase64, mediaName, clientName } = body;
+    const { apiToken, number, message, mediaBase64, mediaName, clientName, testMode } = body;
 
-    if (!apiToken || !number) {
+    if (!apiToken) {
       return new Response(
-        JSON.stringify({ error: "apiToken and number are required" }),
+        JSON.stringify({ error: "apiToken is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const TICKETZ_URL = "https://chat.easyn.digital:443/backend/api/messages/send";
+    // Test mode: validate token by sending to a dummy number
+    if (testMode) {
+      try {
+        const testResponse = await fetch(TICKETZ_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            number: "5500000000000",
+            body: "Teste de conexão",
+            saveOnTicket: false,
+          }),
+        });
+        const testText = await testResponse.text();
+        console.log("Test mode response:", testResponse.status, testText);
+        
+        // If status < 500, the token is valid (even 4xx means auth worked)
+        if (testResponse.status < 500) {
+          return new Response(
+            JSON.stringify({ success: true, testMode: true, status: testResponse.status }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        } else {
+          return new Response(
+            JSON.stringify({ success: false, testMode: true, error: "API server error", details: testText }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } catch (e) {
+        console.error("Test mode error:", e);
+        return new Response(
+          JSON.stringify({ success: false, testMode: true, error: e.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    if (!number) {
+      return new Response(
+        JSON.stringify({ error: "number is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Normalize phone number - ensure it has country code
+    let normalizedNumber = number.replace(/\D/g, "");
+    if (normalizedNumber.length <= 11) {
+      normalizedNumber = "55" + normalizedNumber;
+    }
+
+    console.log(`Sending to: ${normalizedNumber}, type: ${mediaBase64 ? 'media' : 'text'}`);
+
     let ticketzResponse: Response;
     let messageType = "text";
 
     if (mediaBase64 && mediaName) {
-      // Media message - convert base64 to blob and send as multipart/form-data
       messageType = "media";
       const binaryStr = atob(mediaBase64);
       const bytes = new Uint8Array(binaryStr.length);
@@ -62,7 +116,7 @@ Deno.serve(async (req) => {
       }
 
       const formData = new FormData();
-      formData.append("number", number);
+      formData.append("number", normalizedNumber);
       formData.append("saveOnTicket", "true");
       
       const blob = new Blob([bytes], { type: "application/pdf" });
@@ -70,19 +124,21 @@ Deno.serve(async (req) => {
 
       // If there's also a text message, send it first
       if (message) {
-        await fetch(TICKETZ_URL, {
+        const textResp = await fetch(TICKETZ_URL, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${apiToken}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            number,
+            number: normalizedNumber,
             body: message,
             saveOnTicket: true,
             linkPreview: true,
           }),
         });
+        const textResult = await textResp.text();
+        console.log("Text before media response:", textResp.status, textResult);
       }
 
       ticketzResponse = await fetch(TICKETZ_URL, {
@@ -93,7 +149,6 @@ Deno.serve(async (req) => {
         body: formData,
       });
     } else {
-      // Text message
       if (!message) {
         return new Response(
           JSON.stringify({ error: "message is required for text messages" }),
@@ -108,7 +163,7 @@ Deno.serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          number,
+          number: normalizedNumber,
           body: message,
           saveOnTicket: true,
           linkPreview: true,
@@ -117,6 +172,8 @@ Deno.serve(async (req) => {
     }
 
     const responseText = await ticketzResponse.text();
+    console.log("Ticketz response:", ticketzResponse.status, responseText);
+    
     let responseData;
     try {
       responseData = JSON.parse(responseText);
@@ -129,7 +186,7 @@ Deno.serve(async (req) => {
     // Log message in database
     await supabase.from("whatsapp_messages").insert({
       user_id: user.id,
-      phone: number,
+      phone: normalizedNumber,
       message: message || `[Media: ${mediaName}]`,
       status: success ? "sent" : "failed",
       sent_at: success ? new Date().toISOString() : null,
@@ -139,7 +196,7 @@ Deno.serve(async (req) => {
     });
 
     if (!success) {
-      console.error("Ticketz API error:", responseText);
+      console.error("Ticketz API error:", ticketzResponse.status, responseText);
       return new Response(
         JSON.stringify({ success: false, error: "Failed to send message", details: responseData }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

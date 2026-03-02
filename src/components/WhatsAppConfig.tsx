@@ -159,19 +159,19 @@ export function WhatsAppConfig() {
     if (!inst.api_token) return;
     setTesting(inst.id);
     try {
-      const response = await fetch("https://chat.easyn.digital:443/backend/api/messages/send", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${inst.api_token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ number: "5500000000000", body: "Teste de conexão", saveOnTicket: false }),
+      const { data, error } = await supabase.functions.invoke("send-whatsapp", {
+        body: { apiToken: inst.api_token, testMode: true },
       });
-      if (response.status < 500) {
+      if (error) throw error;
+      if (data?.success) {
         setTestResults(prev => ({ ...prev, [inst.id]: "success" }));
         toast.success("Conexão funcionando!");
       } else {
         setTestResults(prev => ({ ...prev, [inst.id]: "error" }));
-        toast.error("Erro de conexão");
+        toast.error(data?.error || "Erro de conexão");
       }
-    } catch {
+    } catch (e: any) {
+      console.error("Test error:", e);
       setTestResults(prev => ({ ...prev, [inst.id]: "error" }));
       toast.error("Não foi possível conectar à API");
     } finally {

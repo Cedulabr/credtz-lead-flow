@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { Lead, PIPELINE_STAGES } from "../types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Phone, MessageCircle, Clock, Calculator, FileText, ChevronRight } from "lucide-react";
+import { Phone, MessageCircle, Clock, Calculator, FileText, ChevronRight, Send } from "lucide-react";
+import { WhatsAppSendDialog } from "@/components/WhatsAppSendDialog";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -20,6 +22,7 @@ interface LeadListItemProps {
 
 export function LeadListItem({ lead, onClick, onSimulation, onTyping, onStatusChange, canEdit = true }: LeadListItemProps) {
   const isMobile = useIsMobile();
+  const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
   const config = PIPELINE_STAGES[lead.status] || PIPELINE_STAGES.new_lead;
 
   const formatPhone = (phone: string) => {
@@ -66,6 +69,7 @@ export function LeadListItem({ lead, onClick, onSimulation, onTyping, onStatusCh
   const showActionButtons = canEdit && ["new_lead", "em_andamento", "aguardando_retorno"].includes(lead.status);
 
   return (
+    <>
     <Card 
       className={cn(
         "cursor-pointer transition-all hover:shadow-md border-l-4 active:scale-[0.99]",
@@ -114,7 +118,7 @@ export function LeadListItem({ lead, onClick, onSimulation, onTyping, onStatusCh
 
         {/* Row 3: Action Buttons */}
         <div className="flex items-center gap-1.5 ml-5 flex-wrap">
-          {/* WhatsApp */}
+          {/* WhatsApp wa.me */}
           <Button
             size="sm"
             variant="ghost"
@@ -123,6 +127,17 @@ export function LeadListItem({ lead, onClick, onSimulation, onTyping, onStatusCh
           >
             <MessageCircle className="h-3.5 w-3.5" />
             <span className="text-xs hidden sm:inline">WhatsApp</span>
+          </Button>
+
+          {/* API WhatsApp */}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 px-2 text-green-600 hover:text-green-700 hover:bg-green-50 gap-1"
+            onClick={(e) => { e.stopPropagation(); setShowWhatsAppDialog(true); }}
+          >
+            <Send className="h-3.5 w-3.5" />
+            <span className="text-xs hidden sm:inline">API WhatsApp</span>
           </Button>
 
           {/* Ligar */}
@@ -184,5 +199,14 @@ export function LeadListItem({ lead, onClick, onSimulation, onTyping, onStatusCh
         </div>
       </CardContent>
     </Card>
+
+    {/* WhatsApp Send Dialog */}
+    <WhatsAppSendDialog
+      open={showWhatsAppDialog}
+      onOpenChange={setShowWhatsAppDialog}
+      clientName={lead.name}
+      clientPhone={lead.phone}
+    />
+    </>
   );
 }
