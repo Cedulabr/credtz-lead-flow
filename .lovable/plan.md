@@ -1,75 +1,61 @@
 
 
-## Plano: Padronizar API WhatsApp + Limpar Activate Leads
+## Plano: Mostrar mensagem "numero pode nao ter WhatsApp" nos 3 modulos
 
-### Problema 1: ERR_INTERNAL_ERROR no envio via API
+### Problema raiz
+O `supabase.functions.invoke()` lanca um `FunctionsHttpError` quando recebe status 502. O hook `useWhatsApp.ts` captura esse erro generico ("Edge Function returned a non-2xx status code") sem extrair o body JSON que contem a mensagem detalhada do edge function.
 
-Os logs mostram que o Ticketz retorna `500 ERR_INTERNAL_ERROR` ao enviar para o numero `5571992858184`. A edge function esta funcionando corretamente -- o erro vem da API externa. As causas provaveis sao:
+### Solucao
 
-- A instancia WhatsApp nao esta conectada/escaneada no painel Easyn
-- O numero de destino precisa incluir o 9o digito ou esta em formato incorreto
-- O token esta associado a uma conexao inativa
+#### 1. Corrigir `src/hooks/useWhatsApp.ts` - Extrair mensagem de erro do body
 
-**Acao**: Melhorar o tratamento de erro na edge function para retornar mensagens mais claras e **nao retornar status 500** quando o erro vem da API externa (usar status 502 Bad Gateway). Tambem adicionar logs mais detalhados do request enviado para facilitar debug.
+Nas funcoes `sendTextMessage` e `sendMediaMessage`, quando o `supabase.functions.invoke` retorna erro, o objeto `error` e do tipo `FunctionsHttpError` que tem um metodo `context.json()` ou o `data` pode conter a resposta. Na verdade, quando o status nao e 2xx, o SDK coloca o erro em `error` mas o `data` ainda pode ter o body.
 
-### Problema 2: Botao API WhatsApp inconsistente nos 3 modulos
+A correcao: usar `error.context?.json()` para extrair o body da resposta de erro, ou alternativamente mudar a abordagem - fazer o edge function sempre retornar 200 com `success: false` no body, para que o SDK nao lance excecao.
 
-Atualmente cada modulo tem estilo diferente para o botao. Vamos padronizar todos com:
-- **Cor verde** (bg-green-600 ou variante)
-- **Texto "API WhatsApp"** visivel
-- **Icone Send** (consistente)
+**Abordagem escolhida**: Modificar a edge function para retornar status **200** com `{ success: false, error: "..." }` em vez de 502. Isso permite que o `data` no hook contenha a mensagem de erro completa sem precisar lidar com excecoes do SDK.
 
-| Modulo | Arquivo | Estado Atual | Acao |
-|---|---|---|---|
-| Activate Leads | `ActivateLeads.tsx` | Icone ghost sem texto | Mudar para botao verde com texto "API WhatsApp" |
-| Leads Premium | `LeadListItem.tsx` | Ghost com texto hidden em mobile | Mudar para botao verde com texto visivel |
-| Meus Clientes | `MyClientsList.tsx` | Icone ghost sem texto | Mudar para botao verde com texto "API WhatsApp" |
+#### 2. Modificar `supabase/functions/send-whatsapp/index.ts`
 
-### Problema 3: Activate Leads com poluicao visual
+Mudar o status de resposta de 502 para **200** quando o erro vem do Ticketz, mantendo `success: false` no body. A mensagem de erro sera:
 
-A tabela atual tem 10 colunas: Checkbox, Nome, Telefone, CPF, Origem, Status, Simulacao, Atribuido, Proxima Acao, Acoes (com 6+ botoes inline).
+```
+"Este numero pode nao ter WhatsApp ativo. Verifique o numero e tente novamente."
+```
 
-**Nova estrutura da tabela** (colunas visiveis):
+Para erros de Ticketz (`ERR_INTERNAL_ERROR`), a mensagem principal sera clara e direta focando no numero invalido, ja que o usuario confirmou que a API esta conectada e funcionando.
 
-| Coluna | Conteudo |
+#### 3. Garantir exibicao via toast em todos os modulos
+
+Como todos os modulos (Activate Leads, Leads Premium, Meus Clientes) usam o mesmo hook `useWhatsApp.ts` e o mesmo `WhatsAppSendDialog`, a correcao no hook + edge function sera automaticamente refletida em todos.
+
+### Arquivos a modificar
+
+| Arquivo | Mudanca |
 |---|---|
-| Nome | Nome do lead (com avatar) |
-| CPF | CPF formatado + botao editar inline |
-| Simulacao | Botao solicitar simulacao (componente existente) |
-| API WhatsApp | Botao verde padrao |
-| Acoes | DropdownMenu com: Ligar, WhatsApp web, Historico, Segunda tentativa, Contato futuro, Atribuir, Alterar status |
+| `supabase/functions/send-whatsapp/index.ts` | Retornar status 200 com success:false + mensagem clara sobre WhatsApp inativo |
+| `src/hooks/useWhatsApp.ts` | Nenhuma mudanca necessaria (ja trata `data.success === false`) |
 
-As colunas removidas da tabela (Telefone, Origem, Status, Atribuido, Proxima Acao, select de status) serao acessiveis pelo menu "Acoes" ou pelo modal de historico/detalhes.
+### Detalhes tecnicos
 
-Para gestores/admin, o checkbox de selecao em massa permanece.
+**Edge function** - bloco de erro (linhas 200-215):
+```typescript
+if (!success) {
+  let errorDetail: string;
+  if (responseData?.error === "ERR_INTERNAL_ERROR") {
+    errorDetail = `Este número (${normalizedNumber}) pode não ter WhatsApp ativo. Verifique o número e tente novamente.`;
+  } else {
+    errorDetail = responseData?.error || "Falha ao enviar mensagem";
+  }
+  return new Response(
+    JSON.stringify({ success: false, error: errorDetail, details: responseData, sentTo: normalizedNumber }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+```
 
-### Detalhes Tecnicos
-
-#### 1. Edge Function `send-whatsapp/index.ts`
-- Mudar o status de resposta de `500` para `502` quando o erro vem do Ticketz (linhas 199-207)
-- Adicionar log do body enviado ao Ticketz para debug
-- Mensagem de erro mais clara: incluir o numero normalizado na resposta para o usuario verificar
-
-#### 2. `src/components/ActivateLeads.tsx`
-- Reduzir colunas da tabela para: Nome, CPF, Simulacao, API WhatsApp, Acoes
-- Criar um `DropdownMenu` na coluna Acoes contendo todas as funcionalidades movidas
-- Botao API WhatsApp: `className="bg-green-600 hover:bg-green-700 text-white text-xs h-8 px-3 gap-1"`
-- Manter o checkbox de selecao em massa (condicional a `canAssignLead`)
-
-#### 3. `src/modules/leads-premium/components/LeadListItem.tsx`
-- Alterar botao "API WhatsApp" (linhas 132-141) para usar estilo verde consistente
-- Tornar o texto "API WhatsApp" sempre visivel (remover `hidden sm:inline`)
-
-#### 4. `src/components/MyClientsList.tsx`
-- Desktop (linha 1501-1509): Substituir icone ghost por botao verde com texto "API WhatsApp"
-- Mobile (linha 1726-1728): Mesmo padrao verde
-
-#### 5. Arquivos a modificar
-
-| Arquivo | Tipo de mudanca |
-|---|---|
-| `supabase/functions/send-whatsapp/index.ts` | Melhorar erro e logs |
-| `src/components/ActivateLeads.tsx` | Redesign tabela + botao verde |
-| `src/modules/leads-premium/components/LeadListItem.tsx` | Padronizar botao verde |
-| `src/components/MyClientsList.tsx` | Padronizar botao verde |
-
+Isso resolve o problema porque:
+1. Status 200 evita que o SDK lance excecao
+2. `success: false` no body e capturado pelo hook na linha 104-105
+3. A mensagem de erro e exibida via `toast.error()` na linha 109
+4. Funciona identicamente em todos os 3 modulos pois usam o mesmo hook
