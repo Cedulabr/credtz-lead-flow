@@ -114,15 +114,23 @@ export function WhatsAppConfig() {
   // Fetch company users (for gestor: own company; for admin: selected company)
   const fetchCompanyUsers = useCallback(async (companyId: string) => {
     if (!companyId) { setCompanyUsers([]); return; }
-    const { data } = await (supabase as any)
+    // Step 1: get user_ids from company
+    const { data: ucData } = await supabase
       .from("user_companies")
-      .select("user_id, profiles:user_id(name, email)")
+      .select("user_id")
       .eq("company_id", companyId)
       .eq("is_active", true);
-    const users: CompanyUser[] = (data || []).map((d: any) => ({
-      user_id: d.user_id,
-      name: d.profiles?.name || "",
-      email: d.profiles?.email || "",
+    const userIds = (ucData || []).map(d => d.user_id);
+    if (userIds.length === 0) { setCompanyUsers([]); return; }
+    // Step 2: get profiles for those users
+    const { data: profilesData } = await supabase
+      .from("profiles")
+      .select("id, name, email")
+      .in("id", userIds);
+    const users: CompanyUser[] = (profilesData || []).map((p: any) => ({
+      user_id: p.id,
+      name: p.name || "",
+      email: p.email || "",
     }));
     setCompanyUsers(users);
   }, []);
@@ -137,7 +145,7 @@ export function WhatsAppConfig() {
     if (!user?.id) return;
     let query = (supabase as any)
       .from("whatsapp_instances")
-      .select("*, profiles:user_id(name, email), companies:company_id(name)")
+      .select("*")
       .order("created_at", { ascending: false });
 
     if (role === "colaborador") {
@@ -145,22 +153,44 @@ export function WhatsAppConfig() {
     } else if (role === "gestor" && myCompanyId) {
       query = query.eq("company_id", myCompanyId);
     }
-    // admin: no filter, gets all
 
     const { data } = await query;
-    const mapped: Instance[] = (data || []).map((d: any) => ({
-      id: d.id,
-      instance_name: d.instance_name,
-      api_token: d.api_token,
-      phone_number: d.phone_number,
-      instance_status: d.instance_status,
-      created_at: d.created_at,
-      user_id: d.user_id,
-      company_id: d.company_id,
-      user_name: d.profiles?.name || "",
-      user_email: d.profiles?.email || "",
-      company_name: d.companies?.name || "",
-    }));
+    const rawInstances = data || [];
+
+    // Collect unique user_ids and company_ids for separate lookups
+    const userIds = [...new Set(rawInstances.map((d: any) => d.user_id).filter(Boolean))] as string[];
+    const companyIds = [...new Set(rawInstances.map((d: any) => d.company_id).filter(Boolean))] as string[];
+
+    // Fetch profiles and companies in parallel
+    const [profilesRes, companiesRes] = await Promise.all([
+      userIds.length > 0
+        ? supabase.from("profiles").select("id, name, email").in("id", userIds)
+        : { data: [] },
+      companyIds.length > 0
+        ? supabase.from("companies").select("id, name").in("id", companyIds)
+        : { data: [] },
+    ]);
+
+    const profilesMap = new Map((profilesRes.data || []).map((p: any) => [p.id, p]));
+    const companiesMap = new Map((companiesRes.data || []).map((c: any) => [c.id, c]));
+
+    const mapped: Instance[] = rawInstances.map((d: any) => {
+      const prof = profilesMap.get(d.user_id);
+      const comp = companiesMap.get(d.company_id);
+      return {
+        id: d.id,
+        instance_name: d.instance_name,
+        api_token: d.api_token,
+        phone_number: d.phone_number,
+        instance_status: d.instance_status,
+        created_at: d.created_at,
+        user_id: d.user_id,
+        company_id: d.company_id,
+        user_name: prof?.name || "",
+        user_email: prof?.email || "",
+        company_name: comp?.name || "",
+      };
+    });
     setInstances(mapped);
   }, [user?.id, role, myCompanyId]);
 
