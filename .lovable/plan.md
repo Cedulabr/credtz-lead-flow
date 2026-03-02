@@ -1,144 +1,89 @@
 
 
-## Plano: Multi-Instancia WhatsApp + Agendamento de Mensagens
+## Plano: Corrigir Erros WhatsApp (Edge Function, Teste API, e Botoes nos Modulos)
 
-### Visao Geral
+### Problemas Identificados
 
-Evoluir o sistema WhatsApp para suportar multiplas instancias por usuario (vendedor com varios numeros), seletor de instancia no envio, e agendamento de mensagens nos modulos Activate Leads, Leads Premium e Meus Clientes.
+**1. Edge Function retorna erro non-2xx**
+- Os headers CORS da edge function estao incompletos (faltam headers do Supabase client)
+- O Ticketz retorna `ERR_INTERNAL_ERROR` -- provavelmente o numero esta sendo enviado sem o formato correto ou o token tem problema
+- A edge function precisa de melhor tratamento de erros e logging
+
+**2. Botao "Testar API" da erro de conexao**
+- O `WhatsAppConfig.tsx` chama a API Ticketz **diretamente do navegador** (linha 162), o que causa erro de CORS pois o navegador bloqueia chamadas cross-origin
+- A solucao e rotear o teste atraves da edge function `send-whatsapp`
+
+**3. Leads Premium e Meus Clientes**
+- Ambos JA possuem o botao "API WhatsApp", porem estao posicionados dentro de modais de detalhe, dificultando o acesso
+- Leads Premium: botao esta dentro do `LeadDetailDrawer` (so aparece ao clicar no lead)
+- Meus Clientes: botao esta dentro do modal de detalhes (so aparece ao abrir o cliente)
+- Ambos funcionam corretamente na estrutura, mas podem nao estar visiveis o suficiente
 
 ---
 
-### Parte 1: Banco de Dados
+### Correcoes Planejadas
 
-**1A. Nova tabela `whatsapp_scheduled_messages`**
+#### Parte 1: Edge Function `send-whatsapp`
 
+**Arquivo:** `supabase/functions/send-whatsapp/index.ts`
+
+- Atualizar CORS headers para incluir todos os headers necessarios do Supabase client
+- Adicionar modo "test" que valida o token sem enviar mensagem real (para o botao testar)
+- Melhorar logging para diagnosticar erros do Ticketz
+- Garantir que o numero esta no formato correto (com codigo do pais)
+
+#### Parte 2: Botao Testar API no WhatsAppConfig
+
+**Arquivo:** `src/components/WhatsAppConfig.tsx`
+
+- Substituir a chamada direta ao Ticketz (`fetch("https://chat.easyn.digital...")`) por uma chamada via edge function `send-whatsapp`
+- Usar `supabase.functions.invoke("send-whatsapp", { body: { apiToken, number: "5500000000000", message: "Teste", testMode: true } })`
+- Isso evita o erro de CORS no navegador
+
+#### Parte 3: Visibilidade dos Botoes nos Modulos
+
+**Leads Premium** (`src/modules/leads-premium/views/LeadsListView.tsx` ou componente de lista):
+- Verificar se o botao WhatsApp aparece na listagem de leads (nao apenas no drawer de detalhes)
+- Adicionar botao WhatsApp na linha/card do lead para acesso rapido, similar ao ActivateLeads
+
+**Meus Clientes** (`src/components/MyClientsKanban.tsx`):
+- O botao ja existe dentro do modal de detalhes, verificar se esta visivel o suficiente
+- Garantir que o botao "API WhatsApp" esta com destaque visual (cor verde) para ser facilmente encontrado
+
+---
+
+### Detalhamento Tecnico
+
+**Edge Function - CORS fix:**
 ```text
-Colunas:
-- id (uuid, PK)
-- user_id (uuid, FK profiles, NOT NULL)
-- instance_id (uuid, FK whatsapp_instances, NOT NULL)
-- phone (text, NOT NULL)
-- message (text)
-- client_name (text)
-- media_base64 (text) -- para PDFs/arquivos
-- media_name (text)
-- scheduled_at (timestamptz, NOT NULL) -- quando enviar
-- status (text, default 'pending') -- pending, sent, failed, cancelled
-- sent_at (timestamptz)
-- error_message (text)
-- source_module (text) -- 'activate_leads', 'leads_premium', 'meus_clientes'
-- source_record_id (text) -- ID do lead/cliente de origem
-- created_at (timestamptz, default now())
+corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, 
+    x-supabase-client-platform, x-supabase-client-platform-version, 
+    x-supabase-client-runtime, x-supabase-client-runtime-version"
+}
 ```
 
-Indexes: `user_id`, `status`, `scheduled_at`, `instance_id`
-
-RLS: Usuario ve/edita seus proprios agendamentos. Admin ve todos.
-
-**1B. Adicionar coluna `phone_number` na tabela `whatsapp_instances`**
-
-Campo para identificar visualmente qual numero esta vinculado a cada instancia (ex: "85 99999-9999").
-
----
-
-### Parte 2: Edge Function - Processador de Agendamentos
-
-**Nova edge function: `process-whatsapp-schedule`**
-
-- Executada via cron job a cada 5 minutos
-- Busca mensagens com `status = 'pending'` e `scheduled_at <= now()`
-- Para cada mensagem: busca o token da instancia, envia via Ticketz API, atualiza status
-- Registra na `whatsapp_messages` apos envio
-
-**Cron job SQL:**
+**Edge Function - Test mode:**
 ```text
-cron.schedule('process-whatsapp-schedule', '*/5 * * * *', ...)
+Se body.testMode === true:
+  - Faz uma chamada simples ao Ticketz para validar o token
+  - Retorna { success: true, testMode: true } se token valido
+  - Nao registra na tabela whatsapp_messages
 ```
 
----
-
-### Parte 3: Hook useWhatsApp - Suporte Multi-Instancia
-
-Refatorar `src/hooks/useWhatsApp.ts`:
-
-- Retornar array `instances` com todas as instancias do usuario (proprias + empresa)
-- Cada instancia: `{ id, name, phoneNumber, hasToken }`
-- Funcoes `sendTextMessage` e `sendMediaMessage` passam a receber `instanceId` como parametro
-- Nova funcao `scheduleMessage(instanceId, phone, message, scheduledAt, sourceModule, sourceRecordId)`
-- Manter compatibilidade: se nao passar instanceId, usa a primeira instancia disponivel
-
----
-
-### Parte 4: WhatsAppConfig - Gerenciamento Multi-Instancia
-
-Refatorar `src/components/WhatsAppConfig.tsx`:
-
-- Listar todas as instancias do usuario em cards
-- Botao "Nova Instancia" para adicionar mais conexoes
-- Cada card mostra: nome, numero de telefone, status da conexao, botao testar, botao editar/excluir
-- Campo novo: "Numero do WhatsApp" (para identificacao visual)
-- Historico de mensagens filtrado por instancia
-- Nova aba: "Agendamentos" mostrando mensagens programadas com opcao de cancelar
-
----
-
-### Parte 5: WhatsAppSendDialog - Seletor de Instancia + Agendamento
-
-Refatorar `src/components/WhatsAppSendDialog.tsx`:
-
-- Adicionar Select para escolher a instancia (quando usuario tem mais de uma)
-- Mostrar nome + numero da instancia no select
-- Adicionar toggle "Agendar envio" com date/time picker
-- Quando agendado: chama `scheduleMessage` em vez de enviar imediatamente
-- Renomear titulo do dialog para "API WhatsApp"
-- Manter fallback wa.me quando nenhuma instancia configurada
-
----
-
-### Parte 6: Integracao nos Modulos
-
-**6A. Activate Leads (`ActivateLeads.tsx`)**
-- Renomear botao de "WhatsApp" para "API WhatsApp"
-- Manter a mesma logica: abre WhatsAppSendDialog com dados pre-preenchidos
-- O dialog agora tera seletor de instancia e opcao de agendamento
-
-**6B. Leads Premium (`LeadDetailDrawer.tsx`)**
-- Renomear botao de "WhatsApp" para "API WhatsApp"
-- Manter abertura do WhatsAppSendDialog (ja implementado)
-
-**6C. Meus Clientes (`MyClientsKanban.tsx`)**
-- Renomear botao de "WhatsApp" para "API WhatsApp"
-- Manter abertura do WhatsAppSendDialog (ja implementado)
-
----
-
-### Arquivos a Criar
-
-| Arquivo | Descricao |
-|---|---|
-| Migracao SQL | Tabela `whatsapp_scheduled_messages` + coluna `phone_number` em instances |
-| `supabase/functions/process-whatsapp-schedule/index.ts` | Processador cron de mensagens agendadas |
+**WhatsAppConfig - handleTest fix:**
+```text
+Antes: fetch direto ao Ticketz (CORS bloqueado)
+Depois: supabase.functions.invoke("send-whatsapp", { body: { apiToken, testMode: true } })
+```
 
 ### Arquivos a Modificar
 
 | Arquivo | Alteracao |
 |---|---|
-| `src/hooks/useWhatsApp.ts` | Retornar array de instancias, aceitar instanceId, adicionar scheduleMessage |
-| `src/components/WhatsAppSendDialog.tsx` | Seletor de instancia, toggle agendamento, date/time picker |
-| `src/components/WhatsAppConfig.tsx` | Listagem multi-instancia, CRUD completo, aba agendamentos |
-| `src/components/ActivateLeads.tsx` | Renomear botao para "API WhatsApp" |
-| `src/modules/leads-premium/components/LeadDetailDrawer.tsx` | Renomear botao para "API WhatsApp" |
-| `src/components/MyClientsKanban.tsx` | Renomear botao para "API WhatsApp" |
-| `supabase/functions/send-whatsapp/index.ts` | Aceitar instanceId para buscar token automaticamente |
-| `supabase/config.toml` | Registrar nova edge function |
-
-### Fluxo do Usuario
-
-1. Acessa modulo "WhatsApp" e cadastra multiplas instancias (uma por numero)
-2. Nos modulos de leads/clientes, clica "API WhatsApp" no lead desejado
-3. Dialog abre com seletor de instancia (se tiver mais de uma)
-4. Escreve a mensagem, pode agendar para data/hora futura
-5. Envia imediatamente ou agenda
-6. Mensagens agendadas sao processadas automaticamente pelo cron a cada 5 minutos
-7. Historico completo visivel no modulo WhatsApp
+| `supabase/functions/send-whatsapp/index.ts` | Fix CORS headers, adicionar testMode, melhorar logging |
+| `src/components/WhatsAppConfig.tsx` | Rotear teste via edge function em vez de chamada direta |
+| `src/modules/leads-premium/views/LeadsListView.tsx` | Verificar/adicionar botao WhatsApp visivel na lista |
+| `src/components/MyClientsKanban.tsx` | Garantir visibilidade do botao API WhatsApp |
 
