@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { MessageCircle, Loader2, CheckCircle } from "lucide-react";
+import { MessageCircle, Loader2, CheckCircle, Info, PhoneForwarded } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBrDid } from "../hooks/useBrDid";
@@ -17,7 +16,7 @@ export function WhatsAppView() {
   const { loading, whatsappConfigurar } = useBrDid();
   const [dids, setDids] = useState<UserDid[]>([]);
   const [selectedDid, setSelectedDid] = useState("");
-  const [webhook, setWebhook] = useState("");
+  const [urlRetorno, setUrlRetorno] = useState("");
 
   useEffect(() => {
     if (user?.id) loadDids();
@@ -35,8 +34,8 @@ export function WhatsAppView() {
   const selectedDidInfo = dids.find(d => d.numero === selectedDid);
 
   const handleConfigurar = async () => {
-    if (!selectedDid || !webhook) return;
-    const result = await whatsappConfigurar(selectedDid, webhook);
+    if (!selectedDid || !urlRetorno) return;
+    const result = await whatsappConfigurar(selectedDid, urlRetorno);
     if (result) {
       await supabase
         .from("user_dids")
@@ -50,6 +49,55 @@ export function WhatsAppView() {
 
   return (
     <div className="space-y-4">
+      {/* Passo a passo explicativo */}
+      <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Info className="h-5 w-5 text-blue-600" />
+            Como vincular seu número ao WhatsApp Business
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="space-y-2">
+            <p className="font-medium">📋 Pré-requisitos:</p>
+            <ul className="list-disc list-inside space-y-1 text-muted-foreground ml-2">
+              <li>Ter um número virtual contratado (aba "Buscar Números")</li>
+              <li>Configurar o <strong>Siga-me</strong> (aba "Configuração SIP") apontando para seu celular — isso permite que você receba a ligação de verificação do WhatsApp</li>
+            </ul>
+          </div>
+
+          <div className="space-y-2">
+            <p className="font-medium">📞 Como funciona a verificação:</p>
+            <ol className="list-decimal list-inside space-y-1 text-muted-foreground ml-2">
+              <li>Ao cadastrar o número virtual no WhatsApp Business, o WhatsApp faz uma <strong>ligação telefônica</strong> para o número</li>
+              <li>Se o Siga-me estiver configurado, a ligação será redirecionada para seu celular</li>
+              <li>Você receberá um <strong>código de verificação por voz</strong> durante a ligação</li>
+              <li>Digite o código no WhatsApp Business para confirmar</li>
+            </ol>
+          </div>
+
+          <div className="space-y-2">
+            <p className="font-medium">🔗 URL de Retorno (Webhook):</p>
+            <p className="text-muted-foreground">
+              A URL de retorno é opcional e serve para receber automaticamente o áudio da ligação de verificação 
+              em um sistema externo (ex: n8n, Make, servidor próprio). Se você <strong>não tem</strong> um 
+              servidor/webhook, pode usar qualquer URL válida (ex: <code className="bg-muted px-1 rounded">https://exemplo.com/webhook</code>) 
+              e receber o código diretamente pela ligação no seu celular via Siga-me.
+            </p>
+          </div>
+
+          <div className="bg-amber-50 dark:bg-amber-950/30 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
+            <p className="flex items-center gap-2 font-medium text-amber-700 dark:text-amber-400">
+              <PhoneForwarded className="h-4 w-4" />
+              Importante
+            </p>
+            <p className="text-amber-600 dark:text-amber-500 text-xs mt-1">
+              Configure o Siga-me ANTES de vincular ao WhatsApp. Sem ele, você não receberá a ligação de verificação.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -58,10 +106,6 @@ export function WhatsAppView() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Configure um webhook para receber o código de verificação do WhatsApp Business no seu número virtual.
-          </p>
-
           <div>
             <Label>Selecione o número</Label>
             <Select value={selectedDid} onValueChange={setSelectedDid}>
@@ -86,19 +130,28 @@ export function WhatsAppView() {
             </div>
           )}
 
+          {selectedDidInfo && !selectedDidInfo.sip_destino && (
+            <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800">
+              <p className="text-sm text-red-700 dark:text-red-400">
+                ⚠️ Este número não tem Siga-me configurado. Configure na aba "Configuração SIP" antes de vincular ao WhatsApp.
+              </p>
+            </div>
+          )}
+
           <div>
-            <Label>URL do Webhook</Label>
+            <Label>URL de Retorno (Webhook)</Label>
             <Input
-              placeholder="https://seu-webhook.com/whatsapp"
-              value={webhook}
-              onChange={(e) => setWebhook(e.target.value)}
+              placeholder="https://seu-servidor.com/webhook/whatsapp"
+              value={urlRetorno}
+              onChange={(e) => setUrlRetorno(e.target.value)}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              O código de verificação do WhatsApp será enviado para este endpoint.
+              URL onde o sistema enviará o áudio da ligação de verificação. Se não tiver um webhook, 
+              use qualquer URL válida e receba o código pela ligação no celular (via Siga-me).
             </p>
           </div>
 
-          <Button onClick={handleConfigurar} disabled={!selectedDid || !webhook || loading}>
+          <Button onClick={handleConfigurar} disabled={!selectedDid || !urlRetorno || loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <MessageCircle className="h-4 w-4 mr-1" />}
             Configurar WhatsApp
           </Button>

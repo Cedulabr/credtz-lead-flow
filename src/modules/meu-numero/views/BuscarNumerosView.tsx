@@ -18,7 +18,7 @@ export function BuscarNumerosView() {
   const [localidades, setLocalidades] = useState<Localidade[]>([]);
   const [selectedArea, setSelectedArea] = useState("");
   const [numeros, setNumeros] = useState<Did[]>([]);
-  const [contracting, setContracting] = useState<number | null>(null);
+  const [contracting, setContracting] = useState<string | null>(null);
 
   useEffect(() => {
     loadLocalidades();
@@ -41,13 +41,13 @@ export function BuscarNumerosView() {
     }
   };
 
+  // Fix #2: Send CN + NUMERO instead of CODIGO
   const handleContratar = async (did: Did) => {
     if (!user?.id) return;
-    setContracting(did.CODIGO);
+    setContracting(did.NUMERO);
     try {
-      const result = await adquirirDid(did.CODIGO);
+      const result = await adquirirDid(did.CN, did.NUMERO);
       if (result) {
-        // Save to database
         await supabase.from("user_dids").insert({
           user_id: user.id,
           numero: did.NUMERO,
@@ -62,7 +62,7 @@ export function BuscarNumerosView() {
           valor_instalacao: did.VALOR_INSTALACAO,
         } as any);
         toast.success(`Número ${did.NUMERO} contratado com sucesso!`);
-        setNumeros(prev => prev.filter(n => n.CODIGO !== did.CODIGO));
+        setNumeros(prev => prev.filter(n => n.NUMERO !== did.NUMERO));
       }
     } finally {
       setContracting(null);
@@ -91,7 +91,7 @@ export function BuscarNumerosView() {
                 </SelectTrigger>
                 <SelectContent>
                   {localidades.map((loc) => (
-                    <SelectItem key={loc.AREA_LOCAL} value={loc.AREA_LOCAL}>
+                    <SelectItem key={String(loc.AREA_LOCAL)} value={String(loc.AREA_LOCAL)}>
                       {loc.AREA_LOCAL} - {loc.LOCALIDADE} ({loc.UF})
                     </SelectItem>
                   ))}
@@ -140,9 +140,9 @@ export function BuscarNumerosView() {
                       <Button
                         size="sm"
                         onClick={() => handleContratar(did)}
-                        disabled={contracting === did.CODIGO}
+                        disabled={contracting === did.NUMERO}
                       >
-                        {contracting === did.CODIGO ? (
+                        {contracting === did.NUMERO ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                           <ShoppingCart className="h-4 w-4" />

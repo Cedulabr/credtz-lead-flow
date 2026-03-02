@@ -47,19 +47,22 @@ export function useBrDid() {
     [callApi]
   );
 
+  // Fix #2: adquirir_did needs CN + NUMERO + SIP_TRUNK
   const adquirirDid = useCallback(
-    (codigo: number) => callApi("adquirir_did", { CODIGO: codigo }),
+    (cn: number, numero: string) => callApi("adquirir_did", { CN: cn, NUMERO: numero, SIP_TRUNK: 0 }),
     [callApi]
   );
 
+  // Fix #9: cancelar_did needs CN + NUMERO
   const cancelarDid = useCallback(
-    (numero: string) => callApi("cancelar_did", { NUMERO: numero }),
+    (cn: number, numero: string) => callApi("cancelar_did", { CN: cn, NUMERO: numero }),
     [callApi]
   );
 
+  // Fix #8: configurar_sip uses NUMERO_TRANSFERIR
   const configurarSip = useCallback(
-    (numero: string, destino: string) =>
-      callApi("configurar_sip", { NUMERO: numero, DESTINO: destino }),
+    (numero: string, numeroTransferir: string) =>
+      callApi("configurar_sip", { NUMERO: numero, NUMERO_TRANSFERIR: numeroTransferir }),
     [callApi]
   );
 
@@ -68,28 +71,35 @@ export function useBrDid() {
     [callApi]
   );
 
+  // Fix #3: whatsapp uses lowercase params
   const whatsappConfigurar = useCallback(
-    (numero: string, webhook: string) =>
-      callApi("whatsapp_configurar", { NUMERO: numero, WEBHOOK: webhook }),
+    (numero: string, urlRetorno: string) =>
+      callApi("whatsapp_configurar", { numero, url_retorno: urlRetorno }),
     [callApi]
   );
 
+  // Fix #7: getCdrs uses PERIODO in MMAAAA format
   const getCdrs = useCallback(
-    (numero: string, mes: number, ano: number) =>
-      callApi("get_cdrs", { NUMERO: numero, MES: mes, ANO: ano }),
+    (numero: string, mes: number, ano: number) => {
+      const periodo = String(mes).padStart(2, "0") + String(ano);
+      return callApi("get_cdrs", { NUMERO: numero, PERIODO: periodo });
+    },
     [callApi]
   );
 
+  // Fix #4: criar_plano uses correct field names with spaces
   const criarPlano = useCallback(
     (params: ActionParams) => callApi("criar_plano", params),
     [callApi]
   );
 
+  // Fix #5: criar_cliente uses all required fields
   const criarCliente = useCallback(
     (params: ActionParams) => callApi("criar_cliente", params),
     [callApi]
   );
 
+  // Fix #6: montar_cliente_plano_dids uses correct param names
   const montarClientePlanoDids = useCallback(
     (params: ActionParams) => callApi("montar_cliente_plano_dids", params),
     [callApi]

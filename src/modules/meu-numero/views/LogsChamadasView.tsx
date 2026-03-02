@@ -30,6 +30,7 @@ export function LogsChamadasView() {
     if (data) setDids(data as unknown as UserDid[]);
   };
 
+  // Fix #7: getCdrs now builds PERIODO internally in the hook
   const handleSearch = async () => {
     if (!selectedDid) return;
     const data = await getCdrs(selectedDid, parseInt(mes), parseInt(ano));
