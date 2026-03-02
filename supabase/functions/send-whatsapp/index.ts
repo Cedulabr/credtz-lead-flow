@@ -198,7 +198,9 @@ Deno.serve(async (req) => {
 
     if (!success) {
       console.error("Ticketz API error:", ticketzResponse.status, responseText);
-      const errorDetail = responseData?.error || "Falha ao enviar mensagem";
+      const errorDetail = responseData?.error === "ERR_INTERNAL_ERROR"
+        ? "Erro interno na API Easyn. Verifique se a instância está conectada na plataforma e se o número do destinatário é válido."
+        : responseData?.error || "Falha ao enviar mensagem";
       return new Response(
         JSON.stringify({ success: false, error: errorDetail, details: responseData }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
