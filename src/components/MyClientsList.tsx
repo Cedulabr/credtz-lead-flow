@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { WhatsAppSendDialog } from "@/components/WhatsAppSendDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -279,6 +280,10 @@ export function MyClientsList() {
   const [savingDeletionRequest, setSavingDeletionRequest] = useState(false);
   const [reviewNotes, setReviewNotes] = useState("");
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
+
+  // WhatsApp API dialog
+  const [whatsAppDialogOpen, setWhatsAppDialogOpen] = useState(false);
+  const [whatsAppClient, setWhatsAppClient] = useState<{ name: string; phone: string } | null>(null);
 
   // Edit form states
   const [editForm, setEditForm] = useState({
@@ -959,6 +964,11 @@ export function MyClientsList() {
     window.open(`https://wa.me/${phoneWithCountry}`, '_blank');
   };
 
+  const openWhatsAppApi = (clientName: string, phone: string) => {
+    setWhatsAppClient({ name: clientName, phone });
+    setWhatsAppDialogOpen(true);
+  };
+
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 15;
 
@@ -1488,6 +1498,15 @@ export function MyClientsList() {
                                 >
                                   <MessageCircle className="h-3.5 w-3.5" />
                                 </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 hover:bg-green-100 hover:text-green-700"
+                                  title="API WhatsApp"
+                                  onClick={() => openWhatsAppApi(client["Nome do cliente"] || "", client.telefone!)}
+                                >
+                                  <Send className="h-3.5 w-3.5" />
+                                </Button>
                               </>
                             )}
                           </div>
@@ -1703,6 +1722,9 @@ export function MyClientsList() {
                           </Button>
                           <Button variant="outline" size="sm" className="hover:bg-green-100 hover:text-green-700" onClick={() => openWhatsApp(client.telefone!)}>
                             <MessageCircle className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="sm" className="hover:bg-green-100 hover:text-green-700" title="API WhatsApp" onClick={() => openWhatsAppApi(client["Nome do cliente"] || "", client.telefone!)}>
+                            <Send className="h-4 w-4" />
                           </Button>
                         </>
                       )}
@@ -2002,9 +2024,14 @@ export function MyClientsList() {
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{selectedClient?.telefone ? formatPhone(selectedClient.telefone) : "N/A"}</p>
                         {selectedClient?.telefone && (
-                          <Button size="sm" variant="ghost" onClick={() => openWhatsApp(selectedClient.telefone!)} className="h-7 w-7 p-0">
-                            <MessageCircle className="h-4 w-4 text-green-600" />
-                          </Button>
+                          <>
+                            <Button size="sm" variant="ghost" onClick={() => openWhatsApp(selectedClient.telefone!)} className="h-7 w-7 p-0">
+                              <MessageCircle className="h-4 w-4 text-green-600" />
+                            </Button>
+                            <Button size="sm" variant="ghost" title="API WhatsApp" onClick={() => openWhatsAppApi(selectedClient["Nome do cliente"] || "", selectedClient.telefone!)} className="h-7 w-7 p-0">
+                              <Send className="h-4 w-4 text-green-600" />
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -2241,6 +2268,14 @@ export function MyClientsList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <WhatsAppSendDialog
+        open={whatsAppDialogOpen}
+        onOpenChange={setWhatsAppDialogOpen}
+        clientName={whatsAppClient?.name || ""}
+        clientPhone={whatsAppClient?.phone || ""}
+        sourceModule="meus_clientes"
+      />
     </AnimatedContainer>
   );
 }
