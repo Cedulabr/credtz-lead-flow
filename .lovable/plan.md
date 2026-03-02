@@ -1,97 +1,114 @@
 
 
-## Plano: Integracao WhatsApp via API Ticketz
+## Plano: Multi-Instancia WhatsApp + Agendamento de Mensagens
 
 ### Visao Geral
 
-Integrar envio de mensagens WhatsApp diretamente pelo aplicativo usando a API do Ticketz (chat.easyn.digital). Inclui: modulo de configuracao de token, botoes de envio nos modulos de leads, e envio de proposta via WhatsApp no Gerador de Propostas.
-
-### Infraestrutura Existente
-
-Ja existem tabelas `whatsapp_instances` e `whatsapp_messages` no banco, mas sem campo de token. Tambem ja existe `can_access_whatsapp` no perfil do usuario. Vamos reaproveitar essas tabelas.
+Evoluir o sistema WhatsApp para suportar multiplas instancias por usuario (vendedor com varios numeros), seletor de instancia no envio, e agendamento de mensagens nos modulos Activate Leads, Leads Premium e Meus Clientes.
 
 ---
 
-### Parte 1: Banco de Dados - Adicionar campo token
+### Parte 1: Banco de Dados
 
-**Migracao SQL:**
-- Adicionar coluna `api_token` (text) na tabela `whatsapp_instances`
-- Adicionar coluna `company_id` (uuid, FK companies) na tabela `whatsapp_instances`
-- Adicionar coluna `direction` (text, default 'outgoing') na tabela `whatsapp_messages`
-- Adicionar coluna `media_url` (text) na tabela `whatsapp_messages`
-- Adicionar coluna `message_type` (text, default 'text') na tabela `whatsapp_messages`
-- Atualizar RLS para permitir gestores gerenciarem tokens da empresa
+**1A. Nova tabela `whatsapp_scheduled_messages`**
 
-### Parte 2: Edge Function - Proxy de envio
+```text
+Colunas:
+- id (uuid, PK)
+- user_id (uuid, FK profiles, NOT NULL)
+- instance_id (uuid, FK whatsapp_instances, NOT NULL)
+- phone (text, NOT NULL)
+- message (text)
+- client_name (text)
+- media_base64 (text) -- para PDFs/arquivos
+- media_name (text)
+- scheduled_at (timestamptz, NOT NULL) -- quando enviar
+- status (text, default 'pending') -- pending, sent, failed, cancelled
+- sent_at (timestamptz)
+- error_message (text)
+- source_module (text) -- 'activate_leads', 'leads_premium', 'meus_clientes'
+- source_record_id (text) -- ID do lead/cliente de origem
+- created_at (timestamptz, default now())
+```
 
-Criar edge function `send-whatsapp` que:
-- Recebe: `{ token, number, body, mediaBase64?, mediaName? }`
-- Faz POST para `https://chat.easyn.digital:443/backend/api/messages/send`
-- Para texto: Content-Type `application/json`, body com number, body, saveOnTicket, linkPreview
-- Para media: Content-Type `multipart/form-data`, FormData com number, medias (arquivo), saveOnTicket
-- Registra na tabela `whatsapp_messages`
-- Retorna sucesso/erro
+Indexes: `user_id`, `status`, `scheduled_at`, `instance_id`
 
-### Parte 3: Modulo WhatsApp (Configuracao)
+RLS: Usuario ve/edita seus proprios agendamentos. Admin ve todos.
 
-**Novo arquivo: `src/components/WhatsAppConfig.tsx`**
+**1B. Adicionar coluna `phone_number` na tabela `whatsapp_instances`**
 
-Interface com:
-- Cadastro/edicao do token da API (campo "Token de Acesso")
-- Status da conexao (teste de envio)
-- Historico de mensagens enviadas
-- Acessivel via navegacao (ja existe `can_access_whatsapp` no perfil)
+Campo para identificar visualmente qual numero esta vinculado a cada instancia (ex: "85 99999-9999").
 
-**Adicionar ao `Navigation.tsx`:**
-- Item "WhatsApp" com icone MessageCircle, permissionKey `can_access_whatsapp`
+---
 
-### Parte 4: Componente de Envio Reutilizavel
+### Parte 2: Edge Function - Processador de Agendamentos
 
-**Novo arquivo: `src/components/WhatsAppSendDialog.tsx`**
+**Nova edge function: `process-whatsapp-schedule`**
 
-Dialog reutilizavel que:
-- Recebe: numero do telefone, nome do cliente, mensagem pre-preenchida (opcional), arquivo PDF (opcional)
-- Busca o token do usuario/empresa na tabela `whatsapp_instances`
-- Permite editar a mensagem antes de enviar
-- Mostra preview da mensagem
-- Chama a edge function `send-whatsapp`
-- Toast de sucesso/erro
+- Executada via cron job a cada 5 minutos
+- Busca mensagens com `status = 'pending'` e `scheduled_at <= now()`
+- Para cada mensagem: busca o token da instancia, envia via Ticketz API, atualiza status
+- Registra na `whatsapp_messages` apos envio
 
-### Parte 5: Integracao nos Modulos
+**Cron job SQL:**
+```text
+cron.schedule('process-whatsapp-schedule', '*/5 * * * *', ...)
+```
 
-#### 5A. Activate Leads (`ActivateLeads.tsx`)
-- Adicionar botao WhatsApp verde ao lado das acoes do lead (na modal de detalhes ou na listagem)
-- Ao clicar, abre `WhatsAppSendDialog` com telefone e nome pre-preenchidos
-- Mensagem padrao: "Ola {nome}, tudo bem?"
+---
 
-#### 5B. Leads Premium (`LeadDetailDrawer.tsx`)
-- O botao "WhatsApp" ja existe (linha 331-336) mas abre `wa.me` externo
-- Substituir para abrir `WhatsAppSendDialog` enviando via API interna
-- Manter opcao de fallback para wa.me caso nao tenha token configurado
+### Parte 3: Hook useWhatsApp - Suporte Multi-Instancia
 
-#### 5C. Meus Clientes (`MyClientsKanban.tsx`)
-- Adicionar botao WhatsApp na modal de detalhes do cliente
-- Mesma logica: abre `WhatsAppSendDialog`
+Refatorar `src/hooks/useWhatsApp.ts`:
 
-#### 5D. Gerador de Propostas (`ProposalGenerator.tsx`)
-- Na tela de summary (apos gerar proposta), adicionar botao "Enviar via WhatsApp"
-- Gera o PDF em memoria (blob) e envia como media via WhatsApp
-- Mensagem acompanhando: "Ola {nome}, segue sua proposta de credito consignado."
+- Retornar array `instances` com todas as instancias do usuario (proprias + empresa)
+- Cada instancia: `{ id, name, phoneNumber, hasToken }`
+- Funcoes `sendTextMessage` e `sendMediaMessage` passam a receber `instanceId` como parametro
+- Nova funcao `scheduleMessage(instanceId, phone, message, scheduledAt, sourceModule, sourceRecordId)`
+- Manter compatibilidade: se nao passar instanceId, usa a primeira instancia disponivel
 
-#### 5E. Sales Wizard (`SalesWizard.tsx`)
-- Apos o `SmsNotifyDialog`, adicionar opcao "Enviar proposta via WhatsApp"
-- Novo dialog `WhatsAppNotifyDialog` similar ao `SmsNotifyDialog`
+---
 
-### Parte 6: Hook de WhatsApp
+### Parte 4: WhatsAppConfig - Gerenciamento Multi-Instancia
 
-**Novo arquivo: `src/hooks/useWhatsApp.ts`**
+Refatorar `src/components/WhatsAppConfig.tsx`:
 
-Hook que:
-- Busca o token do usuario/empresa
-- Funcao `sendTextMessage(number, body)`
-- Funcao `sendMediaMessage(number, file)`
-- Gerencia estados de loading/erro
-- Cache do token para evitar consultas repetidas
+- Listar todas as instancias do usuario em cards
+- Botao "Nova Instancia" para adicionar mais conexoes
+- Cada card mostra: nome, numero de telefone, status da conexao, botao testar, botao editar/excluir
+- Campo novo: "Numero do WhatsApp" (para identificacao visual)
+- Historico de mensagens filtrado por instancia
+- Nova aba: "Agendamentos" mostrando mensagens programadas com opcao de cancelar
+
+---
+
+### Parte 5: WhatsAppSendDialog - Seletor de Instancia + Agendamento
+
+Refatorar `src/components/WhatsAppSendDialog.tsx`:
+
+- Adicionar Select para escolher a instancia (quando usuario tem mais de uma)
+- Mostrar nome + numero da instancia no select
+- Adicionar toggle "Agendar envio" com date/time picker
+- Quando agendado: chama `scheduleMessage` em vez de enviar imediatamente
+- Renomear titulo do dialog para "API WhatsApp"
+- Manter fallback wa.me quando nenhuma instancia configurada
+
+---
+
+### Parte 6: Integracao nos Modulos
+
+**6A. Activate Leads (`ActivateLeads.tsx`)**
+- Renomear botao de "WhatsApp" para "API WhatsApp"
+- Manter a mesma logica: abre WhatsAppSendDialog com dados pre-preenchidos
+- O dialog agora tera seletor de instancia e opcao de agendamento
+
+**6B. Leads Premium (`LeadDetailDrawer.tsx`)**
+- Renomear botao de "WhatsApp" para "API WhatsApp"
+- Manter abertura do WhatsAppSendDialog (ja implementado)
+
+**6C. Meus Clientes (`MyClientsKanban.tsx`)**
+- Renomear botao de "WhatsApp" para "API WhatsApp"
+- Manter abertura do WhatsAppSendDialog (ja implementado)
 
 ---
 
@@ -99,49 +116,29 @@ Hook que:
 
 | Arquivo | Descricao |
 |---|---|
-| `supabase/functions/send-whatsapp/index.ts` | Edge function proxy para API Ticketz |
-| `src/components/WhatsAppConfig.tsx` | Modulo de configuracao de token |
-| `src/components/WhatsAppSendDialog.tsx` | Dialog reutilizavel de envio |
-| `src/hooks/useWhatsApp.ts` | Hook de envio de mensagens |
+| Migracao SQL | Tabela `whatsapp_scheduled_messages` + coluna `phone_number` em instances |
+| `supabase/functions/process-whatsapp-schedule/index.ts` | Processador cron de mensagens agendadas |
 
 ### Arquivos a Modificar
 
 | Arquivo | Alteracao |
 |---|---|
-| Migracao SQL | Adicionar colunas na tabela whatsapp_instances e whatsapp_messages |
-| `src/components/Navigation.tsx` | Adicionar item "WhatsApp" no menu |
-| `src/pages/Index.tsx` | Renderizar WhatsAppConfig e WhatsAppSendDialog |
-| `src/components/ActivateLeads.tsx` | Botao WhatsApp na acao do lead |
-| `src/modules/leads-premium/components/LeadDetailDrawer.tsx` | Substituir wa.me por envio via API |
-| `src/components/MyClientsKanban.tsx` | Botao WhatsApp na modal do cliente |
-| `src/components/ProposalGenerator.tsx` | Botao "Enviar via WhatsApp" no summary |
-| `src/modules/sales-wizard/SalesWizard.tsx` | Opcao WhatsApp apos gerar proposta |
-
-### Detalhamento Tecnico da Edge Function
-
-```text
-Endpoint: POST /send-whatsapp
-Body JSON:
-{
-  "token": "bearer_token",
-  "number": "558599999999",
-  "body": "mensagem",        // para texto
-  "mediaBase64": "base64...", // para media (opcional)
-  "mediaName": "proposta.pdf" // nome do arquivo (opcional)
-}
-
-Logica:
-1. Se mediaBase64 presente -> multipart/form-data com arquivo
-2. Se apenas body -> application/json com texto
-3. Registra em whatsapp_messages
-4. Retorna { success: true/false, messageId }
-```
+| `src/hooks/useWhatsApp.ts` | Retornar array de instancias, aceitar instanceId, adicionar scheduleMessage |
+| `src/components/WhatsAppSendDialog.tsx` | Seletor de instancia, toggle agendamento, date/time picker |
+| `src/components/WhatsAppConfig.tsx` | Listagem multi-instancia, CRUD completo, aba agendamentos |
+| `src/components/ActivateLeads.tsx` | Renomear botao para "API WhatsApp" |
+| `src/modules/leads-premium/components/LeadDetailDrawer.tsx` | Renomear botao para "API WhatsApp" |
+| `src/components/MyClientsKanban.tsx` | Renomear botao para "API WhatsApp" |
+| `supabase/functions/send-whatsapp/index.ts` | Aceitar instanceId para buscar token automaticamente |
+| `supabase/config.toml` | Registrar nova edge function |
 
 ### Fluxo do Usuario
 
-1. Usuario vai em "WhatsApp" no menu lateral
-2. Cadastra seu token de acesso da API Ticketz
-3. Ao navegar para Activate Leads, Leads Premium ou Meus Clientes, ve botao WhatsApp verde
-4. Clica no botao -> abre dialog com mensagem editavel -> envia
-5. No Gerador de Propostas, apos gerar PDF, pode enviar diretamente via WhatsApp
+1. Acessa modulo "WhatsApp" e cadastra multiplas instancias (uma por numero)
+2. Nos modulos de leads/clientes, clica "API WhatsApp" no lead desejado
+3. Dialog abre com seletor de instancia (se tiver mais de uma)
+4. Escreve a mensagem, pode agendar para data/hora futura
+5. Envia imediatamente ou agenda
+6. Mensagens agendadas sao processadas automaticamente pelo cron a cada 5 minutos
+7. Historico completo visivel no modulo WhatsApp
 
