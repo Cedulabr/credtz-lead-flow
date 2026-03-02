@@ -196,7 +196,7 @@ const ManualDispatchDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md p-0 overflow-hidden">
+      <DialogContent className="max-w-md p-0 overflow-hidden max-h-[90vh] flex flex-col">
         <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-6 py-4 border-b">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2.5 text-base">
@@ -208,7 +208,7 @@ const ManualDispatchDialog = ({
           </DialogHeader>
         </div>
 
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
           <RadioGroup value={mode} onValueChange={(v) => setMode(v as any)} className="space-y-2.5">
             {[
               { value: "all", icon: Users, label: "Disparar para todos", desc: `${totalQueue} clientes na fila` },
