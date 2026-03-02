@@ -201,17 +201,13 @@ Deno.serve(async (req) => {
       console.error("Ticketz API error:", ticketzResponse.status, responseText);
       let errorDetail: string;
       if (responseData?.error === "ERR_INTERNAL_ERROR") {
-        errorDetail = `Falha ao enviar para ${normalizedNumber}. Possíveis causas:\n` +
-          `1) O número não possui WhatsApp ativo.\n` +
-          `2) A instância WhatsApp não está conectada/escaneada no painel Easyn.\n` +
-          `3) O número está incorreto ou incompleto (verifique DDD + 9º dígito).\n` +
-          `4) O token da API está inativo ou expirado.`;
+        errorDetail = `Este número (${normalizedNumber}) pode não ter WhatsApp ativo. Verifique o número e tente novamente.`;
       } else {
         errorDetail = responseData?.error || "Falha ao enviar mensagem";
       }
       return new Response(
         JSON.stringify({ success: false, error: errorDetail, details: responseData, sentTo: normalizedNumber }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
