@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { WhatsAppSendDialog } from "@/components/WhatsAppSendDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -152,6 +153,7 @@ export function MyClientsKanban() {
   
   // Delete state
   const [deletingClient, setDeletingClient] = useState(false);
+  const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
 
   // Edit form states
   const [editForm, setEditForm] = useState({
@@ -939,16 +941,12 @@ export function MyClientsKanban() {
                         <p className="font-medium">
                           {selectedProposta?.whatsapp || "N/A"}
                         </p>
-                        {selectedProposta?.whatsapp && (
+                        {(selectedProposta?.whatsapp || selectedProposta?.telefone) && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() =>
-                              window.open(
-                                `https://wa.me/55${selectedProposta.whatsapp?.replace(/\D/g, "")}`,
-                                "_blank"
-                              )
-                            }
+                            className="text-green-600"
+                            onClick={() => setShowWhatsAppDialog(true)}
                           >
                             <MessageCircle className="h-4 w-4" />
                           </Button>
@@ -1101,6 +1099,14 @@ export function MyClientsKanban() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* WhatsApp Send Dialog */}
+      <WhatsAppSendDialog
+        open={showWhatsAppDialog}
+        onOpenChange={setShowWhatsAppDialog}
+        clientName={selectedProposta?.["Nome do cliente"] || ""}
+        clientPhone={selectedProposta?.whatsapp || selectedProposta?.telefone || ""}
+      />
     </div>
   );
 }

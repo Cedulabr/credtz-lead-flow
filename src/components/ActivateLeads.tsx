@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { WhatsAppSendDialog } from '@/components/WhatsAppSendDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -334,6 +335,8 @@ export const ActivateLeads = () => {
   const [showDuplicateFileAlert, setShowDuplicateFileAlert] = useState(false);
   const [pendingCsvFile, setPendingCsvFile] = useState<File | null>(null);
   const [csvFileHash, setCsvFileHash] = useState<string | null>(null);
+  const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
+  const [whatsAppLead, setWhatsAppLead] = useState<ActivateLead | null>(null);
 
   const isGestor = gestorId !== null;
   const canImport = isAdmin || isGestor;
@@ -2001,9 +2004,8 @@ export const ActivateLeads = () => {
                               size="sm"
                               variant="ghost"
                               onClick={() => {
-                                const primeiroNome = lead.nome.split(' ')[0];
-                                const mensagem = encodeURIComponent(`Olá ${primeiroNome}, tudo bem?`);
-                                window.open(`https://wa.me/${lead.telefone.replace(/\D/g, '')}?text=${mensagem}`, '_blank');
+                                setWhatsAppLead(lead);
+                                setShowWhatsAppDialog(true);
                               }}
                               className="h-9 w-9 p-0 hover:bg-green-100 hover:text-green-700 transition-all duration-300"
                               title="WhatsApp"
@@ -2969,6 +2971,14 @@ export const ActivateLeads = () => {
         onConfirm={handleDuplicateFileConfirm}
         duplicateInfo={duplicateFileInfo}
         currentFileName={pendingCsvFile?.name}
+      />
+
+      {/* WhatsApp Send Dialog */}
+      <WhatsAppSendDialog
+        open={showWhatsAppDialog}
+        onOpenChange={setShowWhatsAppDialog}
+        clientName={whatsAppLead?.nome || ""}
+        clientPhone={whatsAppLead?.telefone || ""}
       />
     </motion.div>
   );

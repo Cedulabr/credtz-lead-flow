@@ -35,6 +35,7 @@ import { Collaborative } from "@/components/Collaborative";
 import { MyData } from "@/components/MyData";
 import { TimeClock } from "@/components/TimeClock";
 import { SmsModule } from "@/modules/sms";
+import { WhatsAppConfig } from "@/components/WhatsAppConfig";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -217,6 +218,12 @@ const Index = () => {
           return <BlockedAccess message="Acesso ao módulo SMS bloqueado pelo administrador" />;
         }
         return <SmsModule />;
+      
+      case "whatsapp":
+        if (!hasPermission('can_access_whatsapp')) {
+          return <BlockedAccess message="Acesso ao módulo WhatsApp bloqueado pelo administrador" />;
+        }
+        return <WhatsAppConfig />;
       
       case "notifications":
         return <Notifications />;

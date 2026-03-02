@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { WhatsAppSendDialog } from "@/components/WhatsAppSendDialog";
 import { Lead, UserProfile, PIPELINE_STAGES, HistoryEntry, REJECTION_REASONS, BANKS_LIST } from "../types";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -61,6 +62,7 @@ export function LeadDetailDrawer({
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const [expandedSections, setExpandedSections] = useState<string[]>(["info", "actions"]);
+  const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Modal states
@@ -102,10 +104,7 @@ export function LeadDetailDrawer({
   };
 
   const handleWhatsApp = () => {
-    const phone = lead.phone.replace(/\D/g, "");
-    const firstName = lead.name.split(' ')[0];
-    const message = encodeURIComponent(`Olá ${firstName}, tudo bem?`);
-    window.open(`https://wa.me/55${phone}?text=${message}`, "_blank");
+    setShowWhatsAppDialog(true);
   };
 
   const handleCall = () => {
@@ -838,21 +837,36 @@ export function LeadDetailDrawer({
     </>
   );
 
+  const whatsAppDialog = (
+    <WhatsAppSendDialog
+      open={showWhatsAppDialog}
+      onOpenChange={setShowWhatsAppDialog}
+      clientName={lead.name}
+      clientPhone={lead.phone}
+    />
+  );
+
   if (isMobile) {
     return (
-      <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
-          {content}
-        </SheetContent>
-      </Sheet>
+      <>
+        <Sheet open={isOpen} onOpenChange={onClose}>
+          <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
+            {content}
+          </SheetContent>
+        </Sheet>
+        {whatsAppDialog}
+      </>
     );
   }
 
   return (
-    <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="w-[480px] sm:max-w-[480px] p-0 flex flex-col">
-        {content}
-      </SheetContent>
-    </Sheet>
+    <>
+      <Sheet open={isOpen} onOpenChange={onClose}>
+        <SheetContent className="w-[480px] sm:max-w-[480px] p-0 flex flex-col">
+          {content}
+        </SheetContent>
+      </Sheet>
+      {whatsAppDialog}
+    </>
   );
 }

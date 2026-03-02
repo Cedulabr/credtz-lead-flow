@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2, UserCircle, Clock, ChevronRight, Target, MessageSquare } from "lucide-react";
+import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2, UserCircle, Clock, ChevronRight, Target, MessageSquare, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,7 @@ const navItems = [
   { id: "collaborative", label: "Colaborativo", icon: Users2, permissionKey: "can_access_colaborativo" },
   { id: "time-clock", label: "Controle de Ponto", icon: Clock, permissionKey: "can_access_controle_ponto" },
   { id: "sms", label: "Comunicação SMS", icon: MessageSquare, permissionKey: "can_access_sms" },
+  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle, permissionKey: "can_access_whatsapp" },
 ];
 
 // Mobile priority items - only icons

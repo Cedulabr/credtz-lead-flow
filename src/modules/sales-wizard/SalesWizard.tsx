@@ -15,6 +15,7 @@ import { ConfirmStep } from "./components/ConfirmStep";
 import { DocumentUploadModal } from "./components/DocumentUploadModal";
 import { InitialStatusDialog } from "./components/InitialStatusDialog";
 import { SmsNotifyDialog } from "./components/SmsNotifyDialog";
+import { WhatsAppNotifyDialog } from "./components/WhatsAppNotifyDialog";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Steps padrão (não-portabilidade)
@@ -43,6 +44,7 @@ export function SalesWizard() {
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [showSmsNotify, setShowSmsNotify] = useState(false);
+  const [showWhatsAppNotify, setShowWhatsAppNotify] = useState(false);
   const [savedTelevendasId, setSavedTelevendasId] = useState<string | null>(null);
   const [savedClientData, setSavedClientData] = useState<{ name: string; cpf: string; phone: string } | null>(null);
   
@@ -171,6 +173,8 @@ export function SalesWizard() {
         setShowSuccess(false);
         if (smsEnabled && hasPhone) {
           setShowSmsNotify(true);
+        } else if (hasPhone) {
+          setShowWhatsAppNotify(true);
         } else {
           setShowDocumentModal(true);
         }
@@ -267,11 +271,24 @@ export function SalesWizard() {
           open={showSmsNotify}
           onComplete={() => {
             setShowSmsNotify(false);
-            setShowDocumentModal(true);
+            setShowWhatsAppNotify(true);
           }}
           clientName={savedClientData.name}
           clientPhone={savedClientData.phone}
           televendasId={savedTelevendasId || undefined}
+        />
+      )}
+
+      {/* WhatsApp Notification Dialog */}
+      {savedClientData && (
+        <WhatsAppNotifyDialog
+          open={showWhatsAppNotify}
+          onComplete={() => {
+            setShowWhatsAppNotify(false);
+            setShowDocumentModal(true);
+          }}
+          clientName={savedClientData.name}
+          clientPhone={savedClientData.phone}
         />
       )}
 
