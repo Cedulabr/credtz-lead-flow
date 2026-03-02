@@ -751,11 +751,26 @@ export function MyClientsKanban() {
                               {formatCurrency(proposta.valor_proposta || proposta.valor)}
                             </span>
                           </div>
-                          {proposta.convenio && (
-                            <Badge variant="outline" className="mt-2 text-xs">
-                              {proposta.convenio}
-                            </Badge>
-                          )}
+                          <div className="flex items-center gap-2 mt-2">
+                            {proposta.convenio && (
+                              <Badge variant="outline" className="text-xs">
+                                {proposta.convenio}
+                              </Badge>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-2 text-green-600 hover:text-green-700 hover:bg-green-50 gap-1 ml-auto"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedProposta(proposta);
+                                setShowWhatsAppDialog(true);
+                              }}
+                            >
+                              <MessageCircle className="h-3 w-3" />
+                              <span className="text-[10px]">API WhatsApp</span>
+                            </Button>
+                          </div>
                         </div>
                       );
                     })
