@@ -1,61 +1,75 @@
 
+## Correcao: Isolamento por Empresa quando company_id e NULL
 
-## Correcao: Isolamento por Empresa na Importacao de Leads para Campanhas SMS
+### Problema Raiz
 
-### Problema
+As tabelas `activate_leads` e `leads` (Leads Premium) possuem `company_id = NULL` em **100% dos registros**. A identificacao da empresa e feita indiretamente pelo usuario atribuido (`assigned_to`, `created_by`, `requested_by`), que esta vinculado a uma empresa via `user_companies`.
 
-Quando um gestor de uma empresa (ex: JS Cred) cria uma campanha SMS e importa leads dos modulos Activate, Leads Premium ou Televendas, o sistema puxa leads de **todas as empresas**, violando o isolamento de dados. Alem disso, o filtro por empresa nao esta sendo aplicado porque o componente `CampaignsView` nao possui acesso ao `companyId` do usuario.
+O filtro atual `.eq("company_id", companyId)` nao funciona porque:
+- Quando aplicado: retorna 0 resultados (NULL != companyId)
+- Quando nao aplicado: retorna TODOS os registros de todas as empresas
 
-### Causa Raiz
+### Dados Confirmados (JS Cred)
 
-No arquivo `src/modules/sms/views/CampaignsView.tsx`, a funcao `handleImportLeads` faz queries diretas nas tabelas sem filtrar por `company_id`:
-
-```text
-// Sem filtro de empresa:
-supabase.from("activate_leads").select("id, nome, telefone, status")
-supabase.from("leads").select("id, name, phone, status")
-supabase.from("televendas").select("id, nome, telefone, status")
-```
+| Modulo | Total | JS Cred | em_andamento JS Cred |
+|---|---|---|---|
+| activate_leads | 224 | 10 | **2** |
+| leads (premium) | 2464 | 5 | 0 |
+| televendas | 624 | tem company_id | funciona |
+| propostas | 655 | tem company_id | funciona |
 
 ### Solucao
 
-#### 1. Adicionar hook `useUserCompany` ao CampaignsView
+Para os modulos onde `company_id` e NULL, filtrar pelos IDs de usuarios da empresa. A logica sera:
 
-Importar e utilizar o hook `useUserCompany()` que ja existe no projeto e ja e usado pelo `AutomationView`.
+1. Quando o usuario nao for admin, buscar os `user_ids` da empresa do gestor
+2. Filtrar leads usando `.in("assigned_to", companyUserIds)` ou `.in("created_by", companyUserIds)` como alternativa ao filtro por `company_id`
+3. Manter o filtro por `company_id` para `televendas` e `propostas` que ja possuem esse campo preenchido
 
-#### 2. Filtrar queries por `company_id`
+### Alteracoes
 
-Para cada modulo de origem, adicionar o filtro `.eq("company_id", companyId)` quando o usuario nao for admin:
+#### 1. CampaignsView.tsx - Importacao de leads para campanhas
 
 ```text
-activate_leads:
-  ANTES: supabase.from("activate_leads").select("id, nome, telefone, status")
-  DEPOIS: + .eq("company_id", companyId)  (se nao for admin)
+ANTES:
+  if (!isAdmin && companyId) query = query.eq("company_id", companyId)
 
-leads (Leads Premium):
-  ANTES: supabase.from("leads").select("id, name, phone, status")
-  DEPOIS: + .eq("company_id", companyId)  (se nao for admin)
+DEPOIS (activate_leads):
+  if (!isAdmin && companyUserIds.length) query = query.in("assigned_to", companyUserIds)
 
-televendas:
-  ANTES: supabase.from("televendas").select("id, nome, telefone, status")
-  DEPOIS: + .eq("company_id", companyId)  (se nao for admin)
+DEPOIS (leads_premium):
+  if (!isAdmin && companyUserIds.length) query = query.in("assigned_to", companyUserIds)
+
+DEPOIS (televendas - ja funciona, manter):
+  if (!isAdmin && companyId) query = query.eq("company_id", companyId)
 ```
 
-Admins continuam vendo leads de todas as empresas (comportamento existente em outros modulos).
+Adicionar busca de `companyUserIds` no inicio de `handleImportLeads`:
+```text
+const { data: companyUsers } = await supabase
+  .from("user_companies")
+  .select("user_id")
+  .eq("company_id", companyId)
+  .eq("is_active", true);
+const companyUserIds = (companyUsers || []).map(u => u.user_id);
+```
 
-#### 3. Bloquear importacao se companyId nao estiver disponivel
+#### 2. RemarketingSmsView.tsx - Sincronizacao de remarketing
 
-Se o usuario nao for admin e o `companyId` ainda nao carregou, exibir mensagem informando que a empresa nao foi identificada, impedindo a importacao de dados de empresas incorretas.
+Mesma logica: buscar `companyUserIds` no inicio de `handleSync` e usar `.in("assigned_to", companyUserIds)` para activate_leads e leads premium. Manter `.eq("company_id", companyId)` para propostas.
 
-### Arquivo a Modificar
+Tambem aplicar no Sync Activate Leads: usar `.or("assigned_to.in.(ids),created_by.in.(ids)")` para cobrir ambos os campos.
+
+### Arquivos a Modificar
 
 | Arquivo | Alteracao |
 |---|---|
-| `src/modules/sms/views/CampaignsView.tsx` | Importar `useUserCompany`, aplicar filtro `company_id` nas 3 queries de importacao |
+| `src/modules/sms/views/CampaignsView.tsx` | Buscar user_ids da empresa, filtrar activate_leads e leads por assigned_to |
+| `src/modules/sms/views/RemarketingSmsView.tsx` | Mesma logica no handleSync para activate_leads e leads premium |
 
 ### Resultado Esperado
 
-- Gestores verao apenas os leads da propria empresa ao importar para campanhas SMS
-- Admins continuam com visao global
-- Nenhuma alteracao no banco de dados e necessaria (as colunas `company_id` ja existem nas 3 tabelas)
-
+- JS Cred vera apenas seus 2 leads "em_andamento" do Activate Leads (nao 224)
+- Sync do Remarketing encontrara os 2 leads corretamente
+- Televendas e Meus Clientes continuam funcionando (ja possuem company_id preenchido)
+- Admins mantem visao global sem filtros
