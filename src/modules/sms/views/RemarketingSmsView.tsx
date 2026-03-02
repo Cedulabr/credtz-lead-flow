@@ -106,8 +106,8 @@ export const RemarketingSmsView = () => {
 
       // Sync Propostas (Meus Clientes)
       {
-        let q = supabase.from("propostas").select("id, \"Nome do cliente\", telefone, whatsapp, status, future_contact_date, company_id, created_by_id");
-        q = q.in("status", ["contato_futuro", "aguardando_retorno"]);
+        let q = supabase.from("propostas").select("id, \"Nome do cliente\", telefone, whatsapp, client_status, future_contact_date, company_id, created_by_id");
+        q = q.in("client_status", ["contato_futuro", "aguardando_retorno"]);
         if (!isAdmin && companyId) q = q.eq("company_id", companyId);
         const { data: props } = await q.limit(500);
         toast.info(`Meus Clientes: ${(props || []).length} encontrados`);
@@ -118,8 +118,8 @@ export const RemarketingSmsView = () => {
           const tel = p.telefone || p.whatsapp;
           if (!nome || !tel) { skippedNoPhone++; return []; }
           const userId = p.created_by_id || profile?.id;
-          if (p.status === "contato_futuro" && p.future_contact_date) items.push({ source_module: "meus_clientes", source_id: String(p.id), cliente_nome: nome, cliente_telefone: tel, status_original: p.status, queue_type: "contato_futuro", scheduled_date: p.future_contact_date, company_id: p.company_id, user_id: userId, dias_envio_total: 1 });
-          if (p.status === "aguardando_retorno") items.push({ source_module: "meus_clientes", source_id: String(p.id), cliente_nome: nome, cliente_telefone: tel, status_original: p.status, queue_type: "remarketing", company_id: p.company_id, user_id: userId, dias_envio_total: dias });
+          if (p.client_status === "contato_futuro" && p.future_contact_date) items.push({ source_module: "meus_clientes", source_id: String(p.id), cliente_nome: nome, cliente_telefone: tel, status_original: p.client_status, queue_type: "contato_futuro", scheduled_date: p.future_contact_date, company_id: p.company_id, user_id: userId, dias_envio_total: 1 });
+          if (p.client_status === "aguardando_retorno") items.push({ source_module: "meus_clientes", source_id: String(p.id), cliente_nome: nome, cliente_telefone: tel, status_original: p.client_status, queue_type: "remarketing", company_id: p.company_id, user_id: userId, dias_envio_total: dias });
           return items;
         });
         if (skippedNoPhone > 0) toast.info(`${skippedNoPhone} propostas sem telefone ignoradas`);
