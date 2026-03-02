@@ -5711,6 +5711,8 @@ export type Database = {
       }
       whatsapp_instances: {
         Row: {
+          api_token: string | null
+          company_id: string | null
           created_at: string
           id: string
           instance_name: string
@@ -5720,6 +5722,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          api_token?: string | null
+          company_id?: string | null
           created_at?: string
           id?: string
           instance_name: string
@@ -5729,6 +5733,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          api_token?: string | null
+          company_id?: string | null
           created_at?: string
           id?: string
           instance_name?: string
@@ -5737,34 +5743,54 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_instances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_messages: {
         Row: {
+          client_name: string | null
           created_at: string
+          direction: string | null
           id: string
           instance_id: string | null
+          media_url: string | null
           message: string
+          message_type: string | null
           phone: string
           sent_at: string | null
           status: string | null
           user_id: string
         }
         Insert: {
+          client_name?: string | null
           created_at?: string
+          direction?: string | null
           id?: string
           instance_id?: string | null
+          media_url?: string | null
           message: string
+          message_type?: string | null
           phone: string
           sent_at?: string | null
           status?: string | null
           user_id: string
         }
         Update: {
+          client_name?: string | null
           created_at?: string
+          direction?: string | null
           id?: string
           instance_id?: string | null
+          media_url?: string | null
           message?: string
+          message_type?: string | null
           phone?: string
           sent_at?: string | null
           status?: string | null

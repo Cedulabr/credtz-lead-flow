@@ -37,6 +37,8 @@ import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import { useAuth } from "@/contexts/AuthContext";
 import { SmsNotifyDialog } from "@/modules/sales-wizard/components/SmsNotifyDialog";
+import { WhatsAppSendDialog } from "@/components/WhatsAppSendDialog";
+import { MessageCircle } from "lucide-react";
 
 interface Contract {
   id: string;
@@ -117,6 +119,8 @@ export function ProposalGenerator() {
   
   // SMS notification state
   const [showSmsNotify, setShowSmsNotify] = useState(false);
+  const [showWhatsAppSend, setShowWhatsAppSend] = useState(false);
+  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
   
   // Filters state
   const [filterUser, setFilterUser] = useState<string>("all");
@@ -1023,6 +1027,16 @@ export function ProposalGenerator() {
             <Download className="w-4 h-4 mr-2" />
             Baixar PDF
           </Button>
+          {proposalData.clientPhone && (
+            <Button 
+              onClick={() => setShowWhatsAppSend(true)}
+              variant="outline" 
+              className="flex-1 h-12"
+            >
+              <MessageCircle className="w-4 h-4 mr-2" />
+              Enviar via WhatsApp
+            </Button>
+          )}
           {user && (
             <Button onClick={saveProposal} variant="outline" className="flex-1 h-12" disabled={isSaving}>
               <Save className="w-4 h-4 mr-2" />
@@ -1647,6 +1661,15 @@ export function ProposalGenerator() {
         onComplete={() => setShowSmsNotify(false)}
         clientName={proposalData.clientName}
         clientPhone={proposalData.clientPhone?.replace(/\D/g, "")}
+      />
+
+      {/* WhatsApp Send Dialog */}
+      <WhatsAppSendDialog
+        open={showWhatsAppSend}
+        onOpenChange={setShowWhatsAppSend}
+        clientName={proposalData.clientName}
+        clientPhone={proposalData.clientPhone}
+        defaultMessage={`Olá ${proposalData.clientName?.split(" ")[0] || ""}, segue sua proposta de crédito consignado.`}
       />
     </div>
   );
