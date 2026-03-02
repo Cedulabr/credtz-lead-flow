@@ -1,72 +1,49 @@
 
+## Melhorias no Modulo Comunicacao SMS
 
-## Finalizacao do Modulo Comunicacao SMS
+### 1. Secao "Proximos Envios" com melhor layout, tags de origem e filtros
 
-### 1. Melhorar contraste dos toggles Ativar/Desativar
+**Problema:** A secao "Proximos Envios -- Clientes a Notificar" precisa de melhor organizacao e identificacao de origem.
 
-**Problema:** Os switches de ativar/desativar automacao sao discretos demais e dificeis de identificar visualmente.
+**Solucao no `AutomationView.tsx`:**
+- Expandir a query de `fetchNextSends` para buscar tambem da tabela `sms_proposal_notifications` (propostas nao enviadas) e da `sms_remarketing_queue` (ativos)
+- Adicionar uma tag/badge colorida para cada item indicando a origem: "Televendas" (azul), "Proposta" (teal), "Remarketing" (violeta), "Contato Futuro" (amber)
+- Adicionar filtros por origem (chips similares ao remarketing) no topo da secao
+- Exibir a secao em um Card mais destacado com contador por tipo
+- Melhorar o layout de cada item mostrando: nome, telefone, origem, tipo operacao, progresso, data agendada
 
-**Solucao:** Substituir o `Switch` padrao por um toggle mais visivel com fundo colorido quando ativo (verde) e vermelho/cinza quando inativo, com label textual "Ativa/Inativa" junto ao switch. Adicionar uma barra de status mais evidente no topo de cada card.
+### 2. Corrigir sincronizacao de "Meus Clientes" com status "aguardando_retorno"
 
-**Arquivo:** `src/modules/sms/views/AutomationView.tsx`
-- Criar componente `AutomationToggle` que renderiza o Switch dentro de um container com fundo colorido (`bg-green-500/15` quando ativo, `bg-red-500/10` quando inativo)
-- Label muda de cor: verde "Ativada" / vermelho "Desativada"
-- O `StatusBadge` no header do card tambem ganha mais contraste (fundo solido verde/vermelho ao inves de translucido)
+**Analise:** O codigo em `RemarketingSmsView.tsx` ja usa `.in("status", ["contato_futuro", "aguardando_retorno"])` e o trigger no banco ja trata esse status. O problema pode estar na coluna `"Nome do cliente"` (com espaco) que pode causar problemas no select, ou nos dados com telefone/whatsapp nulos.
 
----
+**Solucao:**
+- Adicionar logging mais detalhado na sincronizacao para mostrar quantos registros foram encontrados por modulo
+- Testar e corrigir a query se necessario
+- O trigger `sms_remarketing_enqueue_propostas` ja funciona para novos registros -- o sync eh para registros existentes
 
-### 2. Garantir que todas as automacoes usem primeiro nome
+### 3. Finalizar automaticamente clientes ao mudar de status (Database Triggers)
 
-**Problema:** Precisa que TODOS os disparos usem apenas o primeiro nome do cliente.
+**Problema:** Quando um cliente sai do status `aguardando_retorno`, `contato_futuro` ou `em_andamento`, ele precisa ser removido/finalizado automaticamente da fila SMS.
 
-**Solucao:** Ja esta implementado no edge function (`getFirstName`), mas vamos garantir consistencia verificando que:
-- A funcao `getFirstName` ja extrai `fullName.split(" ")[0]`
-- Todas as 5 secoes do `sms-automation-run` ja usam `getFirstName`
-- Adicionar dica visual em TODAS as secoes de automacao sobre `{{nome}}` = primeiro nome
+**Solucao -- Atualizar 3 triggers no banco:**
 
-**Arquivo:** `src/modules/sms/views/AutomationView.tsx`
-- Adicionar nota sobre primeiro nome nas secoes que ainda nao tem (Propostas Pagas ja tem, verificar Portabilidade)
+**a) `sms_remarketing_enqueue_propostas` (Meus Clientes):**
+- Ampliar a lista de status finais para incluir TODOS os status que nao sao `aguardando_retorno` ou `contato_futuro`
+- Logica: se o status mudou E o novo status NAO eh `aguardando_retorno` nem `contato_futuro`, finalizar a automacao
 
-Nenhuma alteracao no edge function necessaria — ja extrai primeiro nome em todas as secoes.
+**b) `sms_remarketing_enqueue_leads` (Leads Premium):**
+- Ja finaliza em `cliente_fechado, recusou_oferta, sem_interesse, nao_e_cliente`
+- Adicionar logica: se saiu de `em_andamento` ou `contato_futuro` para QUALQUER outro status nao-ativo, finalizar
 
----
+**c) `sms_remarketing_enqueue_activate_leads` (Activate Leads):**
+- Ja finaliza em `fechado, sem_interesse, nao_e_cliente, fora_do_perfil`
+- Adicionar logica similar para cobrir mudancas de status genericas
 
-### 3. Disparo manual com selecao de cliente
+**d) Tambem cancelar notificacoes de proposta pendentes:** quando o televendas muda para status final (pago/cancelado), marcar as notificacoes pendentes como enviadas para nao gastar SMS
 
-**Problema:** O botao "Disparar Agora" envia para todos sem opcao de escolher clientes especificos.
+### 4. Cancelar sms_proposal_notifications em status finais
 
-**Solucao:** Ao clicar em "Disparar Agora", abrir um Dialog com 3 opcoes:
-1. **Disparar para todos** — comportamento atual
-2. **Selecionar quantidade** — dispara para os N primeiros da fila
-3. **Buscar cliente especifico** — campo de busca por nome/telefone para selecionar um ou mais clientes
-
-**Arquivo:** `src/modules/sms/views/AutomationView.tsx`
-- Criar componente `ManualDispatchDialog` com:
-  - RadioGroup para escolher modo: "Todos", "Quantidade", "Cliente especifico"
-  - Input numerico para quantidade (quando modo = "Quantidade")
-  - Input de busca + lista de resultados (quando modo = "Cliente especifico") consultando a fila da secao correspondente (`sms_televendas_queue` ou `sms_remarketing_queue`)
-  - Checkboxes para multi-selecao de clientes
-  - Botao "Confirmar Disparo" que executa o envio
-- Para o disparo seletivo: invocar `send-sms` individualmente para cada cliente selecionado, similar ao `handleManualSend` do RemarketingSmsView
-- O `SectionTriggerButton` agora abre o dialog ao inves de disparar diretamente
-
----
-
-### 4. Sincronizacao de "Meus Clientes" com status "aguardando_retorno"
-
-**Problema:** Ao selecionar "Meus Clientes" e clicar em sincronizar no Remarketing, nao esta puxando os clientes com status `aguardando_retorno`.
-
-**Analise:** O codigo em `RemarketingSmsView.tsx` (linha 108) ja inclui `aguardando_retorno` no filtro `.or("status.eq.contato_futuro,status.eq.aguardando_retorno")`. O trigger no banco tambem ja trata esse status.
-
-**Possiveis causas e correcoes:**
-- A tabela `propostas` pode ter a coluna `telefone` e `whatsapp` ambas null para alguns registros — o codigo verifica `if (!nome || !tel) return []` e pula esses
-- Verificar se o `company_id` esta preenchido nos registros de propostas
-- O filtro `.or()` pode nao estar funcionando corretamente com a coluna `"Nome do cliente"` (coluna com espaco)
-
-**Correcao no `RemarketingSmsView.tsx`:**
-- Melhorar o log de sincronizacao para mostrar quantos registros foram encontrados por modulo
-- Adicionar tratamento para caso `telefone` e `whatsapp` estejam ambos vazios (mostrar aviso)
-- Garantir que o `.or()` esta sendo aplicado corretamente verificando o formato da query
+**Solucao:** Atualizar o trigger `sms_sync_televendas_status` para tambem marcar notificacoes pendentes como canceladas quando a proposta eh paga ou cancelada.
 
 ---
 
@@ -74,13 +51,35 @@ Nenhuma alteracao no edge function necessaria — ja extrai primeiro nome em tod
 
 | Arquivo | Alteracao |
 |---|---|
-| `src/modules/sms/views/AutomationView.tsx` | Toggle com mais contraste, Dialog de disparo manual seletivo, notas de primeiro nome |
-| `src/modules/sms/views/RemarketingSmsView.tsx` | Fix na sincronizacao de Meus Clientes, melhorar feedback de sync |
+| `src/modules/sms/views/AutomationView.tsx` | Refatorar secao "Proximos Envios" com tags de origem, filtros, busca unificada de 3 tabelas |
+| `src/modules/sms/views/RemarketingSmsView.tsx` | Melhorar feedback de sync com contagem por modulo |
+| Nova migracao SQL | Atualizar 3 triggers para finalizar automacao ao mudar status + cancelar proposal notifications |
+
+### Detalhes tecnicos da migracao SQL
+
+```text
+1. sms_remarketing_enqueue_propostas:
+   - Manter enqueue para aguardando_retorno e contato_futuro
+   - ELSE: se status != aguardando_retorno AND status != contato_futuro -> finalizar
+
+2. sms_remarketing_enqueue_leads:
+   - Manter enqueue para em_andamento e contato_futuro  
+   - ELSE: finalizar (cobre TODOS os outros status)
+
+3. sms_remarketing_enqueue_activate_leads:
+   - Manter enqueue para em_andamento e contato_futuro
+   - ELSE: finalizar
+
+4. sms_sync_televendas_status (update):
+   - Quando status final: tambem UPDATE sms_proposal_notifications SET sent=true WHERE televendas_id=NEW.id AND sent=false
+
+5. Novo trigger propostas -> cancelar proposal_notifications:
+   - Quando proposta muda para status final, cancelar notificacoes pendentes
+```
 
 ### Resultado Esperado
 
-1. Toggles de ativar/desativar com cores fortes (verde/vermelho) facilmente identificaveis
-2. Todas as automacoes mostram dica de que `{{nome}}` = primeiro nome
-3. "Disparar Agora" abre modal com opcoes: todos, quantidade, ou busca de cliente especifico
-4. Sincronizacao do Remarketing puxa corretamente clientes com status `aguardando_retorno` de Meus Clientes
-
+1. Secao "Proximos Envios" reorganizada com tags coloridas (Televendas/Proposta/Remarketing), filtros por tipo e melhor layout
+2. Sincronizacao de Meus Clientes funcionando corretamente com feedback detalhado
+3. Clientes finalizados automaticamente na fila SMS quando saem de status ativos em QUALQUER modulo
+4. Notificacoes de proposta canceladas automaticamente quando proposta eh paga ou cancelada
