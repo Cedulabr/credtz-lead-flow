@@ -36,6 +36,7 @@ import { MyData } from "@/components/MyData";
 import { TimeClock } from "@/components/TimeClock";
 import { SmsModule } from "@/modules/sms";
 import { WhatsAppConfig } from "@/components/WhatsAppConfig";
+import { MeuNumeroModule } from "@/modules/meu-numero";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -224,6 +225,12 @@ const Index = () => {
           return <BlockedAccess message="Acesso ao módulo WhatsApp bloqueado pelo administrador" />;
         }
         return <WhatsAppConfig />;
+      
+      case "meu-numero":
+        if (!hasPermission('can_access_meu_numero')) {
+          return <BlockedAccess message="Acesso ao módulo Meu Número bloqueado pelo administrador" />;
+        }
+        return <MeuNumeroModule />;
       
       case "notifications":
         return <Notifications />;
