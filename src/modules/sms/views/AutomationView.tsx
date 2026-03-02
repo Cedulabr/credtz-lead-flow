@@ -26,7 +26,16 @@ interface QueueItem {
   dias_enviados: number;
   dias_envio_total: number;
   ultimo_envio_at: string | null;
+  origin: "televendas" | "proposta" | "remarketing" | "contato_futuro";
+  scheduled_date?: string | null;
 }
+
+const ORIGIN_LABELS: Record<string, { label: string; color: string }> = {
+  televendas: { label: "Televendas", color: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 border-blue-300" },
+  proposta: { label: "Proposta", color: "bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300 border-teal-300" },
+  remarketing: { label: "Remarketing", color: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300 border-violet-300" },
+  contato_futuro: { label: "Contato Futuro", color: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 border-amber-300" },
+};
 
 const WEEKDAYS = [
   { value: "1", label: "Seg" },
@@ -272,6 +281,7 @@ export const AutomationView = () => {
   const [runningSection, setRunningSection] = useState<string | null>(null);
   const [nextSends, setNextSends] = useState<QueueItem[]>([]);
   const [loadingNext, setLoadingNext] = useState(false);
+  const [nextSendsFilter, setNextSendsFilter] = useState<string>("all");
   const [msgsOpen, setMsgsOpen] = useState(false);
   const [dispatchSection, setDispatchSection] = useState<string | null>(null);
 
@@ -287,22 +297,66 @@ export const AutomationView = () => {
   const fetchNextSends = useCallback(async () => {
     if (companyLoading) return;
     setLoadingNext(true);
-    let query = supabase
-      .from("sms_televendas_queue")
-      .select("id, cliente_nome, cliente_telefone, tipo_operacao, dias_enviados, dias_envio_total, ultimo_envio_at")
-      .eq("automacao_ativa", true)
-      .eq("automacao_status", "ativo")
-      .ilike("tipo_operacao", "%portabilidade%")
-      .order("ultimo_envio_at", { ascending: true, nullsFirst: true })
-      .limit(50);
+    const all: QueueItem[] = [];
 
-    if (!isAdmin && companyId) {
-      query = query.eq("company_id", companyId);
+    // 1. Televendas queue
+    {
+      let q = supabase
+        .from("sms_televendas_queue")
+        .select("id, cliente_nome, cliente_telefone, tipo_operacao, dias_enviados, dias_envio_total, ultimo_envio_at")
+        .eq("automacao_ativa", true)
+        .eq("automacao_status", "ativo")
+        .order("ultimo_envio_at", { ascending: true, nullsFirst: true })
+        .limit(50);
+      if (!isAdmin && companyId) q = q.eq("company_id", companyId);
+      const { data } = await q;
+      ((data as any[]) || []).filter((i: any) => i.dias_enviados < i.dias_envio_total).forEach((i: any) => {
+        all.push({ ...i, origin: "televendas" as const });
+      });
     }
 
-    const { data } = await query;
-    const filtered = ((data as any[]) || []).filter((i: QueueItem) => i.dias_enviados < i.dias_envio_total);
-    setNextSends(filtered);
+    // 2. Proposal notifications (not sent)
+    {
+      let q = supabase
+        .from("sms_proposal_notifications")
+        .select("id, cliente_nome, cliente_telefone, created_at")
+        .eq("sent", false)
+        .order("created_at", { ascending: true })
+        .limit(50);
+      if (!isAdmin && companyId) q = q.eq("company_id", companyId);
+      const { data } = await q;
+      ((data as any[]) || []).forEach((i: any) => {
+        all.push({
+          id: i.id, cliente_nome: i.cliente_nome, cliente_telefone: i.cliente_telefone,
+          tipo_operacao: "Proposta", dias_enviados: 0, dias_envio_total: 1,
+          ultimo_envio_at: null, origin: "proposta" as const, scheduled_date: i.created_at,
+        });
+      });
+    }
+
+    // 3. Remarketing queue (active)
+    {
+      let q = supabase
+        .from("sms_remarketing_queue")
+        .select("id, cliente_nome, cliente_telefone, queue_type, dias_enviados, dias_envio_total, ultimo_envio_at, scheduled_date")
+        .eq("automacao_ativa", true)
+        .eq("automacao_status", "ativo")
+        .order("ultimo_envio_at", { ascending: true, nullsFirst: true })
+        .limit(50);
+      if (!isAdmin && companyId) q = q.eq("company_id", companyId);
+      const { data } = await q;
+      ((data as any[]) || []).forEach((i: any) => {
+        const origin = i.queue_type === "contato_futuro" ? "contato_futuro" : "remarketing";
+        all.push({
+          id: i.id, cliente_nome: i.cliente_nome, cliente_telefone: i.cliente_telefone,
+          tipo_operacao: origin === "contato_futuro" ? "Contato Futuro" : "Remarketing",
+          dias_enviados: i.dias_enviados || 0, dias_envio_total: i.dias_envio_total || 1,
+          ultimo_envio_at: i.ultimo_envio_at, origin: origin as any, scheduled_date: i.scheduled_date,
+        });
+      });
+    }
+
+    setNextSends(all);
     setLoadingNext(false);
   }, [isAdmin, companyId, companyLoading]);
 
@@ -347,6 +401,8 @@ export const AutomationView = () => {
       setRunningSection(null);
     }
   };
+
+  const filteredNextSends = nextSendsFilter === "all" ? nextSends : nextSends.filter(i => i.origin === nextSendsFilter);
 
   const selectedDays = (settings["remarketing_dias_semana"] || "1,2,3,4,5").split(",").filter(Boolean);
 
@@ -713,54 +769,91 @@ export const AutomationView = () => {
         </Card>
       </div>
 
-      {/* ─── Próximos Envios ─── */}
+      {/* ─── Próximos Envios — Unificado ─── */}
       <Card className="border overflow-hidden">
-        <div className="px-5 py-3.5 bg-muted/30 flex items-center justify-between">
+        <div className="px-5 py-3.5 bg-muted/30 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-primary" />
             <span className="text-sm font-semibold">Próximos Envios — Clientes a Notificar</span>
-            <Badge variant="secondary" className="text-[10px]">{nextSends.length}</Badge>
+            <Badge variant="secondary" className="text-[10px]">{filteredNextSends.length}</Badge>
             {!isAdmin && companyId && <Badge variant="outline" className="text-[10px]">Sua empresa</Badge>}
           </div>
+          <div className="flex items-center gap-3 text-[10px] font-medium text-muted-foreground">
+            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500" />{nextSends.filter(i => i.origin === "televendas").length} Televendas</span>
+            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-teal-500" />{nextSends.filter(i => i.origin === "proposta").length} Proposta</span>
+            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-violet-500" />{nextSends.filter(i => i.origin === "remarketing").length} Remarketing</span>
+            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" />{nextSends.filter(i => i.origin === "contato_futuro").length} C. Futuro</span>
+          </div>
+        </div>
+        <div className="px-5 py-2 border-b flex flex-wrap gap-1.5">
+          {[
+            { value: "all", label: "Todos" },
+            { value: "televendas", label: "🔵 Televendas" },
+            { value: "proposta", label: "🟢 Proposta" },
+            { value: "remarketing", label: "🟣 Remarketing" },
+            { value: "contato_futuro", label: "🟡 Contato Futuro" },
+          ].map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setNextSendsFilter(f.value)}
+              className={`h-7 px-2.5 rounded-full text-[11px] font-medium transition-all border ${nextSendsFilter === f.value ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border text-muted-foreground hover:bg-muted"}`}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
         <CardContent className="p-5">
           {loadingNext ? (
             <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : nextSends.length === 0 ? (
+          ) : filteredNextSends.length === 0 ? (
             <div className="text-center py-6 text-muted-foreground">
               <Ban className="h-8 w-8 mx-auto mb-2 opacity-40" />
               <p className="text-sm">Nenhum cliente pendente de envio</p>
             </div>
           ) : (
-            <div className="space-y-2 max-h-[300px] overflow-y-auto">
-              {nextSends.map((item, i) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.02 }}
-                  className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-border/50 bg-card text-sm hover:bg-muted/30 transition-colors"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center text-xs font-bold text-blue-600">
-                      {(item.cliente_nome || "?")[0].toUpperCase()}
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {filteredNextSends.map((item, i) => {
+                const originStyle = ORIGIN_LABELS[item.origin];
+                return (
+                  <motion.div
+                    key={`${item.origin}-${item.id}`}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.015 }}
+                    className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-border/50 bg-card text-sm hover:bg-muted/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                        {(item.cliente_nome || "?")[0].toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="font-medium truncate block text-sm">{item.cliente_nome}</span>
+                        <span className="text-[10px] font-mono text-muted-foreground">{item.cliente_telefone}</span>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <span className="font-medium truncate block text-sm">{item.cliente_nome}</span>
-                      <span className="text-[10px] font-mono text-muted-foreground">{item.cliente_telefone}</span>
+                    <div className="flex items-center gap-2.5 flex-shrink-0">
+                      <Badge variant="outline" className={`text-[9px] px-1.5 py-0 border ${originStyle?.color || ""}`}>
+                        {originStyle?.label || item.origin}
+                      </Badge>
+                      {item.origin !== "proposta" && (
+                        <span className="text-xs text-muted-foreground">{item.dias_enviados}/{item.dias_envio_total}</span>
+                      )}
+                      {item.scheduled_date && (
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                          <CalendarDays className="h-3 w-3" />
+                          {new Date(item.scheduled_date + (item.scheduled_date.includes("T") ? "" : "T00:00:00")).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {item.ultimo_envio_at
+                          ? new Date(item.ultimo_envio_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+                          : "Nunca"}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-xs text-muted-foreground">{item.dias_enviados}/{item.dias_envio_total}</span>
-                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {item.ultimo_envio_at
-                        ? new Date(item.ultimo_envio_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
-                        : "Nunca"}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
           )}
         </CardContent>
