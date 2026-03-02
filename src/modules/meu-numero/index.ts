@@ -1,0 +1,1 @@
+export { MeuNumeroModule } from "./MeuNumeroModule";

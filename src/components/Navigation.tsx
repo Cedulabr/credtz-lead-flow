@@ -38,6 +38,7 @@ const navItems = [
   { id: "time-clock", label: "Controle de Ponto", icon: Clock, permissionKey: "can_access_controle_ponto" },
   { id: "sms", label: "Comunicação SMS", icon: MessageSquare, permissionKey: "can_access_sms" },
   { id: "whatsapp", label: "WhatsApp", icon: MessageCircle, permissionKey: "can_access_whatsapp" },
+  { id: "meu-numero", label: "Meu Número", icon: Phone, permissionKey: "can_access_meu_numero" },
 ];
 
 // Mobile priority items - only icons

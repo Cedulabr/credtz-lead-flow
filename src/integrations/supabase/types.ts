@@ -5611,6 +5611,74 @@ export type Database = {
           },
         ]
       }
+      user_dids: {
+        Row: {
+          area_local: string | null
+          cn: number | null
+          codigo: number | null
+          company_id: string | null
+          created_at: string
+          id: string
+          numero: string
+          sip_destino: string | null
+          sip_dominio: string | null
+          sip_senha: string | null
+          sip_usuario: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          valor_instalacao: number | null
+          valor_mensal: number | null
+          whatsapp_configured: boolean | null
+        }
+        Insert: {
+          area_local?: string | null
+          cn?: number | null
+          codigo?: number | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          numero: string
+          sip_destino?: string | null
+          sip_dominio?: string | null
+          sip_senha?: string | null
+          sip_usuario?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          valor_instalacao?: number | null
+          valor_mensal?: number | null
+          whatsapp_configured?: boolean | null
+        }
+        Update: {
+          area_local?: string | null
+          cn?: number | null
+          codigo?: number | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          numero?: string
+          sip_destino?: string | null
+          sip_dominio?: string | null
+          sip_senha?: string | null
+          sip_usuario?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          valor_instalacao?: number | null
+          valor_mensal?: number | null
+          whatsapp_configured?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_dids_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_documents: {
         Row: {
           created_at: string
