@@ -50,6 +50,20 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Validate token format - should not be a phone number
+    const cleanToken = apiToken.replace(/\D/g, "");
+    if (cleanToken.length === apiToken.length && apiToken.length <= 15) {
+      console.error("Token appears to be a phone number, not an API token:", apiToken.substring(0, 4) + "...");
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Token inválido", 
+          details: "O token informado parece ser um número de telefone. O token da API Ticketz/Easyn é uma string alfanumérica longa (Bearer token), geralmente começando com 'eyJ...'. Verifique na configuração da plataforma Ticketz/Easyn." 
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Test mode: validate token by sending to a dummy number
     if (testMode) {
       try {
@@ -197,8 +211,11 @@ Deno.serve(async (req) => {
 
     if (!success) {
       console.error("Ticketz API error:", ticketzResponse.status, responseText);
+      const errorDetail = responseData?.error === "ERR_INTERNAL_ERROR" 
+        ? "Erro interno na API Ticketz. Verifique se o token da API está correto (não é o número de telefone) e se a instância está conectada na plataforma Easyn/Ticketz."
+        : responseData?.error || "Falha ao enviar mensagem";
       return new Response(
-        JSON.stringify({ success: false, error: "Failed to send message", details: responseData }),
+        JSON.stringify({ success: false, error: errorDetail, details: responseData }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
