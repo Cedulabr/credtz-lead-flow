@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { cn } from "@/lib/utils";
 import { Settings, Save, Play, Loader2, Zap, Users, Clock, CalendarDays, ChevronDown, Sparkles, Send, Ban, Search, Hash } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -195,77 +196,134 @@ const ManualDispatchDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-primary" /> Disparar Agora
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <RadioGroup value={mode} onValueChange={(v) => setMode(v as any)} className="space-y-2">
-            <div className="flex items-center gap-2 p-2.5 rounded-lg border hover:bg-muted/30 cursor-pointer">
-              <RadioGroupItem value="all" id="d-all" />
-              <Label htmlFor="d-all" className="flex-1 cursor-pointer">
-                <span className="text-sm font-medium">Disparar para todos</span>
-                <span className="text-[10px] text-muted-foreground block">{totalQueue} clientes na fila</span>
-              </Label>
-            </div>
-            <div className="flex items-center gap-2 p-2.5 rounded-lg border hover:bg-muted/30 cursor-pointer">
-              <RadioGroupItem value="quantity" id="d-qty" />
-              <Label htmlFor="d-qty" className="flex-1 cursor-pointer">
-                <span className="text-sm font-medium">Selecionar quantidade</span>
-                <span className="text-[10px] text-muted-foreground block">Dispara para os primeiros N da fila</span>
-              </Label>
-            </div>
-            <div className="flex items-center gap-2 p-2.5 rounded-lg border hover:bg-muted/30 cursor-pointer">
-              <RadioGroupItem value="specific" id="d-spec" />
-              <Label htmlFor="d-spec" className="flex-1 cursor-pointer">
-                <span className="text-sm font-medium">Buscar cliente específico</span>
-                <span className="text-[10px] text-muted-foreground block">Busque por nome ou telefone</span>
-              </Label>
-            </div>
+      <DialogContent className="max-w-md p-0 overflow-hidden">
+        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-6 py-4 border-b">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2.5 text-base">
+              <div className="h-8 w-8 rounded-lg bg-primary/15 flex items-center justify-center">
+                <Zap className="h-4 w-4 text-primary" />
+              </div>
+              Disparar Agora
+            </DialogTitle>
+          </DialogHeader>
+        </div>
+
+        <div className="px-6 py-5 space-y-5">
+          <RadioGroup value={mode} onValueChange={(v) => setMode(v as any)} className="space-y-2.5">
+            {[
+              { value: "all", icon: Users, label: "Disparar para todos", desc: `${totalQueue} clientes na fila` },
+              { value: "quantity", icon: Hash, label: "Selecionar quantidade", desc: "Dispara para os primeiros N da fila" },
+              { value: "specific", icon: Search, label: "Buscar cliente específico", desc: "Busque por nome ou telefone" },
+            ].map((opt) => (
+              <label
+                key={opt.value}
+                htmlFor={`d-${opt.value}`}
+                className={cn(
+                  "flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-200",
+                  mode === opt.value
+                    ? "border-primary bg-primary/5 shadow-sm"
+                    : "border-border hover:border-primary/30 hover:bg-muted/30"
+                )}
+              >
+                <RadioGroupItem value={opt.value} id={`d-${opt.value}`} className="sr-only" />
+                <div className={cn(
+                  "h-9 w-9 rounded-lg flex items-center justify-center shrink-0 transition-colors",
+                  mode === opt.value ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                )}>
+                  <opt.icon className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-semibold block">{opt.label}</span>
+                  <span className="text-xs text-muted-foreground block mt-0.5">{opt.desc}</span>
+                </div>
+                <div className={cn(
+                  "h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all",
+                  mode === opt.value ? "border-primary bg-primary" : "border-muted-foreground/30"
+                )}>
+                  {mode === opt.value && <div className="h-2 w-2 rounded-full bg-primary-foreground" />}
+                </div>
+              </label>
+            ))}
           </RadioGroup>
 
           {mode === "quantity" && (
-            <div className="flex items-center gap-2">
-              <Hash className="h-4 w-4 text-muted-foreground" />
-              <Input type="number" min={1} max={totalQueue || 100} value={quantity} onChange={(e) => setQuantity(parseInt(e.target.value) || 1)} className="w-24" />
-              <span className="text-xs text-muted-foreground">de {totalQueue} disponíveis</span>
+            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-muted/40 border">
+              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Hash className="h-4 w-4 text-primary" />
+              </div>
+              <Input
+                type="number"
+                min={1}
+                max={totalQueue || 100}
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                className="w-20 h-9 text-center font-bold text-lg border-primary/20 focus:border-primary"
+              />
+              <span className="text-sm text-muted-foreground">de <strong className="text-foreground">{totalQueue}</strong> disponíveis</span>
             </div>
           )}
 
           {mode === "specific" && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar por nome ou telefone..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nome ou telefone..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10 h-10 rounded-xl"
+                />
               </div>
-              <div className="max-h-48 overflow-y-auto space-y-1 border rounded-lg p-1.5">
+              <div className="max-h-52 overflow-y-auto space-y-1 border rounded-xl p-2 bg-muted/20">
                 {searching ? (
-                  <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" /></div>
+                  <div className="flex flex-col items-center justify-center py-6 gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <span className="text-xs text-muted-foreground">Buscando...</span>
+                  </div>
                 ) : clients.length === 0 ? (
-                  <p className="text-xs text-center text-muted-foreground py-4">Nenhum cliente encontrado</p>
+                  <div className="flex flex-col items-center justify-center py-6 gap-1">
+                    <Users className="h-5 w-5 text-muted-foreground/50" />
+                    <p className="text-xs text-muted-foreground">Nenhum cliente encontrado</p>
+                  </div>
                 ) : (
                   clients.map((c) => (
-                    <label key={c.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/40 cursor-pointer text-sm">
+                    <label
+                      key={c.id}
+                      className={cn(
+                        "flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all",
+                        selectedIds.has(c.id)
+                          ? "bg-primary/10 border border-primary/20"
+                          : "hover:bg-muted/50"
+                      )}
+                    >
                       <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggleClient(c.id)} />
-                      <span className="font-medium truncate flex-1">{c.cliente_nome}</span>
-                      <span className="text-[10px] font-mono text-muted-foreground">{c.cliente_telefone}</span>
+                      <span className="font-medium truncate flex-1 text-sm">{c.cliente_nome}</span>
+                      <span className="text-[11px] font-mono text-muted-foreground tabular-nums">{c.cliente_telefone}</span>
                     </label>
                   ))
                 )}
               </div>
-              {selectedIds.size > 0 && <p className="text-xs text-primary font-medium">{selectedIds.size} selecionado(s)</p>}
+              {selectedIds.size > 0 && (
+                <div className="flex items-center gap-2 px-1">
+                  <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                  <p className="text-xs text-primary font-semibold">{selectedIds.size} cliente{selectedIds.size > 1 ? "s" : ""} selecionado{selectedIds.size > 1 ? "s" : ""}</p>
+                </div>
+              )}
             </div>
           )}
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleDispatch} disabled={dispatching || (mode === "specific" && selectedIds.size === 0)} className="gap-1.5">
-            {dispatching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+
+        <div className="px-6 py-4 border-t bg-muted/20 flex items-center justify-end gap-3">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-10">Cancelar</Button>
+          <Button
+            onClick={handleDispatch}
+            disabled={dispatching || (mode === "specific" && selectedIds.size === 0)}
+            className="gap-2 h-10 px-5 font-semibold"
+          >
+            {dispatching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
             Confirmar Disparo
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
