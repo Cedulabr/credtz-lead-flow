@@ -6,6 +6,7 @@ import { AdminPeople } from './AdminPeople';
 import { AdminFinance } from './AdminFinance';
 import { AdminSystem } from './AdminSystem';
 import { AdminDatabase } from './AdminDatabase';
+import { AdminLogs } from './AdminLogs';
 import { supabase } from '@/integrations/supabase/client';
 
 export function AdminPanelNew() {
@@ -52,6 +53,8 @@ export function AdminPanelNew() {
         return <AdminSystem />;
       case 'database':
         return <AdminDatabase />;
+      case 'logs':
+        return <AdminLogs />;
       default:
         return <AdminDashboard onNavigate={setActiveModule} />;
     }

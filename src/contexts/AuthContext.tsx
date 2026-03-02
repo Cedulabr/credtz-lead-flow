@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { logActivityDirect } from '@/hooks/useActivityLogger';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Profile = Tables<'profiles'>;
@@ -227,10 +228,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password,
       });
+      if (!error && data.user) {
+        logActivityDirect({
+          userId: data.user.id,
+          userName: data.user.user_metadata?.name || email.split('@')[0],
+          userEmail: email.trim().toLowerCase(),
+          action: 'login',
+          module: 'auth',
+          description: `Login realizado: ${email.trim().toLowerCase()}`,
+        });
+      }
       return { error };
     } catch (error) {
       console.error('Sign in error:', error);
@@ -258,6 +269,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
+      if (user) {
+        logActivityDirect({
+          userId: user.id,
+          userName: profile?.name || user.email?.split('@')[0] || '',
+          userEmail: user.email || '',
+          action: 'logout',
+          module: 'auth',
+          description: `Logout realizado: ${user.email}`,
+        });
+      }
       profileCache.current = null;
       await supabase.auth.signOut();
       setProfile(null);
