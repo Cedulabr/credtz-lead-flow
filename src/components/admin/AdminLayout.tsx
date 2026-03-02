@@ -12,7 +12,8 @@ import {
   X,
   Menu,
   ArrowLeft,
-  Shield
+  Shield,
+  ScrollText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -26,7 +27,8 @@ export type AdminModule =
   | 'people' 
   | 'finance' 
   | 'system'
-  | 'database';
+  | 'database'
+  | 'logs';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -77,6 +79,13 @@ const modules = [
     icon: Database,
     description: 'Conexão Supabase',
     color: 'from-cyan-500 to-cyan-600'
+  },
+  { 
+    id: 'logs' as AdminModule, 
+    label: 'Logs', 
+    icon: ScrollText,
+    description: 'Atividades do sistema',
+    color: 'from-orange-500 to-orange-600'
   },
 ];
 

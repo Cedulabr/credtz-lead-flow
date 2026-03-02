@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserCompany } from "../hooks/useUserCompany";
+import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { toast } from "sonner";
 import {
   SmsCampaign,
@@ -40,6 +41,7 @@ export const CampaignsView = ({
 }: CampaignsViewProps) => {
   const { user, isAdmin } = useAuth();
   const { companyId } = useUserCompany();
+  const { logActivity } = useActivityLogger();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendingCampaignId, setSendingCampaignId] = useState<string | null>(null);
@@ -166,6 +168,12 @@ export const CampaignsView = ({
       setSelectedList(listData.id);
       setContactSource("list");
       onRefreshLists();
+      logActivity({
+        action: 'import_leads',
+        module: 'sms',
+        description: `Importou ${leads.length} leads de ${leadSource} para campanha SMS`,
+        metadata: { source: leadSource, count: leads.length, list_id: listData.id },
+      });
       toast.success(`${leads.length} leads importados`);
     } catch (e) {
       console.error(e);
@@ -188,6 +196,12 @@ export const CampaignsView = ({
         company_id: companyId || null,
       } as any);
       if (error) throw error;
+      logActivity({
+        action: 'create_campaign',
+        module: 'sms',
+        description: `Criou campanha SMS: ${campaignName.trim()}`,
+        metadata: { campaign_name: campaignName.trim(), recipients: list?.contact_count || 0 },
+      });
       toast.success("Campanha criada");
       setDialogOpen(false);
       resetForm();
