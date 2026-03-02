@@ -85,7 +85,7 @@ export function ProfessionalProposalPDF({
   const [whatsAppMessage, setWhatsAppMessage] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
 
-  const { sendMediaMessage, hasInstances, sending, instances, loadingInstances } = useWhatsApp();
+  const { sendTextMessage, sendMediaMessage, hasInstances, sending, instances, loadingInstances } = useWhatsApp();
 
   // Sync with external selection if provided
   useEffect(() => {
@@ -108,6 +108,47 @@ export function ProfessionalProposalPDF({
     } else {
       setSelectedContracts(contracts.map(c => c.id));
     }
+  };
+
+  const generateProposalText = () => {
+    const selectedContractsList = contracts.filter(c => selectedContracts.includes(c.id));
+    const totalSaldo = selectedContractsList.reduce((sum, c) => sum + (c.saldo || 0), 0);
+
+    let text = `📋 *PROPOSTA DE REFINANCIAMENTO*\n━━━━━━━━━━━━━━━━━\n\n`;
+    text += `👤 *Beneficiário:* ${client.nome || 'N/I'}\n`;
+    text += `📄 *CPF:* ${client.cpf ? formatCPF(client.cpf) : 'N/I'}\n`;
+    text += `🔢 *NB:* ${client.nb || 'N/I'}\n`;
+    text += `🏦 *Banco Pagto:* ${client.banco_pagto || 'N/I'}\n`;
+    if (client.mr && client.mr > 0) {
+      text += `💰 *Margem Disponível:* ${formatCurrency(client.mr)}\n`;
+    }
+
+    text += `\n📄 *CONTRATOS SELECIONADOS*\n━━━━━━━━━━━━━━━━━\n\n`;
+    selectedContractsList.forEach((contract, index) => {
+      const num = ['1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'][index] || `${index+1}.`;
+      text += `${num} *${contract.banco_emprestimo || 'N/I'}* - ${contract.tipo_emprestimo || 'Empréstimo'}\n`;
+      text += `   Nº ${contract.contrato}\n`;
+      text += `   Parcela: ${formatCurrency(contract.vl_parcela)} | Saldo: ${formatCurrency(contract.saldo)}\n`;
+      if (contract.prazo || contract.taxa) {
+        text += `   Prazo: ${contract.prazo || '0'}x | Taxa: ${contract.taxa ? contract.taxa.toFixed(2) + '%' : 'N/I'}\n`;
+      }
+      text += `\n`;
+    });
+
+    if (trocoSimulation && trocoSimulation.troco > 0) {
+      text += `💰 *SIMULAÇÃO DE TROCO*\n━━━━━━━━━━━━━━━━━\n`;
+      text += `🏦 Banco: ${trocoSimulation.bancoLabel}\n`;
+      text += `📊 Taxa: ${trocoSimulation.taxa.toFixed(2)}% | Prazo: ${trocoSimulation.prazo}x\n`;
+      text += `💵 Nova Parcela: ${formatCurrency(trocoSimulation.novaParcela)}\n`;
+      text += `🤑 *TROCO: ${formatCurrency(trocoSimulation.troco)}*\n\n`;
+    }
+
+    text += `📊 *RESUMO*\n`;
+    text += `Total contratos: ${selectedContractsList.length}\n`;
+    text += `Saldo total: ${formatCurrency(totalSaldo)}\n\n`;
+    text += `_Proposta gerada por Easyn_`;
+
+    return text;
   };
 
   const generatePDF = async () => {
@@ -451,7 +492,7 @@ export function ProfessionalProposalPDF({
       const base64 = doc.output('datauristring').split(',')[1];
       setPdfBase64(base64);
       setPhoneNumber(client.tel_cel_1?.replace(/\D/g, '') || '');
-      setWhatsAppMessage(`Olá ${client.nome?.split(' ')[0] || ''}, segue sua proposta de refinanciamento. Qualquer dúvida estou à disposição!`);
+      setWhatsAppMessage(generateProposalText());
       setShowWhatsAppSend(true);
 
       toast.success('PDF gerado! Agora você pode enviar via WhatsApp.');
@@ -464,20 +505,29 @@ export function ProfessionalProposalPDF({
     }
   };
 
-  const handleSendWhatsApp = async () => {
-    if (!pdfBase64) return;
+  const getFullPhone = () => {
     const cleanPhone = phoneNumber.replace(/\D/g, '');
     if (cleanPhone.length < 10) {
       toast.error('Número de telefone inválido');
-      return;
+      return null;
     }
-    const fullPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    return cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+  };
+
+  const handleSendText = async () => {
+    const fullPhone = getFullPhone();
+    if (!fullPhone) return;
+    const success = await sendTextMessage(fullPhone, whatsAppMessage, client.nome);
+    if (success) handleCloseAll();
+  };
+
+  const handleSendPDF = async () => {
+    if (!pdfBase64) return;
+    const fullPhone = getFullPhone();
+    if (!fullPhone) return;
     const fileName = `proposta_${client.cpf?.replace(/\D/g, '') || 'cliente'}.pdf`;
-    
-    const success = await sendMediaMessage(fullPhone, pdfBase64, fileName, whatsAppMessage, client.nome);
-    if (success) {
-      handleCloseAll();
-    }
+    const success = await sendMediaMessage(fullPhone, pdfBase64, fileName, undefined, client.nome);
+    if (success) handleCloseAll();
   };
 
   const handleCloseAll = () => {
@@ -548,13 +598,13 @@ export function ProfessionalProposalPDF({
               </div>
 
               <div>
-                <Label className="text-sm font-medium">Mensagem</Label>
+                <Label className="text-sm font-medium">📋 Texto para enviar ao cliente:</Label>
                 <Textarea
                   value={whatsAppMessage}
                   onChange={(e) => setWhatsAppMessage(e.target.value)}
-                  rows={3}
-                  className="mt-1"
-                  placeholder="Digite a mensagem que acompanhará o PDF..."
+                  rows={10}
+                  className="mt-1 font-mono text-xs"
+                  placeholder="Texto da proposta..."
                 />
               </div>
             </div>
@@ -568,20 +618,32 @@ export function ProfessionalProposalPDF({
             )}
 
             <div className="flex gap-3 pt-2 shrink-0">
-              <Button variant="outline" onClick={handleCloseAll} className="flex-1">
+              <Button variant="outline" onClick={handleCloseAll}>
                 Fechar
               </Button>
               <Button 
-                onClick={handleSendWhatsApp}
+                onClick={handleSendText}
                 disabled={!hasInstances || sending || !phoneNumber.trim()}
                 className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white"
               >
                 {sending ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Send className="w-4 h-4" />
+                  <MessageCircle className="w-4 h-4" />
                 )}
-                API WhatsApp
+                Enviar Texto
+              </Button>
+              <Button 
+                onClick={handleSendPDF}
+                disabled={!hasInstances || sending || !phoneNumber.trim() || !pdfBase64}
+                className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white"
+              >
+                {sending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileText className="w-4 h-4" />
+                )}
+                Enviar PDF
               </Button>
             </div>
           </div>
