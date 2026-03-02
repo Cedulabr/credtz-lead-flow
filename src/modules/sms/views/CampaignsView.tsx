@@ -89,6 +89,17 @@ export const CampaignsView = ({
     }
     setImportingLeads(true);
     try {
+      // Fetch company user IDs for filtering tables where company_id is NULL
+      let companyUserIds: string[] = [];
+      if (!isAdmin && companyId) {
+        const { data: companyUsers } = await supabase
+          .from("user_companies")
+          .select("user_id")
+          .eq("company_id", companyId)
+          .eq("is_active", true);
+        companyUserIds = (companyUsers || []).map(u => u.user_id);
+      }
+
       let leads: { name: string; phone: string; source_id: string }[] = [];
       const statusMap: Record<string, Record<string, string[]>> = {
         activate_leads: {
@@ -110,7 +121,8 @@ export const CampaignsView = ({
 
       if (leadSource === "activate_leads") {
         let query = supabase.from("activate_leads").select("id, nome, telefone, status");
-        if (!isAdmin && companyId) query = query.eq("company_id", companyId);
+        if (!isAdmin && companyUserIds.length > 0) query = query.or(`assigned_to.in.(${companyUserIds.join(',')}),created_by.in.(${companyUserIds.join(',')})`);
+
         if (leadStatusFilter !== "all") {
           const statuses = statusMap.activate_leads[leadStatusFilter] || [];
           if (statuses.length) query = query.in("status", statuses);
@@ -119,7 +131,8 @@ export const CampaignsView = ({
         leads = (data || []).map((l) => ({ name: l.nome, phone: l.telefone.replace(/\D/g, ""), source_id: l.id }));
       } else if (leadSource === "leads_premium") {
         let query = supabase.from("leads").select("id, name, phone, status");
-        if (!isAdmin && companyId) query = query.eq("company_id", companyId);
+        if (!isAdmin && companyUserIds.length > 0) query = query.or(`assigned_to.in.(${companyUserIds.join(',')}),requested_by.in.(${companyUserIds.join(',')})`);
+
         if (leadStatusFilter !== "all") {
           const statuses = statusMap.leads_premium[leadStatusFilter] || [];
           if (statuses.length) query = query.in("status", statuses);
