@@ -1,75 +1,146 @@
 
-## Correcao: Isolamento por Empresa quando company_id e NULL
 
-### Problema Raiz
+## Auditoria Completa: Isolamento por Empresa para Gestores
 
-As tabelas `activate_leads` e `leads` (Leads Premium) possuem `company_id = NULL` em **100% dos registros**. A identificacao da empresa e feita indiretamente pelo usuario atribuido (`assigned_to`, `created_by`, `requested_by`), que esta vinculado a uma empresa via `user_companies`.
+### Diagnostico Geral
 
-O filtro atual `.eq("company_id", companyId)` nao funciona porque:
-- Quando aplicado: retorna 0 resultados (NULL != companyId)
-- Quando nao aplicado: retorna TODOS os registros de todas as empresas
+Apos analise detalhada de todos os modulos, identifiquei que varios componentes nao possuem filtro de empresa para gestores. O padrao correto ja existe em alguns modulos (ActivateLeads, MyClientsKanban, TelevendasModule, Dashboard, Commissions), mas esta ausente em outros criticos.
 
-### Dados Confirmados (JS Cred)
+### Modulos com Filtro de Empresa CORRETO (nao precisam de alteracao)
 
-| Modulo | Total | JS Cred | em_andamento JS Cred |
-|---|---|---|---|
-| activate_leads | 224 | 10 | **2** |
-| leads (premium) | 2464 | 5 | 0 |
-| televendas | 624 | tem company_id | funciona |
-| propostas | 655 | tem company_id | funciona |
-
-### Solucao
-
-Para os modulos onde `company_id` e NULL, filtrar pelos IDs de usuarios da empresa. A logica sera:
-
-1. Quando o usuario nao for admin, buscar os `user_ids` da empresa do gestor
-2. Filtrar leads usando `.in("assigned_to", companyUserIds)` ou `.in("created_by", companyUserIds)` como alternativa ao filtro por `company_id`
-3. Manter o filtro por `company_id` para `televendas` e `propostas` que ja possuem esse campo preenchido
-
-### Alteracoes
-
-#### 1. CampaignsView.tsx - Importacao de leads para campanhas
-
-```text
-ANTES:
-  if (!isAdmin && companyId) query = query.eq("company_id", companyId)
-
-DEPOIS (activate_leads):
-  if (!isAdmin && companyUserIds.length) query = query.in("assigned_to", companyUserIds)
-
-DEPOIS (leads_premium):
-  if (!isAdmin && companyUserIds.length) query = query.in("assigned_to", companyUserIds)
-
-DEPOIS (televendas - ja funciona, manter):
-  if (!isAdmin && companyId) query = query.eq("company_id", companyId)
-```
-
-Adicionar busca de `companyUserIds` no inicio de `handleImportLeads`:
-```text
-const { data: companyUsers } = await supabase
-  .from("user_companies")
-  .select("user_id")
-  .eq("company_id", companyId)
-  .eq("is_active", true);
-const companyUserIds = (companyUsers || []).map(u => u.user_id);
-```
-
-#### 2. RemarketingSmsView.tsx - Sincronizacao de remarketing
-
-Mesma logica: buscar `companyUserIds` no inicio de `handleSync` e usar `.in("assigned_to", companyUserIds)` para activate_leads e leads premium. Manter `.eq("company_id", companyId)` para propostas.
-
-Tambem aplicar no Sync Activate Leads: usar `.or("assigned_to.in.(ids),created_by.in.(ids)")` para cobrir ambos os campos.
-
-### Arquivos a Modificar
-
-| Arquivo | Alteracao |
+| Modulo | Mecanismo |
 |---|---|
-| `src/modules/sms/views/CampaignsView.tsx` | Buscar user_ids da empresa, filtrar activate_leads e leads por assigned_to |
-| `src/modules/sms/views/RemarketingSmsView.tsx` | Mesma logica no handleSync para activate_leads e leads premium |
+| ActivateLeads.tsx | Filtra por `assigned_to` usando IDs de usuarios da empresa |
+| MyClientsKanban.tsx | Filtra por `company_id` nas propostas |
+| TelevendasModule.tsx | Filtra por `company_id` |
+| Dashboard.tsx | Filtra atividades por empresa |
+| Commissions.tsx | Filtra por `company_id` |
+| SalesRanking.tsx | Filtra por `company_id` |
+| SMS TelevendasSmsView | Filtra por `company_id` |
+| SMS AutomationView | Filtra por `company_id` |
+
+### Modulos com PROBLEMAS (precisam de correcao)
+
+---
+
+#### 1. Leads Premium (`useLeadsPremium.ts`) - CRITICO
+
+**Problema:** Gestores so veem seus proprios leads. Nao veem leads dos colaboradores da empresa.
+
+Codigo atual (linhas 73-75):
+```text
+if (!isAdmin) {
+  query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
+}
+```
+
+**Correcao:** Adicionar verificacao de gestor e filtrar por IDs de usuarios da empresa:
+- Buscar se o usuario e gestor via `user_companies`
+- Se gestor, buscar todos os `user_ids` da empresa
+- Filtrar leads por `assigned_to` ou `created_by` pertencentes a empresa
+- Tambem corrigir `fetchUsers` (linha 92-105) para mostrar apenas usuarios da empresa
+
+---
+
+#### 2. SMS - useSmsData.ts (Campanhas, Listas, Historico)
+
+**Problema:** Os dados de campanhas (`sms_campaigns`), listas de contatos (`sms_contact_lists`) e historico (`sms_history`) sao carregados sem filtro de empresa. Gestores veem campanhas e listas criadas por qualquer usuario.
+
+**Correcao:**
+- Filtrar `sms_campaigns` por `created_by` usando IDs dos usuarios da empresa
+- Filtrar `sms_contact_lists` por `created_by` usando IDs dos usuarios da empresa
+- `sms_history` ja tem filtro parcial por `company_id`, mas deve usar IDs de usuarios tambem (pois `company_id` pode ser NULL)
+
+---
+
+#### 3. SMS - CampaignsView.tsx (Gravar company_id)
+
+**Problema:** Ao criar campanhas e listas de contatos importadas, o campo `company_id` fica NULL. Isso impede filtragem futura.
+
+**Correcao:**
+- Ao criar campanha (linha 184): adicionar `company_id: companyId`
+- Ao criar lista de contatos importada (linha 157-158): adicionar `company_id: companyId`
+
+---
+
+#### 4. SMS - ContactsView.tsx (Gravar company_id)
+
+**Problema:** Ao criar listas de contatos manualmente, `company_id` nao e gravado.
+
+**Correcao:** Adicionar `company_id` ao inserir novas listas.
+
+---
+
+### Alteracoes por Arquivo
+
+| Arquivo | Tipo de Alteracao |
+|---|---|
+| `src/modules/leads-premium/hooks/useLeadsPremium.ts` | Adicionar logica de gestor em fetchLeads e fetchUsers |
+| `src/modules/sms/hooks/useSmsData.ts` | Filtrar campanhas, listas e historico por empresa |
+| `src/modules/sms/views/CampaignsView.tsx` | Gravar company_id ao criar campanha e lista |
+| `src/modules/sms/views/ContactsView.tsx` | Gravar company_id ao criar lista de contatos |
+
+### Detalhamento Tecnico
+
+#### useLeadsPremium.ts
+
+```text
+// Adicionar estado para gestor
+const [isGestor, setIsGestor] = useState(false);
+const [companyUserIds, setCompanyUserIds] = useState<string[]>([]);
+
+// No useEffect inicial, verificar role na user_companies
+// Se gestor, buscar todos user_ids da empresa
+
+// Em fetchLeads:
+ANTES:
+  if (!isAdmin) {
+    query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
+  }
+
+DEPOIS:
+  if (!isAdmin) {
+    if (isGestor && companyUserIds.length > 0) {
+      query = query.or(`assigned_to.in.(${companyUserIds.join(',')}),created_by.in.(${companyUserIds.join(',')})`);
+    } else {
+      query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
+    }
+  }
+
+// Em fetchUsers:
+ANTES: Busca TODOS os usuarios
+DEPOIS: Se gestor, buscar apenas usuarios da empresa via user_companies
+```
+
+#### useSmsData.ts
+
+```text
+// Buscar companyUserIds no inicio (mesmo padrao de useUserCompany + user lookup)
+
+// fetchCampaigns:
+  if (!isAdmin && companyUserIds.length > 0) 
+    query = query.in("created_by", companyUserIds)
+
+// fetchContactLists:
+  if (!isAdmin && companyUserIds.length > 0) 
+    query = query.in("created_by", companyUserIds)
+
+// fetchHistory:
+  if (!isAdmin && companyUserIds.length > 0) 
+    query = query.in("sent_by", companyUserIds)
+```
+
+#### CampaignsView.tsx e ContactsView.tsx
+
+```text
+// Ao inserir campanha/lista, incluir company_id:
+  { ..., company_id: companyId }
+```
 
 ### Resultado Esperado
 
-- JS Cred vera apenas seus 2 leads "em_andamento" do Activate Leads (nao 224)
-- Sync do Remarketing encontrara os 2 leads corretamente
-- Televendas e Meus Clientes continuam funcionando (ja possuem company_id preenchido)
-- Admins mantem visao global sem filtros
+- Gestores da JS CRED (e qualquer outra empresa) verao apenas leads, campanhas, listas e historico dos usuarios de sua propria empresa
+- Administradores mantem visao global
+- Colaboradores continuam vendo apenas seus proprios dados
+- Novos registros (campanhas, listas) serao criados com `company_id` preenchido para filtragem futura
+
