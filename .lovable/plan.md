@@ -1,59 +1,61 @@
 
 
-## Correcao: Migracao Automatica de "Aguardando Retorno" para SMS Remarketing
+## Correcao: Isolamento por Empresa na Importacao de Leads para Campanhas SMS
 
-### Problema Identificado
+### Problema
 
-A coluna usada para o status do cliente em "Meus Clientes" (tabela `propostas`) e `client_status`, **nao** `status`. Tanto o trigger do banco quanto o codigo de sincronizacao estao consultando a coluna errada (`status`), que esta sempre NULL para esses registros.
+Quando um gestor de uma empresa (ex: JS Cred) cria uma campanha SMS e importa leads dos modulos Activate, Leads Premium ou Televendas, o sistema puxa leads de **todas as empresas**, violando o isolamento de dados. Alem disso, o filtro por empresa nao esta sendo aplicado porque o componente `CampaignsView` nao possui acesso ao `companyId` do usuario.
 
-**Evidencia:**
-- `client_status` tem 58 registros com "aguardando_retorno" e 257 com "contato_futuro"
-- `status` tem 0 registros com qualquer valor
+### Causa Raiz
 
-### Correcoes Necessarias
-
-#### 1. Atualizar trigger `sms_remarketing_enqueue_propostas` (Migracao SQL)
-
-O trigger precisa:
-- Disparar em mudancas de `client_status` (em vez de `status`)
-- Usar `NEW.client_status` em toda a logica interna
-- Manter a mesma logica de enfileirar para `aguardando_retorno` e `contato_futuro`, e finalizar para qualquer outro status
+No arquivo `src/modules/sms/views/CampaignsView.tsx`, a funcao `handleImportLeads` faz queries diretas nas tabelas sem filtrar por `company_id`:
 
 ```text
-Trigger: trg_sms_remarketing_propostas
-ANTES: AFTER INSERT OR UPDATE OF status, pipeline_stage, future_contact_date
-DEPOIS: AFTER INSERT OR UPDATE OF client_status, pipeline_stage, future_contact_date
-
-Logica interna: trocar todas as referencias de NEW.status / OLD.status para NEW.client_status / OLD.client_status
+// Sem filtro de empresa:
+supabase.from("activate_leads").select("id, nome, telefone, status")
+supabase.from("leads").select("id, name, phone, status")
+supabase.from("televendas").select("id, nome, telefone, status")
 ```
 
-#### 2. Corrigir sincronizacao em `RemarketingSmsView.tsx`
+### Solucao
 
-Na secao "Sync Propostas (Meus Clientes)", trocar:
+#### 1. Adicionar hook `useUserCompany` ao CampaignsView
+
+Importar e utilizar o hook `useUserCompany()` que ja existe no projeto e ja e usado pelo `AutomationView`.
+
+#### 2. Filtrar queries por `company_id`
+
+Para cada modulo de origem, adicionar o filtro `.eq("company_id", companyId)` quando o usuario nao for admin:
+
 ```text
-ANTES: .in("status", ["contato_futuro", "aguardando_retorno"])
-DEPOIS: .in("client_status", ["contato_futuro", "aguardando_retorno"])
+activate_leads:
+  ANTES: supabase.from("activate_leads").select("id, nome, telefone, status")
+  DEPOIS: + .eq("company_id", companyId)  (se nao for admin)
 
-ANTES: if (p.status === "contato_futuro" ...)
-DEPOIS: if (p.client_status === "contato_futuro" ...)
+leads (Leads Premium):
+  ANTES: supabase.from("leads").select("id, name, phone, status")
+  DEPOIS: + .eq("company_id", companyId)  (se nao for admin)
 
-ANTES: if (p.status === "aguardando_retorno")
-DEPOIS: if (p.client_status === "aguardando_retorno")
-
-ANTES: status_original: p.status
-DEPOIS: status_original: p.client_status
+televendas:
+  ANTES: supabase.from("televendas").select("id, nome, telefone, status")
+  DEPOIS: + .eq("company_id", companyId)  (se nao for admin)
 ```
 
-### Arquivos a Modificar
+Admins continuam vendo leads de todas as empresas (comportamento existente em outros modulos).
+
+#### 3. Bloquear importacao se companyId nao estiver disponivel
+
+Se o usuario nao for admin e o `companyId` ainda nao carregou, exibir mensagem informando que a empresa nao foi identificada, impedindo a importacao de dados de empresas incorretas.
+
+### Arquivo a Modificar
 
 | Arquivo | Alteracao |
 |---|---|
-| Nova migracao SQL | Recriar trigger `sms_remarketing_enqueue_propostas` usando `client_status` e atualizar o evento do trigger |
-| `src/modules/sms/views/RemarketingSmsView.tsx` | Trocar `status` por `client_status` na query e logica de sync de Meus Clientes |
+| `src/modules/sms/views/CampaignsView.tsx` | Importar `useUserCompany`, aplicar filtro `company_id` nas 3 queries de importacao |
 
 ### Resultado Esperado
 
-- Os 58 clientes com "Aguardando Retorno" serao sincronizados automaticamente para o modulo Remarketing SMS ao clicar "Sincronizar"
-- O trigger passara a detectar mudancas reais de `client_status`, enfileirando automaticamente novos clientes
-- Quando o cliente mudar de "Aguardando Retorno" ou "Contato Futuro" para qualquer outro status, ele sera finalizado automaticamente na fila SMS
+- Gestores verao apenas os leads da propria empresa ao importar para campanhas SMS
+- Admins continuam com visao global
+- Nenhuma alteracao no banco de dados e necessaria (as colunas `company_id` ja existem nas 3 tabelas)
 
