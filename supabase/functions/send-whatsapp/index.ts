@@ -199,9 +199,16 @@ Deno.serve(async (req) => {
 
     if (!success) {
       console.error("Ticketz API error:", ticketzResponse.status, responseText);
-      const errorDetail = responseData?.error === "ERR_INTERNAL_ERROR"
-        ? `Erro interno na API Easyn. Verifique: 1) Se a instância WhatsApp está conectada/escaneada no painel Easyn. 2) Se o número ${normalizedNumber} é válido. 3) Se o token está ativo.`
-        : responseData?.error || "Falha ao enviar mensagem";
+      let errorDetail: string;
+      if (responseData?.error === "ERR_INTERNAL_ERROR") {
+        errorDetail = `Falha ao enviar para ${normalizedNumber}. Possíveis causas:\n` +
+          `1) O número não possui WhatsApp ativo.\n` +
+          `2) A instância WhatsApp não está conectada/escaneada no painel Easyn.\n` +
+          `3) O número está incorreto ou incompleto (verifique DDD + 9º dígito).\n` +
+          `4) O token da API está inativo ou expirado.`;
+      } else {
+        errorDetail = responseData?.error || "Falha ao enviar mensagem";
+      }
       return new Response(
         JSON.stringify({ success: false, error: errorDetail, details: responseData, sentTo: normalizedNumber }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
