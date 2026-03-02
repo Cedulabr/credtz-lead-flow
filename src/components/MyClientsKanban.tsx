@@ -948,7 +948,8 @@ export function MyClientsKanban() {
                             className="text-green-600"
                             onClick={() => setShowWhatsAppDialog(true)}
                           >
-                            <MessageCircle className="h-4 w-4" />
+                            <MessageCircle className="h-4 w-4 mr-1" />
+                            API WhatsApp
                           </Button>
                         )}
                       </div>

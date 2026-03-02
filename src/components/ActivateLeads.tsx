@@ -2008,7 +2008,7 @@ export const ActivateLeads = () => {
                                 setShowWhatsAppDialog(true);
                               }}
                               className="h-9 w-9 p-0 hover:bg-green-100 hover:text-green-700 transition-all duration-300"
-                              title="WhatsApp"
+                              title="API WhatsApp"
                             >
                               <MessageCircle className="h-4 w-4" />
                             </Button>

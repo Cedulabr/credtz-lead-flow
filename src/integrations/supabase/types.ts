@@ -5717,6 +5717,7 @@ export type Database = {
           id: string
           instance_name: string
           instance_status: string | null
+          phone_number: string | null
           qr_code: string | null
           updated_at: string
           user_id: string
@@ -5728,6 +5729,7 @@ export type Database = {
           id?: string
           instance_name: string
           instance_status?: string | null
+          phone_number?: string | null
           qr_code?: string | null
           updated_at?: string
           user_id: string
@@ -5739,6 +5741,7 @@ export type Database = {
           id?: string
           instance_name?: string
           instance_status?: string | null
+          phone_number?: string | null
           qr_code?: string | null
           updated_at?: string
           user_id?: string
@@ -5799,6 +5802,68 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "whatsapp_messages_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_scheduled_messages: {
+        Row: {
+          client_name: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          instance_id: string
+          media_base64: string | null
+          media_name: string | null
+          message: string | null
+          phone: string
+          scheduled_at: string
+          sent_at: string | null
+          source_module: string | null
+          source_record_id: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          client_name?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          instance_id: string
+          media_base64?: string | null
+          media_name?: string | null
+          message?: string | null
+          phone: string
+          scheduled_at: string
+          sent_at?: string | null
+          source_module?: string | null
+          source_record_id?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          client_name?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          instance_id?: string
+          media_base64?: string | null
+          media_name?: string | null
+          message?: string | null
+          phone?: string
+          scheduled_at?: string
+          sent_at?: string | null
+          source_module?: string | null
+          source_record_id?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_scheduled_messages_instance_id_fkey"
             columns: ["instance_id"]
             isOneToOne: false
             referencedRelation: "whatsapp_instances"
