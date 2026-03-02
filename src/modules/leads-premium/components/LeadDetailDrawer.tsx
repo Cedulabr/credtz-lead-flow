@@ -332,7 +332,7 @@ export function LeadDetailDrawer({
               onClick={handleWhatsApp}
             >
               <MessageCircle className="h-5 w-5 mr-2" />
-              WhatsApp
+              API WhatsApp
             </Button>
             <Button 
               variant="outline" 

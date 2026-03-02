@@ -13,7 +13,7 @@ interface WhatsAppNotifyDialogProps {
 }
 
 export function WhatsAppNotifyDialog({ open, onComplete, clientName, clientPhone }: WhatsAppNotifyDialogProps) {
-  const { hasToken, sending, sendTextMessage } = useWhatsApp();
+  const { hasInstances, sending, sendTextMessage } = useWhatsApp();
   const [message, setMessage] = useState(
     `Olá ${clientName?.split(" ")[0] || ""}, tudo bem? Sua proposta foi registrada com sucesso. Em breve entraremos em contato!`
   );
@@ -59,7 +59,7 @@ export function WhatsAppNotifyDialog({ open, onComplete, clientName, clientPhone
           <Button variant="outline" onClick={onComplete} disabled={sending} className="flex-1">
             Não, obrigado
           </Button>
-          {hasToken ? (
+          {hasInstances ? (
             <Button
               onClick={handleSend}
               disabled={sending}
