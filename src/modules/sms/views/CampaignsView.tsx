@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserCompany } from "../hooks/useUserCompany";
 import { toast } from "sonner";
 import {
   SmsCampaign,
@@ -38,6 +39,7 @@ export const CampaignsView = ({
   onRefreshLists,
 }: CampaignsViewProps) => {
   const { user, isAdmin } = useAuth();
+  const { companyId } = useUserCompany();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendingCampaignId, setSendingCampaignId] = useState<string | null>(null);
@@ -81,6 +83,10 @@ export const CampaignsView = ({
   }, [selectedTemplate, templates]);
 
   const handleImportLeads = async () => {
+    if (!isAdmin && !companyId) {
+      toast.error("Empresa não identificada. Aguarde ou entre em contato com o suporte.");
+      return;
+    }
     setImportingLeads(true);
     try {
       let leads: { name: string; phone: string; source_id: string }[] = [];
@@ -104,6 +110,7 @@ export const CampaignsView = ({
 
       if (leadSource === "activate_leads") {
         let query = supabase.from("activate_leads").select("id, nome, telefone, status");
+        if (!isAdmin && companyId) query = query.eq("company_id", companyId);
         if (leadStatusFilter !== "all") {
           const statuses = statusMap.activate_leads[leadStatusFilter] || [];
           if (statuses.length) query = query.in("status", statuses);
@@ -112,6 +119,7 @@ export const CampaignsView = ({
         leads = (data || []).map((l) => ({ name: l.nome, phone: l.telefone.replace(/\D/g, ""), source_id: l.id }));
       } else if (leadSource === "leads_premium") {
         let query = supabase.from("leads").select("id, name, phone, status");
+        if (!isAdmin && companyId) query = query.eq("company_id", companyId);
         if (leadStatusFilter !== "all") {
           const statuses = statusMap.leads_premium[leadStatusFilter] || [];
           if (statuses.length) query = query.in("status", statuses);
@@ -120,6 +128,7 @@ export const CampaignsView = ({
         leads = (data || []).map((l: any) => ({ name: l.name, phone: (l.phone || "").replace(/\D/g, ""), source_id: l.id }));
       } else if (leadSource === "televendas") {
         let query = supabase.from("televendas").select("id, nome, telefone, status");
+        if (!isAdmin && companyId) query = query.eq("company_id", companyId);
         if (leadStatusFilter !== "all") {
           const statuses = statusMap.televendas[leadStatusFilter] || [];
           if (statuses.length) query = query.in("status", statuses);
