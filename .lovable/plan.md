@@ -1,61 +1,80 @@
 
+## Plano: Enviar proposta PDF via WhatsApp apos gerar
 
-## Plano: Mostrar mensagem "numero pode nao ter WhatsApp" nos 3 modulos
+### Contexto
+O componente `ProfessionalProposalPDF` gera um PDF usando jsPDF e faz download automatico. O objetivo e adicionar a opcao de enviar esse PDF + mensagem de texto via WhatsApp API apos a geracao.
 
-### Problema raiz
-O `supabase.functions.invoke()` lanca um `FunctionsHttpError` quando recebe status 502. O hook `useWhatsApp.ts` captura esse erro generico ("Edge Function returned a non-2xx status code") sem extrair o body JSON que contem a mensagem detalhada do edge function.
+A edge function `send-whatsapp` ja suporta envio de midia via multipart/form-data (linhas 112-152) e o hook `useWhatsApp` ja tem `sendMediaMessage`. A API esta corretamente configurada.
 
-### Solucao
+### Mudancas
 
-#### 1. Corrigir `src/hooks/useWhatsApp.ts` - Extrair mensagem de erro do body
+#### 1. `src/modules/baseoff/components/ProfessionalProposalPDF.tsx`
 
-Nas funcoes `sendTextMessage` e `sendMediaMessage`, quando o `supabase.functions.invoke` retorna erro, o objeto `error` e do tipo `FunctionsHttpError` que tem um metodo `context.json()` ou o `data` pode conter a resposta. Na verdade, quando o status nao e 2xx, o SDK coloca o erro em `error` mas o `data` ainda pode ter o body.
+Apos gerar e baixar o PDF, mostrar um dialog/estado perguntando se o usuario quer enviar via WhatsApp:
 
-A correcao: usar `error.context?.json()` para extrair o body da resposta de erro, ou alternativamente mudar a abordagem - fazer o edge function sempre retornar 200 com `success: false` no body, para que o SDK nao lance excecao.
+- Modificar `generatePDF` para, alem de salvar, guardar o PDF em base64 no estado (`doc.output('datauristring')` ou `doc.output('arraybuffer')`)
+- Apos gerar, em vez de fechar o modal imediatamente, exibir uma secao de "Enviar via WhatsApp"
+- Campos: numero do telefone (pre-preenchido com `client.tel_cel_1`), mensagem de texto editavel, botao verde "API WhatsApp" para enviar
+- Usar `useWhatsApp().sendMediaMessage` para enviar o base64 do PDF + mensagem de texto
+- Manter botao "Fechar" para quem nao quer enviar
 
-**Abordagem escolhida**: Modificar a edge function para retornar status **200** com `{ success: false, error: "..." }` em vez de 502. Isso permite que o `data` no hook contenha a mensagem de erro completa sem precisar lidar com excecoes do SDK.
+**Fluxo do usuario:**
+1. Seleciona contratos -> clica "Gerar PDF" -> PDF e baixado
+2. Modal muda para tela "Enviar via WhatsApp?" com campo de mensagem e telefone
+3. Clica "API WhatsApp" (verde) -> envia texto + PDF via API
+4. Ou clica "Fechar" para sair
 
-#### 2. Modificar `supabase/functions/send-whatsapp/index.ts`
+#### 2. Nenhuma mudanca na edge function
+A edge function ja implementa corretamente o envio de midia via `multipart/form-data` com o campo `medias` (blob). O base64 e convertido em bytes na edge function (linhas 114-118) e enviado como FormData. Nao precisa alterar.
 
-Mudar o status de resposta de 502 para **200** quando o erro vem do Ticketz, mantendo `success: false` no body. A mensagem de erro sera:
-
-```
-"Este numero pode nao ter WhatsApp ativo. Verifique o numero e tente novamente."
-```
-
-Para erros de Ticketz (`ERR_INTERNAL_ERROR`), a mensagem principal sera clara e direta focando no numero invalido, ja que o usuario confirmou que a API esta conectada e funcionando.
-
-#### 3. Garantir exibicao via toast em todos os modulos
-
-Como todos os modulos (Activate Leads, Leads Premium, Meus Clientes) usam o mesmo hook `useWhatsApp.ts` e o mesmo `WhatsAppSendDialog`, a correcao no hook + edge function sera automaticamente refletida em todos.
-
-### Arquivos a modificar
-
-| Arquivo | Mudanca |
-|---|---|
-| `supabase/functions/send-whatsapp/index.ts` | Retornar status 200 com success:false + mensagem clara sobre WhatsApp inativo |
-| `src/hooks/useWhatsApp.ts` | Nenhuma mudanca necessaria (ja trata `data.success === false`) |
+#### 3. Nenhuma mudanca no hook `useWhatsApp`
+O hook ja tem `sendMediaMessage` que aceita `mediaBase64`, `mediaName`, `message`, `clientName` e `instanceId`.
 
 ### Detalhes tecnicos
 
-**Edge function** - bloco de erro (linhas 200-215):
+**Estado adicional no ProfessionalProposalPDF:**
 ```typescript
-if (!success) {
-  let errorDetail: string;
-  if (responseData?.error === "ERR_INTERNAL_ERROR") {
-    errorDetail = `Este número (${normalizedNumber}) pode não ter WhatsApp ativo. Verifique o número e tente novamente.`;
-  } else {
-    errorDetail = responseData?.error || "Falha ao enviar mensagem";
-  }
-  return new Response(
-    JSON.stringify({ success: false, error: errorDetail, details: responseData, sentTo: normalizedNumber }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
-}
+const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+const [showWhatsAppSend, setShowWhatsAppSend] = useState(false);
+const [whatsAppMessage, setWhatsAppMessage] = useState('');
+const [phoneNumber, setPhoneNumber] = useState('');
 ```
 
-Isso resolve o problema porque:
-1. Status 200 evita que o SDK lance excecao
-2. `success: false` no body e capturado pelo hook na linha 104-105
-3. A mensagem de erro e exibida via `toast.error()` na linha 109
-4. Funciona identicamente em todos os 3 modulos pois usam o mesmo hook
+**Captura do base64 no generatePDF:**
+```typescript
+// Apos doc.save(fileName):
+const base64 = doc.output('datauristring').split(',')[1]; // puro base64
+setPdfBase64(base64);
+setPhoneNumber(client.tel_cel_1 || '');
+setWhatsAppMessage(`Olá ${client.nome?.split(' ')[0]}, segue sua proposta de refinanciamento.`);
+setShowWhatsAppSend(true);
+// NAO chamar onClose() aqui
+```
+
+**Envio via WhatsApp:**
+```typescript
+const { sendMediaMessage, hasInstances, sending } = useWhatsApp();
+
+const handleSendWhatsApp = async () => {
+  const cleanPhone = phoneNumber.replace(/\D/g, '');
+  const fullPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+  const fileName = `proposta_${client.cpf?.replace(/\D/g, '') || 'cliente'}.pdf`;
+  
+  await sendMediaMessage(fullPhone, pdfBase64!, fileName, whatsAppMessage, client.nome);
+  onClose();
+  setShowWhatsAppSend(false);
+};
+```
+
+**UI apos gerar PDF:** Substituir a tela de selecao de contratos por uma tela com:
+- Mensagem "PDF gerado com sucesso!"
+- Campo de telefone (Input, pre-preenchido)
+- Campo de mensagem (Textarea, editavel)
+- Botao verde "API WhatsApp" (padrao consistente com os outros modulos)
+- Botao "Fechar" para sair sem enviar
+
+### Arquivo modificado
+
+| Arquivo | Mudanca |
+|---|---|
+| `src/modules/baseoff/components/ProfessionalProposalPDF.tsx` | Adicionar estado de envio WhatsApp apos gerar PDF |
