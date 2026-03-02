@@ -33,6 +33,7 @@ export function ConfiguracaoSipView() {
 
   const selectedDidInfo = dids.find(d => d.numero === selectedDid);
 
+  // Fix #8: uses NUMERO_TRANSFERIR via hook
   const handleConfigurar = async () => {
     if (!selectedDid || !destino) return;
     const result = await configurarSip(selectedDid, destino);
@@ -72,6 +73,11 @@ export function ConfiguracaoSipView() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            O Siga-me redireciona as chamadas recebidas no seu número virtual para outro número (celular ou fixo).
+            Isso é necessário para receber ligações e o código de verificação do WhatsApp.
+          </p>
+
           <div>
             <Label>Selecione o número</Label>
             <Select value={selectedDid} onValueChange={setSelectedDid}>
@@ -105,6 +111,9 @@ export function ConfiguracaoSipView() {
               value={destino}
               onChange={(e) => setDestino(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              As chamadas recebidas no número virtual serão redirecionadas para este número.
+            </p>
           </div>
 
           <Button onClick={handleConfigurar} disabled={!selectedDid || !destino || loading}>

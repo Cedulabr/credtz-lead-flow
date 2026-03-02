@@ -55,13 +55,23 @@ export interface CdrRecord {
 export interface BillingPlano {
   ID: number;
   NOME: string;
-  VALOR: number;
-  DESCRICAO: string;
+  "VALOR MINUTOS FIXO": number;
+  "VALOR MINUTOS MOVEL": number;
 }
 
 export interface BillingCliente {
   ID: number;
   NOME: string;
   EMAIL: string;
-  CPF_CNPJ: string;
+  TELEFONE: string;
+  "CPF / CNPJ": string;
+  CEP: string;
+  ENDERECO: string;
+  NUMERO: string;
+  COMPLEMENTO?: string;
+  BAIRRO: string;
+  CIDADE: string;
+  ESTADO: string;
+  VENCIMENTO: number;
+  "CORTE FATURA": number;
 }

@@ -9,20 +9,20 @@ const corsHeaders = {
 const BRDID_BASE = "https://brdid.com.br/br-did/api/public";
 
 const ACTION_MAP: Record<string, { endpoint: string; method: "GET" | "POST" }> = {
-  buscar_localidades:      { endpoint: "buscar_localidades",           method: "GET" },
-  buscar_numeros:          { endpoint: "buscar_numeros_by_area_local", method: "GET" },
-  consultar_did:           { endpoint: "consultar_did",                method: "GET" },
-  adquirir_did:            { endpoint: "adquirir_novo_did",            method: "POST" },
-  cancelar_did:            { endpoint: "cancelar_did",                 method: "POST" },
-  configurar_sip:          { endpoint: "configurar_siga_me",           method: "POST" },
-  desconfigurar_sip:       { endpoint: "desconfigurar_siga_me",        method: "POST" },
-  whatsapp_configurar:     { endpoint: "whatsapp_configurar",          method: "POST" },
-  get_cdrs:                { endpoint: "get_dids_cdrs",                method: "GET" },
-  criar_plano:             { endpoint: "criar_plano",                  method: "POST" },
-  criar_cliente:           { endpoint: "criar_cliente",                method: "POST" },
-  montar_cliente_plano_dids: { endpoint: "montar_cliente_plano_dids",  method: "POST" },
-  listar_clientes:         { endpoint: "listar_clientes",              method: "GET" },
-  listar_planos:           { endpoint: "listar_planos",                method: "GET" },
+  buscar_localidades:        { endpoint: "buscar_localidades",           method: "GET" },
+  buscar_numeros:            { endpoint: "buscar_numeros_by_area_local", method: "GET" },
+  consultar_did:             { endpoint: "consultar_did",                method: "GET" },
+  adquirir_did:              { endpoint: "adquirir_novo_did",            method: "POST" },
+  cancelar_did:              { endpoint: "cancelar_did",                 method: "POST" },
+  configurar_sip:            { endpoint: "configurar_siga_me",           method: "POST" },
+  desconfigurar_sip:         { endpoint: "desconfigurar_siga_me",        method: "POST" },
+  whatsapp_configurar:       { endpoint: "whatsapp_configurar",          method: "POST" },
+  get_cdrs:                  { endpoint: "get_dids_cdrs",                method: "GET" },
+  criar_plano:               { endpoint: "criar_plano",                  method: "POST" },
+  criar_cliente:             { endpoint: "criar_cliente",                method: "POST" },
+  montar_cliente_plano_dids: { endpoint: "montar_cliente_plano_dids",    method: "POST" },
+  listar_clientes:           { endpoint: "listar_clientes",              method: "GET" },
+  listar_planos:             { endpoint: "listar_planos",                method: "GET" },
 };
 
 Deno.serve(async (req) => {
@@ -31,7 +31,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Auth check
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -73,32 +72,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Build URL with query params
+    // Build URL - ALL params go as query string (BR DID API requirement)
     const url = new URL(`${BRDID_BASE}/${mapping.endpoint}`);
     url.searchParams.set("TOKEN", BRDID_TOKEN);
 
-    // Add params as query params for GET, or body for POST
-    if (mapping.method === "GET") {
-      for (const [key, value] of Object.entries(params)) {
-        if (value !== undefined && value !== null) {
-          url.searchParams.set(key, String(value));
-        }
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null) {
+        url.searchParams.set(key, String(value));
       }
     }
 
-    const fetchOptions: RequestInit = {
+    console.log(`BR DID API call: ${action} -> ${mapping.method} ${url.toString()}`);
+
+    const response = await fetch(url.toString(), {
       method: mapping.method,
-      headers: { "Content-Type": "application/json" },
-    };
-
-    if (mapping.method === "POST") {
-      // For POST, add TOKEN to URL and params to body
-      fetchOptions.body = JSON.stringify(params);
-    }
-
-    console.log(`BR DID API call: ${action} -> ${mapping.method} ${url.pathname}`);
-
-    const response = await fetch(url.toString(), fetchOptions);
+    });
     const responseText = await response.text();
 
     let data;

@@ -34,10 +34,15 @@ export function MeusNumerosView() {
     setLoadingDids(false);
   };
 
+  // Fix #9: cancelar_did needs CN + NUMERO
   const handleCancel = async (did: UserDid) => {
+    if (!did.cn) {
+      toast.error("CN não encontrado para este número. Não é possível cancelar.");
+      return;
+    }
     setCancelling(did.id);
     try {
-      const result = await cancelarDid(did.numero);
+      const result = await cancelarDid(did.cn, did.numero);
       if (result) {
         await supabase
           .from("user_dids")
