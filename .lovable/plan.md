@@ -1,146 +1,126 @@
 
 
-## Auditoria Completa: Isolamento por Empresa para Gestores
+## Plano: Correcao Import SMS + Painel de Logs Admin
 
-### Diagnostico Geral
+### Parte 1: Correcao da Importacao de Leads para Gestores
 
-Apos analise detalhada de todos os modulos, identifiquei que varios componentes nao possuem filtro de empresa para gestores. O padrao correto ja existe em alguns modulos (ActivateLeads, MyClientsKanban, TelevendasModule, Dashboard, Commissions), mas esta ausente em outros criticos.
+#### Problema Identificado
 
-### Modulos com Filtro de Empresa CORRETO (nao precisam de alteracao)
+Apos analise detalhada, identifiquei dois problemas distintos:
 
-| Modulo | Mecanismo |
+**1. RLS da tabela `leads` bloqueia acesso do gestor aos leads de colaboradores**
+
+A politica SELECT atual da tabela `leads` verifica:
+```text
+is_global_admin(auth.uid()) 
+OR company_id IN (get_user_company_ids(auth.uid()))   -- company_id e NULL!
+OR auth.uid() = assigned_to                           -- so ve os proprios
+OR auth.uid() = created_by                            -- so ve os proprios
+```
+
+Como `company_id` e NULL em todos os registros da tabela `leads`, o gestor so consegue ver os leads onde ELE e o `assigned_to` ou `created_by`. Nao ve leads dos colaboradores.
+
+**2. Potencial race condition no carregamento de `companyUserIds`**
+
+Se o gestor clica "Importar" antes do hook `useUserCompany` terminar de carregar, o filtro `.or()` nao e aplicado corretamente.
+
+#### Solucao
+
+**1A. Atualizar RLS da tabela `leads`** - Criar uma funcao `is_company_colleague` que verifica se o lead pertence a um usuario da mesma empresa do gestor. Atualizar a politica SELECT para incluir essa verificacao.
+
+Nova politica SELECT para `leads`:
+```text
+is_global_admin(auth.uid())
+OR company_id IN (get_user_company_ids(auth.uid()))
+OR auth.uid() = assigned_to
+OR auth.uid() = created_by
+OR (
+  is_gestor_or_admin(auth.uid()) 
+  AND (
+    user_in_same_company(assigned_to)
+    OR user_in_same_company(requested_by)
+  )
+)
+```
+
+**1B. Atualizar RLS da tabela `activate_leads`** - A politica "Users can view their leads or all if admin/gestor" e muito permissiva (permite qualquer gestor ver TODOS os activate_leads de TODAS as empresas). Corrigir para filtrar por empresa.
+
+**1C. Melhorar tratamento de erro no CampaignsView** - Adicionar logs detalhados e bloquear o botao de importar enquanto companyId nao carregou.
+
+#### Arquivos a Modificar (Parte 1)
+
+| Arquivo | Alteracao |
 |---|---|
-| ActivateLeads.tsx | Filtra por `assigned_to` usando IDs de usuarios da empresa |
-| MyClientsKanban.tsx | Filtra por `company_id` nas propostas |
-| TelevendasModule.tsx | Filtra por `company_id` |
-| Dashboard.tsx | Filtra atividades por empresa |
-| Commissions.tsx | Filtra por `company_id` |
-| SalesRanking.tsx | Filtra por `company_id` |
-| SMS TelevendasSmsView | Filtra por `company_id` |
-| SMS AutomationView | Filtra por `company_id` |
-
-### Modulos com PROBLEMAS (precisam de correcao)
+| Migracao SQL | Atualizar RLS de `leads` e `activate_leads` para gestores |
+| `src/modules/sms/views/CampaignsView.tsx` | Melhorar tratamento de erro e logging |
 
 ---
 
-#### 1. Leads Premium (`useLeadsPremium.ts`) - CRITICO
+### Parte 2: Painel de Activity Logs no Admin
 
-**Problema:** Gestores so veem seus proprios leads. Nao veem leads dos colaboradores da empresa.
+#### Objetivo
 
-Codigo atual (linhas 73-75):
-```text
-if (!isAdmin) {
-  query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
-}
-```
+Criar um modulo "Logs" no painel admin que mostra em tempo real todas as acoes dos usuarios no sistema: login, criacao de leads, importacoes, alteracoes de status, etc.
 
-**Correcao:** Adicionar verificacao de gestor e filtrar por IDs de usuarios da empresa:
-- Buscar se o usuario e gestor via `user_companies`
-- Se gestor, buscar todos os `user_ids` da empresa
-- Filtrar leads por `assigned_to` ou `created_by` pertencentes a empresa
-- Tambem corrigir `fetchUsers` (linha 92-105) para mostrar apenas usuarios da empresa
-
----
-
-#### 2. SMS - useSmsData.ts (Campanhas, Listas, Historico)
-
-**Problema:** Os dados de campanhas (`sms_campaigns`), listas de contatos (`sms_contact_lists`) e historico (`sms_history`) sao carregados sem filtro de empresa. Gestores veem campanhas e listas criadas por qualquer usuario.
-
-**Correcao:**
-- Filtrar `sms_campaigns` por `created_by` usando IDs dos usuarios da empresa
-- Filtrar `sms_contact_lists` por `created_by` usando IDs dos usuarios da empresa
-- `sms_history` ja tem filtro parcial por `company_id`, mas deve usar IDs de usuarios tambem (pois `company_id` pode ser NULL)
-
----
-
-#### 3. SMS - CampaignsView.tsx (Gravar company_id)
-
-**Problema:** Ao criar campanhas e listas de contatos importadas, o campo `company_id` fica NULL. Isso impede filtragem futura.
-
-**Correcao:**
-- Ao criar campanha (linha 184): adicionar `company_id: companyId`
-- Ao criar lista de contatos importada (linha 157-158): adicionar `company_id: companyId`
-
----
-
-#### 4. SMS - ContactsView.tsx (Gravar company_id)
-
-**Problema:** Ao criar listas de contatos manualmente, `company_id` nao e gravado.
-
-**Correcao:** Adicionar `company_id` ao inserir novas listas.
-
----
-
-### Alteracoes por Arquivo
-
-| Arquivo | Tipo de Alteracao |
-|---|---|
-| `src/modules/leads-premium/hooks/useLeadsPremium.ts` | Adicionar logica de gestor em fetchLeads e fetchUsers |
-| `src/modules/sms/hooks/useSmsData.ts` | Filtrar campanhas, listas e historico por empresa |
-| `src/modules/sms/views/CampaignsView.tsx` | Gravar company_id ao criar campanha e lista |
-| `src/modules/sms/views/ContactsView.tsx` | Gravar company_id ao criar lista de contatos |
-
-### Detalhamento Tecnico
-
-#### useLeadsPremium.ts
+#### Nova Tabela: `system_activity_logs`
 
 ```text
-// Adicionar estado para gestor
-const [isGestor, setIsGestor] = useState(false);
-const [companyUserIds, setCompanyUserIds] = useState<string[]>([]);
-
-// No useEffect inicial, verificar role na user_companies
-// Se gestor, buscar todos user_ids da empresa
-
-// Em fetchLeads:
-ANTES:
-  if (!isAdmin) {
-    query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
-  }
-
-DEPOIS:
-  if (!isAdmin) {
-    if (isGestor && companyUserIds.length > 0) {
-      query = query.or(`assigned_to.in.(${companyUserIds.join(',')}),created_by.in.(${companyUserIds.join(',')})`);
-    } else {
-      query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
-    }
-  }
-
-// Em fetchUsers:
-ANTES: Busca TODOS os usuarios
-DEPOIS: Se gestor, buscar apenas usuarios da empresa via user_companies
+Colunas:
+- id (uuid, PK)
+- user_id (uuid, FK profiles)
+- user_name (text) -- cache do nome para consulta rapida
+- user_email (text)
+- action (text) -- ex: "login", "create_lead", "import_leads", "update_status"
+- module (text) -- ex: "auth", "activate_leads", "leads_premium", "sms", "televendas"
+- description (text) -- descricao legivel da acao
+- metadata (jsonb) -- detalhes extras (IP, user agent, dados alterados)
+- created_at (timestamptz)
 ```
 
-#### useSmsData.ts
+Indexes: `user_id`, `action`, `module`, `created_at DESC`
 
-```text
-// Buscar companyUserIds no inicio (mesmo padrao de useUserCompany + user lookup)
+#### Nova Interface: AdminLogs
 
-// fetchCampaigns:
-  if (!isAdmin && companyUserIds.length > 0) 
-    query = query.in("created_by", companyUserIds)
+- Tabela com busca por usuario, modulo e periodo
+- Filtros por tipo de acao (login, criacao, atualizacao, exclusao, importacao)
+- Filtros por modulo (Auth, Leads Premium, Activate, Televendas, SMS, etc.)
+- Badge de cores por tipo de acao
+- Paginacao com scroll infinito
+- Botao de atualizar em tempo real
+- Export CSV dos logs filtrados
 
-// fetchContactLists:
-  if (!isAdmin && companyUserIds.length > 0) 
-    query = query.in("created_by", companyUserIds)
+#### Integracao com AdminLayout
 
-// fetchHistory:
-  if (!isAdmin && companyUserIds.length > 0) 
-    query = query.in("sent_by", companyUserIds)
-```
+- Adicionar novo modulo `logs` no type `AdminModule`
+- Adicionar icone `ScrollText` na barra de navegacao
+- Renderizar `AdminLogs` no switch de modulos
 
-#### CampaignsView.tsx e ContactsView.tsx
+#### Instrumentacao de Logs
 
-```text
-// Ao inserir campanha/lista, incluir company_id:
-  { ..., company_id: companyId }
-```
+Criar hook `useActivityLogger` que registra acoes automaticamente. Instrumentar nos seguintes pontos:
+
+1. **Login/Logout** - AuthContext
+2. **Import de leads** - CampaignsView, RemarketingSmsView
+3. **Criacao de campanha SMS** - CampaignsView
+4. **Alteracao de status de lead** - useLeadsPremium, ActivateLeads
+5. **Criacao de proposta** - TelevendasModule
+
+#### Arquivos a Criar/Modificar (Parte 2)
+
+| Arquivo | Tipo | Alteracao |
+|---|---|---|
+| Migracao SQL | Criar | Tabela `system_activity_logs` + indexes + RLS |
+| `src/hooks/useActivityLogger.ts` | Criar | Hook para registrar logs |
+| `src/components/admin/AdminLogs.tsx` | Criar | Componente do painel de logs |
+| `src/components/admin/AdminLayout.tsx` | Modificar | Adicionar modulo "Logs" |
+| `src/components/admin/index.tsx` | Modificar | Importar e renderizar AdminLogs |
+| `src/contexts/AuthContext.tsx` | Modificar | Instrumentar login/logout |
+| `src/modules/sms/views/CampaignsView.tsx` | Modificar | Log de importacao e criacao de campanha |
 
 ### Resultado Esperado
 
-- Gestores da JS CRED (e qualquer outra empresa) verao apenas leads, campanhas, listas e historico dos usuarios de sua propria empresa
-- Administradores mantem visao global
-- Colaboradores continuam vendo apenas seus proprios dados
-- Novos registros (campanhas, listas) serao criados com `company_id` preenchido para filtragem futura
+1. Gestores conseguem importar leads de activate_leads e leads_premium no SMS
+2. RLS corretamente limita gestores a dados da propria empresa
+3. Admin tem visao completa de todas as acoes do sistema com filtros e busca
+4. Logs registram automaticamente as principais acoes dos usuarios
 
