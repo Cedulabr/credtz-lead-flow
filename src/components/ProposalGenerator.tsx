@@ -714,7 +714,7 @@ export function ProposalGenerator() {
 
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(51, 51, 51); // Cinza escuro para títulos
+      doc.setTextColor(51, 51, 51);
       doc.text(`${i + 1}. ${productInfo?.label || c.product}`, 20, y + 5);
 
       doc.setTextColor(0, 0, 0);
@@ -728,7 +728,6 @@ export function ProposalGenerator() {
 
       y += 40;
 
-      // Add new page if needed
       if (y > 250) {
         doc.addPage();
         y = 20;
@@ -739,7 +738,7 @@ export function ProposalGenerator() {
 
     // Troco Total Estimado
     if (totalTroco > 0) {
-      doc.setFillColor(16, 185, 129); // emerald-500
+      doc.setFillColor(16, 185, 129);
       doc.roundedRect(15, y - 5, pageWidth - 30, 20, 3, 3, "F");
       
       doc.setTextColor(255, 255, 255);
@@ -751,7 +750,7 @@ export function ProposalGenerator() {
 
     // Product-specific footers
     if (footers.length > 0) {
-      doc.setTextColor(55, 65, 81); // Cinza escuro
+      doc.setTextColor(55, 65, 81);
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       doc.text("INFORMAÇÕES IMPORTANTES:", 20, y);
@@ -776,6 +775,11 @@ export function ProposalGenerator() {
 
     // Save
     doc.save(`proposta_${proposalData.clientName.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`);
+    
+    // Capture base64 for WhatsApp
+    const base64 = doc.output('datauristring').split(',')[1];
+    setPdfBase64(base64);
+    
     toast.success("PDF gerado com sucesso!");
   };
 
@@ -1030,10 +1034,9 @@ export function ProposalGenerator() {
           {proposalData.clientPhone && (
             <Button 
               onClick={() => setShowWhatsAppSend(true)}
-              variant="outline" 
-              className="flex-1 h-12"
+              className="flex-1 h-12 gap-2 bg-green-600 hover:bg-green-700 text-white"
             >
-              <MessageCircle className="w-4 h-4 mr-2" />
+              <MessageCircle className="w-4 h-4" />
               Enviar via WhatsApp
             </Button>
           )}
@@ -1669,7 +1672,9 @@ export function ProposalGenerator() {
         onOpenChange={setShowWhatsAppSend}
         clientName={proposalData.clientName}
         clientPhone={proposalData.clientPhone}
-        defaultMessage={`Olá ${proposalData.clientName?.split(" ")[0] || ""}, segue sua proposta de crédito consignado.`}
+        defaultMessage={generateProposalText()}
+        mediaBase64={pdfBase64 || undefined}
+        mediaName={pdfBase64 ? `proposta_${proposalData.clientName.replace(/\s+/g, "_")}.pdf` : undefined}
       />
     </div>
   );
