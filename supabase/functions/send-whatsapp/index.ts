@@ -69,18 +69,18 @@ Deno.serve(async (req) => {
         const testText = await testResponse.text();
         console.log("Test mode response:", testResponse.status, testText);
         
-        // If status < 500, the token is valid (even 4xx means auth worked)
-        if (testResponse.status < 500) {
+        // 401/403 means invalid token; anything else (including 500 with dummy number) means token is accepted
+        if (testResponse.status === 401 || testResponse.status === 403) {
           return new Response(
-            JSON.stringify({ success: true, testMode: true, status: testResponse.status }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        } else {
-          return new Response(
-            JSON.stringify({ success: false, testMode: true, error: "API server error", details: testText }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({ success: false, testMode: true, error: "Token inválido ou sem permissão. Verifique o token na plataforma Easyn.", details: testText }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
+        
+        return new Response(
+          JSON.stringify({ success: true, testMode: true, status: testResponse.status }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       } catch (e) {
         console.error("Test mode error:", e);
         return new Response(
