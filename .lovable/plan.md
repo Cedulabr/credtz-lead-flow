@@ -1,138 +1,124 @@
 
 
-## Plano: Modulo "Meu Numero" - Integracao BR DID API
+## Plano: Corrigir modulo "Meu Numero" - Adequar a API BR DID
 
-### Resumo
+### Problema
 
-Criar um novo modulo completo chamado **"Meu Numero"** que integra com a API da BR DID (brdid.com.br) para permitir que usuarios adquiram e gerenciem numeros virtuais diretamente na plataforma.
+Apos estudar a documentacao oficial da API (https://brdid.com.br/api-docs/brdid-api.json), identifiquei **9 problemas criticos** que impedem o funcionamento correto do modulo. Os nomes dos parametros e o metodo de envio estao incorretos em praticamente todos os endpoints.
 
-### API BR DID - Endpoints mapeados
+### Problemas identificados e correcoes
 
-Base URL: `https://brdid.com.br/br-did/api/public/`
-Autenticacao: Token via query parameter `TOKEN`
+#### 1. Edge Function: TODOS os parametros sao via query string (NAO body)
 
-| Secao do Modulo | Endpoint(s) API | Metodo |
-|---|---|---|
-| Buscar localidades | `/buscar_localidades` | GET |
-| Buscar numeros por area | `/buscar_numeros_by_area_local` | GET |
-| Consultar DID | `/consultar_did` | GET |
-| Contratar DID | `/adquirir_novo_did` | POST |
-| Cancelar DID | `/cancelar_did` | POST |
-| Configurar Siga-me (SIP) | `/configurar_siga_me` | POST |
-| Desconfigurar Siga-me | `/desconfigurar_siga_me` | POST |
-| WhatsApp configurar | `/whatsapp_configurar` | POST |
-| Logs de chamadas | `/get_dids_cdrs` | GET |
-| Billing: criar plano | `/criar_plano` | POST |
-| Billing: criar cliente | `/criar_cliente` | POST |
-| Billing: vincular DID+plano+cliente | `/montar_cliente_plano_dids` | POST |
-| Billing: listar clientes | `/listar_clientes` | GET |
-| Billing: listar planos | `/listar_planos` | GET |
+A API BR DID usa `"in": "query"` para TODOS os parametros, inclusive nos endpoints POST. A edge function envia params no body para POST, mas a API espera tudo na URL como query params.
 
-### Arquivos a criar
+**Correcao:** Alterar a edge function para enviar TODOS os parametros como query params, independente do metodo HTTP.
 
-#### 1. Secret: `BRDID_API_TOKEN`
-Armazenar o token fornecido como secret do Supabase para uso na edge function.
+#### 2. Contratacao de DID (adquirir_novo_did)
 
-#### 2. Edge Function: `supabase/functions/brdid-api/index.ts`
-Proxy seguro que recebe requisicoes do frontend e chama a API BR DID com o token. Suporta todas as acoes via um campo `action` no body JSON.
+Parametros errados:
+- Enviamos: `{ CODIGO }` 
+- API exige: `CN` (numero) + `NUMERO` (string) + `SIP_TRUNK` (opcional, enviar 0 para criar usuario SIP)
 
-```text
-Frontend -> Edge Function (com auth do usuario)
-Edge Function -> BR DID API (com TOKEN secreto)
-```
+**Correcao no hook e na view BuscarNumerosView:** Enviar `CN`, `NUMERO` e `SIP_TRUNK=0`.
 
-Acoes suportadas:
-- `buscar_localidades` - lista areas disponiveis
-- `buscar_numeros` - busca DIDs por area local
-- `consultar_did` - consulta dados de um DID
-- `adquirir_did` - contrata um DID
-- `cancelar_did` - cancela um DID
-- `configurar_sip` - configura siga-me
-- `desconfigurar_sip` - remove siga-me
-- `whatsapp_configurar` - configura webhook WhatsApp
-- `get_cdrs` - busca logs de chamadas
-- `criar_plano` - cria plano billing
-- `criar_cliente` - cria cliente billing
-- `montar_cliente_plano_dids` - vincula DID+plano+cliente
-- `listar_clientes` - lista clientes billing
-- `listar_planos` - lista planos billing
+#### 3. WhatsApp configurar
 
-#### 3. Modulo frontend: `src/modules/meu-numero/`
+Parametros errados:
+- Enviamos: `NUMERO` + `WEBHOOK`
+- API exige: `numero` (minusculo!) + `url_retorno`
 
-Estrutura:
-```text
-src/modules/meu-numero/
-  index.ts              - Export principal
-  MeuNumeroModule.tsx   - Componente principal com tabs
-  types.ts              - Tipos TypeScript
-  hooks/
-    useBrDid.ts         - Hook para chamadas a edge function
-  views/
-    BuscarNumerosView.tsx   - Busca + lista de numeros disponiveis
-    MeusNumerosView.tsx     - DIDs contratados + consulta + cancelamento
-    ConfiguracaoSipView.tsx - Configurar/desconfigurar siga-me
-    WhatsAppView.tsx        - Integracao WhatsApp
-    BillingView.tsx         - Planos, clientes, vinculacao
-    LogsChamadasView.tsx    - CDRs / historico de chamadas
-```
+**Correcao adicional:** Melhorar a explicacao do campo webhook para leigos. Explicar passo a passo como vincular o WhatsApp Business ao numero virtual, incluindo o fluxo de verificacao por ligacao.
 
-#### 4. Tabela Supabase: `user_dids`
-Para rastrear quais DIDs cada usuario contratou:
-- id, user_id, numero, cn, area_local, status, sip_config, whatsapp_configured, created_at, updated_at
+#### 4. Billing - Criar Plano
 
-#### 5. Integracao no sistema existente
+Campos totalmente errados:
+- Enviamos: `NOME`, `VALOR`, `DESCRICAO`
+- API exige: `NOME`, `VALOR MINUTOS FIXO`, `VALOR MINUTOS MOVEL` (com espacos!)
 
-| Arquivo | Mudanca |
-|---|---|
-| `src/components/Navigation.tsx` | Adicionar item "Meu Numero" com icone Phone e permissionKey `can_access_meu_numero` |
-| `src/pages/Index.tsx` | Adicionar case "meu-numero" renderizando MeuNumeroModule |
-| `src/components/UsersList.tsx` | Adicionar permissao `can_access_meu_numero` no PERMISSION_MODULES |
-| `supabase/config.toml` | Adicionar `[functions.brdid-api]` com verify_jwt = false |
+**Correcao:** Redesenhar o formulario com os campos corretos.
 
-### Interface do modulo
+#### 5. Billing - Criar Cliente
 
-O modulo tera 6 abas (tabs):
+Faltam 9 campos obrigatorios. A API exige:
+- `NOME`, `EMAIL`, `TELEFONE`, `CPF / CNPJ`, `CEP`, `ENDERECO`, `NUMERO`, `BAIRRO`, `CIDADE`, `ESTADO`, `VENCIMENTO`, `CORTE FATURA`
 
-1. **Buscar Numeros** - Selecionar localidade (DDD), ver numeros disponiveis com valores (mensal + instalacao), botao "Contratar" para cada numero
-2. **Meus Numeros** - Lista de DIDs contratados, consulta de status, botao de cancelamento com confirmacao
-3. **Configuracao SIP** - Formulario para configurar siga-me (numero de destino) ou desconfigurar
-4. **WhatsApp** - Configurar webhook para receber codigo de verificacao do WhatsApp Business
-5. **Billing** - Criar planos, criar clientes, vincular DIDs a clientes+planos, listar planos e clientes
-6. **Logs de Chamadas** - Selecionar DID + periodo (mes/ano), visualizar CDRs em tabela
+**Correcao:** Redesenhar o formulario completo com todos os 12 campos.
 
-### Detalhes tecnicos
+#### 6. Billing - Vincular (montar_cliente_plano_dids)
 
-**Hook `useBrDid`**: centraliza todas as chamadas via `supabase.functions.invoke('brdid-api', { body: { action, params } })`. Retorna funcoes tipadas para cada operacao + estados de loading/error.
+Parametros errados:
+- Enviamos: `CLIENTE_ID`, `PLANO_ID`, `DID_NUMERO`
+- API exige: `ID CLIENTE`, `ID PLANO`, `LISTA DE DIDS` (CN+Numero, separado por virgula)
 
-**Edge Function**: recebe `{ action: string, params: Record<string, any> }`, monta a URL com query params conforme a API BR DID, faz fetch e retorna o resultado. Todas as chamadas usam `https://brdid.com.br/br-did/api/public/{endpoint}?TOKEN=...&param1=...`.
+#### 7. Logs de Chamadas (CDR)
 
-**Modelo Did** (da API):
-```text
-CODIGO: number
-VALOR_MENSAL: number
-VALOR_INSTALACAO: number
-CN: number
-NUMERO: string
-GOLD: boolean
-SUPER_GOLD: boolean
-DIAMANTE: boolean
-```
+Parametro errado:
+- Enviamos: `NUMERO`, `MES`, `ANO` separados
+- API exige: `NUMERO` + `PERIODO` no formato `MMAAAA` (ex: `032026`)
 
-**Resposta de contratacao** (retorno):
-```text
-STATUS: string
-USUARIO: number (SIP user)
-SENHA: string (SIP password)
-DOMINIO: string (SIP domain)
-```
+#### 8. SIP Configurar (siga_me)
 
-**Tabela `user_dids`**: armazena os dados de retorno da contratacao (usuario SIP, senha, dominio) para que o usuario possa consultar suas credenciais SIP a qualquer momento.
+Parametro errado:
+- Enviamos: `DESTINO`
+- API exige: `NUMERO_TRANSFERIR`
+
+#### 9. Cancelar DID
+
+Falta parametro:
+- Enviamos: apenas `NUMERO`
+- API exige: `CN` + `NUMERO`
+
+---
+
+### Arquivos a modificar
+
+#### `supabase/functions/brdid-api/index.ts`
+- Mover TODOS os params para query string (tanto GET quanto POST)
+- Corrigir nomes de parametros com espacos (usar encodeURIComponent ou URLSearchParams)
+
+#### `src/modules/meu-numero/hooks/useBrDid.ts`
+- Corrigir `adquirirDid`: enviar `CN`, `NUMERO`, `SIP_TRUNK=0`
+- Corrigir `whatsappConfigurar`: usar `numero` (minusculo) e `url_retorno`
+- Corrigir `configurarSip`: usar `NUMERO_TRANSFERIR`
+- Corrigir `cancelarDid`: enviar `CN` + `NUMERO`
+- Corrigir `getCdrs`: montar `PERIODO` como `MMAAAA`
+- Corrigir `criarPlano`: usar campos corretos com espacos
+- Corrigir `criarCliente`: usar todos os campos obrigatorios
+- Corrigir `montarClientePlanoDids`: usar `ID PLANO`, `ID CLIENTE`, `LISTA DE DIDS`
+
+#### `src/modules/meu-numero/views/BuscarNumerosView.tsx`
+- Corrigir `handleContratar` para enviar `CN` e `NUMERO` ao inves de `CODIGO`
+- Garantir que o Select de localidades funcione corretamente (converter AREA_LOCAL para string)
+
+#### `src/modules/meu-numero/views/WhatsAppView.tsx`
+- Substituir campo "URL do Webhook" por explicacao detalhada passo a passo:
+  1. O que e: "Quando voce cadastrar seu numero no WhatsApp Business, o sistema vai ligar pro seu numero com um codigo de verificacao"
+  2. Explicar que o webhook recebe o audio com o codigo automaticamente
+  3. Adicionar card explicativo com passo a passo de como vincular ao WhatsApp Business
+  4. Informar que precisa ter o "Siga-me" configurado OU um softphone para receber a ligacao
+
+#### `src/modules/meu-numero/views/BillingView.tsx`
+- **Criar Plano:** Redesenhar com campos: Nome, Valor Minutos Fixo, Valor Minutos Movel, e campos opcionais (Aplicar Limite, Limite por Valor, Limite por Minutos, Produtos Adicionais)
+- **Criar Cliente:** Redesenhar com todos os 12 campos: Nome, Email, Telefone, CPF/CNPJ, CEP, Endereco, Numero, Complemento, Bairro, Cidade, Estado, Vencimento, Corte Fatura, ID Plano (opcional)
+- **Vincular:** Corrigir parametros para `ID PLANO`, `ID CLIENTE`, `LISTA DE DIDS`
+
+#### `src/modules/meu-numero/views/LogsChamadasView.tsx`
+- Montar `PERIODO` no formato `MMAAAA` (ex: mes 3 + ano 2026 = `032026`)
+
+#### `src/modules/meu-numero/views/ConfiguracaoSipView.tsx`
+- Corrigir parametro para `NUMERO_TRANSFERIR`
+
+#### `src/modules/meu-numero/views/MeusNumerosView.tsx`
+- Corrigir cancelamento para enviar `CN` + `NUMERO`
+
+#### `src/modules/meu-numero/types.ts`
+- Atualizar tipos do BillingCliente com todos os campos
 
 ### Sequencia de implementacao
 
-1. Adicionar secret `BRDID_API_TOKEN`
-2. Criar migration para tabela `user_dids` com RLS
-3. Criar edge function `brdid-api`
-4. Criar modulo frontend completo
-5. Integrar no Navigation, Index e UsersList
+1. Corrigir edge function (query params para tudo)
+2. Corrigir hook useBrDid (nomes de parametros)
+3. Corrigir todas as 6 views
+4. Deploy da edge function e testar
 
