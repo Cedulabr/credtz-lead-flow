@@ -13,8 +13,43 @@ export function useLeadsPremium() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [userCredits, setUserCredits] = useState(0);
+  const [companyUserIds, setCompanyUserIds] = useState<string[]>([]);
+  const [isGestor, setIsGestor] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
+
+  // Fetch company info and user IDs for gestor filtering
+  useEffect(() => {
+    if (!user || isAdmin) return;
+
+    const fetchCompanyInfo = async () => {
+      // Check if user is gestor
+      const { data: uc } = await supabase
+        .from('user_companies')
+        .select('company_id, company_role')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!uc) return;
+
+      const gestorRole = uc.company_role === 'gestor';
+      setIsGestor(gestorRole);
+
+      if (gestorRole && uc.company_id) {
+        // Fetch all user IDs belonging to this company
+        const { data: companyUsers } = await supabase
+          .from('user_companies')
+          .select('user_id')
+          .eq('company_id', uc.company_id)
+          .eq('is_active', true);
+        setCompanyUserIds((companyUsers || []).map(u => u.user_id));
+      }
+    };
+
+    fetchCompanyInfo();
+  }, [user, isAdmin]);
 
   // Calculate stats from leads
   const stats = useMemo<LeadStats>(() => {
@@ -34,7 +69,6 @@ export function useLeadsPremium() {
     const converted = statusCounts['cliente_fechado'] || 0;
     const conversionRate = leads.length > 0 ? (converted / leads.length) * 100 : 0;
 
-    // Calculate average time to conversion (in hours)
     const convertedLeads = leads.filter(l => l.status === 'cliente_fechado' && l.updated_at);
     const avgTimeToConversion = convertedLeads.length > 0
       ? convertedLeads.reduce((acc, l) => {
@@ -71,7 +105,13 @@ export function useLeadsPremium() {
         .limit(500);
 
       if (!isAdmin) {
-        query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
+        if (isGestor && companyUserIds.length > 0) {
+          // Gestor: see all leads from company users
+          query = query.or(`assigned_to.in.(${companyUserIds.join(',')}),created_by.in.(${companyUserIds.join(',')})`);
+        } else {
+          // Colaborador: see only own leads
+          query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
+        }
       }
 
       const { data, error } = await query;
@@ -87,22 +127,28 @@ export function useLeadsPremium() {
     } finally {
       setIsLoading(false);
     }
-  }, [user, isAdmin, toast]);
+  }, [user, isAdmin, isGestor, companyUserIds, toast]);
 
   const fetchUsers = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles')
         .select('id, name, email')
         .eq('is_active', true)
         .order('name');
 
+      // Gestor: only show company users
+      if (!isAdmin && isGestor && companyUserIds.length > 0) {
+        query = query.in('id', companyUserIds);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
     }
-  }, []);
+  }, [isAdmin, isGestor, companyUserIds]);
 
   const fetchUserCredits = useCallback(async () => {
     if (!user) return;
@@ -160,7 +206,6 @@ export function useLeadsPremium() {
 
       if (error) throw error;
 
-      // Handle special status: cliente_fechado -> create proposta
       if (newStatus === 'cliente_fechado') {
         await handleClienteFechado(lead);
       }
@@ -309,8 +354,11 @@ export function useLeadsPremium() {
 
   const canEditLead = useCallback((lead: Lead): boolean => {
     if (isAdmin) return true;
+    if (isGestor && companyUserIds.length > 0) {
+      return companyUserIds.includes(lead.assigned_to || '') || companyUserIds.includes(lead.created_by || '');
+    }
     return lead.assigned_to === user?.id || lead.created_by === user?.id;
-  }, [isAdmin, user]);
+  }, [isAdmin, isGestor, companyUserIds, user]);
 
   return {
     leads,

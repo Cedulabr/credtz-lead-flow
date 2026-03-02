@@ -155,7 +155,7 @@ export const CampaignsView = ({
 
       const listName = `${LEAD_SOURCE_OPTIONS.find((o) => o.value === leadSource)?.label} - ${new Date().toLocaleDateString("pt-BR")}`;
       const { data: listData, error: listError } = await supabase
-        .from("sms_contact_lists").insert({ name: listName, created_by: user?.id } as any).select("id").single();
+        .from("sms_contact_lists").insert({ name: listName, created_by: user?.id, company_id: companyId || null } as any).select("id").single();
       if (listError) throw listError;
 
       const contacts = leads.map((l) => ({ list_id: listData.id, name: l.name, phone: l.phone, source: leadSource, source_id: l.source_id }));
@@ -185,6 +185,7 @@ export const CampaignsView = ({
         name: campaignName.trim(), template_id: selectedTemplate !== "none" ? selectedTemplate : null,
         message_content: messageContent.trim(), contact_list_id: selectedList,
         total_recipients: list?.contact_count || 0, created_by: user?.id, status: "draft",
+        company_id: companyId || null,
       } as any);
       if (error) throw error;
       toast.success("Campanha criada");

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserCompany } from "../hooks/useUserCompany";
 import { toast } from "sonner";
 import { SmsContactList, SmsContact } from "../types";
 import * as XLSX from "xlsx";
@@ -28,6 +29,7 @@ interface ImportReport {
 
 export const ContactsView = ({ contactLists, onRefresh }: ContactsViewProps) => {
   const { user } = useAuth();
+  const { companyId } = useUserCompany();
   const [createOpen, setCreateOpen] = useState(false);
   const [listName, setListName] = useState("");
   const [listDesc, setListDesc] = useState("");
@@ -46,7 +48,7 @@ export const ContactsView = ({ contactLists, onRefresh }: ContactsViewProps) => 
     if (!listName.trim()) { toast.error("Nome é obrigatório"); return; }
     setSaving(true);
     try {
-      const { error } = await supabase.from("sms_contact_lists").insert({ name: listName.trim(), description: listDesc.trim() || null, created_by: user?.id } as any);
+      const { error } = await supabase.from("sms_contact_lists").insert({ name: listName.trim(), description: listDesc.trim() || null, created_by: user?.id, company_id: companyId || null } as any);
       if (error) throw error;
       toast.success("Lista criada"); setCreateOpen(false); setListName(""); setListDesc(""); onRefresh();
     } catch { toast.error("Erro ao criar lista"); } finally { setSaving(false); }
