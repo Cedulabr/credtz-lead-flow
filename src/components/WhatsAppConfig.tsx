@@ -409,10 +409,10 @@ export function WhatsAppConfig() {
               <Input value={formPhone} onChange={(e) => setFormPhone(e.target.value)} placeholder="85 99999-9999" />
             </div>
             <div>
-              <Label>Token de Acesso (API Ticketz/Easyn)</Label>
-              <Input value={formToken} onChange={(e) => setFormToken(e.target.value)} placeholder="Ex: eyJhbGciOiJIUzI1NiIs..." type="password" />
+              <Label>Token de Acesso (Easyn)</Label>
+              <Input value={formToken} onChange={(e) => setFormToken(e.target.value)} placeholder="Cole o token configurado na conexão Easyn" type="password" />
               <p className="text-xs text-muted-foreground mt-1">
-                ⚠️ <strong>Não é o número de telefone.</strong> É o token Bearer gerado na plataforma Ticketz/Easyn. Geralmente começa com "eyJ..." ou é uma string longa alfanumérica.
+                Token cadastrado na conexão do chat Easyn. Acesse Conexões &gt; Editar &gt; copie o token.
               </p>
             </div>
           </div>

@@ -50,19 +50,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate token format - should not be a phone number
-    const cleanToken = apiToken.replace(/\D/g, "");
-    if (cleanToken.length === apiToken.length && apiToken.length <= 15) {
-      console.error("Token appears to be a phone number, not an API token:", apiToken.substring(0, 4) + "...");
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Token inválido", 
-          details: "O token informado parece ser um número de telefone. O token da API Ticketz/Easyn é uma string alfanumérica longa (Bearer token), geralmente começando com 'eyJ...'. Verifique na configuração da plataforma Ticketz/Easyn." 
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     // Test mode: validate token by sending to a dummy number
     if (testMode) {
