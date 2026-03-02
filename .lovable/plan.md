@@ -1,126 +1,147 @@
 
 
-## Plano: Correcao Import SMS + Painel de Logs Admin
+## Plano: Integracao WhatsApp via API Ticketz
 
-### Parte 1: Correcao da Importacao de Leads para Gestores
+### Visao Geral
 
-#### Problema Identificado
+Integrar envio de mensagens WhatsApp diretamente pelo aplicativo usando a API do Ticketz (chat.easyn.digital). Inclui: modulo de configuracao de token, botoes de envio nos modulos de leads, e envio de proposta via WhatsApp no Gerador de Propostas.
 
-Apos analise detalhada, identifiquei dois problemas distintos:
+### Infraestrutura Existente
 
-**1. RLS da tabela `leads` bloqueia acesso do gestor aos leads de colaboradores**
-
-A politica SELECT atual da tabela `leads` verifica:
-```text
-is_global_admin(auth.uid()) 
-OR company_id IN (get_user_company_ids(auth.uid()))   -- company_id e NULL!
-OR auth.uid() = assigned_to                           -- so ve os proprios
-OR auth.uid() = created_by                            -- so ve os proprios
-```
-
-Como `company_id` e NULL em todos os registros da tabela `leads`, o gestor so consegue ver os leads onde ELE e o `assigned_to` ou `created_by`. Nao ve leads dos colaboradores.
-
-**2. Potencial race condition no carregamento de `companyUserIds`**
-
-Se o gestor clica "Importar" antes do hook `useUserCompany` terminar de carregar, o filtro `.or()` nao e aplicado corretamente.
-
-#### Solucao
-
-**1A. Atualizar RLS da tabela `leads`** - Criar uma funcao `is_company_colleague` que verifica se o lead pertence a um usuario da mesma empresa do gestor. Atualizar a politica SELECT para incluir essa verificacao.
-
-Nova politica SELECT para `leads`:
-```text
-is_global_admin(auth.uid())
-OR company_id IN (get_user_company_ids(auth.uid()))
-OR auth.uid() = assigned_to
-OR auth.uid() = created_by
-OR (
-  is_gestor_or_admin(auth.uid()) 
-  AND (
-    user_in_same_company(assigned_to)
-    OR user_in_same_company(requested_by)
-  )
-)
-```
-
-**1B. Atualizar RLS da tabela `activate_leads`** - A politica "Users can view their leads or all if admin/gestor" e muito permissiva (permite qualquer gestor ver TODOS os activate_leads de TODAS as empresas). Corrigir para filtrar por empresa.
-
-**1C. Melhorar tratamento de erro no CampaignsView** - Adicionar logs detalhados e bloquear o botao de importar enquanto companyId nao carregou.
-
-#### Arquivos a Modificar (Parte 1)
-
-| Arquivo | Alteracao |
-|---|---|
-| Migracao SQL | Atualizar RLS de `leads` e `activate_leads` para gestores |
-| `src/modules/sms/views/CampaignsView.tsx` | Melhorar tratamento de erro e logging |
+Ja existem tabelas `whatsapp_instances` e `whatsapp_messages` no banco, mas sem campo de token. Tambem ja existe `can_access_whatsapp` no perfil do usuario. Vamos reaproveitar essas tabelas.
 
 ---
 
-### Parte 2: Painel de Activity Logs no Admin
+### Parte 1: Banco de Dados - Adicionar campo token
 
-#### Objetivo
+**Migracao SQL:**
+- Adicionar coluna `api_token` (text) na tabela `whatsapp_instances`
+- Adicionar coluna `company_id` (uuid, FK companies) na tabela `whatsapp_instances`
+- Adicionar coluna `direction` (text, default 'outgoing') na tabela `whatsapp_messages`
+- Adicionar coluna `media_url` (text) na tabela `whatsapp_messages`
+- Adicionar coluna `message_type` (text, default 'text') na tabela `whatsapp_messages`
+- Atualizar RLS para permitir gestores gerenciarem tokens da empresa
 
-Criar um modulo "Logs" no painel admin que mostra em tempo real todas as acoes dos usuarios no sistema: login, criacao de leads, importacoes, alteracoes de status, etc.
+### Parte 2: Edge Function - Proxy de envio
 
-#### Nova Tabela: `system_activity_logs`
+Criar edge function `send-whatsapp` que:
+- Recebe: `{ token, number, body, mediaBase64?, mediaName? }`
+- Faz POST para `https://chat.easyn.digital:443/backend/api/messages/send`
+- Para texto: Content-Type `application/json`, body com number, body, saveOnTicket, linkPreview
+- Para media: Content-Type `multipart/form-data`, FormData com number, medias (arquivo), saveOnTicket
+- Registra na tabela `whatsapp_messages`
+- Retorna sucesso/erro
+
+### Parte 3: Modulo WhatsApp (Configuracao)
+
+**Novo arquivo: `src/components/WhatsAppConfig.tsx`**
+
+Interface com:
+- Cadastro/edicao do token da API (campo "Token de Acesso")
+- Status da conexao (teste de envio)
+- Historico de mensagens enviadas
+- Acessivel via navegacao (ja existe `can_access_whatsapp` no perfil)
+
+**Adicionar ao `Navigation.tsx`:**
+- Item "WhatsApp" com icone MessageCircle, permissionKey `can_access_whatsapp`
+
+### Parte 4: Componente de Envio Reutilizavel
+
+**Novo arquivo: `src/components/WhatsAppSendDialog.tsx`**
+
+Dialog reutilizavel que:
+- Recebe: numero do telefone, nome do cliente, mensagem pre-preenchida (opcional), arquivo PDF (opcional)
+- Busca o token do usuario/empresa na tabela `whatsapp_instances`
+- Permite editar a mensagem antes de enviar
+- Mostra preview da mensagem
+- Chama a edge function `send-whatsapp`
+- Toast de sucesso/erro
+
+### Parte 5: Integracao nos Modulos
+
+#### 5A. Activate Leads (`ActivateLeads.tsx`)
+- Adicionar botao WhatsApp verde ao lado das acoes do lead (na modal de detalhes ou na listagem)
+- Ao clicar, abre `WhatsAppSendDialog` com telefone e nome pre-preenchidos
+- Mensagem padrao: "Ola {nome}, tudo bem?"
+
+#### 5B. Leads Premium (`LeadDetailDrawer.tsx`)
+- O botao "WhatsApp" ja existe (linha 331-336) mas abre `wa.me` externo
+- Substituir para abrir `WhatsAppSendDialog` enviando via API interna
+- Manter opcao de fallback para wa.me caso nao tenha token configurado
+
+#### 5C. Meus Clientes (`MyClientsKanban.tsx`)
+- Adicionar botao WhatsApp na modal de detalhes do cliente
+- Mesma logica: abre `WhatsAppSendDialog`
+
+#### 5D. Gerador de Propostas (`ProposalGenerator.tsx`)
+- Na tela de summary (apos gerar proposta), adicionar botao "Enviar via WhatsApp"
+- Gera o PDF em memoria (blob) e envia como media via WhatsApp
+- Mensagem acompanhando: "Ola {nome}, segue sua proposta de credito consignado."
+
+#### 5E. Sales Wizard (`SalesWizard.tsx`)
+- Apos o `SmsNotifyDialog`, adicionar opcao "Enviar proposta via WhatsApp"
+- Novo dialog `WhatsAppNotifyDialog` similar ao `SmsNotifyDialog`
+
+### Parte 6: Hook de WhatsApp
+
+**Novo arquivo: `src/hooks/useWhatsApp.ts`**
+
+Hook que:
+- Busca o token do usuario/empresa
+- Funcao `sendTextMessage(number, body)`
+- Funcao `sendMediaMessage(number, file)`
+- Gerencia estados de loading/erro
+- Cache do token para evitar consultas repetidas
+
+---
+
+### Arquivos a Criar
+
+| Arquivo | Descricao |
+|---|---|
+| `supabase/functions/send-whatsapp/index.ts` | Edge function proxy para API Ticketz |
+| `src/components/WhatsAppConfig.tsx` | Modulo de configuracao de token |
+| `src/components/WhatsAppSendDialog.tsx` | Dialog reutilizavel de envio |
+| `src/hooks/useWhatsApp.ts` | Hook de envio de mensagens |
+
+### Arquivos a Modificar
+
+| Arquivo | Alteracao |
+|---|---|
+| Migracao SQL | Adicionar colunas na tabela whatsapp_instances e whatsapp_messages |
+| `src/components/Navigation.tsx` | Adicionar item "WhatsApp" no menu |
+| `src/pages/Index.tsx` | Renderizar WhatsAppConfig e WhatsAppSendDialog |
+| `src/components/ActivateLeads.tsx` | Botao WhatsApp na acao do lead |
+| `src/modules/leads-premium/components/LeadDetailDrawer.tsx` | Substituir wa.me por envio via API |
+| `src/components/MyClientsKanban.tsx` | Botao WhatsApp na modal do cliente |
+| `src/components/ProposalGenerator.tsx` | Botao "Enviar via WhatsApp" no summary |
+| `src/modules/sales-wizard/SalesWizard.tsx` | Opcao WhatsApp apos gerar proposta |
+
+### Detalhamento Tecnico da Edge Function
 
 ```text
-Colunas:
-- id (uuid, PK)
-- user_id (uuid, FK profiles)
-- user_name (text) -- cache do nome para consulta rapida
-- user_email (text)
-- action (text) -- ex: "login", "create_lead", "import_leads", "update_status"
-- module (text) -- ex: "auth", "activate_leads", "leads_premium", "sms", "televendas"
-- description (text) -- descricao legivel da acao
-- metadata (jsonb) -- detalhes extras (IP, user agent, dados alterados)
-- created_at (timestamptz)
+Endpoint: POST /send-whatsapp
+Body JSON:
+{
+  "token": "bearer_token",
+  "number": "558599999999",
+  "body": "mensagem",        // para texto
+  "mediaBase64": "base64...", // para media (opcional)
+  "mediaName": "proposta.pdf" // nome do arquivo (opcional)
+}
+
+Logica:
+1. Se mediaBase64 presente -> multipart/form-data com arquivo
+2. Se apenas body -> application/json com texto
+3. Registra em whatsapp_messages
+4. Retorna { success: true/false, messageId }
 ```
 
-Indexes: `user_id`, `action`, `module`, `created_at DESC`
+### Fluxo do Usuario
 
-#### Nova Interface: AdminLogs
-
-- Tabela com busca por usuario, modulo e periodo
-- Filtros por tipo de acao (login, criacao, atualizacao, exclusao, importacao)
-- Filtros por modulo (Auth, Leads Premium, Activate, Televendas, SMS, etc.)
-- Badge de cores por tipo de acao
-- Paginacao com scroll infinito
-- Botao de atualizar em tempo real
-- Export CSV dos logs filtrados
-
-#### Integracao com AdminLayout
-
-- Adicionar novo modulo `logs` no type `AdminModule`
-- Adicionar icone `ScrollText` na barra de navegacao
-- Renderizar `AdminLogs` no switch de modulos
-
-#### Instrumentacao de Logs
-
-Criar hook `useActivityLogger` que registra acoes automaticamente. Instrumentar nos seguintes pontos:
-
-1. **Login/Logout** - AuthContext
-2. **Import de leads** - CampaignsView, RemarketingSmsView
-3. **Criacao de campanha SMS** - CampaignsView
-4. **Alteracao de status de lead** - useLeadsPremium, ActivateLeads
-5. **Criacao de proposta** - TelevendasModule
-
-#### Arquivos a Criar/Modificar (Parte 2)
-
-| Arquivo | Tipo | Alteracao |
-|---|---|---|
-| Migracao SQL | Criar | Tabela `system_activity_logs` + indexes + RLS |
-| `src/hooks/useActivityLogger.ts` | Criar | Hook para registrar logs |
-| `src/components/admin/AdminLogs.tsx` | Criar | Componente do painel de logs |
-| `src/components/admin/AdminLayout.tsx` | Modificar | Adicionar modulo "Logs" |
-| `src/components/admin/index.tsx` | Modificar | Importar e renderizar AdminLogs |
-| `src/contexts/AuthContext.tsx` | Modificar | Instrumentar login/logout |
-| `src/modules/sms/views/CampaignsView.tsx` | Modificar | Log de importacao e criacao de campanha |
-
-### Resultado Esperado
-
-1. Gestores conseguem importar leads de activate_leads e leads_premium no SMS
-2. RLS corretamente limita gestores a dados da propria empresa
-3. Admin tem visao completa de todas as acoes do sistema com filtros e busca
-4. Logs registram automaticamente as principais acoes dos usuarios
+1. Usuario vai em "WhatsApp" no menu lateral
+2. Cadastra seu token de acesso da API Ticketz
+3. Ao navegar para Activate Leads, Leads Premium ou Meus Clientes, ve botao WhatsApp verde
+4. Clica no botao -> abre dialog com mensagem editavel -> envia
+5. No Gerador de Propostas, apos gerar PDF, pode enviar diretamente via WhatsApp
 
