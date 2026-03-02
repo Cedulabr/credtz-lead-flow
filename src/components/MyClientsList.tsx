@@ -1500,12 +1500,12 @@ export function MyClientsList() {
                                 </Button>
                                 <Button
                                   size="sm"
-                                  variant="ghost"
-                                  className="h-7 w-7 p-0 hover:bg-green-100 hover:text-green-700"
+                                  className="h-7 px-2 bg-green-600 hover:bg-green-700 text-white gap-1"
                                   title="API WhatsApp"
                                   onClick={() => openWhatsAppApi(client["Nome do cliente"] || "", client.telefone!)}
                                 >
                                   <Send className="h-3.5 w-3.5" />
+                                  <span className="text-[10px]">API WhatsApp</span>
                                 </Button>
                               </>
                             )}
@@ -1723,8 +1723,9 @@ export function MyClientsList() {
                           <Button variant="outline" size="sm" className="hover:bg-green-100 hover:text-green-700" onClick={() => openWhatsApp(client.telefone!)}>
                             <MessageCircle className="h-4 w-4" />
                           </Button>
-                          <Button variant="outline" size="sm" className="hover:bg-green-100 hover:text-green-700" title="API WhatsApp" onClick={() => openWhatsAppApi(client["Nome do cliente"] || "", client.telefone!)}>
+                          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white gap-1" title="API WhatsApp" onClick={() => openWhatsAppApi(client["Nome do cliente"] || "", client.telefone!)}>
                             <Send className="h-4 w-4" />
+                            <span className="text-xs">API WhatsApp</span>
                           </Button>
                         </>
                       )}
@@ -2028,8 +2029,9 @@ export function MyClientsList() {
                             <Button size="sm" variant="ghost" onClick={() => openWhatsApp(selectedClient.telefone!)} className="h-7 w-7 p-0">
                               <MessageCircle className="h-4 w-4 text-green-600" />
                             </Button>
-                            <Button size="sm" variant="ghost" title="API WhatsApp" onClick={() => openWhatsAppApi(selectedClient["Nome do cliente"] || "", selectedClient.telefone!)} className="h-7 w-7 p-0">
-                              <Send className="h-4 w-4 text-green-600" />
+                            <Button size="sm" className="h-7 px-2 bg-green-600 hover:bg-green-700 text-white gap-1" title="API WhatsApp" onClick={() => openWhatsAppApi(selectedClient["Nome do cliente"] || "", selectedClient.telefone!)}>
+                              <Send className="h-3.5 w-3.5" />
+                              <span className="text-[10px]">API WhatsApp</span>
                             </Button>
                           </>
                         )}

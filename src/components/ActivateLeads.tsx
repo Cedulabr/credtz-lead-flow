@@ -62,8 +62,17 @@ import {
   History,
   BarChart3,
   Edit,
-  Save
+  Save,
+  Send,
+  MoreVertical
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { format, addDays, parseISO, isToday, isBefore, subDays, subWeeks, subMonths, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -1856,20 +1865,16 @@ export const ActivateLeads = () => {
                     </TableHead>
                   )}
                   <TableHead className="font-bold text-base">👤 Nome</TableHead>
-                  <TableHead className="font-bold text-base">📞 Telefone</TableHead>
                   <TableHead className="font-bold text-base">🆔 CPF</TableHead>
-                  <TableHead className="font-bold text-base">📍 Origem</TableHead>
-                  <TableHead className="font-bold text-base">📊 Status</TableHead>
                   <TableHead className="font-bold text-base">📈 Simulação</TableHead>
-                  <TableHead className="font-bold text-base">🎯 Atribuído</TableHead>
-                  <TableHead className="font-bold text-base">📅 Próxima Ação</TableHead>
+                  <TableHead className="font-bold text-base">💬 WhatsApp</TableHead>
                   <TableHead className="font-bold text-base text-center">⚡ Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedLeads.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canAssignLead ? 10 : 9} className="h-40">
+                    <TableCell colSpan={canAssignLead ? 6 : 5} className="h-40">
                       <motion.div 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -1913,17 +1918,27 @@ export const ActivateLeads = () => {
                             />
                           </TableCell>
                         )}
+                        {/* Nome + Status badge */}
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-primary/20 to-primary/10 flex items-center justify-center">
                               <User className="h-5 w-5 text-primary" />
                             </div>
-                            <span className="font-semibold text-base">{lead.nome}</span>
+                            <div>
+                              <span className="font-semibold text-base block">{lead.nome}</span>
+                              <div className={cn(
+                                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border mt-1",
+                                statusConfig.bgColor,
+                                statusConfig.textColor,
+                                statusConfig.borderColor
+                              )}>
+                                <span>{statusConfig.emoji}</span>
+                                {statusConfig.label}
+                              </div>
+                            </div>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <span className="font-mono text-base">{formatPhone(lead.telefone)}</span>
-                        </TableCell>
+                        {/* CPF */}
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {lead.cpf ? (
@@ -1942,23 +1957,7 @@ export const ActivateLeads = () => {
                             </Button>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="font-medium capitalize text-sm">
-                            {lead.origem}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className={cn(
-                            "inline-flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold border transition-all duration-300",
-                            statusConfig.bgColor,
-                            statusConfig.textColor,
-                            statusConfig.borderColor
-                          )}>
-                            <span>{statusConfig.emoji}</span>
-                            {statusConfig.icon}
-                            {statusConfig.label}
-                          </div>
-                        </TableCell>
+                        {/* Simulação */}
                         <TableCell>
                           <ActivateSimulationRequestButton
                             leadId={lead.id}
@@ -1967,117 +1966,73 @@ export const ActivateLeads = () => {
                             onSuccess={fetchLeads}
                           />
                         </TableCell>
+                        {/* API WhatsApp */}
                         <TableCell>
-                          {assignedUser ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center">
-                                <User className="h-4 w-4 text-primary" />
-                              </div>
-                              <span className="text-sm font-medium">{assignedUser.name}</span>
-                            </div>
-                          ) : (
-                            <Badge variant="outline" className="text-muted-foreground">
-                              🆓 Disponível
-                            </Badge>
-                          )}
+                          <Button
+                            size="sm"
+                            className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white gap-1"
+                            onClick={() => {
+                              setWhatsAppLead(lead);
+                              setShowWhatsAppDialog(true);
+                            }}
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                            <span className="text-xs">API WhatsApp</span>
+                          </Button>
                         </TableCell>
+                        {/* Ações Dropdown */}
                         <TableCell>
-                          <span className="text-sm">
-                            {lead.proxima_acao || (lead.data_proxima_operacao 
-                              ? `📅 Operação em ${format(parseISO(lead.data_proxima_operacao), "dd/MM/yyyy", { locale: ptBR })}`
-                              : <span className="text-muted-foreground">-</span>)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => window.open(`tel:${lead.telefone}`, '_self')}
-                              className="h-9 w-9 p-0 hover:bg-blue-100 hover:text-blue-700 transition-all duration-300"
-                              title="Ligar"
-                            >
-                              <Phone className="h-4 w-4" />
-                            </Button>
-                            
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                setWhatsAppLead(lead);
-                                setShowWhatsAppDialog(true);
-                              }}
-                              className="h-9 w-9 p-0 hover:bg-green-100 hover:text-green-700 transition-all duration-300"
-                              title="API WhatsApp"
-                            >
-                              <MessageCircle className="h-4 w-4" />
-                            </Button>
-
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => openHistoryModal(lead)}
-                              className="h-9 w-9 p-0 hover:bg-amber-100 hover:text-amber-700 transition-all duration-300"
-                              title="📜 Ver histórico do lead"
-                            >
-                              <History className="h-4 w-4" />
-                            </Button>
-
-                            {canEditLead(lead) && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleStatusChange(lead, 'segunda_tentativa')}
-                                  className="h-9 w-9 p-0 hover:bg-cyan-100 hover:text-cyan-700 transition-all duration-300"
-                                  title="🔁 Segunda tentativa de contato"
-                                >
-                                  <RotateCcw className="h-4 w-4" />
+                          <div className="flex items-center justify-center">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-9 px-3 gap-1">
+                                  <MoreVertical className="h-4 w-4" />
+                                  <span className="text-xs">Ações</span>
                                 </Button>
-                                
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleStatusChange(lead, 'contato_futuro')}
-                                  className="h-9 w-9 p-0 hover:bg-purple-100 hover:text-purple-700 transition-all duration-300"
-                                  title="📅 Agendar contato futuro"
-                                >
-                                  <CalendarClock className="h-4 w-4" />
-                                </Button>
-                              </>
-                            )}
-
-                            {canAssignLead && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => openAssignModal(lead)}
-                                className="h-9 w-9 p-0 hover:bg-indigo-100 hover:text-indigo-700 transition-all duration-300"
-                                title={lead.assigned_to ? '👤 Reatribuir lead' : '👤 Atribuir lead'}
-                              >
-                                <UserPlus className="h-4 w-4" />
-                              </Button>
-                            )}
-
-                            <Select 
-                              value={lead.status}
-                              onValueChange={(value) => handleStatusChange(lead, value)}
-                              disabled={!canEditLead(lead)}
-                            >
-                              <SelectTrigger className="w-40 h-9 text-sm transition-all duration-300">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-52">
+                                <DropdownMenuItem onClick={() => window.open(`tel:${lead.telefone}`, '_self')}>
+                                  <Phone className="h-4 w-4 mr-2" /> Ligar ({formatPhone(lead.telefone)})
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => {
+                                  const phone = lead.telefone.replace(/\D/g, '');
+                                  window.open(`https://wa.me/55${phone}`, '_blank');
+                                }}>
+                                  <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp Web
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => openHistoryModal(lead)}>
+                                  <History className="h-4 w-4 mr-2" /> Ver Histórico
+                                </DropdownMenuItem>
+                                {canEditLead(lead) && (
+                                  <>
+                                    <DropdownMenuItem onClick={() => handleStatusChange(lead, 'segunda_tentativa')}>
+                                      <RotateCcw className="h-4 w-4 mr-2" /> Segunda Tentativa
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleStatusChange(lead, 'contato_futuro')}>
+                                      <CalendarClock className="h-4 w-4 mr-2" /> Contato Futuro
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                                {canAssignLead && (
+                                  <DropdownMenuItem onClick={() => openAssignModal(lead)}>
+                                    <UserPlus className="h-4 w-4 mr-2" /> {lead.assigned_to ? 'Reatribuir' : 'Atribuir'}
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
+                                {/* Status change submenu inline */}
                                 {Object.entries(STATUS_CONFIG).map(([key, config]) => (
-                                  <SelectItem key={key} value={key}>
-                                    <span className="flex items-center gap-2">
-                                      <span>{config.emoji}</span>
-                                      {config.label}
-                                    </span>
-                                  </SelectItem>
+                                  <DropdownMenuItem
+                                    key={key}
+                                    disabled={!canEditLead(lead) || lead.status === key}
+                                    onClick={() => handleStatusChange(lead, key)}
+                                    className={lead.status === key ? 'font-bold' : ''}
+                                  >
+                                    <span className="mr-2">{config.emoji}</span> {config.label}
+                                  </DropdownMenuItem>
                                 ))}
-                              </SelectContent>
-                            </Select>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </TableCell>
                       </motion.tr>

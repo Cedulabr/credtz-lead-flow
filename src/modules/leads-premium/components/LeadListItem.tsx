@@ -132,12 +132,11 @@ export function LeadListItem({ lead, onClick, onSimulation, onTyping, onStatusCh
           {/* API WhatsApp */}
           <Button
             size="sm"
-            variant="ghost"
-            className="h-8 px-2 text-green-600 hover:text-green-700 hover:bg-green-50 gap-1"
+            className="h-8 px-2.5 bg-green-600 hover:bg-green-700 text-white gap-1"
             onClick={(e) => { e.stopPropagation(); setShowWhatsAppDialog(true); }}
           >
             <Send className="h-3.5 w-3.5" />
-            <span className="text-xs hidden sm:inline">API WhatsApp</span>
+            <span className="text-xs">API WhatsApp</span>
           </Button>
 
           {/* Ligar */}

@@ -103,7 +103,8 @@ Deno.serve(async (req) => {
       normalizedNumber = "55" + normalizedNumber;
     }
 
-    console.log(`Sending to: ${normalizedNumber}, type: ${mediaBase64 ? 'media' : 'text'}`);
+    console.log(`Sending to: ${normalizedNumber}, type: ${mediaBase64 ? 'media' : 'text'}, message length: ${message?.length || 0}`);
+    console.log(`Request payload: number=${normalizedNumber}, hasMedia=${!!mediaBase64}, mediaName=${mediaName || 'none'}`);
 
     let ticketzResponse: Response;
     let messageType = "text";
@@ -199,11 +200,11 @@ Deno.serve(async (req) => {
     if (!success) {
       console.error("Ticketz API error:", ticketzResponse.status, responseText);
       const errorDetail = responseData?.error === "ERR_INTERNAL_ERROR"
-        ? "Erro interno na API Easyn. Verifique se a instância está conectada na plataforma e se o número do destinatário é válido."
+        ? `Erro interno na API Easyn. Verifique: 1) Se a instância WhatsApp está conectada/escaneada no painel Easyn. 2) Se o número ${normalizedNumber} é válido. 3) Se o token está ativo.`
         : responseData?.error || "Falha ao enviar mensagem";
       return new Response(
-        JSON.stringify({ success: false, error: errorDetail, details: responseData }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: errorDetail, details: responseData, sentTo: normalizedNumber }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
