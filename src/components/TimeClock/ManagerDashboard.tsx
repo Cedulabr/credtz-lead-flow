@@ -13,6 +13,7 @@ import {
   FileText, Bell
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useGestorCompany } from '@/hooks/useGestorCompany';
 import { format, parseISO, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { JustificationManager } from './JustificationManager';
@@ -88,18 +89,25 @@ export function ManagerDashboard() {
   // Company filter
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
+  const { companyId: gestorCompanyId, companyName: gestorCompanyName, isGestor, isAdmin, companyUserIds, loading: gestorLoading } = useGestorCompany();
 
-  // Load companies once
+  // Load companies once - gestor sees only their company
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase.from('companies').select('id, name').order('name');
-      if (data) setCompanies(data);
-    })();
-  }, []);
+    if (gestorLoading) return;
+    if (isGestor && gestorCompanyId) {
+      setCompanies([{ id: gestorCompanyId, name: gestorCompanyName || 'Minha Empresa' }]);
+      setSelectedCompanyId(gestorCompanyId);
+    } else if (isAdmin) {
+      (async () => {
+        const { data } = await supabase.from('companies').select('id, name').order('name');
+        if (data) setCompanies(data);
+      })();
+    }
+  }, [gestorLoading, gestorCompanyId, isGestor, isAdmin]);
 
   useEffect(() => {
-    loadData();
-  }, [selectedDate, selectedCompanyId]);
+    if (!gestorLoading) loadData();
+  }, [selectedDate, selectedCompanyId, gestorLoading]);
 
   const loadData = async () => {
     setLoading(true);

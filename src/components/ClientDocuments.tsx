@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGestorCompany } from "@/hooks/useGestorCompany";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,6 +89,7 @@ const ITEMS_PER_PAGE_OPTIONS = [10, 20, 30];
 
 export function ClientDocuments() {
   const { user, isAdmin } = useAuth();
+  const { companyId: gestorCompanyId, isGestor, companyUserIds, loading: gestorLoading } = useGestorCompany();
   const { toast } = useToast();
   const [documents, setDocuments] = useState<ClientDocument[]>([]);
   const [groupedDocuments, setGroupedDocuments] = useState<DocumentGroup[]>([]);
@@ -121,8 +123,8 @@ export function ClientDocuments() {
   const [editCpfError, setEditCpfError] = useState("");
 
   useEffect(() => {
-    fetchDocuments();
-  }, []);
+    if (!gestorLoading) fetchDocuments();
+  }, [gestorLoading, gestorCompanyId]);
 
   useEffect(() => {
     groupDocumentsByCpf();
@@ -134,11 +136,18 @@ export function ClientDocuments() {
 
   const fetchDocuments = async () => {
     try {
-      // Fetch documents
-      const { data: docsData, error: docsError } = await supabase
+      // Fetch documents - gestor sees only company documents
+      let query = supabase
         .from("client_documents")
         .select("*")
         .order("created_at", { ascending: false });
+
+      if (isGestor && gestorCompanyId) {
+        // Gestor: filter by company_id or uploaded by company users
+        query = query.or(`company_id.eq.${gestorCompanyId}${companyUserIds.length > 0 ? `,uploaded_by.in.(${companyUserIds.join(',')})` : ''}`);
+      }
+
+      const { data: docsData, error: docsError } = await query;
 
       if (docsError) throw docsError;
 
