@@ -1,50 +1,51 @@
 
 
-## Plano: Corrigir build error + acesso de gestores aos modulos da empresa
+## Plano: Corrigir filtros de data, pipeline operacional e alertas no Televendas
 
-### Problema 1: Build error em LeadDetailDrawer.tsx
+### 1. Filtro por data de criacao (TelevendasModule.tsx, linhas 160-164)
 
-O arquivo tem codigo duplicado flutuando fora de qualquer funcao (linhas 242-285). Apos `handleSaveCpf` terminar na linha 240, ha um bloco de codigo solto que era o corpo de `handleSimulationRequest` duplicado. Isso causa:
-- `TS1128: Declaration or statement expected` na linha 982
-- `await can only be used inside an async function` na linha 255
+O modo "criacao" usa um OR que mistura `data_venda` e `data_pagamento`, fazendo contratos pagos em fevereiro aparecerem na visao de criacao de fevereiro.
 
-**Correcao:** Remover o bloco duplicado (linhas 242-285) que ja existe como funcao propria mais adiante no arquivo.
+**Correcao:** Remover o OR, filtrar apenas por `data_venda`:
+```typescript
+// Linha 160-164 — ANTES:
+query = query.or(`and(data_venda.gte...,data_venda.lte...),and(status.eq.proposta_paga,data_pagamento.gte...,data_pagamento.lte...)`);
 
----
-
-### Problema 2: Gestores nao veem dados da empresa nos modulos
-
-Varios modulos carregam dados sem filtrar por empresa para gestores:
-
-**a) TimeClock - AdminControl.tsx (linha 48-53):**
-`loadUsers()` busca TODOS os profiles do sistema. Gestor deveria ver apenas usuarios da sua empresa.
-
-**Correcao:** Detectar se e gestor, buscar `company_id` do gestor, filtrar usuarios por `user_companies.company_id` e filtrar registros de ponto pela mesma empresa.
-
-**b) TimeClock - ManagerDashboard.tsx (linha 93-97):**
-Carrega TODAS as empresas e permite filtrar. Gestor deveria ver apenas sua propria empresa e nao ter seletor de empresa.
-
-**Correcao:** Detectar se e gestor, carregar apenas a empresa do gestor, forcar `selectedCompanyId` para essa empresa.
-
-**c) ClientDocuments.tsx (linha 135-141):**
-Busca todos os documentos sem filtro de empresa. A RLS ja filtra por `company_id`, porem muitos documentos podem ter `company_id = NULL` (inseridos antes da coluna existir), fazendo com que gestores nao vejam nada.
-
-**Correcao:** Para gestores, buscar apenas documentos onde `company_id` pertence a sua empresa OU `uploaded_by` e um usuario da empresa.
-
-**d) Collaborative/index.tsx:**
-Ja funciona para todos autenticados, sem problema de acesso.
-
----
-
-### Problema 3: RLS do `client_documents` - `is_company_gestor` com argumentos invertidos
-
-Na politica de DELETE (linha 196 da migracao):
-```sql
-public.is_company_gestor(company_id, auth.uid())
+// DEPOIS:
+query = query.gte("data_venda", startStr).lte("data_venda", endStr);
 ```
-Mas a funcao espera `(_user_id uuid, _company_id uuid)` - os argumentos estao invertidos. Isso impede gestores de deletar documentos.
 
-**Correcao via migracao SQL:** Recriar a politica com argumentos na ordem correta.
+---
+
+### 2. Pipeline Operacional filtra errado (TelevendasModule.tsx, linha 218)
+
+O filtro compara `tv.status_bancario` diretamente, mas esse campo geralmente e null. O pipeline conta usando `mapToPipelineStatus()` — o filtro precisa usar a mesma funcao.
+
+**Correcao:**
+- Exportar `mapToPipelineStatus` de `BankingPipeline.tsx` (mover de metodo local para funcao exportada no nivel do modulo)
+- Importar em `TelevendasModule.tsx`
+- Substituir linha 218:
+
+```typescript
+// ANTES:
+const matchesBankStatus = !bankStatusFilter || (tv.status_bancario || "aguardando_digitacao") === bankStatusFilter;
+
+// DEPOIS:
+const matchesBankStatus = !bankStatusFilter || mapToPipelineStatus(tv) === bankStatusFilter;
+```
+
+---
+
+### 3. Banner pulsante de alertas (novo componente)
+
+Criar `src/modules/televendas/components/StalledAlertBanner.tsx`:
+- Banner vermelho/laranja proeminente no topo do modulo (acima de DashboardCards)
+- Animacao pulsante forte com `animate-pulse` + glow vermelho para criticos
+- Exibe contagem de propostas criticas e em alerta
+- Botao "Ver propostas" que ativa o filtro de prioridade correspondente
+- So aparece quando existem propostas criticas ou em alerta
+
+Integrar no `TelevendasModule.tsx` acima do `DashboardCards`.
 
 ---
 
@@ -52,17 +53,7 @@ Mas a funcao espera `(_user_id uuid, _company_id uuid)` - os argumentos estao in
 
 | Arquivo | Mudanca |
 |---|---|
-| `src/modules/leads-premium/components/LeadDetailDrawer.tsx` | Remover bloco duplicado (linhas 242-285) |
-| `src/components/TimeClock/AdminControl.tsx` | Filtrar usuarios e registros por empresa do gestor |
-| `src/components/TimeClock/ManagerDashboard.tsx` | Gestor ve apenas sua empresa, sem seletor global |
-| `src/components/ClientDocuments.tsx` | Filtrar documentos por empresa do gestor |
-| Migracao SQL | Corrigir `is_company_gestor` args na politica DELETE de `client_documents` |
-
-### Sequencia
-
-1. Corrigir build error em LeadDetailDrawer (remover duplicata)
-2. Migracao SQL para corrigir RLS de client_documents
-3. Adicionar logica de deteccao gestor + filtro por empresa em AdminControl
-4. Adicionar filtro por empresa do gestor em ManagerDashboard
-5. Adicionar filtro por empresa do gestor em ClientDocuments
+| `src/modules/televendas/TelevendasModule.tsx` | Corrigir query de datas (linha 160-164), corrigir filtro pipeline (linha 218), importar mapToPipelineStatus, adicionar StalledAlertBanner |
+| `src/modules/televendas/components/BankingPipeline.tsx` | Exportar `mapToPipelineStatus` como funcao standalone |
+| `src/modules/televendas/components/StalledAlertBanner.tsx` | Novo: banner pulsante com contagem de criticos/alertas |
 
