@@ -65,6 +65,15 @@ export function LeadDetailDrawer({
   const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // CPF editing state
+  const [isEditingCpf, setIsEditingCpf] = useState(false);
+  const [cpfValue, setCpfValue] = useState("");
+  const [savingCpf, setSavingCpf] = useState(false);
+
+  // Contato Futuro state
+  const [showFutureContactModal, setShowFutureContactModal] = useState(false);
+  const [futureContactDate, setFutureContactDate] = useState("");
+
   // Modal states
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -142,6 +151,12 @@ export function LeadDetailDrawer({
       return;
     }
 
+    if (newStatus === 'contato_futuro') {
+      setFutureContactDate(format(addDays(new Date(), 7), 'yyyy-MM-dd'));
+      setShowFutureContactModal(true);
+      return;
+    }
+
     setIsProcessing(true);
     await onStatusChange(lead.id, newStatus);
     setIsProcessing(false);
@@ -193,7 +208,38 @@ export function LeadDetailDrawer({
     setIsProcessing(false);
   };
 
-  const handleSimulationRequest = async () => {
+  const handleFutureContactSubmit = async () => {
+    if (!futureContactDate) {
+      toast({ title: "Erro", description: "Selecione a data do contato futuro", variant: "destructive" });
+      return;
+    }
+    setIsProcessing(true);
+    await onStatusChange(lead.id, 'contato_futuro', { future_contact_date: futureContactDate });
+    setShowFutureContactModal(false);
+    setIsProcessing(false);
+  };
+
+  const handleSaveCpf = async () => {
+    if (!lead) return;
+    setSavingCpf(true);
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ cpf: cpfValue.replace(/\D/g, '') } as any)
+        .eq('id', lead.id);
+      if (error) throw error;
+      toast({ title: "CPF salvo com sucesso!" });
+      setIsEditingCpf(false);
+      // Trigger refresh via status change with same status
+      await onStatusChange(lead.id, lead.status, { cpf: cpfValue.replace(/\D/g, '') });
+    } catch (e: any) {
+      toast({ title: "Erro ao salvar CPF", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingCpf(false);
+    }
+  };
+
+
     if (!simulationForm.banco) {
       toast({
         title: "Erro",
@@ -371,8 +417,37 @@ export function LeadDetailDrawer({
                   </div>
                 )}
                 <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">CPF</p>
-                  <p className="font-medium">{lead.cpf || "Não informado"}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">CPF</p>
+                    {canEdit && !isEditingCpf && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 w-5 p-0"
+                        onClick={() => { setCpfValue(lead.cpf || ""); setIsEditingCpf(true); }}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                  {isEditingCpf ? (
+                    <div className="flex gap-1 mt-1">
+                      <Input
+                        value={cpfValue}
+                        onChange={(e) => setCpfValue(e.target.value)}
+                        placeholder="000.000.000-00"
+                        className="h-7 text-sm"
+                      />
+                      <Button size="sm" className="h-7 px-2" onClick={handleSaveCpf} disabled={savingCpf}>
+                        {savingCpf ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setIsEditingCpf(false)}>
+                        <XCircle className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="font-medium">{lead.cpf || "Não informado"}</p>
+                  )}
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-xs text-muted-foreground">Convênio</p>
@@ -470,6 +545,15 @@ export function LeadDetailDrawer({
                     >
                       <Clock className="h-4 w-4 mr-2" />
                       Aguardando Retorno
+                    </Button>
+                    <Button 
+                      className="w-full justify-start"
+                      variant="outline"
+                      onClick={() => handleQuickStatusChange("contato_futuro")}
+                      disabled={isProcessing}
+                    >
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Contato Futuro
                     </Button>
                   </>
                 )}
@@ -830,6 +914,32 @@ export function LeadDetailDrawer({
             >
               {isProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Solicitar Digitação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Future Contact Modal */}
+      <Dialog open={showFutureContactModal} onOpenChange={setShowFutureContactModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Contato Futuro</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Data para retomar contato</Label>
+              <Input
+                type="date"
+                value={futureContactDate}
+                onChange={(e) => setFutureContactDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFutureContactModal(false)}>Cancelar</Button>
+            <Button onClick={handleFutureContactSubmit} disabled={isProcessing || !futureContactDate}>
+              {isProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Confirmar
             </Button>
           </DialogFooter>
         </DialogContent>
