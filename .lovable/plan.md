@@ -1,59 +1,71 @@
 
 
-## Plano: Corrigir carregamento de usuarios ao selecionar empresa
+## Plano: Corrigir 4 problemas em WhatsApp, Leads Premium e Televendas
 
-### Problema identificado
+### Problema 1: Instancias WhatsApp mostram todas para colaboradores
 
-O bug esta na funcao `fetchCompanyUsers` (linha 115-128 do `WhatsAppConfig.tsx`). Ela usa um join Supabase assim:
+**Causa:** Em `src/hooks/useWhatsApp.ts` (linha 40-48), o hook busca TODAS as instancias da empresa do usuario (`company_id`), sem filtrar por `user_id`. Colaboradores deveriam ver apenas instancias designadas a eles pelo gestor.
 
-```
-.from("user_companies")
-.select("user_id, profiles:user_id(name, email)")
-```
-
-Esse join **nao funciona** porque nao existe uma Foreign Key direta entre `user_companies.user_id` e `profiles.id`. Ambas referenciam `auth.users(id)`, mas nao ha relacao direta entre si. O PostgREST silenciosamente retorna dados sem o join, resultando em `name` e `email` vazios.
-
-### Correcao
-
-Alterar `fetchCompanyUsers` para fazer duas consultas:
-
-1. Buscar `user_id` de `user_companies` filtrado por `company_id`
-2. Buscar `name` e `email` de `profiles` filtrado pelos `user_ids` encontrados
+**Correcao em `src/hooks/useWhatsApp.ts`:**
+- Para colaboradores: buscar apenas instancias onde `user_id = user.id` (remover a busca por `company_id` para colaboradores)
+- A logica atual de "buscar instancias da empresa" deve ser mantida apenas para gestores e admins
+- Verificar o role do usuario: se nao for gestor/admin, buscar somente `user_id = user.id`
 
 ```text
-// Passo 1: buscar user_ids da empresa
-const { data: ucData } = await supabase
-  .from("user_companies")
-  .select("user_id")
-  .eq("company_id", companyId)
-  .eq("is_active", true);
+// Colaborador: apenas suas instancias
+query.eq("user_id", user.id)
 
-// Passo 2: buscar profiles desses users
-const userIds = ucData.map(d => d.user_id);
-const { data: profilesData } = await supabase
-  .from("profiles")
-  .select("id, name, email")
-  .in("id", userIds);
+// Gestor/Admin: instancias da empresa + proprias
+query.eq("company_id", companyId) OU query.eq("user_id", user.id)
 ```
 
-### Tambem corrigir: join na fetchInstances
+Precisara buscar o `company_role` do usuario via `user_companies` e o `profile.role` para determinar se e gestor/admin.
 
-O mesmo problema existe em `fetchInstances` (linha 140):
+---
+
+### Problema 2: Leads Premium - Colaborador nao consegue mudar para "Contato Futuro" e nao pode editar CPF
+
+**Causa 1 - Contato Futuro:** Em `LeadDetailDrawer.tsx` (linhas 445-474), os botoes de acao comercial nao incluem "Contato Futuro" como opcao. Existe "Agendar Retorno" (status `agendamento`) mas nao "Contato Futuro" (`contato_futuro`).
+
+**Correcao:** Adicionar botao "Contato Futuro" na secao de acoes, ao lado de "Agendar Retorno".
+
+**Causa 2 - Editar CPF:** O campo CPF no `LeadDetailDrawer.tsx` (linha 373-376) e exibido como texto puro, sem opcao de edicao. Colaboradores precisam poder editar o CPF dos leads.
+
+**Correcao:** Tornar o campo CPF editavel com um botao de edicao inline. Ao clicar, transforma em Input, salva diretamente no banco.
+
+---
+
+### Problema 3: Televendas - Gestor nao consegue aprovar/rejeitar propostas
+
+**Causa:** O erro no console revela tudo: `column "updated_at" of relation "sms_proposal_notifications" does not exist`. 
+
+A trigger SQL `sms_sync_televendas_status()` e disparada toda vez que o status de uma proposta muda. Ela tenta executar:
+```sql
+UPDATE public.sms_proposal_notifications
+SET sent = true, updated_at = now()
+WHERE televendas_id = NEW.id AND sent = false;
 ```
-.select("*, profiles:user_id(name, email), companies:company_id(name)")
+Mas a tabela `sms_proposal_notifications` NAO possui coluna `updated_at`. Isso causa erro 42703, que faz o UPDATE inteiro falhar (incluindo a mudanca de status).
+
+**Correcao via migracao SQL:** Adicionar a coluna `updated_at` na tabela `sms_proposal_notifications`:
+```sql
+ALTER TABLE public.sms_proposal_notifications 
+ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 ```
 
-O join `profiles:user_id` tambem falha pela mesma razao. Corrigir para buscar profiles separadamente apos obter as instancias.
+---
 
-### Arquivo a modificar
+### Arquivos a modificar
 
 | Arquivo | Mudanca |
 |---|---|
-| `src/components/WhatsAppConfig.tsx` | Corrigir `fetchCompanyUsers` e `fetchInstances` para usar duas queries em vez de join quebrado |
+| Migracao SQL | Adicionar coluna `updated_at` em `sms_proposal_notifications` |
+| `src/hooks/useWhatsApp.ts` | Filtrar instancias por role: colaborador ve so as suas |
+| `src/modules/leads-premium/components/LeadDetailDrawer.tsx` | Adicionar botao "Contato Futuro" + campo CPF editavel |
 
 ### Sequencia
 
-1. Corrigir `fetchCompanyUsers` com consulta em duas etapas
-2. Corrigir `fetchInstances` para popular `user_name`/`user_email` corretamente
-3. Garantir que o Select de usuarios apareca e funcione tanto para Gestor quanto Admin
+1. Migracao SQL (desbloqueia aprovacoes de televendas)
+2. Corrigir useWhatsApp.ts (filtro de instancias por role)
+3. Corrigir LeadDetailDrawer.tsx (contato futuro + editar CPF)
 
