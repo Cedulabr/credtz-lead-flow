@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Users, Download, Clock, MapPin, Image, Edit, Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTimeClock } from '@/hooks/useTimeClock';
+import { useGestorCompany } from '@/hooks/useGestorCompany';
 import { clockTypeLabels, statusLabels, statusColors, type TimeClock, type TimeClockType, type TimeClockStatus } from './types';
 import { format, startOfMonth, endOfMonth, parseISO, differenceInMinutes, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -36,21 +37,33 @@ export function AdminControl() {
   const [lateUsers, setLateUsers] = useState<{ user: UserProfile; count: number }[]>([]);
 
   const { getAllUsersHistory, adjustClock } = useTimeClock(undefined);
+  const { companyId, isGestor, isAdmin, companyUserIds, loading: gestorLoading } = useGestorCompany();
 
   useEffect(() => {
-    loadUsers();
-  }, []);
+    if (!gestorLoading) loadUsers();
+  }, [gestorLoading, companyId]);
 
   useEffect(() => {
-    loadRecords();
-  }, [startDate, endDate, selectedUser]);
+    if (!gestorLoading) loadRecords();
+  }, [startDate, endDate, selectedUser, gestorLoading, companyId]);
 
   const loadUsers = async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, name, email')
-      .order('name');
-    if (data) setUsers(data);
+    if (isGestor && companyUserIds.length > 0) {
+      // Gestor: only load users from their company
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .in('id', companyUserIds)
+        .order('name');
+      if (data) setUsers(data);
+    } else if (isAdmin) {
+      // Admin: load all users
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .order('name');
+      if (data) setUsers(data);
+    }
   };
 
   const loadRecords = async () => {
@@ -65,6 +78,9 @@ export function AdminControl() {
 
     if (selectedUser !== 'all') {
       query = query.eq('user_id', selectedUser);
+    } else if (isGestor && companyUserIds.length > 0) {
+      // Gestor without specific user filter: only company users
+      query = query.in('user_id', companyUserIds);
     }
 
     const { data } = await query;

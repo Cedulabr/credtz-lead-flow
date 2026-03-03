@@ -239,7 +239,7 @@ export function LeadDetailDrawer({
     }
   };
 
-
+  const handleSimulationRequest = async () => {
     if (!simulationForm.banco) {
       toast({
         title: "Erro",
@@ -251,7 +251,6 @@ export function LeadDetailDrawer({
 
     setIsProcessing(true);
     try {
-      // Create simulation request
       const { error } = await supabase
         .from('activate_leads_simulations')
         .insert({
@@ -283,6 +282,7 @@ export function LeadDetailDrawer({
       setIsProcessing(false);
     }
   };
+
 
   const handleTypingRequest = async () => {
     if (!typingForm.banco) {
