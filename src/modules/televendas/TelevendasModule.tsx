@@ -21,8 +21,9 @@ import {
 } from "./types";
 import { getDateRange, normalizeStatus } from "./utils";
 import { DashboardCards } from "./components/DashboardCards";
-import { BankingPipeline } from "./components/BankingPipeline";
+import { BankingPipeline, mapToPipelineStatus } from "./components/BankingPipeline";
 import { ProductionBar } from "./components/ProductionBar";
+import { StalledAlertBanner } from "./components/StalledAlertBanner";
 import { SmartSearch } from "./components/SmartSearch";
 import { StatusChangeModal } from "./components/StatusChangeModal";
 import { FiltersDrawer } from "./components/FiltersDrawer";
@@ -158,10 +159,8 @@ export const TelevendasModule = () => {
               .gte("data_pagamento", startStr)
               .lte("data_pagamento", endStr);
           } else {
-            // Default mode: proposals by data_venda OR paid proposals by data_pagamento
-            query = query.or(
-              `and(data_venda.gte.${startStr},data_venda.lte.${endStr}),and(status.eq.proposta_paga,data_pagamento.gte.${startStr},data_pagamento.lte.${endStr})`
-            );
+            // Creation mode: filter strictly by data_venda
+            query = query.gte("data_venda", startStr).lte("data_venda", endStr);
           }
         }
       }
@@ -215,7 +214,7 @@ export const TelevendasModule = () => {
       const matchesStatus = filters.status === "all" || tv.status === filters.status;
       const matchesProduct = filters.product === "all" || tv.tipo_operacao === filters.product;
       const matchesBank = filters.bank === "all" || tv.banco === filters.bank;
-      const matchesBankStatus = !bankStatusFilter || (tv.status_bancario || "aguardando_digitacao") === bankStatusFilter;
+      const matchesBankStatus = !bankStatusFilter || mapToPipelineStatus(tv) === bankStatusFilter;
       
       // Priority filter
       let matchesPriority = true;
@@ -688,6 +687,12 @@ export const TelevendasModule = () => {
         televendas={televendas}
         onSelectResult={(tv) => handleView(tv)}
         placeholder="Buscar por nome, CPF, telefone ou ID..."
+      />
+
+      {/* ALERTA: Propostas paradas */}
+      <StalledAlertBanner
+        televendas={televendas}
+        onFilterByPriority={handleFilterByPriority}
       />
 
       {/* BLOCO 1 — Visão Executiva */}
