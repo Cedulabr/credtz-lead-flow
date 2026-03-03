@@ -103,36 +103,34 @@ interface BankingPipelineProps {
   selectedPriority?: string;
 }
 
+// Exported mapping function for reuse in filters
+export const mapToPipelineStatus = (tv: Televenda): string => {
+  switch (tv.status) {
+    case "solicitar_digitacao":
+      return "aguardando_digitacao";
+    case "bloqueado":
+      return "bloqueado";
+    case "em_andamento":
+      return "em_andamento";
+    case "proposta_pendente":
+    case "devolvido":
+      return "pendente";
+    case "proposta_paga":
+    case "pago_aguardando":
+      return "pago_cliente";
+    case "proposta_cancelada":
+    case "cancelado_aguardando":
+    case "exclusao_aprovada":
+      return "cancelado_banco";
+    default:
+      if (tv.status_bancario && BANKING_STATUS_CONFIG[tv.status_bancario]) {
+        return tv.status_bancario;
+      }
+      return "em_andamento";
+  }
+};
+
 export const BankingPipeline = ({ televendas, onFilterByBankStatus, selectedBankStatus, onFilterByPriority, selectedPriority }: BankingPipelineProps) => {
-  // Map commercial status to banking pipeline status
-  // Commercial status takes priority to avoid misclassification
-  const mapToPipelineStatus = (tv: Televenda): string => {
-    // Commercial status always takes priority
-    switch (tv.status) {
-      case "solicitar_digitacao":
-        return "aguardando_digitacao";
-      case "bloqueado":
-        return "bloqueado";
-      case "em_andamento":
-        return "em_andamento";
-      case "proposta_pendente":
-      case "devolvido":
-        return "pendente";
-      case "proposta_paga":
-      case "pago_aguardando":
-        return "pago_cliente";
-      case "proposta_cancelada":
-      case "cancelado_aguardando":
-      case "exclusao_aprovada":
-        return "cancelado_banco";
-      default:
-        // Fallback to status_bancario if set, otherwise em_andamento
-        if (tv.status_bancario && BANKING_STATUS_CONFIG[tv.status_bancario]) {
-          return tv.status_bancario;
-        }
-        return "em_andamento";
-    }
-  };
 
   const stats = useMemo(() => {
     const byStatus = televendas.reduce((acc, tv) => {
