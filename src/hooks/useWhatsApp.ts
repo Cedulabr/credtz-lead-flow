@@ -11,7 +11,7 @@ export interface WhatsAppInstance {
 }
 
 export function useWhatsApp() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [instances, setInstances] = useState<WhatsAppInstance[]>([]);
   const [loadingInstances, setLoadingInstances] = useState(true);
   const [sending, setSending] = useState(false);
@@ -20,6 +20,26 @@ export function useWhatsApp() {
     if (!user?.id) { setLoadingInstances(false); return; }
     setLoadingInstances(true);
     try {
+      // Determine user role
+      const isAdmin = profile?.role === 'admin';
+      let isGestor = false;
+      let myCompanyId: string | null = null;
+
+      if (!isAdmin) {
+        const { data: ucData } = await supabase
+          .from("user_companies")
+          .select("company_id, company_role")
+          .eq("user_id", user.id)
+          .eq("is_active", true)
+          .limit(1)
+          .maybeSingle();
+
+        if (ucData) {
+          myCompanyId = ucData.company_id;
+          isGestor = ucData.company_role === 'gestor';
+        }
+      }
+
       // Fetch user's own instances
       const { data: userInstances } = await (supabase as any)
         .from("whatsapp_instances")
@@ -27,21 +47,13 @@ export function useWhatsApp() {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
-      // Fetch company-level instances
-      const { data: ucData } = await supabase
-        .from("user_companies")
-        .select("company_id")
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .limit(1)
-        .maybeSingle();
-
+      // For gestor/admin: also fetch company-level instances
       let companyInstances: any[] = [];
-      if (ucData?.company_id) {
+      if ((isAdmin || isGestor) && myCompanyId) {
         const { data } = await (supabase as any)
           .from("whatsapp_instances")
           .select("id, instance_name, phone_number, api_token")
-          .eq("company_id", ucData.company_id)
+          .eq("company_id", myCompanyId)
           .not("api_token", "is", null)
           .order("created_at", { ascending: false });
         companyInstances = data || [];
@@ -68,7 +80,7 @@ export function useWhatsApp() {
     } finally {
       setLoadingInstances(false);
     }
-  }, [user?.id]);
+  }, [user?.id, profile?.role]);
 
   useEffect(() => { fetchInstances(); }, [fetchInstances]);
 
