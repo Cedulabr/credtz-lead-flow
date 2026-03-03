@@ -1,57 +1,50 @@
 
 
-## Plano: Corrigir 4 problemas em WhatsApp, Leads Premium e Televendas
+## Plano: Corrigir build error + acesso de gestores aos modulos da empresa
 
-### Problema 1: Instancias WhatsApp mostram todas para colaboradores
+### Problema 1: Build error em LeadDetailDrawer.tsx
 
-**Causa:** Em `src/hooks/useWhatsApp.ts` (linha 40-48), o hook busca TODAS as instancias da empresa do usuario (`company_id`), sem filtrar por `user_id`. Colaboradores deveriam ver apenas instancias designadas a eles pelo gestor.
+O arquivo tem codigo duplicado flutuando fora de qualquer funcao (linhas 242-285). Apos `handleSaveCpf` terminar na linha 240, ha um bloco de codigo solto que era o corpo de `handleSimulationRequest` duplicado. Isso causa:
+- `TS1128: Declaration or statement expected` na linha 982
+- `await can only be used inside an async function` na linha 255
 
-**Correcao em `src/hooks/useWhatsApp.ts`:**
-- Para colaboradores: buscar apenas instancias onde `user_id = user.id` (remover a busca por `company_id` para colaboradores)
-- A logica atual de "buscar instancias da empresa" deve ser mantida apenas para gestores e admins
-- Verificar o role do usuario: se nao for gestor/admin, buscar somente `user_id = user.id`
-
-```text
-// Colaborador: apenas suas instancias
-query.eq("user_id", user.id)
-
-// Gestor/Admin: instancias da empresa + proprias
-query.eq("company_id", companyId) OU query.eq("user_id", user.id)
-```
-
-Precisara buscar o `company_role` do usuario via `user_companies` e o `profile.role` para determinar se e gestor/admin.
+**Correcao:** Remover o bloco duplicado (linhas 242-285) que ja existe como funcao propria mais adiante no arquivo.
 
 ---
 
-### Problema 2: Leads Premium - Colaborador nao consegue mudar para "Contato Futuro" e nao pode editar CPF
+### Problema 2: Gestores nao veem dados da empresa nos modulos
 
-**Causa 1 - Contato Futuro:** Em `LeadDetailDrawer.tsx` (linhas 445-474), os botoes de acao comercial nao incluem "Contato Futuro" como opcao. Existe "Agendar Retorno" (status `agendamento`) mas nao "Contato Futuro" (`contato_futuro`).
+Varios modulos carregam dados sem filtrar por empresa para gestores:
 
-**Correcao:** Adicionar botao "Contato Futuro" na secao de acoes, ao lado de "Agendar Retorno".
+**a) TimeClock - AdminControl.tsx (linha 48-53):**
+`loadUsers()` busca TODOS os profiles do sistema. Gestor deveria ver apenas usuarios da sua empresa.
 
-**Causa 2 - Editar CPF:** O campo CPF no `LeadDetailDrawer.tsx` (linha 373-376) e exibido como texto puro, sem opcao de edicao. Colaboradores precisam poder editar o CPF dos leads.
+**Correcao:** Detectar se e gestor, buscar `company_id` do gestor, filtrar usuarios por `user_companies.company_id` e filtrar registros de ponto pela mesma empresa.
 
-**Correcao:** Tornar o campo CPF editavel com um botao de edicao inline. Ao clicar, transforma em Input, salva diretamente no banco.
+**b) TimeClock - ManagerDashboard.tsx (linha 93-97):**
+Carrega TODAS as empresas e permite filtrar. Gestor deveria ver apenas sua propria empresa e nao ter seletor de empresa.
+
+**Correcao:** Detectar se e gestor, carregar apenas a empresa do gestor, forcar `selectedCompanyId` para essa empresa.
+
+**c) ClientDocuments.tsx (linha 135-141):**
+Busca todos os documentos sem filtro de empresa. A RLS ja filtra por `company_id`, porem muitos documentos podem ter `company_id = NULL` (inseridos antes da coluna existir), fazendo com que gestores nao vejam nada.
+
+**Correcao:** Para gestores, buscar apenas documentos onde `company_id` pertence a sua empresa OU `uploaded_by` e um usuario da empresa.
+
+**d) Collaborative/index.tsx:**
+Ja funciona para todos autenticados, sem problema de acesso.
 
 ---
 
-### Problema 3: Televendas - Gestor nao consegue aprovar/rejeitar propostas
+### Problema 3: RLS do `client_documents` - `is_company_gestor` com argumentos invertidos
 
-**Causa:** O erro no console revela tudo: `column "updated_at" of relation "sms_proposal_notifications" does not exist`. 
-
-A trigger SQL `sms_sync_televendas_status()` e disparada toda vez que o status de uma proposta muda. Ela tenta executar:
+Na politica de DELETE (linha 196 da migracao):
 ```sql
-UPDATE public.sms_proposal_notifications
-SET sent = true, updated_at = now()
-WHERE televendas_id = NEW.id AND sent = false;
+public.is_company_gestor(company_id, auth.uid())
 ```
-Mas a tabela `sms_proposal_notifications` NAO possui coluna `updated_at`. Isso causa erro 42703, que faz o UPDATE inteiro falhar (incluindo a mudanca de status).
+Mas a funcao espera `(_user_id uuid, _company_id uuid)` - os argumentos estao invertidos. Isso impede gestores de deletar documentos.
 
-**Correcao via migracao SQL:** Adicionar a coluna `updated_at` na tabela `sms_proposal_notifications`:
-```sql
-ALTER TABLE public.sms_proposal_notifications 
-ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
-```
+**Correcao via migracao SQL:** Recriar a politica com argumentos na ordem correta.
 
 ---
 
@@ -59,13 +52,17 @@ ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 
 | Arquivo | Mudanca |
 |---|---|
-| Migracao SQL | Adicionar coluna `updated_at` em `sms_proposal_notifications` |
-| `src/hooks/useWhatsApp.ts` | Filtrar instancias por role: colaborador ve so as suas |
-| `src/modules/leads-premium/components/LeadDetailDrawer.tsx` | Adicionar botao "Contato Futuro" + campo CPF editavel |
+| `src/modules/leads-premium/components/LeadDetailDrawer.tsx` | Remover bloco duplicado (linhas 242-285) |
+| `src/components/TimeClock/AdminControl.tsx` | Filtrar usuarios e registros por empresa do gestor |
+| `src/components/TimeClock/ManagerDashboard.tsx` | Gestor ve apenas sua empresa, sem seletor global |
+| `src/components/ClientDocuments.tsx` | Filtrar documentos por empresa do gestor |
+| Migracao SQL | Corrigir `is_company_gestor` args na politica DELETE de `client_documents` |
 
 ### Sequencia
 
-1. Migracao SQL (desbloqueia aprovacoes de televendas)
-2. Corrigir useWhatsApp.ts (filtro de instancias por role)
-3. Corrigir LeadDetailDrawer.tsx (contato futuro + editar CPF)
+1. Corrigir build error em LeadDetailDrawer (remover duplicata)
+2. Migracao SQL para corrigir RLS de client_documents
+3. Adicionar logica de deteccao gestor + filtro por empresa em AdminControl
+4. Adicionar filtro por empresa do gestor em ManagerDashboard
+5. Adicionar filtro por empresa do gestor em ClientDocuments
 
