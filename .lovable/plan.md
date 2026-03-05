@@ -1,51 +1,63 @@
 
 
-## Plano: Corrigir filtros de data, pipeline operacional e alertas no Televendas
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### 1. Filtro por data de criacao (TelevendasModule.tsx, linhas 160-164)
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-O modo "criacao" usa um OR que mistura `data_venda` e `data_pagamento`, fazendo contratos pagos em fevereiro aparecerem na visao de criacao de fevereiro.
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-**Correcao:** Remover o OR, filtrar apenas por `data_venda`:
-```typescript
-// Linha 160-164 — ANTES:
-query = query.or(`and(data_venda.gte...,data_venda.lte...),and(status.eq.proposta_paga,data_pagamento.gte...,data_pagamento.lte...)`);
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
 
-// DEPOIS:
-query = query.gte("data_venda", startStr).lte("data_venda", endStr);
-```
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
 
 ---
 
-### 2. Pipeline Operacional filtra errado (TelevendasModule.tsx, linha 218)
+### 2. Conectar Base OFF ao PostgreSQL externo
 
-O filtro compara `tv.status_bancario` diretamente, mas esse campo geralmente e null. O pipeline conta usando `mapToPipelineStatus()` — o filtro precisa usar a mesma funcao.
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
 
-**Correcao:**
-- Exportar `mapToPipelineStatus` de `BankingPipeline.tsx` (mover de metodo local para funcao exportada no nivel do modulo)
-- Importar em `TelevendasModule.tsx`
-- Substituir linha 218:
+**Arquitetura:**
 
-```typescript
-// ANTES:
-const matchesBankStatus = !bankStatusFilter || (tv.status_bancario || "aguardando_digitacao") === bankStatusFilter;
-
-// DEPOIS:
-const matchesBankStatus = !bankStatusFilter || mapToPipelineStatus(tv) === bankStatusFilter;
+```text
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
 ```
+
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
 
 ---
 
-### 3. Banner pulsante de alertas (novo componente)
+### 3. Simplificar modulo Base OFF - apenas Consulta
 
-Criar `src/modules/televendas/components/StalledAlertBanner.tsx`:
-- Banner vermelho/laranja proeminente no topo do modulo (acima de DashboardCards)
-- Animacao pulsante forte com `animate-pulse` + glow vermelho para criticos
-- Exibe contagem de propostas criticas e em alerta
-- Botao "Ver propostas" que ativa o filtro de prioridade correspondente
-- So aparece quando existem propostas criticas ou em alerta
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
 
-Integrar no `TelevendasModule.tsx` acima do `DashboardCards`.
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
 
 ---
 
@@ -53,7 +65,16 @@ Integrar no `TelevendasModule.tsx` acima do `DashboardCards`.
 
 | Arquivo | Mudanca |
 |---|---|
-| `src/modules/televendas/TelevendasModule.tsx` | Corrigir query de datas (linha 160-164), corrigir filtro pipeline (linha 218), importar mapToPipelineStatus, adicionar StalledAlertBanner |
-| `src/modules/televendas/components/BankingPipeline.tsx` | Exportar `mapToPipelineStatus` como funcao standalone |
-| `src/modules/televendas/components/StalledAlertBanner.tsx` | Novo: banner pulsante com contagem de criticos/alertas |
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
+
+---
+
+### Pergunta necessaria
+
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 
