@@ -34,95 +34,104 @@ serve(async (req) => {
     const cleanDigits = term.replace(/\D/g, '');
 
     let matchType = 'nome';
-    let clientsQuery = '';
+    let query = '';
     let queryParams: (string | number)[] = [];
 
-    // Determine search type
     if (cleanDigits.length === 11) {
-      // CPF search
       matchType = 'cpf';
-      clientsQuery = `
-        SELECT c.*, COUNT(*) OVER() as total_count
-        FROM baseoff_clients c
-        WHERE normalize_cpf(c.cpf) = LPAD($1, 11, '0')
-        ORDER BY c.nome
+      query = `
+        SELECT *, COUNT(*) OVER() as total_count
+        FROM mailing_inss
+        WHERE REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), ' ', '') = $1
+        ORDER BY nome
         LIMIT $2 OFFSET $3
       `;
       queryParams = [cleanDigits, search_limit, search_offset];
     } else if (cleanDigits.length >= 8 && cleanDigits.length <= 10 && term === cleanDigits) {
-      // NB search
       matchType = 'nb';
-      clientsQuery = `
-        SELECT c.*, COUNT(*) OVER() as total_count
-        FROM baseoff_clients c
-        WHERE c.nb LIKE '%' || $1 || '%'
-        ORDER BY c.nome
-        LIMIT $2 OFFSET $3
-      `;
-      queryParams = [cleanDigits, search_limit, search_offset];
-    } else if (cleanDigits.length >= 10 && cleanDigits.length <= 11) {
-      // Phone search
-      matchType = 'telefone';
-      clientsQuery = `
-        SELECT c.*, COUNT(*) OVER() as total_count
-        FROM baseoff_clients c
-        WHERE c.tel_cel_1 LIKE '%' || $1 || '%'
-           OR c.tel_cel_2 LIKE '%' || $1 || '%'
-           OR c.tel_fixo_1 LIKE '%' || $1 || '%'
-        ORDER BY c.nome
+      query = `
+        SELECT *, COUNT(*) OVER() as total_count
+        FROM mailing_inss
+        WHERE nb LIKE '%' || $1 || '%'
+        ORDER BY nome
         LIMIT $2 OFFSET $3
       `;
       queryParams = [cleanDigits, search_limit, search_offset];
     } else {
-      // Name search
       matchType = 'nome';
-      clientsQuery = `
-        SELECT c.*, COUNT(*) OVER() as total_count
-        FROM baseoff_clients c
-        WHERE UPPER(c.nome) LIKE '%' || UPPER($1) || '%'
-        ORDER BY c.nome
+      query = `
+        SELECT *, COUNT(*) OVER() as total_count
+        FROM mailing_inss
+        WHERE UPPER(nome) LIKE '%' || UPPER($1) || '%'
+        ORDER BY nome
         LIMIT $2 OFFSET $3
       `;
       queryParams = [term, search_limit, search_offset];
     }
 
-    const clientsResult = await connection.queryObject(clientsQuery, queryParams);
-    const clients = clientsResult.rows as any[];
-    const totalCount = clients.length > 0 ? parseInt(clients[0].total_count) : 0;
-
-    // Fetch contracts for found clients
-    const clientIds = clients.map(c => c.id);
-    let contracts: any[] = [];
-
-    if (clientIds.length > 0) {
-      const placeholders = clientIds.map((_, i) => `$${i + 1}`).join(',');
-      const contractsResult = await connection.queryObject(
-        `SELECT * FROM baseoff_contracts WHERE client_id IN (${placeholders}) ORDER BY data_averbacao DESC`,
-        clientIds
-      );
-      contracts = contractsResult.rows as any[];
-    }
+    const result = await connection.queryObject(query, queryParams);
+    const rows = result.rows as any[];
+    const totalCount = rows.length > 0 ? parseInt(rows[0].total_count) : 0;
 
     connection.release();
     await pool.end();
 
-    // Group contracts by client_id
-    const contractsByClient: Record<string, any[]> = {};
-    contracts.forEach(c => {
-      if (!contractsByClient[c.client_id]) contractsByClient[c.client_id] = [];
-      contractsByClient[c.client_id].push(c);
-    });
+    // Group rows by CPF to aggregate contracts per client
+    const clientMap = new Map<string, any>();
 
-    // Transform results
-    const results = clients.map(client => ({
-      ...client,
-      total_count: totalCount,
-      match_type: matchType,
-      contracts: contractsByClient[client.id] || [],
-      total_contracts: (contractsByClient[client.id] || []).length,
-      // Credit opportunities
-      credit_opportunities: calculateCreditOpportunities(client, contractsByClient[client.id] || []),
-    }));
+    for (const row of rows) {
+      const cpf = row.cpf || '';
+      if (!clientMap.has(cpf)) {
+        clientMap.set(cpf, {
+          cpf,
+          nome: row.nome,
+          nb: row.nb,
+          data_nascimento: row.dtnascimento,
+          mr: parseFloat(row.mr) || 0,
+          valor_rmc: parseFloat(row.valorrmc) || 0,
+          valor_rcc: parseFloat(row.valorrcc) || 0,
+          total_count: totalCount,
+          match_type: matchType,
+          contracts: [],
+        });
+      }
+
+      // Add contract info if present
+      if (row.contrato || row.bancoemprestimo) {
+        clientMap.get(cpf).contracts.push({
+          banco_emprestimo: row.bancoemprestimo,
+          contrato: row.contrato,
+          vl_parcela: parseFloat(row.vlparcela) || 0,
+          prazo: parseInt(row.prazo) || 0,
+          tipo_emprestimo: row.tipoemprestimo,
+          situacao_emprestimo: row.situacaoemprestimo,
+        });
+      }
+    }
+
+    // Transform to final results with credit opportunities
+    const results = Array.from(clientMap.values()).map(client => {
+      const activeContracts = client.contracts.filter((c: any) =>
+        c.situacao_emprestimo?.toLowerCase()?.includes('ativ')
+      );
+      const refinanciableContracts = activeContracts.filter((c: any) => (c.prazo || 0) > 12);
+      const totalParcelas = activeContracts.reduce((sum: number, c: any) => sum + (c.vl_parcela || 0), 0);
+
+      return {
+        ...client,
+        total_contracts: client.contracts.length,
+        credit_opportunities: {
+          margem_disponivel: client.mr,
+          margem_35: client.mr * 0.35,
+          valor_rmc: client.valor_rmc,
+          valor_rcc: client.valor_rcc,
+          total_contratos_ativos: activeContracts.length,
+          contratos_refinanciaveis: refinanciableContracts.length,
+          total_parcelas: totalParcelas,
+          has_portabilidade: activeContracts.some((c: any) => c.tipo_emprestimo?.toLowerCase()?.includes('port')),
+        },
+      };
+    });
 
     return new Response(JSON.stringify(results), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -136,35 +145,3 @@ serve(async (req) => {
     });
   }
 });
-
-function calculateCreditOpportunities(client: any, contracts: any[]) {
-  const mr = parseFloat(client.mr) || 0;
-  const margem35 = mr * 0.35;
-  const valorRmc = parseFloat(client.valor_rmc) || 0;
-  const valorRcc = parseFloat(client.valor_rcc) || 0;
-
-  const activeContracts = contracts.filter(c =>
-    c.situacao_emprestimo?.toLowerCase()?.includes('ativ')
-  );
-
-  const refinanciableContracts = activeContracts.filter(c => {
-    const prazo = parseInt(c.prazo) || 0;
-    const parcelas = parseInt(c.competencia_final) || prazo;
-    return parcelas > 12;
-  });
-
-  const totalSaldoDevedor = activeContracts.reduce((sum, c) => sum + (parseFloat(c.saldo) || 0), 0);
-  const totalParcelas = activeContracts.reduce((sum, c) => sum + (parseFloat(c.vl_parcela) || 0), 0);
-
-  return {
-    margem_disponivel: mr,
-    margem_35: margem35,
-    valor_rmc: valorRmc,
-    valor_rcc: valorRcc,
-    total_contratos_ativos: activeContracts.length,
-    contratos_refinanciaveis: refinanciableContracts.length,
-    saldo_devedor_total: totalSaldoDevedor,
-    total_parcelas: totalParcelas,
-    has_portabilidade: activeContracts.some(c => c.tipo_emprestimo?.toLowerCase()?.includes('port')),
-  };
-}
