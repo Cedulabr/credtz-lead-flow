@@ -28,8 +28,8 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const lastQueryRef = useRef<string>('');
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -42,15 +42,8 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
     page: number = 0,
     immediate: boolean = false
   ) => {
-    // Clear previous debounce
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-
-    // Cancel previous request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (abortControllerRef.current) abortControllerRef.current.abort();
 
     if (!query.trim()) {
       setClients([]);
@@ -60,6 +53,8 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
       return;
     }
 
+    lastQueryRef.current = query;
+
     const executeSearch = async () => {
       setIsLoading(true);
       abortControllerRef.current = new AbortController();
@@ -67,19 +62,21 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
       try {
         const offset = page * pageSize;
 
-        // Call optimized RPC function
-        const { data, error } = await supabase
-          .rpc('search_baseoff_clients', {
+        // Call edge function that queries external PG
+        const { data, error } = await supabase.functions.invoke('baseoff-external-query', {
+          body: {
             search_term: query.trim(),
             search_limit: pageSize,
-            search_offset: offset
-          });
+            search_offset: offset,
+          },
+        });
 
         if (error) throw error;
 
+        const results = data || [];
+
         // Transform results
-        const transformedClients: BaseOffClient[] = (data || []).map((row: any) => {
-          // Determine status from status_beneficio
+        const transformedClients: BaseOffClient[] = results.map((row: any) => {
           let status: ClientStatus = 'simulado';
           if (row.status_beneficio) {
             const statusLower = row.status_beneficio.toLowerCase();
@@ -113,18 +110,19 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
             created_at: row.created_at,
             updated_at: row.updated_at,
             status,
-            total_contracts: 0, // Will be fetched on client detail view
+            total_contracts: row.total_contracts || 0,
+            contracts: row.contracts || [],
+            credit_opportunities: row.credit_opportunities || null,
           };
         });
 
         setClients(transformedClients);
-        setTotalCount(data?.[0]?.total_count || transformedClients.length);
+        setTotalCount(results?.[0]?.total_count || transformedClients.length);
         setCurrentPage(page);
         setHasSearched(true);
 
-        // Set match type from first result
-        if (data && data.length > 0) {
-          setMatchType(data[0].match_type);
+        if (results.length > 0) {
+          setMatchType(results[0].match_type);
         }
 
         if (transformedClients.length === 0) {
@@ -135,7 +133,7 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
             nb: 'Número do Benefício',
             telefone: 'Telefone',
             nome: 'Nome'
-          }[data?.[0]?.match_type] || 'busca';
+          }[results?.[0]?.match_type] || 'busca';
           toast.success(`${transformedClients.length} cliente(s) encontrado(s) por ${matchLabel}`);
         }
 
@@ -156,16 +154,16 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
   }, [debounceMs, pageSize]);
 
   const nextPage = useCallback(() => {
-    if ((currentPage + 1) * pageSize < totalCount) {
-      // This would need the last query - you'd store it in a ref
+    if ((currentPage + 1) * pageSize < totalCount && lastQueryRef.current) {
+      search(lastQueryRef.current, currentPage + 1, true);
     }
-  }, [currentPage, pageSize, totalCount]);
+  }, [currentPage, pageSize, totalCount, search]);
 
   const previousPage = useCallback(() => {
-    if (currentPage > 0) {
-      // This would need the last query - you'd store it in a ref
+    if (currentPage > 0 && lastQueryRef.current) {
+      search(lastQueryRef.current, currentPage - 1, true);
     }
-  }, [currentPage]);
+  }, [currentPage, search]);
 
   const reset = useCallback(() => {
     setClients([]);
@@ -173,6 +171,7 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
     setHasSearched(false);
     setMatchType(null);
     setCurrentPage(0);
+    lastQueryRef.current = '';
   }, []);
 
   return {
@@ -185,6 +184,8 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
     pageSize,
     totalPages: Math.ceil(totalCount / pageSize),
     search,
+    nextPage,
+    previousPage,
     reset,
   };
 }

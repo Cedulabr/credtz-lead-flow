@@ -81,6 +81,8 @@ export function UsersList() {
     { key: "can_access_colaborativo", label: "Colaborativo", defaultValue: true },
     { key: "can_access_controle_ponto", label: "Controle de Ponto", defaultValue: true },
     { key: "can_access_meu_numero", label: "Meu Número", defaultValue: true },
+    { key: "can_access_sms", label: "Comunicação SMS", defaultValue: false },
+    { key: "can_access_whatsapp", label: "WhatsApp", defaultValue: false },
   ] as const;
 
   // Gerar estado inicial baseado nos módulos definidos
