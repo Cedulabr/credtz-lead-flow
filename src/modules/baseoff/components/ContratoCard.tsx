@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   CreditCard, 
@@ -13,11 +12,13 @@ import {
   FileText,
   Calendar,
   Percent,
-  Wallet
+  Wallet,
+  CheckCircle,
+  Clock
 } from 'lucide-react';
 import { BaseOffContract, ClientStatus } from '../types';
 import { StatusBadge } from './StatusBadge';
-import { formatCurrency, formatDate } from '../utils';
+import { formatCurrency, formatDate, calculateInstallments } from '../utils';
 import { cn } from '@/lib/utils';
 
 interface ContratoCardProps {
@@ -32,7 +33,7 @@ interface ContratoCardProps {
 function getContractStatus(situacao: string | null): ClientStatus {
   if (!situacao) return 'simulado';
   const lower = situacao.toLowerCase();
-  if (lower.includes('ativo') || lower.includes('normal') || lower.includes('regular')) {
+  if (lower.includes('ativo') || lower.includes('normal') || lower.includes('regular') || lower === '1') {
     return 'ativo';
   }
   if (lower.includes('finalizado') || lower.includes('quitado') || lower.includes('liquidado')) {
@@ -56,6 +57,11 @@ export function ContratoCard({
 }: ContratoCardProps) {
   const [isOpen, setIsOpen] = useState(false);
   const status = getContractStatus(contract.situacao_emprestimo);
+
+  const installments = useMemo(() => 
+    calculateInstallments(contract.data_averbacao, contract.prazo),
+    [contract.data_averbacao, contract.prazo]
+  );
 
   return (
     <Card className="overflow-hidden border-2 hover:border-primary/30 transition-all">
@@ -92,8 +98,12 @@ export function ContratoCard({
                   <p className="font-bold text-lg">{formatCurrency(contract.saldo)}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xs text-muted-foreground">Prazo</p>
-                  <p className="font-bold text-lg">{contract.prazo || '---'}</p>
+                  <p className="text-xs text-muted-foreground">Pagas/Restantes</p>
+                  <p className="font-bold text-lg">
+                    <span className="text-emerald-600">{installments.pagas}</span>
+                    <span className="text-muted-foreground">/</span>
+                    <span className="text-orange-600">{installments.restantes}</span>
+                  </p>
                 </div>
               </div>
 
@@ -118,8 +128,12 @@ export function ContratoCard({
                 <p className="font-bold">{formatCurrency(contract.saldo)}</p>
               </div>
               <div className="flex-1 text-center">
-                <p className="text-xs text-muted-foreground">Prazo</p>
-                <p className="font-bold">{contract.prazo || '---'}</p>
+                <p className="text-xs text-muted-foreground">Pagas/Rest.</p>
+                <p className="font-bold">
+                  <span className="text-emerald-600">{installments.pagas}</span>
+                  /
+                  <span className="text-orange-600">{installments.restantes}</span>
+                </p>
               </div>
             </div>
           </button>
@@ -141,13 +155,18 @@ export function ContratoCard({
               />
               <DetailItem 
                 icon={Calendar} 
-                label="Início Desconto" 
-                value={formatDate(contract.inicio_desconto)} 
-              />
-              <DetailItem 
-                icon={Calendar} 
                 label="Data Averbação" 
                 value={formatDate(contract.data_averbacao)} 
+              />
+              <DetailItem 
+                icon={CheckCircle} 
+                label="Parcelas Pagas" 
+                value={`${installments.pagas} de ${contract.prazo || 0}`} 
+              />
+              <DetailItem 
+                icon={Clock} 
+                label="Parcelas Restantes" 
+                value={String(installments.restantes)} 
               />
               <DetailItem 
                 icon={Calendar} 

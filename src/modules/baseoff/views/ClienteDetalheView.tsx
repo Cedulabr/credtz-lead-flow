@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { BaseOffClient, BaseOffContract, BaseOffInlineContract, TimelineEvent } from '../types';
 import { ClienteHeader } from '../components/ClienteHeader';
 import { MargemCards } from '../components/MargemCards';
+import { CartoesSection, isCardContract } from '../components/CartoesSection';
 import { TelefoneHotPanel } from '../components/TelefoneHotPanel';
 import { ContratoCard } from '../components/ContratoCard';
 import { SimulationModal } from '../components/SimulationModal';
@@ -133,6 +134,11 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
     return phones;
   }, [client]);
 
+  // Separate loan contracts from card contracts
+  const loanContracts = useMemo(() => 
+    contracts.filter(c => !isCardContract(c.tipo_emprestimo)),
+    [contracts]
+  );
   // Generate timeline events
   const timelineEvents = useMemo<TimelineEvent[]>(() => {
     const events: TimelineEvent[] = [];
@@ -237,14 +243,19 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
               baseCalculo={client.mr ? client.mr * 1.3 : null}
               margemCartao={client.valor_rmc}
               cartaoBeneficio={client.valor_rcc}
+              contracts={contracts}
+              esp={client.esp}
             />
           </div>
+
+          {/* Cartões Section */}
+          <CartoesSection contracts={contracts} />
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
             <TabsList className="grid w-full grid-cols-2 h-12">
               <TabsTrigger value="contratos" className="gap-2 text-base">
                 <FileText className="w-4 h-4" />
-                📄 Contratos ({contracts.length})
+                📄 Contratos ({loanContracts.length})
               </TabsTrigger>
               <TabsTrigger value="timeline" className="gap-2 text-base">
                 <Clock className="w-4 h-4" />
@@ -256,22 +267,22 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <p className="text-sm text-muted-foreground">
-                    {contracts.length} contrato(s) encontrado(s)
+                    {loanContracts.length} contrato(s) encontrado(s)
                   </p>
-                  {contracts.length > 0 && (
+                  {loanContracts.length > 0 && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        if (selectedContractIds.length === contracts.length) {
+                      if (selectedContractIds.length === loanContracts.length) {
                           setSelectedContractIds([]);
                         } else {
-                          setSelectedContractIds(contracts.map(c => c.id));
+                          setSelectedContractIds(loanContracts.map(c => c.id));
                         }
                       }}
                       className="text-xs"
                     >
-                      {selectedContractIds.length === contracts.length ? 'Desmarcar todos' : 'Selecionar todos'}
+                      {selectedContractIds.length === loanContracts.length ? 'Desmarcar todos' : 'Selecionar todos'}
                     </Button>
                   )}
                 </div>
@@ -292,7 +303,7 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
                 Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-32 rounded-xl" />
                 ))
-              ) : contracts.length === 0 ? (
+              ) : loanContracts.length === 0 ? (
                 <Card className="p-8 text-center">
                   <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                   <h4 className="text-lg font-medium">Nenhum contrato</h4>
@@ -302,7 +313,7 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
                 </Card>
               ) : (
                 <div className="space-y-3">
-                  {contracts.map(contract => (
+                  {loanContracts.map(contract => (
                     <div key={contract.id} className="flex items-start gap-3">
                       <div className="pt-4">
                         <Checkbox
@@ -330,9 +341,9 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
                 </div>
               )}
 
-              {contracts.length > 0 && (
+              {loanContracts.length > 0 && (
                 <TrocoCalculator
-                  contracts={contracts}
+                  contracts={loanContracts}
                   selectedContracts={selectedContractIds}
                   onSelectionChange={setSelectedContractIds}
                   onSimulationChange={setCurrentSimulation}
