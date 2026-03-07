@@ -94,6 +94,7 @@ interface BaseOffClient {
   email_1: string | null;
   email_2: string | null;
   email_3: string | null;
+  contratos?: BaseOffContract[];
 }
 
 interface BaseOffContract {
