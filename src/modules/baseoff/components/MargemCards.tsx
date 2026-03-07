@@ -54,7 +54,7 @@ const margensConfig: MargemItem[] = [
   },
   { 
     key: 'margemCartao', 
-    label: 'Margem Cartão', 
+    label: 'Margem Cartão (RMC)', 
     icon: CreditCard, 
     emoji: '💳',
     bgColor: 'bg-indigo-50 dark:bg-indigo-950/30',
@@ -62,7 +62,7 @@ const margensConfig: MargemItem[] = [
   },
   { 
     key: 'cartaoBeneficio', 
-    label: 'Cartão Benefício', 
+    label: 'Cartão Benefício (RCC)', 
     icon: Gift, 
     emoji: '🎁',
     bgColor: 'bg-pink-50 dark:bg-pink-950/30',
@@ -79,7 +79,6 @@ export function MargemCards({
 }: MargemCardsProps) {
   const values: MargemCardsProps = { mr, baseCalculo, margem35, margemCartao, cartaoBeneficio };
   
-  // Calculate margem35 if not provided
   const calculatedMargem35 = margem35 ?? (mr ? mr * 0.35 : null);
   const displayValues = { ...values, margem35: calculatedMargem35 };
 

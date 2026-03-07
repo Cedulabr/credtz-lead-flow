@@ -10,13 +10,16 @@ import {
   Copy, 
   CreditCard,
   FileText,
-  Hash
+  Hash,
+  Shield,
+  Home,
+  Landmark,
+  Banknote
 } from 'lucide-react';
 import { BaseOffClient } from '../types';
 import { StatusBadge } from './StatusBadge';
-import { formatCPFFull, formatDate } from '../utils';
+import { formatCPFFull, formatDate, formatCurrency } from '../utils';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 
 interface ClienteHeaderProps {
   client: BaseOffClient;
@@ -28,7 +31,6 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
     toast.success(`${label} copiado!`);
   };
 
-  // Calculate age
   const calculateAge = (birthDate: string | null): number | null => {
     if (!birthDate) return null;
     const birth = new Date(birthDate);
@@ -42,6 +44,19 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
   };
 
   const age = calculateAge(client.data_nascimento);
+
+  // Build full address string
+  const buildAddress = () => {
+    const parts = [
+      client.logr_tipo_1,
+      client.logr_titulo_1,
+      client.logr_nome_1,
+      client.logr_numero_1 ? `nº ${client.logr_numero_1}` : null,
+      client.logr_complemento_1,
+    ].filter(Boolean);
+    if (parts.length > 0) return parts.join(' ');
+    return client.endereco;
+  };
 
   return (
     <Card className="p-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
@@ -74,38 +89,72 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
         </Badge>
       </div>
 
-      {/* Two Column Layout */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Left Column - Personal Info */}
+      {/* Three Column Layout */}
+      <div className="grid md:grid-cols-3 gap-6">
+        {/* Column 1 - Personal & Benefit Info */}
         <div className="space-y-4">
           <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
             <User className="w-4 h-4" />
-            Dados Pessoais
+            Dados Pessoais / Benefício
           </h3>
-          <div className="grid gap-3">
-            <InfoRow 
-              icon={Calendar} 
-              label="Data Nascimento" 
-              value={client.data_nascimento ? `${formatDate(client.data_nascimento)}${age ? ` (${age} anos)` : ''}` : null} 
-            />
+          <div className="grid gap-2">
+            <InfoRow icon={Calendar} label="Nascimento" value={client.data_nascimento ? `${formatDate(client.data_nascimento)}${age ? ` (${age} anos)` : ''}` : null} />
             <InfoRow icon={User} label="Sexo" value={client.sexo} />
             <InfoRow icon={User} label="Nome da Mãe" value={client.nome_mae} />
             <InfoRow icon={Hash} label="NB" value={client.nb} />
             <InfoRow icon={FileText} label="Espécie" value={client.esp} />
-            <InfoRow icon={FileText} label="Situação Benefício" value={client.status_beneficio} />
+            <InfoRow icon={Calendar} label="DIB" value={formatDate(client.dib)} />
+            <InfoRow icon={Calendar} label="DDB" value={formatDate(client.ddb)} />
+            <InfoRow icon={FileText} label="Situação" value={client.status_beneficio} />
+            <InfoRow icon={Shield} label="Bloqueio" value={client.bloqueio} />
+            <InfoRow icon={FileText} label="Pensão" value={client.pensao_alimenticia} />
+            <InfoRow icon={User} label="Representante" value={client.representante} />
           </div>
         </div>
 
-        {/* Right Column - Bank & Location */}
+        {/* Column 2 - Banking Info */}
         <div className="space-y-4">
           <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            <Building className="w-4 h-4" />
-            Dados Bancários e Localização
+            <Landmark className="w-4 h-4" />
+            Dados Bancários
           </h3>
-          <div className="grid gap-3">
-            <InfoRow icon={CreditCard} label="Banco Pagamento" value={client.banco_pagto} />
-            <InfoRow icon={MapPin} label="Município" value={client.municipio} />
-            <InfoRow icon={MapPin} label="UF" value={client.uf} />
+          <div className="grid gap-2">
+            <InfoRow icon={Building} label="Banco Pagto" value={client.banco_pagto} />
+            <InfoRow icon={Hash} label="Agência" value={client.agencia_pagto} />
+            <InfoRow icon={Hash} label="Conta Corrente" value={client.conta_corrente} />
+            <InfoRow icon={FileText} label="Meio Pagto" value={client.meio_pagto} />
+            <InfoRow icon={Building} label="Órgão Pagador" value={client.orgao_pagador} />
+            <InfoRow icon={Banknote} label="MR" value={client.mr ? formatCurrency(client.mr) : null} />
+            <InfoRow icon={CreditCard} label="Banco RMC" value={client.banco_rmc} />
+            <InfoRow icon={Banknote} label="Valor RMC" value={client.valor_rmc ? formatCurrency(client.valor_rmc) : null} />
+            <InfoRow icon={CreditCard} label="Banco RCC" value={client.banco_rcc} />
+            <InfoRow icon={Banknote} label="Valor RCC" value={client.valor_rcc ? formatCurrency(client.valor_rcc) : null} />
+          </div>
+        </div>
+
+        {/* Column 3 - Address Info */}
+        <div className="space-y-4">
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <Home className="w-4 h-4" />
+            Endereço
+          </h3>
+          <div className="grid gap-2">
+            <InfoRow icon={MapPin} label="Endereço" value={buildAddress()} />
+            <InfoRow icon={MapPin} label="Bairro" value={client.bairro || client.bairro_1} />
+            <InfoRow icon={MapPin} label="Município" value={client.municipio || client.cidade_1} />
+            <InfoRow icon={MapPin} label="UF" value={client.uf || client.uf_1} />
+            <InfoRow icon={MapPin} label="CEP" value={client.cep || client.cep_1} />
+            {client.bairro_1 && client.bairro && client.bairro_1 !== client.bairro && (
+              <>
+                <div className="pt-2 border-t border-border/50">
+                  <span className="text-xs text-muted-foreground font-semibold">Endereço Alternativo</span>
+                </div>
+                <InfoRow icon={MapPin} label="Bairro" value={client.bairro_1} />
+                <InfoRow icon={MapPin} label="Cidade" value={client.cidade_1} />
+                <InfoRow icon={MapPin} label="UF" value={client.uf_1} />
+                <InfoRow icon={MapPin} label="CEP" value={client.cep_1} />
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -122,24 +171,24 @@ function InfoRow({
   label: string; 
   value: string | number | null | undefined;
 }) {
-  if (!value) {
+  if (!value || value === '---') {
     return (
-      <div className="flex items-center justify-between py-2 border-b border-border/50">
-        <span className="text-muted-foreground flex items-center gap-2 text-sm">
-          <Icon className="w-4 h-4" />
+      <div className="flex items-center justify-between py-1.5 border-b border-border/30">
+        <span className="text-muted-foreground flex items-center gap-2 text-xs">
+          <Icon className="w-3.5 h-3.5" />
           {label}
         </span>
-        <span className="text-muted-foreground/50">---</span>
+        <span className="text-muted-foreground/50 text-xs">---</span>
       </div>
     );
   }
   return (
-    <div className="flex items-center justify-between py-2 border-b border-border/50">
-      <span className="text-muted-foreground flex items-center gap-2 text-sm">
-        <Icon className="w-4 h-4" />
+    <div className="flex items-center justify-between py-1.5 border-b border-border/30">
+      <span className="text-muted-foreground flex items-center gap-2 text-xs">
+        <Icon className="w-3.5 h-3.5" />
         {label}
       </span>
-      <span className="font-medium">{value}</span>
+      <span className="font-medium text-sm text-right max-w-[60%] truncate">{value}</span>
     </div>
   );
 }

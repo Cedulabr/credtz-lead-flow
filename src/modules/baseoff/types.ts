@@ -46,30 +46,101 @@ export interface ImportJob {
   processing_ended_at: string | null;
 }
 
+// Inline contract returned by external API
+export interface BaseOffInlineContract {
+  banco_emprestimo: string;
+  contrato: string;
+  vl_emprestimo: number | null;
+  inicio_desconto: string | null;
+  prazo: number | null;
+  vl_parcela: number | null;
+  tipo_emprestimo: string | null;
+  data_averbacao: string | null;
+  situacao_emprestimo: string | null;
+  competencia: string | null;
+  competencia_final: string | null;
+  taxa: number | null;
+  saldo: number | null;
+}
+
+// Credit opportunities calculated by external API
+export interface BaseOffCreditOpportunities {
+  margem_livre: number | null;
+  margem_35: number | null;
+  margem_cartao: number | null;
+  cartao_beneficio: number | null;
+  total_parcelas: number | null;
+  total_saldo: number | null;
+  contratos_ativos: number | null;
+}
+
 export interface BaseOffClient {
   id: string;
   nb: string;
   cpf: string;
   nome: string;
+  // Dados pessoais
   data_nascimento: string | null;
   sexo: string | null;
   nome_mae: string | null;
+  nome_pai: string | null;
+  naturalidade: string | null;
+  // Benefício
   esp: string | null;
+  dib: string | null;
+  ddb: string | null;
   mr: number | null;
-  banco_pagto: string | null;
   status_beneficio: string | null;
+  bloqueio: string | null;
+  pensao_alimenticia: string | null;
+  representante: string | null;
+  // Dados bancários
+  banco_pagto: string | null;
+  agencia_pagto: string | null;
+  orgao_pagador: string | null;
+  conta_corrente: string | null;
+  meio_pagto: string | null;
+  // RMC / RCC
+  banco_rmc: string | null;
+  valor_rmc: number | null;
+  banco_rcc: string | null;
+  valor_rcc: number | null;
+  // Endereço principal
+  bairro: string | null;
   municipio: string | null;
   uf: string | null;
+  cep: string | null;
+  endereco: string | null;
+  // Endereço secundário
+  logr_tipo_1: string | null;
+  logr_titulo_1: string | null;
+  logr_nome_1: string | null;
+  logr_numero_1: string | null;
+  logr_complemento_1: string | null;
+  bairro_1: string | null;
+  cidade_1: string | null;
+  uf_1: string | null;
+  cep_1: string | null;
+  // Telefones
   tel_cel_1: string | null;
   tel_cel_2: string | null;
+  tel_cel_3: string | null;
   tel_fixo_1: string | null;
+  tel_fixo_2: string | null;
+  tel_fixo_3: string | null;
+  // Emails
   email_1: string | null;
+  email_2: string | null;
+  email_3: string | null;
+  // Timestamps
   created_at: string;
   updated_at: string;
-  // Computed fields
+  // Computed / inline fields
   total_contracts?: number;
   status?: ClientStatus;
   last_action?: string;
+  contracts?: BaseOffInlineContract[];
+  credit_opportunities?: BaseOffCreditOpportunities | null;
 }
 
 export interface BaseOffContract {
@@ -85,6 +156,7 @@ export interface BaseOffContract {
   tipo_emprestimo: string | null;
   data_averbacao: string | null;
   situacao_emprestimo: string | null;
+  competencia: string | null;
   competencia_final: string | null;
   taxa: number | null;
   saldo: number | null;
