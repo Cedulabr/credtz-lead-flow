@@ -2,24 +2,62 @@ import React, { lazy, Suspense } from 'react';
 import { Skeleton } from './ui/skeleton';
 import { Card, CardContent, CardHeader } from './ui/card';
 
-// Lazy load heavy components to improve initial bundle size
-export const AdminPanel = lazy(() => import('./AdminPanel').then(module => ({ default: module.AdminPanel })));
-export const BaseOff = lazy(() => import('./BaseOff').then(module => ({ default: module.BaseOff })));
-export const BaseOffModern = lazy(() => import('./BaseOffModern').then(module => ({ default: module.BaseOffModern })));
-export const Commissions = lazy(() => import('./Commissions').then(module => ({ default: module.Commissions })));
-export const LeadsManagement = lazy(() => import('@/modules/leads-premium/LeadsPremiumModule').then(module => ({ default: module.LeadsPremiumModule })));
+// ── Lazy Modules ──────────────────────────────────────────────────────
+// Core
+export const Dashboard = lazy(() => import('./Dashboard').then(m => ({ default: m.Dashboard })));
+export const Notifications = lazy(() => import('./Notifications').then(m => ({ default: m.Notifications })));
+export const SystemStatus = lazy(() => import('./SystemStatus').then(m => ({ default: m.SystemStatus })));
+
+// Leads & Sales
+export const LeadsManagement = lazy(() => import('@/modules/leads-premium/LeadsPremiumModule').then(m => ({ default: m.LeadsPremiumModule })));
+export const ActivateLeads = lazy(() => import('./ActivateLeads').then(m => ({ default: m.ActivateLeads })));
+export const IndicateClient = lazy(() => import('./IndicateClient').then(m => ({ default: m.IndicateClient })));
 export const LeadsIndicados = lazy(() => import('./LeadsIndicados'));
-export const TestFunctionalities = lazy(() => import('./TestFunctionalities').then(module => ({ default: module.TestFunctionalities })));
-export const ActivateLeads = lazy(() => import('./ActivateLeads').then(module => ({ default: module.ActivateLeads })));
-export const ClientReuseAlerts = lazy(() => import('./ClientReuseAlerts').then(module => ({ default: module.ClientReuseAlerts })));
+export const SalesWizard = lazy(() => import('@/modules/sales-wizard/SalesWizard').then(m => ({ default: m.SalesWizard })));
+export const ProposalGenerator = lazy(() => import('./ProposalGenerator').then(m => ({ default: m.ProposalGenerator })));
 
-// Additional lazy loaded components for performance
-export const Dashboard = lazy(() => import('./Dashboard').then(module => ({ default: module.Dashboard })));
-export const TelevendasManagement = lazy(() => import('./TelevendasManagement').then(module => ({ default: module.TelevendasManagement })));
-export const MyClientsKanban = lazy(() => import('./MyClientsKanban').then(module => ({ default: module.MyClientsKanban })));
-export const Notifications = lazy(() => import('./Notifications').then(module => ({ default: module.Notifications })));
+// Clients
+export const MyClientsList = lazy(() => import('./MyClientsList').then(m => ({ default: m.MyClientsList })));
+export const ClientDocuments = lazy(() => import('./ClientDocuments').then(m => ({ default: m.ClientDocuments })));
 
-// Loading skeleton components for better UX
+// Televendas
+export const TelevendasModule = lazy(() => import('@/modules/televendas/TelevendasModule').then(m => ({ default: m.TelevendasModule })));
+
+// Base OFF
+export const BaseOffModule = lazy(() => import('@/modules/baseoff/BaseOffModule').then(m => ({ default: m.BaseOffModule })));
+
+// Opportunities
+export const OpportunitiesModule = lazy(() => import('@/modules/opportunities/OpportunitiesModule').then(m => ({ default: m.OpportunitiesModule })));
+
+// Finance & Commissions
+export const FinanceKanban = lazy(() => import('./FinanceKanban').then(m => ({ default: m.FinanceKanban })));
+export const CommissionTable = lazy(() => import('./CommissionTable').then(m => ({ default: m.CommissionTable })));
+export const Commissions = lazy(() => import('./Commissions').then(m => ({ default: m.Commissions })));
+
+// Admin & Tools
+export const AdminPanel = lazy(() => import('./AdminPanel').then(m => ({ default: m.AdminPanel })));
+export const TestFunctionalities = lazy(() => import('./TestFunctionalities').then(m => ({ default: m.TestFunctionalities })));
+
+// Performance & Collaboration
+export const PerformanceReport = lazy(() => import('./PerformanceReport').then(m => ({ default: m.PerformanceReport })));
+export const Collaborative = lazy(() => import('./Collaborative').then(m => ({ default: m.Collaborative })));
+export const MyData = lazy(() => import('./MyData').then(m => ({ default: m.MyData })));
+export const TimeClock = lazy(() => import('./TimeClock').then(m => ({ default: m.TimeClock })));
+
+// Communication
+export const SmsModule = lazy(() => import('@/modules/sms/SmsModule').then(m => ({ default: m.SmsModule || m.default })));
+export const WhatsAppConfig = lazy(() => import('./WhatsAppConfig').then(m => ({ default: m.WhatsAppConfig })));
+export const MeuNumeroModule = lazy(() => import('@/modules/meu-numero/MeuNumeroModule').then(m => ({ default: m.MeuNumeroModule })));
+
+// Client Reuse
+export const ClientReuseAlerts = lazy(() => import('./ClientReuseAlerts').then(m => ({ default: m.ClientReuseAlerts })));
+
+// Base OFF legacy
+export const BaseOff = lazy(() => import('./BaseOff').then(m => ({ default: m.BaseOff })));
+export const BaseOffModern = lazy(() => import('./BaseOffModern').then(m => ({ default: m.BaseOffModern })));
+export const MyClientsKanban = lazy(() => import('./MyClientsKanban').then(m => ({ default: m.MyClientsKanban })));
+
+// ── Loading Skeletons ─────────────────────────────────────────────────
 const TableSkeleton = () => (
   <Card>
     <CardHeader>
@@ -87,7 +125,7 @@ const DashboardSkeleton = () => (
   </div>
 );
 
-// HOC for wrapping lazy components with appropriate loading states
+// ── HOC for wrapping lazy components with loading states ──────────────
 export const withLazyLoading = <P extends Record<string, any>>(
   Component: React.LazyExoticComponent<React.ComponentType<P>>,
   LoadingComponent: React.ComponentType = TableSkeleton
@@ -99,7 +137,8 @@ export const withLazyLoading = <P extends Record<string, any>>(
   ));
 };
 
-// Pre-configured lazy components with loading states
+// ── Pre-configured lazy components with loading states ────────────────
+export const LazyDashboard = withLazyLoading(Dashboard, DashboardSkeleton);
 export const LazyAdminPanel = withLazyLoading(AdminPanel, FormSkeleton);
 export const LazyBaseOff = withLazyLoading(BaseOff, TableSkeleton);
 export const LazyBaseOffModern = withLazyLoading(BaseOffModern, TableSkeleton);
@@ -109,7 +148,23 @@ export const LazyLeadsIndicados = withLazyLoading(LeadsIndicados, FormSkeleton);
 export const LazyTestFunctionalities = withLazyLoading(TestFunctionalities, FormSkeleton);
 export const LazyActivateLeads = withLazyLoading(ActivateLeads, TableSkeleton);
 export const LazyClientReuseAlerts = withLazyLoading(ClientReuseAlerts, TableSkeleton);
-export const LazyDashboard = withLazyLoading(Dashboard, DashboardSkeleton);
-export const LazyTelevendasManagement = withLazyLoading(TelevendasManagement, TableSkeleton);
+export const LazyTelevendasModule = withLazyLoading(TelevendasModule, TableSkeleton);
 export const LazyMyClientsKanban = withLazyLoading(MyClientsKanban, TableSkeleton);
 export const LazyNotifications = withLazyLoading(Notifications, FormSkeleton);
+export const LazyIndicateClient = withLazyLoading(IndicateClient, FormSkeleton);
+export const LazyFinanceKanban = withLazyLoading(FinanceKanban, TableSkeleton);
+export const LazyProposalGenerator = withLazyLoading(ProposalGenerator, FormSkeleton);
+export const LazyMyClientsList = withLazyLoading(MyClientsList, TableSkeleton);
+export const LazyClientDocuments = withLazyLoading(ClientDocuments, TableSkeleton);
+export const LazySalesWizard = withLazyLoading(SalesWizard, FormSkeleton);
+export const LazyBaseOffModule = withLazyLoading(BaseOffModule, TableSkeleton);
+export const LazyOpportunitiesModule = withLazyLoading(OpportunitiesModule, TableSkeleton);
+export const LazyCommissionTable = withLazyLoading(CommissionTable, TableSkeleton);
+export const LazyPerformanceReport = withLazyLoading(PerformanceReport, TableSkeleton);
+export const LazyCollaborative = withLazyLoading(Collaborative, FormSkeleton);
+export const LazyMyData = withLazyLoading(MyData, FormSkeleton);
+export const LazyTimeClock = withLazyLoading(TimeClock, TableSkeleton);
+export const LazySmsModule = withLazyLoading(SmsModule, TableSkeleton);
+export const LazyWhatsAppConfig = withLazyLoading(WhatsAppConfig, FormSkeleton);
+export const LazyMeuNumeroModule = withLazyLoading(MeuNumeroModule, FormSkeleton);
+export const LazySystemStatus = withLazyLoading(SystemStatus, FormSkeleton);

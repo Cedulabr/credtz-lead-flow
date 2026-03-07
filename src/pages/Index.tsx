@@ -1,59 +1,184 @@
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
-import { Navigation } from "@/components/Navigation";
-import { Dashboard } from "@/components/Dashboard";
-import { IndicateClient } from "@/components/IndicateClient";
-import { Notifications } from "@/components/Notifications";
-import { BlockedAccess } from "@/components/BlockedAccess";
-import { SystemStatus } from "@/components/SystemStatus";
-import { SalesWizard } from "@/modules/sales-wizard";
-import { TelevendasModule as TelevendasModuleNew } from "@/modules/televendas/TelevendasModule";
-import { BaseOffModule } from "@/modules/baseoff";
-import { OpportunitiesModule } from "@/modules/opportunities";
-import { CommissionTable } from "@/components/CommissionTable";
-import { ClientDocuments } from "@/components/ClientDocuments";
-import { MyClientsList } from "@/components/MyClientsList";
-import { FinanceKanban } from "@/components/FinanceKanban";
-import { ProposalGenerator } from "@/components/ProposalGenerator";
-import { BaseOffConsulta } from "@/components/BaseOffConsulta";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent } from "@/components/ui/card";
 import { LogIn } from "lucide-react";
-import LoadingAuth from "@/components/LoadingAuth";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWhitelabel } from "@/hooks/useWhitelabel";
 
-import { 
-  LazyLeadsManagement, 
-  LazyCommissions, 
-  LazyTestFunctionalities,
-  LazyActivateLeads
-} from "@/components/LazyComponents";
-import { PerformanceReport } from "@/components/PerformanceReport";
-import { Collaborative } from "@/components/Collaborative";
-import { MyData } from "@/components/MyData";
-import { TimeClock } from "@/components/TimeClock";
-import { SmsModule } from "@/modules/sms";
-import { WhatsAppConfig } from "@/components/WhatsAppConfig";
-import { MeuNumeroModule } from "@/modules/meu-numero";
+// ── Light imports (always loaded) ─────────────────────────────────────
+import { Navigation } from "@/components/Navigation";
+import LoadingAuth from "@/components/LoadingAuth";
+import { BlockedAccess } from "@/components/BlockedAccess";
+import { LoadingFallback } from "@/components/LoadingFallback";
 
+// ── All heavy modules via lazy loading ────────────────────────────────
+import {
+  LazyDashboard,
+  LazyIndicateClient,
+  LazyProposalGenerator,
+  LazyActivateLeads,
+  LazyLeadsManagement,
+  LazyBaseOffModule,
+  LazyMyClientsList,
+  LazyClientDocuments,
+  LazySalesWizard,
+  LazyTelevendasModule,
+  LazyFinanceKanban,
+  LazyCommissionTable,
+  LazyCommissions,
+  LazyOpportunitiesModule,
+  LazyPerformanceReport,
+  LazyCollaborative,
+  LazyTimeClock,
+  LazySmsModule,
+  LazyWhatsAppConfig,
+  LazyMeuNumeroModule,
+  LazyNotifications,
+  LazyTestFunctionalities,
+  LazySystemStatus,
+  LazyMyData,
+} from "@/components/LazyComponents";
+
+// ── Types ─────────────────────────────────────────────────────────────
+type TabConfig = {
+  permission?: string;
+  blockedMessage?: string;
+  wrapP4?: boolean;
+};
+
+// ── Permission-only config (no components here — built in useMemo) ───
+const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMessage' | 'wrapP4'>> = {
+  indicate: {
+    permission: 'can_access_indicar',
+    blockedMessage: 'Acesso à seção Indicar bloqueado pelo administrador',
+  },
+  'proposal-generator': {
+    permission: 'can_access_gerador_propostas',
+    blockedMessage: 'Acesso ao Gerador de Propostas bloqueado pelo administrador',
+  },
+  'activate-leads': {
+    permission: 'can_access_activate_leads',
+    blockedMessage: 'Acesso ao Activate Leads bloqueado pelo administrador',
+  },
+  leads: {
+    permission: 'can_access_premium_leads',
+    blockedMessage: 'Acesso aos Leads Premium bloqueado pelo administrador',
+  },
+  'my-clients': {
+    permission: 'can_access_meus_clientes',
+    blockedMessage: 'Acesso à seção Meus Clientes bloqueado pelo administrador',
+  },
+  documents: {
+    permission: 'can_access_documentos',
+    blockedMessage: 'Acesso à seção Documentos bloqueado pelo administrador',
+  },
+  televendas: {
+    permission: 'can_access_televendas',
+    blockedMessage: 'Acesso à seção Televendas bloqueado pelo administrador',
+    wrapP4: true,
+  },
+  'televendas-manage': {
+    permission: 'can_access_gestao_televendas',
+    blockedMessage: 'Acesso à Gestão de Televendas bloqueado pelo administrador',
+  },
+  finances: {
+    permission: 'can_access_financas',
+    blockedMessage: 'Acesso à seção Finanças bloqueado pelo administrador',
+  },
+  'commission-table': {
+    permission: 'can_access_tabela_comissoes',
+    blockedMessage: 'Acesso à Tabela de Comissões bloqueado pelo administrador',
+    wrapP4: true,
+  },
+  commissions: {
+    permission: 'can_access_minhas_comissoes',
+    blockedMessage: 'Acesso a Minhas Comissões bloqueado pelo administrador',
+  },
+  'reuse-alerts': {
+    permission: 'can_access_alertas',
+    blockedMessage: 'Acesso ao Painel de Oportunidades bloqueado pelo administrador',
+  },
+  sms: {
+    permission: 'can_access_sms',
+    blockedMessage: 'Acesso ao módulo SMS bloqueado pelo administrador',
+  },
+  whatsapp: {
+    permission: 'can_access_whatsapp',
+    blockedMessage: 'Acesso ao módulo WhatsApp bloqueado pelo administrador',
+  },
+  'meu-numero': {
+    permission: 'can_access_meu_numero',
+    blockedMessage: 'Acesso ao módulo Meu Número bloqueado pelo administrador',
+  },
+};
+
+// ── Main Component ────────────────────────────────────────────────────
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const navigate = useNavigate();
   const { user, profile, isAdmin, loading } = useAuth();
   const { companyName } = useWhitelabel();
 
+  // ── Auth redirect ───────────────────────────────────────────────────
   useEffect(() => {
     if (!loading && !user) {
       navigate("/auth");
     }
   }, [user, loading, navigate]);
 
+  // ── Permission helper (deny-by-default) ─────────────────────────────
+  const hasPermission = (permissionKey: string): boolean => {
+    if (isAdmin) return true;
+    const profileData = profile as any;
+    return profileData?.[permissionKey] === true;
+  };
+
+  // ── Declarative tab → component map (memoized) ─────────────────────
+  const tabComponents = useMemo(() => ({
+    dashboard: <LazyDashboard onNavigate={setActiveTab} />,
+    'my-data': <div className="p-4"><LazyMyData /></div>,
+    indicate: <LazyIndicateClient />,
+    'proposal-generator': <LazyProposalGenerator />,
+    'activate-leads': <LazyActivateLeads />,
+    leads: <LazyLeadsManagement />,
+    'baseoff-consulta': <LazyBaseOffModule />,
+    'my-clients': <LazyMyClientsList />,
+    documents: <LazyClientDocuments />,
+    televendas: <div className="p-4"><LazySalesWizard /></div>,
+    'televendas-manage': <LazyTelevendasModule />,
+    finances: <LazyFinanceKanban />,
+    'commission-table': <div className="p-4"><LazyCommissionTable /></div>,
+    commissions: <LazyCommissions />,
+    'reuse-alerts': <LazyOpportunitiesModule />,
+    'performance-report': <LazyPerformanceReport />,
+    collaborative: <LazyCollaborative />,
+    'time-clock': <LazyTimeClock />,
+    sms: <LazySmsModule />,
+    whatsapp: <LazyWhatsAppConfig />,
+    'meu-numero': <LazyMeuNumeroModule />,
+    notifications: <LazyNotifications />,
+    'test-functionalities': <LazyTestFunctionalities />,
+    'system-status': <LazySystemStatus />,
+  }), [setActiveTab]);
+
+  // ── Render active tab ──────────────────────────────────────────────
+  const renderActiveComponent = () => {
+    const permConfig = TAB_PERMISSIONS[activeTab];
+
+    if (permConfig?.permission && !hasPermission(permConfig.permission)) {
+      return <BlockedAccess message={permConfig.blockedMessage} />;
+    }
+
+    const component = tabComponents[activeTab as keyof typeof tabComponents];
+    return component || tabComponents.dashboard;
+  };
+
+  // ── Loading state ───────────────────────────────────────────────────
   if (loading) {
     return <LoadingAuth />;
   }
 
+  // ── Unauthenticated ─────────────────────────────────────────────────
   if (!user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -73,191 +198,15 @@ const Index = () => {
     );
   }
 
-  const hasPermission = (permissionKey: string): boolean => {
-    if (isAdmin) return true;
-    const profileData = profile as any;
-    return profileData?.[permissionKey] !== false;
-  };
-
-  const renderActiveComponent = () => {
-    const LoadingFallback = () => (
-      <Card className="m-4">
-        <CardContent className="p-6">
-          <div className="space-y-4">
-            <Skeleton className="h-8 w-48" />
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Skeleton className="h-32" />
-              <Skeleton className="h-32" />
-              <Skeleton className="h-32" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-
-    switch (activeTab) {
-      case "dashboard":
-        return <Dashboard onNavigate={setActiveTab} />;
-      
-      case "my-data":
-        return (
-          <div className="p-4">
-            <MyData />
-          </div>
-        );
-      
-      case "indicate":
-        if (!hasPermission('can_access_indicar')) {
-          return <BlockedAccess message="Acesso à seção Indicar bloqueado pelo administrador" />;
-        }
-        return <IndicateClient />;
-      
-      case "proposal-generator":
-        if (!hasPermission('can_access_gerador_propostas')) {
-          return <BlockedAccess message="Acesso ao Gerador de Propostas bloqueado pelo administrador" />;
-        }
-        return <ProposalGenerator />;
-      
-      case "activate-leads":
-        if (!hasPermission('can_access_activate_leads')) {
-          return <BlockedAccess message="Acesso ao Activate Leads bloqueado pelo administrador" />;
-        }
-        return (
-          <Suspense fallback={<LoadingFallback />}>
-            <LazyActivateLeads />
-          </Suspense>
-        );
-
-      case "leads":
-        if (!hasPermission('can_access_premium_leads')) {
-          return <BlockedAccess message="Acesso aos Leads Premium bloqueado pelo administrador" />;
-        }
-        return (
-          <Suspense fallback={<LoadingFallback />}>
-            <LazyLeadsManagement />
-          </Suspense>
-        );
-      
-      case "baseoff-consulta":
-        return (
-          <Suspense fallback={<LoadingFallback />}>
-            <BaseOffModule />
-          </Suspense>
-        );
-      
-      case "my-clients":
-        if (!hasPermission('can_access_meus_clientes')) {
-          return <BlockedAccess message="Acesso à seção Meus Clientes bloqueado pelo administrador" />;
-        }
-        return <MyClientsList />;
-      
-      case "documents":
-        if (!hasPermission('can_access_documentos')) {
-          return <BlockedAccess message="Acesso à seção Documentos bloqueado pelo administrador" />;
-        }
-        return <ClientDocuments />;
-      
-      case "televendas":
-        if (!hasPermission('can_access_televendas')) {
-          return <BlockedAccess message="Acesso à seção Televendas bloqueado pelo administrador" />;
-        }
-        return (
-          <div className="p-4">
-            <SalesWizard />
-          </div>
-        );
-      
-      case "televendas-manage":
-        if (!hasPermission('can_access_gestao_televendas')) {
-          return <BlockedAccess message="Acesso à Gestão de Televendas bloqueado pelo administrador" />;
-        }
-        return <TelevendasModuleNew />;
-      
-      case "finances":
-        if (!hasPermission('can_access_financas')) {
-          return <BlockedAccess message="Acesso à seção Finanças bloqueado pelo administrador" />;
-        }
-        return <FinanceKanban />;
-      
-      case "commission-table":
-        if (!hasPermission('can_access_tabela_comissoes')) {
-          return <BlockedAccess message="Acesso à Tabela de Comissões bloqueado pelo administrador" />;
-        }
-        return (
-          <div className="p-4">
-            <CommissionTable />
-          </div>
-        );
-      
-      case "commissions":
-        if (!hasPermission('can_access_minhas_comissoes')) {
-          return <BlockedAccess message="Acesso a Minhas Comissões bloqueado pelo administrador" />;
-        }
-        return (
-          <Suspense fallback={<LoadingFallback />}>
-            <LazyCommissions />
-          </Suspense>
-        );
-      
-      case "reuse-alerts":
-        if (!hasPermission('can_access_alertas')) {
-          return <BlockedAccess message="Acesso ao Painel de Oportunidades bloqueado pelo administrador" />;
-        }
-        return <OpportunitiesModule />;
-      
-      case "performance-report":
-        return <PerformanceReport />;
-      
-      case "collaborative":
-        return <Collaborative />;
-      
-      case "time-clock":
-        return <TimeClock />;
-      
-      case "sms":
-        if (!hasPermission('can_access_sms')) {
-          return <BlockedAccess message="Acesso ao módulo SMS bloqueado pelo administrador" />;
-        }
-        return <SmsModule />;
-      
-      case "whatsapp":
-        if (!hasPermission('can_access_whatsapp')) {
-          return <BlockedAccess message="Acesso ao módulo WhatsApp bloqueado pelo administrador" />;
-        }
-        return <WhatsAppConfig />;
-      
-      case "meu-numero":
-        if (!hasPermission('can_access_meu_numero')) {
-          return <BlockedAccess message="Acesso ao módulo Meu Número bloqueado pelo administrador" />;
-        }
-        return <MeuNumeroModule />;
-      
-      case "notifications":
-        return <Notifications />;
-      
-      case "test-functionalities":
-        return (
-          <Suspense fallback={<LoadingFallback />}>
-            <LazyTestFunctionalities />
-          </Suspense>
-        );
-      
-      case "system-status":
-        return <SystemStatus />;
-      
-      default:
-        return <Dashboard onNavigate={setActiveTab} />;
-    }
-  };
-
+  // ── Authenticated layout ────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
       <div className="flex flex-col md:flex-row min-h-screen">
         <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="flex-1 w-full max-w-full overflow-x-hidden pt-14 pb-20 md:pt-0 md:pb-0">
-          <div className="w-full max-w-full overflow-x-hidden">
+        <main className="flex-1 w-full max-w-full overflow-x-auto pt-14 pb-20 md:pt-0 md:pb-0">
+          <Suspense fallback={<LoadingFallback />}>
             {renderActiveComponent()}
-          </div>
+          </Suspense>
         </main>
       </div>
     </div>
