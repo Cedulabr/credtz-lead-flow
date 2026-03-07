@@ -64,14 +64,14 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
   const [selectedContractIds, setSelectedContractIds] = useState<string[]>([]);
   const [currentSimulation, setCurrentSimulation] = useState<TrocoSimulation | null>(null);
 
-  const hasInlineContracts = client.contracts && client.contracts.length > 0;
+  const inlineContracts = client.contratos || client.contracts;
+  const hasInlineContracts = inlineContracts && inlineContracts.length > 0;
 
   const fetchContracts = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Use inline contracts from API if available
       if (hasInlineContracts) {
-        const mapped = client.contracts!.map((c, i) => inlineToContract(c, client.id, client.cpf, i));
+        const mapped = inlineContracts!.map((c, i) => inlineToContract(c, client.id, client.cpf, i));
         setContracts(mapped);
       } else {
         // Fallback: query from Supabase
