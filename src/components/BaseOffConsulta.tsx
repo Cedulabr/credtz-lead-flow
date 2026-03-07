@@ -526,11 +526,21 @@ export function BaseOffConsulta() {
 
       if (insertError) throw insertError;
 
-      // Buscar contratos para cada cliente (prioriza vínculo por client_id)
+      // Buscar contratos para cada cliente via baseoff_contracts local
       const clientsWithContracts: ActiveClient[] = [];
 
       for (const client of availableClients) {
-        const contractsData = await fetchContractsForClient(client as BaseOffClient);
+        let contractsData: BaseOffContract[] = [];
+        try {
+          const { data: cData } = await supabase
+            .from("baseoff_contracts")
+            .select("*")
+            .eq("client_id", client.id)
+            .order("data_averbacao", { ascending: false });
+          contractsData = (cData || []) as BaseOffContract[];
+        } catch (e) {
+          console.error("Erro ao buscar contratos:", e);
+        }
 
         clientsWithContracts.push({
           id: "",
