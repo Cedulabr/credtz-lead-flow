@@ -14,7 +14,8 @@ interface ClienteCardProps {
 
 export function ClienteCard({ client, onClick }: ClienteCardProps) {
   const status: ClientStatus = client.status || 'simulado';
-  const phone = client.tel_cel_1 || client.tel_fixo_1;
+  const phone = client.telefones?.[0] || client.tel_cel_1 || client.tel_fixo_1;
+  const contractCount = client.contratos?.length || client.contracts?.length || client.total_contracts || 0;
   
   return (
     <Card 
