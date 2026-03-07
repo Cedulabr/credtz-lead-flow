@@ -94,6 +94,7 @@ interface BaseOffClient {
   email_1: string | null;
   email_2: string | null;
   email_3: string | null;
+  contratos?: BaseOffContract[];
 }
 
 interface BaseOffContract {
@@ -274,54 +275,92 @@ export function BaseOffConsulta() {
     setContracts([]);
 
     try {
-      let data: BaseOffClient[] | null = null;
-      let error: any = null;
-
-      if (searchType === "cpf") {
-        // Busca por CPF - normaliza removendo caracteres não numéricos
-        const cleanCpf = searchTerm.replace(/\D/g, "").padStart(11, "0").slice(0, 11);
-        const result = await supabase.from("baseoff_clients").select("*").eq("cpf", cleanCpf).limit(50);
-        data = result.data as BaseOffClient[];
-        error = result.error;
-      } else if (searchType === "telefone") {
-        // Busca por telefone - normaliza e busca em todas as colunas de telefone
-        const cleanPhone = normalizePhone(searchTerm);
-        if (cleanPhone.length < 8) {
-          toast.error("Digite pelo menos 8 dígitos do telefone");
-          setIsSearching(false);
-          return;
-        }
-        
-        // Busca telefone em qualquer uma das colunas de telefone
-        const result = await supabase
-          .from("baseoff_clients")
-          .select("*")
-          .or(`tel_cel_1.ilike.%${cleanPhone}%,tel_cel_2.ilike.%${cleanPhone}%,tel_cel_3.ilike.%${cleanPhone}%,tel_fixo_1.ilike.%${cleanPhone}%,tel_fixo_2.ilike.%${cleanPhone}%,tel_fixo_3.ilike.%${cleanPhone}%`)
-          .limit(50);
-        data = result.data as BaseOffClient[];
-        error = result.error;
-      } else if (searchType === "nb") {
-        const result = await supabase.from("baseoff_clients").select("*").ilike("nb", `%${searchTerm}%`).limit(50);
-        data = result.data as BaseOffClient[];
-        error = result.error;
-      } else {
-        // Busca por nome
-        const result = await supabase.from("baseoff_clients").select("*").ilike("nome", `%${searchTerm}%`).limit(50);
-        data = result.data as BaseOffClient[];
-        error = result.error;
-      }
+      const { data, error } = await supabase.functions.invoke('baseoff-external-query', {
+        body: { search_term: searchTerm.trim() },
+      });
 
       if (error) throw error;
 
-      if (!data || data.length === 0) {
+      const results = data || [];
+
+      // Mapear resposta da API para o formato BaseOffClient
+      const mappedClients: BaseOffClient[] = results.map((row: any) => ({
+        id: row.id || row.cpf,
+        nb: row.nb || '',
+        cpf: row.cpf || '',
+        nome: row.nome || '',
+        data_nascimento: row.data_nascimento,
+        sexo: row.sexo,
+        nome_mae: row.nome_mae,
+        nome_pai: row.nome_pai,
+        naturalidade: row.naturalidade,
+        esp: row.esp,
+        dib: row.dib,
+        mr: row.mr != null ? parseFloat(row.mr) : null,
+        banco_pagto: row.banco_pagto,
+        agencia_pagto: row.agencia_pagto,
+        orgao_pagador: row.orgao_pagador,
+        conta_corrente: row.conta_corrente,
+        meio_pagto: row.meio_pagto,
+        status_beneficio: row.status_beneficio,
+        bloqueio: row.bloqueio,
+        pensao_alimenticia: row.pensao_alimenticia,
+        representante: row.representante,
+        ddb: row.ddb,
+        banco_rmc: row.banco_rmc,
+        valor_rmc: row.valor_rmc != null ? parseFloat(row.valor_rmc) : null,
+        banco_rcc: row.banco_rcc,
+        valor_rcc: row.valor_rcc != null ? parseFloat(row.valor_rcc) : null,
+        bairro: row.bairro,
+        municipio: row.municipio,
+        uf: row.uf,
+        cep: row.cep,
+        endereco: row.endereco,
+        logr_tipo_1: row.logr_tipo_1 || null,
+        logr_titulo_1: row.logr_titulo_1 || null,
+        logr_nome_1: row.logr_nome_1 || null,
+        logr_numero_1: row.logr_numero_1 || null,
+        logr_complemento_1: row.logr_complemento_1 || null,
+        bairro_1: row.bairro_1 || null,
+        cidade_1: row.cidade_1 || null,
+        uf_1: row.uf_1 || null,
+        cep_1: row.cep_1 || null,
+        tel_fixo_1: row.tel_fixo_1 || null,
+        tel_fixo_2: row.tel_fixo_2 || null,
+        tel_fixo_3: row.tel_fixo_3 || null,
+        tel_cel_1: row.tel_cel_1,
+        tel_cel_2: row.tel_cel_2,
+        tel_cel_3: row.tel_cel_3,
+        email_1: row.email_1,
+        email_2: row.email_2 || null,
+        email_3: row.email_3 || null,
+        contratos: (row.contratos || []).map((c: any) => ({
+          id: c.id || c.contrato,
+          banco_emprestimo: c.banco_emprestimo || '',
+          contrato: c.contrato || '',
+          vl_emprestimo: c.vl_emprestimo != null ? parseFloat(c.vl_emprestimo) : null,
+          inicio_desconto: c.inicio_desconto,
+          prazo: c.prazo != null ? parseInt(c.prazo) : null,
+          vl_parcela: c.vl_parcela != null ? parseFloat(c.vl_parcela) : null,
+          tipo_emprestimo: c.tipo_emprestimo,
+          data_averbacao: c.data_averbacao,
+          situacao_emprestimo: c.situacao_emprestimo,
+          competencia: c.competencia,
+          competencia_final: c.competencia_final,
+          taxa: c.taxa != null ? parseFloat(c.taxa) : null,
+          saldo: c.saldo != null ? parseFloat(c.saldo) : null,
+        })),
+      }));
+
+      if (mappedClients.length === 0) {
         toast.info("Nenhum cliente encontrado");
         return;
       }
 
-      setSearchResults(data);
+      setSearchResults(mappedClients);
 
-      if (data.length === 1) {
-        await selectClient(data[0]);
+      if (mappedClients.length === 1) {
+        selectClient(mappedClients[0]);
       }
     } catch (error) {
       console.error("Erro na busca:", error);
@@ -333,51 +372,12 @@ export function BaseOffConsulta() {
 
   const normalizeCpf = (cpf: string) => cpf.replace(/\D/g, "").padStart(11, "0").slice(0, 11);
 
-  // Buscar contratos do cliente (prioriza vínculo por client_id; fallback por CPF)
-  const fetchContractsForClient = async (client: Pick<BaseOffClient, "id" | "cpf">): Promise<BaseOffContract[]> => {
-    // 1) client_id (mais confiável)
-    try {
-      const { data, error } = await supabase
-        .from("baseoff_contracts")
-        .select("*")
-        .eq("client_id", client.id)
-        .order("data_averbacao", { ascending: false });
-
-      if (error) throw error;
-      if (data && data.length > 0) return data as BaseOffContract[];
-    } catch (error) {
-      console.error("Erro ao buscar contratos por client_id:", error);
-    }
-
-    // 2) fallback por CPF (caso existam contratos legados sem client_id consistente)
-    try {
-      const cpfDigits = normalizeCpf(client.cpf);
-      const cpfSemZeros = cpfDigits.replace(/^0+/, "");
-      const cpfMascara = cpfDigits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
-      const variants = Array.from(new Set([cpfDigits, cpfSemZeros, cpfMascara].filter(Boolean)));
-
-      const { data, error } = await supabase
-        .from("baseoff_contracts")
-        .select("*")
-        .in("cpf", variants)
-        .order("data_averbacao", { ascending: false });
-
-      if (error) throw error;
-      return (data || []) as BaseOffContract[];
-    } catch (error) {
-      console.error("Erro ao buscar contratos por CPF:", error);
-      return [];
-    }
-  };
-
-  const selectClient = async (client: BaseOffClient) => {
+  const selectClient = (client: BaseOffClient) => {
     setSelectedClient(client);
     setSearchResults([]);
     setActiveTab("dados");
     setShowSimulation(false);
-
-    const clientContracts = await fetchContractsForClient(client);
-    setContracts(clientContracts);
+    setContracts(client.contratos || []);
   };
 
   // Calcular simulações - apenas para contratos de empréstimo
@@ -526,11 +526,21 @@ export function BaseOffConsulta() {
 
       if (insertError) throw insertError;
 
-      // Buscar contratos para cada cliente (prioriza vínculo por client_id)
+      // Buscar contratos para cada cliente via baseoff_contracts local
       const clientsWithContracts: ActiveClient[] = [];
 
       for (const client of availableClients) {
-        const contractsData = await fetchContractsForClient(client as BaseOffClient);
+        let contractsData: BaseOffContract[] = [];
+        try {
+          const { data: cData } = await supabase
+            .from("baseoff_contracts")
+            .select("*")
+            .eq("client_id", client.id)
+            .order("data_averbacao", { ascending: false });
+          contractsData = (cData || []) as BaseOffContract[];
+        } catch (e) {
+          console.error("Erro ao buscar contratos:", e);
+        }
 
         clientsWithContracts.push({
           id: "",

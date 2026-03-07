@@ -1,61 +1,80 @@
 
 
-## Plano: Atualizar BaseOffConsulta para consumir API externa
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Resumo
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-Substituir todas as consultas diretas ao Supabase (`baseoff_clients`, `baseoff_contracts`) no componente `BaseOffConsulta.tsx` pela chamada a `supabase.functions.invoke('baseoff-external-query')`, que ja existe e retorna clientes com contratos agrupados. O layout permanece inalterado.
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-### Alteracoes no arquivo `src/components/BaseOffConsulta.tsx`
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
 
-**1. Interface `BaseOffClient` (linha 47-97)** -- Adicionar campo `contratos`:
-- Adicionar `contratos?: BaseOffContract[]` ao tipo
-- Manter todos os campos existentes (layout nao muda)
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
 
-**2. Funcao `handleSearch` (linhas 265-332)** -- Substituir queries Supabase por chamada a Edge Function:
-- Remover as 4 queries condicionais (`supabase.from("baseoff_clients")...`)
-- Substituir por `supabase.functions.invoke('baseoff-external-query', { body: { search_term: searchTerm.trim() } })`
-- Mapear resposta da API para o formato `BaseOffClient` com `contratos` embutido
-- Quando a API retorna array, usar `data` diretamente como `searchResults`
+---
 
-**3. Funcao `selectClient` (linhas 373-381)** -- Remover fetch de contratos:
-- Remover chamada a `fetchContractsForClient(client)`
-- Usar `setContracts(client.contratos || [])` diretamente
+### 2. Conectar Base OFF ao PostgreSQL externo
 
-**4. Remover `fetchContractsForClient` (linhas 337-371)** -- Funcao inteira removida, pois contratos vem da API.
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
 
-**5. Remover queries Supabase do fluxo "Ativo" (linhas 227-260, 434-571)** -- As funcoes `fetchCidades`, `handleConfirmAtivo` consultam `baseoff_clients` e `baseoff_active_clients`. Estas dependem de tabelas locais do Supabase, entao serao mantidas como estao (nao fazem parte da busca principal).
+**Arquitetura:**
 
-**6. Remover funcoes de duplicatas (linhas 653-713)** -- `checkDuplicates` e `removeDuplicates` consultam `baseoff_clients` local. Manter como estao pois sao funcoes admin separadas.
+```text
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
+```
 
-**7. Ajustar ContractsBlock e SimulationBlock** -- Ja recebem `contractsList` como prop, nenhuma mudanca necessaria.
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
 
-### Mapeamento de campos da API para o componente
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
 
-| Campo API | Campo interface existente |
-|---|---|
-| `id` (= cpf) | `id` |
-| `contratos[]` | novo campo `contratos` |
-| `data_nascimento` | `data_nascimento` |
-| `valor_rmc` / `valor_rcc` | `valor_rmc` / `valor_rcc` |
-| `banco_rmc` / `banco_rcc` | `banco_rmc` / `banco_rcc` |
-| `tel_cel_3` | `tel_cel_3` |
-| Todos os demais | mapeamento direto (nomes iguais) |
+---
 
-### Edge Function
+### 3. Simplificar modulo Base OFF - apenas Consulta
 
-A Edge Function `baseoff-external-query` ja existe e retorna dados no formato correto. A unica diferenca e que o usuario menciona endpoint `baseoff-search` -- usaremos o nome existente `baseoff-external-query` que ja esta deployado e configurado.
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
 
-### Arquivos modificados
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+
+---
+
+### Arquivos a modificar
 
 | Arquivo | Mudanca |
 |---|---|
-| `src/components/BaseOffConsulta.tsx` | Substituir busca Supabase por `supabase.functions.invoke`, remover `fetchContractsForClient`, adicionar `contratos` a interface, usar contratos da API |
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
 
-### O que NAO muda
+---
 
-- Layout, cards, simulacoes, telefones, abas -- tudo permanece identico
-- Fluxo "Ativo" (usa tabelas locais Supabase)
-- Funcoes admin de importacao e duplicatas
-- Edge Function existente (ja esta correta)
+### Pergunta necessaria
+
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 
