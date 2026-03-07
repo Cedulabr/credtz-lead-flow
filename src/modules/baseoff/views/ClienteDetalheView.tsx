@@ -55,6 +55,43 @@ function inlineToContract(inline: BaseOffInlineContract, clientId: string, cpf: 
   };
 }
 
+// Helper to compute margin data
+function useMargemData(client: BaseOffClient, contracts: BaseOffContract[]) {
+  return useMemo(() => {
+    const isLOAS = client.esp === '87' || client.esp === '88';
+    const factor = isLOAS ? 0.30 : 0.35;
+    const margemBruta = client.mr ? client.mr * factor : null;
+    const totalParcelasEmprestimo = contracts
+      .filter(c => !isCardContract(c.tipo_emprestimo))
+      .reduce((sum, c) => sum + (c.vl_parcela || 0), 0);
+    const totalParcelasCartao = contracts
+      .filter(c => isCardContract(c.tipo_emprestimo))
+      .reduce((sum, c) => sum + (c.vl_parcela || 0), 0);
+    const margemLivre = margemBruta !== null ? Math.max(0, margemBruta - totalParcelasEmprestimo) : null;
+    const rmcDisponivel = client.valor_rmc ? Math.max(0, client.valor_rmc - totalParcelasCartao) : null;
+    const rccDisponivel = client.valor_rcc ? Math.max(0, client.valor_rcc - totalParcelasCartao) : null;
+    return { margemLivre, rmcDisponivel, rccDisponivel, isLOAS, factor };
+  }, [client, contracts]);
+}
+
+function MargemCardsSection({ client, contracts }: { client: BaseOffClient; contracts: BaseOffContract[] }) {
+  return (
+    <div>
+      <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+        💰 Margens e Indicadores
+      </h3>
+      <MargemCards 
+        mr={client.mr}
+        baseCalculo={client.mr ? client.mr * 1.3 : null}
+        margemCartao={client.valor_rmc}
+        cartaoBeneficio={client.valor_rcc}
+        contracts={contracts}
+        esp={client.esp}
+      />
+    </div>
+  );
+}
+
 export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) {
   const [contracts, setContracts] = useState<BaseOffContract[]>([]);
   const [isLoading, setIsLoading] = useState(true);
