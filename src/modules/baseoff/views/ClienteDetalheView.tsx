@@ -234,19 +234,7 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
         <div className="space-y-6">
           <ClienteHeader client={client} />
 
-          <div>
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              💰 Margens e Indicadores
-            </h3>
-            <MargemCards 
-              mr={client.mr}
-              baseCalculo={client.mr ? client.mr * 1.3 : null}
-              margemCartao={client.valor_rmc}
-              cartaoBeneficio={client.valor_rcc}
-              contracts={contracts}
-              esp={client.esp}
-            />
-          </div>
+          <MargemCardsSection client={client} contracts={contracts} />
 
           {/* Cartões Section */}
           <CartoesSection contracts={contracts} />
