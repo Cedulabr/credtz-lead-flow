@@ -238,8 +238,13 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
               baseCalculo={client.mr ? client.mr * 1.3 : null}
               margemCartao={client.valor_rmc}
               cartaoBeneficio={client.valor_rcc}
+              contracts={contracts}
+              esp={client.esp}
             />
           </div>
+
+          {/* Cartões Section */}
+          <CartoesSection contracts={contracts} />
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
             <TabsList className="grid w-full grid-cols-2 h-12">

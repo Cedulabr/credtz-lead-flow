@@ -47,10 +47,10 @@ interface ProfessionalProposalPDFProps {
 // PDF Template Configuration
 const PDF_CONFIG = {
   colors: {
-    primary: { r: 37, g: 99, b: 235 },      // Blue-600
-    secondary: { r: 100, g: 116, b: 139 },   // Slate-500
+    primary: { r: 59, g: 130, b: 246 },      // Blue-500 (lighter)
+    secondary: { r: 120, g: 136, b: 159 },   // Lighter slate
     success: { r: 16, g: 185, b: 129 },      // Emerald-500
-    dark: { r: 30, g: 41, b: 59 },           // Slate-800
+    dark: { r: 51, g: 65, b: 85 },           // Slate-700 (lighter than 800)
     light: { r: 248, g: 250, b: 252 },       // Slate-50
     border: { r: 226, g: 232, b: 240 },      // Slate-200
   },
