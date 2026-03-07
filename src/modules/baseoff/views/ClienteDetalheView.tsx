@@ -329,15 +329,16 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
                 </div>
               )}
 
-              {loanContracts.length > 0 && (
-                <TrocoCalculator
-                  contracts={loanContracts}
-                  selectedContracts={selectedContractIds}
-                  onSelectionChange={setSelectedContractIds}
-                  onSimulationChange={setCurrentSimulation}
-                  onGeneratePDF={() => setShowProposal(true)}
-                />
-              )}
+              <TrocoCalculator
+                contracts={loanContracts}
+                selectedContracts={selectedContractIds}
+                onSelectionChange={setSelectedContractIds}
+                onSimulationChange={setCurrentSimulation}
+                onGeneratePDF={() => setShowProposal(true)}
+                margemLivre={margemData.margemLivre}
+                rmcDisponivel={margemData.rmcDisponivel}
+                rccDisponivel={margemData.rccDisponivel}
+              />
             </TabsContent>
 
             <TabsContent value="timeline" className="space-y-4">
