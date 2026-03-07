@@ -231,7 +231,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const startDate = `${selectedMonth}-01`;
       const endDate = format(endOfMonth(parseISO(startDate)), 'yyyy-MM-dd');
 
-      const [recordsRes, justRes, scheduleRes, profileRes, salaryRes] = await Promise.all([
+      const [recordsRes, justRes, scheduleRes, profileRes, salaryRes, dayOffsRes] = await Promise.all([
         supabase.from('time_clock').select('*').eq('user_id', userId)
           .gte('clock_date', startDate).lte('clock_date', endDate)
           .order('clock_date', { ascending: true }).order('clock_time', { ascending: true }),
@@ -240,6 +240,8 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).single(),
         supabase.from('profiles').select('name, email, cpf, role').eq('id', userId).single(),
         supabase.from('employee_salaries').select('*').eq('user_id', userId).eq('is_active', true).single(),
+        supabase.from('time_clock_day_offs').select('off_date, off_type').eq('user_id', userId)
+          .gte('off_date', startDate).lte('off_date', endDate),
       ]);
 
       const records = recordsRes.data || [];
@@ -247,6 +249,8 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const schedule = scheduleRes.data;
       const profile = profileRes.data;
       const salary = salaryRes.data;
+      const dayOffMap: Record<string, string> = {};
+      (dayOffsRes.data || []).forEach((d: any) => { dayOffMap[d.off_date] = d.off_type; });
 
       const doc = new jsPDF({ orientation: 'landscape' });
       const pageWidth = doc.internal.pageSize.getWidth();
