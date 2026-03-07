@@ -4,6 +4,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -23,6 +25,7 @@ import {
   Calculator, 
   Wallet, 
   Calendar,
+  CalendarIcon,
   Download,
   ChevronDown,
   ChevronUp,
@@ -39,6 +42,8 @@ import { formatCurrency } from '../utils';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { format, differenceInDays, addDays, addMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export interface TrocoSimulation {
   banco: string;
@@ -85,10 +90,17 @@ const FALLBACK_BANKS: BankRate[] = [
 const PRAZOS_PORT_REFIN = [96, 84];
 const PRAZOS_MARGEM_CARTAO = [96, 84, 72];
 const DEFAULT_RATES = [1.85, 1.80, 1.75];
-const IOF_PERCENT = 0.03;
 const CARTAO_TAXA = 2.55;
 const CARTAO_SAQUE_PERCENT = 0.70;
 
+// ─── Financial Functions ────────────────────────────────────────────────
+
+/** Convert monthly rate to equivalent daily rate */
+function getTaxaDiaria(taxaMensalPct: number): number {
+  return Math.pow(1 + taxaMensalPct / 100, 1 / 30) - 1;
+}
+
+/** PMT = PV × [r(1+r)^n] / [(1+r)^n - 1] */
 function calcPMT(pv: number, ratePct: number, n: number): number {
   const r = ratePct / 100;
   if (r === 0) return pv / n;
@@ -96,20 +108,61 @@ function calcPMT(pv: number, ratePct: number, n: number): number {
   return pv * factor;
 }
 
-// Price System: Calculate Present Value (financed amount) from installment
-function calcPV(pmt: number, ratePct: number, n: number): number {
-  const r = ratePct / 100;
-  if (r === 0) return pmt * n;
-  return pmt * (1 - Math.pow(1 + r, -n)) / r;
+/** PV with daily coefficient for first period (fractional first installment) */
+function calcPVDiario(pmt: number, taxaMensalPct: number, n: number, diasPrimeiraParcela: number): number {
+  const im = taxaMensalPct / 100;
+  if (im === 0) return pmt * n;
+  const id = getTaxaDiaria(taxaMensalPct);
+  const fatorPrimeiro = Math.pow(1 + id, diasPrimeiraParcela);
+  // First installment discounted by daily factor, remaining by monthly Price
+  const pvRestante = pmt * (1 - Math.pow(1 + im, -(n - 1))) / im;
+  return (pmt + pvRestante) / fatorPrimeiro;
 }
+
+/** PMT from PV using daily coefficient for first period */
+function calcPMTDiario(pv: number, taxaMensalPct: number, n: number, diasPrimeiraParcela: number): number {
+  const im = taxaMensalPct / 100;
+  if (im === 0) return pv / n;
+  const id = getTaxaDiaria(taxaMensalPct);
+  const fatorPrimeiro = Math.pow(1 + id, diasPrimeiraParcela);
+  const pvFactor = (1 + (1 - Math.pow(1 + im, -(n - 1))) / im) / fatorPrimeiro;
+  return pv / pvFactor;
+}
+
+/** IOF federal: 0.38% fixed + 0.0082%/day (capped at 365 days) */
+function calcIOFFederal(valorFinanciado: number, prazoMeses: number): number {
+  const iofFixo = valorFinanciado * 0.0038;
+  const dias = Math.min(prazoMeses * 30, 365);
+  const iofDiario = valorFinanciado * 0.000082 * dias;
+  return iofFixo + iofDiario;
+}
+
+/** CET mensal via bisection: find rate r where PV(pmt, r, n) = valorLiberado */
+function calcCETMensal(valorLiberado: number, pmt: number, n: number): number {
+  if (valorLiberado <= 0 || pmt <= 0 || n <= 0) return 0;
+  let lo = 0.0001, hi = 0.15; // 0.01% to 15% monthly
+  for (let i = 0; i < 100; i++) {
+    const mid = (lo + hi) / 2;
+    const pv = pmt * (1 - Math.pow(1 + mid, -n)) / mid;
+    if (pv > valorLiberado) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+// ─── Interfaces ─────────────────────────────────────────────────────────
 
 interface RateResult {
   taxa: number;
   novaParcela: number;
   valorContrato: number;
   iof: number;
+  valorLiberado: number;
   trocoBruto: number;
   trocoLiquido: number;
+  cetMensal: number;
+  cetAnual: number;
+  totalOperacao: number;
 }
 
 interface CardResult {
@@ -151,11 +204,24 @@ export function TrocoCalculator({
   const [newBankName, setNewBankName] = useState('');
   const [newBankRate, setNewBankRate] = useState('');
 
+  // Date fields for daily coefficient
+  const [dataContratacao, setDataContratacao] = useState<Date>(new Date());
+  const [primeiroVencimento, setPrimeiroVencimento] = useState<Date>(addDays(new Date(), 30));
+
+  const diasAtePrimeiraParcela = useMemo(
+    () => Math.max(1, differenceInDays(primeiroVencimento, dataContratacao)),
+    [dataContratacao, primeiroVencimento]
+  );
+
+  const ultimoVencimento = useMemo(
+    () => addMonths(primeiroVencimento, prazo - 1),
+    [primeiroVencimento, prazo]
+  );
+
   const prazos = (operationType === 'portabilidade' || operationType === 'refinanciamento') 
     ? PRAZOS_PORT_REFIN 
     : PRAZOS_MARGEM_CARTAO;
 
-  // Reset prazo when switching modes if current prazo is not available
   useEffect(() => {
     if (!prazos.includes(prazo)) {
       setPrazo(prazos[0]);
@@ -203,76 +269,74 @@ export function TrocoCalculator({
     };
   }, [contracts, selectedContracts]);
 
-  // Port/Refin results
+  // Port/Refin results with daily coefficient + federal IOF
   const rateResults = useMemo<RateResult[]>(() => {
     if ((operationType !== 'portabilidade' && operationType !== 'refinanciamento') || 
         selectedContracts.length === 0 || totals.saldoTotal <= 0) return [];
 
     return allRates.map(taxa => {
       const saldo = totals.saldoTotal;
-      const iof = saldo * IOF_PERCENT;
       
       if (operationType === 'portabilidade') {
         // Portabilidade: preserve current installment, lower rate = higher PV = troco
         const novaParcela = totals.parcelaTotal;
-        const valorContrato = calcPV(novaParcela, taxa, prazo);
+        const valorContrato = calcPVDiario(novaParcela, taxa, prazo, diasAtePrimeiraParcela);
+        const iof = calcIOFFederal(valorContrato, prazo);
+        const valorLiberado = valorContrato - iof;
         const trocoBruto = valorContrato - saldo - iof;
-        return { taxa, novaParcela, valorContrato, iof, trocoBruto, trocoLiquido: trocoBruto };
+        const totalOperacao = novaParcela * prazo;
+        const cetM = calcCETMensal(valorLiberado, novaParcela, prazo);
+        const cetA = Math.pow(1 + cetM, 12) - 1;
+        return { taxa, novaParcela, valorContrato, iof, valorLiberado, trocoBruto, trocoLiquido: trocoBruto, cetMensal: cetM * 100, cetAnual: cetA * 100, totalOperacao };
       } else {
-        // Refinanciamento: recalculate installment from balance
-        const novaParcela = calcPMT(saldo, taxa, prazo);
-        const valorContrato = calcPV(novaParcela, taxa, prazo);
+        // Refinanciamento: recalculate installment from balance using daily coefficient
+        const novaParcela = calcPMTDiario(saldo, taxa, prazo, diasAtePrimeiraParcela);
+        const valorContrato = calcPVDiario(novaParcela, taxa, prazo, diasAtePrimeiraParcela);
+        const iof = calcIOFFederal(valorContrato, prazo);
+        const valorLiberado = valorContrato - iof;
         const trocoBruto = valorContrato - saldo - iof;
-        return { taxa, novaParcela, valorContrato, iof, trocoBruto, trocoLiquido: trocoBruto };
+        const totalOperacao = novaParcela * prazo;
+        const cetM = calcCETMensal(valorLiberado, novaParcela, prazo);
+        const cetA = Math.pow(1 + cetM, 12) - 1;
+        return { taxa, novaParcela, valorContrato, iof, valorLiberado, trocoBruto, trocoLiquido: trocoBruto, cetMensal: cetM * 100, cetAnual: cetA * 100, totalOperacao };
       }
     });
-  }, [allRates, prazo, selectedContracts, totals, operationType]);
+  }, [allRates, prazo, selectedContracts, totals, operationType, diasAtePrimeiraParcela]);
 
-  // Novo empréstimo results
+  // Novo empréstimo results with daily coefficient + federal IOF
   const novoEmprestimoResults = useMemo<RateResult[]>(() => {
     if (operationType !== 'novo_emprestimo' || !margemLivre || margemLivre <= 0) return [];
 
     return allRates.map(taxa => {
-      const r = taxa / 100;
-      const pv = r === 0 
-        ? margemLivre * prazo 
-        : margemLivre * (Math.pow(1 + r, prazo) - 1) / (r * Math.pow(1 + r, prazo));
-      const iof = pv * IOF_PERCENT;
-      const liquido = pv - iof;
+      const novaParcela = margemLivre;
+      const valorContrato = calcPVDiario(novaParcela, taxa, prazo, diasAtePrimeiraParcela);
+      const iof = calcIOFFederal(valorContrato, prazo);
+      const valorLiberado = valorContrato - iof;
+      const totalOperacao = novaParcela * prazo;
+      const cetM = calcCETMensal(valorLiberado, novaParcela, prazo);
+      const cetA = Math.pow(1 + cetM, 12) - 1;
       return { 
-        taxa, 
-        novaParcela: margemLivre, 
-        valorContrato: pv, 
-        iof, 
-        trocoBruto: liquido, 
-        trocoLiquido: liquido 
+        taxa, novaParcela, valorContrato, iof, valorLiberado,
+        trocoBruto: valorLiberado, trocoLiquido: valorLiberado,
+        cetMensal: cetM * 100, cetAnual: cetA * 100, totalOperacao
       };
     });
-  }, [allRates, prazo, margemLivre, operationType]);
+  }, [allRates, prazo, margemLivre, operationType, diasAtePrimeiraParcela]);
 
-  // Cartão results
+  // Cartão results (kept with fixed IOF for cards as per original spec)
   const cartaoResults = useMemo<CardResult[]>(() => {
     if (operationType !== 'cartao') return [];
     const results: CardResult[] = [];
     
     const calcCard = (tipo: 'RMC' | 'RCC', margem: number | null) => {
       if (!margem || margem <= 0) return;
-      // Margem is the installment the client can pay
-      // Limit = margem / (taxa/100) using simple card formula
-      // For card: parcela = margem, limit = parcela * prazo (simplified)
-      // Actually: limit calculated via PMT inverse at 2.55%
       const r = CARTAO_TAXA / 100;
-      const limit = r === 0 
-        ? margem * prazo 
-        : margem * (Math.pow(1 + r, prazo) - 1) / (r * Math.pow(1 + r, prazo));
-      const iof = limit * IOF_PERCENT;
-      const saque = (limit - iof) * CARTAO_SAQUE_PERCENT;
 
       prazos.forEach(p => {
         const limitP = r === 0
           ? margem * p
           : margem * (Math.pow(1 + r, p) - 1) / (r * Math.pow(1 + r, p));
-        const iofP = limitP * IOF_PERCENT;
+        const iofP = calcIOFFederal(limitP, p);
         const saqueP = (limitP - iofP) * CARTAO_SAQUE_PERCENT;
         results.push({ tipo, prazo: p, margem, parcela: margem, limite: limitP, iof: iofP, saque: saqueP });
       });
@@ -437,58 +501,108 @@ export function TrocoCalculator({
 
           {/* Parameters for port/refin/novo */}
           {operationType !== 'cartao' && (
-            <div className="grid sm:grid-cols-2 gap-4">
-              {showContractBasedUI && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="flex items-center gap-2">
-                      <Wallet className="w-4 h-4" />
-                      Banco
-                    </Label>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-xs gap-1"
-                      onClick={(e) => { e.stopPropagation(); setShowBankManager(!showBankManager); }}
-                    >
-                      <Settings className="w-3 h-3" />
-                      Gerenciar
-                    </Button>
+            <>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {showContractBasedUI && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="flex items-center gap-2">
+                        <Wallet className="w-4 h-4" />
+                        Banco
+                      </Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs gap-1"
+                        onClick={(e) => { e.stopPropagation(); setShowBankManager(!showBankManager); }}
+                      >
+                        <Settings className="w-3 h-3" />
+                        Gerenciar
+                      </Button>
+                    </div>
+                    <Select value={banco} onValueChange={setBanco}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {banks.map(b => (
+                          <SelectItem key={b.id} value={b.bank_name}>
+                            {b.bank_name} ({b.default_rate.toFixed(2)}% a.m.)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Select value={banco} onValueChange={setBanco}>
+                )}
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    Prazo
+                  </Label>
+                  <Select value={String(prazo)} onValueChange={(v) => setPrazo(Number(v))}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {banks.map(b => (
-                        <SelectItem key={b.id} value={b.bank_name}>
-                          {b.bank_name} ({b.default_rate.toFixed(2)}% a.m.)
+                      {prazos.map(p => (
+                        <SelectItem key={p} value={String(p)}>
+                          {p} meses ({Math.floor(p / 12)} anos)
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              )}
-
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  Prazo
-                </Label>
-                <Select value={String(prazo)} onValueChange={(v) => setPrazo(Number(v))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {prazos.map(p => (
-                      <SelectItem key={p} value={String(p)}>
-                        {p} meses ({Math.floor(p / 12)} anos)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
-            </div>
+
+              {/* Date pickers for daily coefficient */}
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">Data da Contratação</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {format(dataContratacao, "dd/MM/yyyy", { locale: ptBR })}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={dataContratacao}
+                        onSelect={(d) => d && setDataContratacao(d)}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Primeiro Vencimento</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {format(primeiroVencimento, "dd/MM/yyyy", { locale: ptBR })}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={primeiroVencimento}
+                        onSelect={(d) => d && setPrimeiroVencimento(d)}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-muted-foreground">
+                <span>Dias até 1ª parcela: <strong className="text-foreground">{diasAtePrimeiraParcela} dias</strong></span>
+                <span>Último vencimento: <strong className="text-foreground">{format(ultimoVencimento, "dd/MM/yyyy", { locale: ptBR })}</strong></span>
+              </div>
+            </>
           )}
 
           {/* Bank Manager */}
@@ -567,14 +681,18 @@ export function TrocoCalculator({
                   <Badge variant="outline" className="text-xs">Parcela preservada</Badge>
                 )}
               </div>
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30">
                     <TableHead className="text-xs font-semibold">Taxa a.m.</TableHead>
                     <TableHead className="text-xs font-semibold text-right">Parcela</TableHead>
                     <TableHead className="text-xs font-semibold text-right">Vl. Financiado</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">IOF (~3%)</TableHead>
+                    <TableHead className="text-xs font-semibold text-right">IOF</TableHead>
+                    <TableHead className="text-xs font-semibold text-right">Vl. Liberado</TableHead>
                     <TableHead className="text-xs font-semibold text-right">💰 Troco</TableHead>
+                    <TableHead className="text-xs font-semibold text-right">CET a.m.</TableHead>
+                    <TableHead className="text-xs font-semibold text-right">CET a.a.</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -584,6 +702,7 @@ export function TrocoCalculator({
                       <TableCell className="text-right text-sm">{formatCurrency(r.novaParcela)}</TableCell>
                       <TableCell className="text-right text-sm font-medium">{formatCurrency(r.valorContrato)}</TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.iof)}</TableCell>
+                      <TableCell className="text-right text-sm">{formatCurrency(r.valorLiberado)}</TableCell>
                       <TableCell className={cn(
                         "text-right font-bold text-sm",
                         r.trocoLiquido >= 0 
@@ -599,10 +718,13 @@ export function TrocoCalculator({
                           {formatCurrency(r.trocoLiquido)}
                         </span>
                       </TableCell>
+                      <TableCell className="text-right text-sm text-muted-foreground">{r.cetMensal.toFixed(2)}%</TableCell>
+                      <TableCell className="text-right text-sm text-muted-foreground">{r.cetAnual.toFixed(2)}%</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </div>
           )}
 
@@ -614,14 +736,17 @@ export function TrocoCalculator({
                   <div className="px-4 py-2 bg-muted/30 text-sm border-b">
                     Margem livre disponível: <strong className="text-emerald-600">{formatCurrency(margemLivre)}</strong> /mês
                   </div>
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/30">
                         <TableHead className="text-xs font-semibold">Taxa a.m.</TableHead>
                         <TableHead className="text-xs font-semibold text-right">Parcela</TableHead>
                         <TableHead className="text-xs font-semibold text-right">Vl. Financiado</TableHead>
-                        <TableHead className="text-xs font-semibold text-right">IOF (~3%)</TableHead>
-                        <TableHead className="text-xs font-semibold text-right">💰 Líquido</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">IOF</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">💰 Liberado</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">CET a.m.</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">CET a.a.</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -633,13 +758,16 @@ export function TrocoCalculator({
                           <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.iof)}</TableCell>
                           <TableCell className="text-right font-bold text-sm">
                             <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600">
-                              {formatCurrency(r.trocoLiquido)}
+                              {formatCurrency(r.valorLiberado)}
                             </span>
                           </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">{r.cetMensal.toFixed(2)}%</TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">{r.cetAnual.toFixed(2)}%</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-6 text-muted-foreground">
@@ -665,7 +793,7 @@ export function TrocoCalculator({
                         <TableHead className="text-xs font-semibold text-right">Prazo</TableHead>
                         <TableHead className="text-xs font-semibold text-right">Parcela</TableHead>
                         <TableHead className="text-xs font-semibold text-right">Limite</TableHead>
-                        <TableHead className="text-xs font-semibold text-right">IOF (~3%)</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">IOF</TableHead>
                         <TableHead className="text-xs font-semibold text-right">💰 Saque (70%)</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -698,7 +826,6 @@ export function TrocoCalculator({
             </>
           )}
 
-          {/* Summary row */}
           {/* Cartões info */}
           {operationType === 'cartao' && cartaoResults.length > 0 && (
             <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">

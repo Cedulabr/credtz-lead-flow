@@ -1,101 +1,80 @@
 
 
-## Plano: Simulador Financeiro com Coeficiente Diário e IOF Federal
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Contexto
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-O simulador atual usa cálculos Price mensais simples com IOF fixo de 3%. Precisa evoluir para usar coeficiente financeiro diário (considerando dias até o primeiro vencimento) e IOF conforme regra federal (fixo 0,38% + diário 0,0082%/dia limitado a 365 dias).
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-### Alterações em `TrocoCalculator.tsx`
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
 
-#### 1. Novos campos de estado
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
 
-Adicionar campos de data na interface:
-- `dataContratacao` (Date, default: hoje)
-- `primeiroVencimento` (Date, default: hoje + 30 dias)
+---
 
-Campos calculados automaticamente:
-- `diasAtePrimeiraParcela` = diferença em dias entre contratação e primeiro vencimento
-- `ultimoVencimento` = primeiroVencimento + (prazo - 1) meses
+### 2. Conectar Base OFF ao PostgreSQL externo
 
-#### 2. Novas funções financeiras
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
 
-```ts
-// Taxa diária equivalente
-function taxaDiaria(taxaMensal: number): number {
-  return Math.pow(1 + taxaMensal / 100, 1 / 30) - 1;
-}
+**Arquitetura:**
 
-// PV com coeficiente diário (primeiro período fracionado)
-function calcPVDiario(pmt: number, taxaMensalPct: number, n: number, diasPrimeiraParcela: number): number {
-  const im = taxaMensalPct / 100;
-  const id = taxaDiaria(taxaMensalPct);
-  const fatorPrimeiro = Math.pow(1 + id, diasPrimeiraParcela);
-  // PV = PMT / fatorPrimeiro + PMT * (1 - (1+im)^-(n-1)) / im  ... all discounted
-  // Fórmula completa: primeiro período com dias reais, restante mensal
-  if (im === 0) return pmt * n;
-  const pvRestante = pmt * (1 - Math.pow(1 + im, -(n - 1))) / im;
-  return (pmt + pvRestante) / fatorPrimeiro;
-}
-
-// IOF federal correto
-function calcIOFFederal(valorFinanciado: number, prazoMeses: number): number {
-  const iofFixo = valorFinanciado * 0.0038;
-  const dias = Math.min(prazoMeses * 30, 365);
-  const iofDiario = valorFinanciado * 0.000082 * dias;
-  return iofFixo + iofDiario;
-}
+```text
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
 ```
 
-#### 3. Atualizar interface `RateResult`
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
 
-Adicionar campos:
-- `valorLiberado: number` (financiado - IOF)
-- `cetMensal: number`
-- `cetAnual: number`
-- `totalOperacao: number` (parcela × prazo)
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
 
-#### 4. Atualizar cálculos (`rateResults`, `novoEmprestimoResults`)
+---
 
-Substituir `calcPV` por `calcPVDiario` usando `diasAtePrimeiraParcela`. Substituir `IOF_PERCENT` fixo por `calcIOFFederal`. Calcular CET mensal e anual.
+### 3. Simplificar modulo Base OFF - apenas Consulta
 
-#### 5. UI — Campos de data
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
 
-Na seção de parâmetros (abaixo do prazo), adicionar dois date pickers lado a lado:
-- **Data da Contratação** (Calendar popover)
-- **Primeiro Vencimento** (Calendar popover)
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
 
-Abaixo, exibir em texto pequeno:
-- Dias até 1ª parcela: **X dias**
-- Último vencimento: **dd/MM/yyyy**
+---
 
-#### 6. UI — Colunas da tabela de resultados
+### Arquivos a modificar
 
-Atualizar colunas Port/Refin:
-| Taxa | Parcela | Vl. Financiado | IOF | Vl. Liberado | Troco | CET a.m. | CET a.a. |
-
-Atualizar colunas Novo Empréstimo:
-| Taxa | Parcela | Vl. Financiado | IOF | Liberado | CET a.m. | CET a.a. |
-
-Para mobile: as colunas CET podem ficar em scroll horizontal (já tem `overflow-auto` na Table).
-
-#### 7. CET — Cálculo
-
-CET mensal ≈ taxa efetiva que iguala PV (com IOF embutido) às parcelas. Usar Newton-Raphson ou bisection para encontrar a taxa `r` tal que:
-
-```
-valorLiberado = PMT * (1 - (1+r)^-n) / r
-```
-
-CET anual = `(1 + cetMensal)^12 - 1`
-
-### Resumo de arquivos
-
-| Arquivo | Ação |
+| Arquivo | Mudanca |
 |---|---|
-| `TrocoCalculator.tsx` | Adicionar date pickers, funções de coeficiente diário, IOF federal, CET, colunas extras |
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
 
-### Resultado
+---
 
-O simulador passará a gerar resultados compatíveis com simuladores bancários reais, considerando dias até primeiro vencimento e IOF conforme legislação federal.
+### Pergunta necessaria
+
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 
