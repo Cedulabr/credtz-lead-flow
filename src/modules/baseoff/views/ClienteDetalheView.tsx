@@ -274,15 +274,15 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        if (selectedContractIds.length === contracts.length) {
+                      if (selectedContractIds.length === loanContracts.length) {
                           setSelectedContractIds([]);
                         } else {
-                          setSelectedContractIds(contracts.map(c => c.id));
+                          setSelectedContractIds(loanContracts.map(c => c.id));
                         }
                       }}
                       className="text-xs"
                     >
-                      {selectedContractIds.length === contracts.length ? 'Desmarcar todos' : 'Selecionar todos'}
+                      {selectedContractIds.length === loanContracts.length ? 'Desmarcar todos' : 'Selecionar todos'}
                     </Button>
                   )}
                 </div>
