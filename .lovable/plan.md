@@ -1,64 +1,80 @@
 
 
-## Plano: Configuração do Simulador em 3 Blocos + Correção de Cálculos
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Problemas Identificados
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-1. **Refinanciamento com cálculo errado**: O código atual calcula `novaParcela = calcPMTDiario(saldo, taxa, prazo, dias)` e depois `valorContrato = calcPVDiario(novaParcela, ...)`. Isso é circular — PMT do saldo gera PV ≈ saldo, resultando em troco ≈ -IOF sempre. O correto é manter a parcela atual (como na portabilidade) e calcular o PV que essa parcela compra no novo prazo/taxa.
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-2. **Novo Empréstimo**: Lógica correta (usa margem livre como parcela e calcula PV com coeficiente diário). Já está usando `calcPVDiario`.
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
 
-3. **NB no header**: O campo já está no `ClienteHeader` (linha 75), mas precisa garantir que aparece mesmo quando vazio, com label visível.
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
 
-4. **Interface de configuração**: Formulário técnico denso, precisa virar 3 blocos visuais.
+---
 
-### Alterações
+### 2. Conectar Base OFF ao PostgreSQL externo
 
-#### 1. `TrocoCalculator.tsx` — Correção do Refinanciamento (linhas 268-278)
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
 
-Refinanciamento deve usar a mesma lógica da portabilidade: manter parcela atual e calcular o PV correspondente.
+**Arquitetura:**
 
-```typescript
-// ANTES (errado - circular):
-const novaParcela = calcPMTDiario(saldo, taxa, prazo, diasAtePrimeiraParcela);
-const valorContrato = calcPVDiario(novaParcela, taxa, prazo, diasAtePrimeiraParcela);
-
-// DEPOIS (correto - mantém parcela):
-const novaParcela = totals.parcelaTotal;
-const valorContrato = calcPVDiario(novaParcela, taxa, prazo, diasAtePrimeiraParcela);
+```text
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
 ```
 
-Isso garante que tanto portabilidade quanto refinanciamento calculem o PV a partir da parcela existente, gerando troco real.
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
 
-#### 2. `TrocoCalculator.tsx` — UI: 3 Blocos de Configuração
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
 
-Substituir o Card único de parâmetros (linhas 425-556) por 3 cards organizados:
+---
 
-**Bloco 1 — Banco**: Card com nome do banco, taxa padrão em badge, botão "Alterar". Banco manager fica dentro.
+### 3. Simplificar modulo Base OFF - apenas Consulta
 
-**Bloco 2 — Condições da Operação**: Grid de 3 cards: Prazo (com ícone Calendar), Data Contratação, Primeiro Vencimento. Dias até 1ª parcela exibido como info auxiliar.
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
 
-**Bloco 3 — Taxas da Simulação**: Lista visual de taxas ativas (badges), campo para adicionar taxa personalizada, recalculo automático ao mudar qualquer valor.
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
 
-#### 3. `ClienteHeader.tsx` — NB sempre visível
+---
 
-Garantir que o chip NB aparece mesmo quando o valor está vazio, exibindo "N/I" como fallback para que o campo nunca fique oculto.
+### Arquivos a modificar
 
-#### 4. `ProfessionalProposalPDF.tsx` — Cores neutras
-
-Manter as cores neutras já definidas no `PDF_CONFIG` (preto puro para texto, branco para fundo, azul escuro para headings). Não alterar — já segue o padrão solicitado.
-
-### Arquivos
-
-| Arquivo | Ação |
+| Arquivo | Mudanca |
 |---|---|
-| `TrocoCalculator.tsx` | Corrigir refinanciamento (usar parcelaTotal), redesign UI em 3 blocos |
-| `ClienteHeader.tsx` | NB sempre visível com fallback "N/I" |
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
 
-### Resultado
+---
 
-- Refinanciamento gera troco real (igual portabilidade)
-- Novo empréstimo mantém lógica atual (já correta com coeficiente diário)
-- Interface de configuração organizada em Banco / Condições / Taxas
-- NB sempre visível no perfil do cliente
+### Pergunta necessaria
+
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 

@@ -72,7 +72,7 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
             {/* Chips: CPF, NB */}
             <div className="flex items-center gap-3 flex-wrap mt-2">
               <CopyChip label="CPF" value={formatCPFFull(client.cpf)} rawValue={client.cpf} onCopy={copyToClipboard} />
-              <CopyChip label="NB" value={client.nb} rawValue={client.nb} onCopy={copyToClipboard} />
+              <CopyChip label="NB" value={client.nb || 'N/I'} rawValue={client.nb || ''} onCopy={copyToClipboard} />
             </div>
 
             {/* Info Badges */}

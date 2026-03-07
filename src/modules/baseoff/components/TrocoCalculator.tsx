@@ -266,7 +266,8 @@ export function TrocoCalculator({
         const cetA = Math.pow(1 + cetM, 12) - 1;
         return { taxa, novaParcela, valorContrato, iof, valorLiberado, trocoBruto, trocoLiquido: trocoBruto, cetMensal: cetM * 100, cetAnual: cetA * 100, totalOperacao };
       } else {
-        const novaParcela = calcPMTDiario(saldo, taxa, prazo, diasAtePrimeiraParcela);
+        // Refinanciamento: mantém parcela atual e calcula PV no novo prazo/taxa
+        const novaParcela = totals.parcelaTotal;
         const valorContrato = calcPVDiario(novaParcela, taxa, prazo, diasAtePrimeiraParcela);
         const iof = calcIOFFederal(valorContrato, prazo);
         const valorLiberado = valorContrato - iof;
@@ -422,129 +423,145 @@ export function TrocoCalculator({
 
           {/* Parameters */}
           {operationType !== 'cartao' && (
-            <Card className="p-4 space-y-4 shadow-sm">
-              <div className="grid sm:grid-cols-2 gap-4">
-                {showContractBasedUI && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="flex items-center gap-2 text-sm">
-                        <Wallet className="w-4 h-4" /> Banco
-                      </Label>
-                      <Button variant="ghost" size="sm" className="h-6 text-xs gap-1"
-                        onClick={(e) => { e.stopPropagation(); setShowBankManager(!showBankManager); }}>
-                        <Settings className="w-3 h-3" /> Gerenciar
-                      </Button>
+            <div className="space-y-4">
+              {/* ─── Bloco 1: Banco ─── */}
+              {showContractBasedUI && (
+                <Card className="p-4 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Wallet className="w-3.5 h-3.5" /> Banco
+                    </h4>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1"
+                      onClick={() => setShowBankManager(!showBankManager)}>
+                      <Settings className="w-3 h-3" /> {showBankManager ? 'Fechar' : 'Alterar'}
+                    </Button>
+                  </div>
+
+                  {!showBankManager ? (
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <Wallet className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-base truncate">{bancoInfo?.bank_name || banco}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Badge variant="secondary" className="text-xs font-mono">
+                            {bancoInfo?.default_rate?.toFixed(2) || '0.00'}% a.m.
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">Taxa padrão</span>
+                        </div>
+                      </div>
+                      <Select value={banco} onValueChange={setBanco}>
+                        <SelectTrigger className="w-auto h-8 text-xs border-dashed">
+                          <SelectValue placeholder="Trocar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {banks.map(b => (
+                            <SelectItem key={b.id} value={b.bank_name}>
+                              {b.bank_name} ({b.default_rate.toFixed(2)}%)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <Select value={banco} onValueChange={setBanco}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2">
                         {banks.map(b => (
-                          <SelectItem key={b.id} value={b.bank_name}>
-                            {b.bank_name} ({b.default_rate.toFixed(2)}% a.m.)
-                          </SelectItem>
+                          <Badge key={b.id} variant={b.bank_name === banco ? 'default' : 'secondary'} 
+                            className="gap-1 pr-1 cursor-pointer" onClick={() => setBanco(b.bank_name)}>
+                            {b.bank_name} ({b.default_rate.toFixed(2)}%)
+                            <Button variant="ghost" size="icon" className="h-4 w-4 hover:bg-destructive/20" 
+                              onClick={(e) => { e.stopPropagation(); handleRemoveBank(b.id); }}>
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input placeholder="Nome do banco" value={newBankName} onChange={(e) => setNewBankName(e.target.value)} className="h-8 text-sm" />
+                        <Input placeholder="Taxa %" value={newBankRate} onChange={(e) => setNewBankRate(e.target.value)} className="h-8 text-sm w-24" />
+                        <Button variant="outline" size="sm" onClick={handleAddBank} className="h-8 gap-1"><Plus className="w-3 h-3" /> Adicionar</Button>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              {/* ─── Bloco 2: Condições da Operação ─── */}
+              <Card className="p-4 shadow-sm">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                  <Calendar className="w-3.5 h-3.5" /> Condições da Operação
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Prazo */}
+                  <div className="p-3 rounded-lg border bg-muted/30 space-y-1.5">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Prazo</p>
+                    <Select value={String(prazo)} onValueChange={(v) => setPrazo(Number(v))}>
+                      <SelectTrigger className="h-9 border-0 bg-background shadow-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {prazos.map(p => (
+                          <SelectItem key={p} value={String(p)}>{p} meses ({Math.floor(p / 12)} anos)</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                )}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2 text-sm">
-                    <Calendar className="w-4 h-4" /> Prazo
-                  </Label>
-                  <Select value={String(prazo)} onValueChange={(v) => setPrazo(Number(v))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {prazos.map(p => (
-                        <SelectItem key={p} value={String(p)}>{p} meses ({Math.floor(p / 12)} anos)</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
 
-              {/* Advanced: date pickers */}
-              <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="text-xs gap-1 text-muted-foreground">
-                    <Settings className="w-3 h-3" />
-                    {showAdvanced ? 'Ocultar avançado' : 'Configurações avançadas'}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="pt-3 space-y-3">
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs">Data da Contratação</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {format(dataContratacao, "dd/MM/yyyy", { locale: ptBR })}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <CalendarComponent mode="single" selected={dataContratacao} onSelect={(d) => d && setDataContratacao(d)} initialFocus className="p-3 pointer-events-auto" />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">Primeiro Vencimento</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm">
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {format(primeiroVencimento, "dd/MM/yyyy", { locale: ptBR })}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <CalendarComponent mode="single" selected={primeiroVencimento} onSelect={(d) => d && setPrimeiroVencimento(d)} initialFocus className="p-3 pointer-events-auto" />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-muted-foreground">
-                    <span>Dias até 1ª parcela: <strong className="text-foreground">{diasAtePrimeiraParcela} dias</strong></span>
-                    <span>Último vencimento: <strong className="text-foreground">{format(ultimoVencimento, "dd/MM/yyyy", { locale: ptBR })}</strong></span>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Bank Manager */}
-              {showBankManager && showContractBasedUI && (
-                <div className="p-3 space-y-3 border-dashed border rounded-lg">
-                  <p className="text-sm font-semibold">Gerenciar Bancos</p>
-                  <div className="flex flex-wrap gap-2">
-                    {banks.map(b => (
-                      <Badge key={b.id} variant="secondary" className="gap-1 pr-1">
-                        {b.bank_name} ({b.default_rate.toFixed(2)}%)
-                        <Button variant="ghost" size="icon" className="h-4 w-4 hover:bg-destructive/20" onClick={() => handleRemoveBank(b.id)}>
-                          <X className="w-3 h-3" />
+                  {/* Data Contratação */}
+                  <div className="p-3 rounded-lg border bg-muted/30 space-y-1.5">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Contratação</p>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm border-0 bg-background shadow-sm">
+                          <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                          {format(dataContratacao, "dd/MM/yyyy", { locale: ptBR })}
                         </Button>
-                      </Badge>
-                    ))}
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent mode="single" selected={dataContratacao} onSelect={(d) => d && setDataContratacao(d)} initialFocus className="p-3 pointer-events-auto" />
+                      </PopoverContent>
+                    </Popover>
                   </div>
-                  <div className="flex gap-2">
-                    <Input placeholder="Nome do banco" value={newBankName} onChange={(e) => setNewBankName(e.target.value)} className="h-8 text-sm" />
-                    <Input placeholder="Taxa %" value={newBankRate} onChange={(e) => setNewBankRate(e.target.value)} className="h-8 text-sm w-24" />
-                    <Button variant="outline" size="sm" onClick={handleAddBank} className="h-8 gap-1"><Plus className="w-3 h-3" /></Button>
-                  </div>
-                </div>
-              )}
 
-              {/* Custom rate */}
-              <div className="flex items-end gap-2">
-                <div className="space-y-1 flex-1">
-                  <Label className="text-xs">Adicionar taxa personalizada (%)</Label>
-                  <Input type="text" placeholder="Ex: 1.60" value={newRate} onChange={(e) => setNewRate(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddRate()} className="h-9" />
+                  {/* Primeiro Vencimento */}
+                  <div className="p-3 rounded-lg border bg-muted/30 space-y-1.5">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">1º Vencimento</p>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal h-9 text-sm border-0 bg-background shadow-sm">
+                          <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                          {format(primeiroVencimento, "dd/MM/yyyy", { locale: ptBR })}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent mode="single" selected={primeiroVencimento} onSelect={(d) => d && setPrimeiroVencimento(d)} initialFocus className="p-3 pointer-events-auto" />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleAddRate} className="h-9 gap-1">
-                  <Plus className="w-3.5 h-3.5" /> Adicionar
-                </Button>
-              </div>
-              {customRates.length > 0 && (
-                <div className="flex flex-wrap gap-2">
+
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-muted-foreground mt-3 pt-3 border-t">
+                  <span>Dias até 1ª parcela: <strong className="text-foreground">{diasAtePrimeiraParcela} dias</strong></span>
+                  <span>Último vencimento: <strong className="text-foreground">{format(ultimoVencimento, "dd/MM/yyyy", { locale: ptBR })}</strong></span>
+                </div>
+              </Card>
+
+              {/* ─── Bloco 3: Taxas da Simulação ─── */}
+              <Card className="p-4 shadow-sm">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                  <Calculator className="w-3.5 h-3.5" /> Taxas da Simulação
+                </h4>
+
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {DEFAULT_RATES.map(rate => (
+                    <Badge key={rate} variant="outline" className="text-sm font-mono py-1 px-3">
+                      {rate.toFixed(2)}%
+                    </Badge>
+                  ))}
                   {customRates.map(rate => (
-                    <Badge key={rate} variant="secondary" className="gap-1 pr-1">
+                    <Badge key={rate} variant="secondary" className="text-sm font-mono py-1 px-3 gap-1 pr-1.5">
                       {rate.toFixed(2)}%
                       <Button variant="ghost" size="icon" className="h-4 w-4 hover:bg-destructive/20" onClick={() => handleRemoveRate(rate)}>
                         <X className="w-3 h-3" />
@@ -552,8 +569,16 @@ export function TrocoCalculator({
                     </Badge>
                   ))}
                 </div>
-              )}
-            </Card>
+
+                <div className="flex items-center gap-2">
+                  <Input type="text" placeholder="Ex: 1.60" value={newRate} onChange={(e) => setNewRate(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddRate()} className="h-9 flex-1" />
+                  <Button variant="outline" size="sm" onClick={handleAddRate} className="h-9 gap-1 shrink-0">
+                    <Plus className="w-3.5 h-3.5" /> Adicionar taxa
+                  </Button>
+                </div>
+              </Card>
+            </div>
           )}
 
           {/* ═══ BEST OPERATION HIGHLIGHT ═══ */}
