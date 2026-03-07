@@ -86,7 +86,7 @@ serve(async (req) => {
           id: cpf,
           cpf,
           nome: row.nome,
-          nb: row.nb,
+          nb: row.nb || row.NB || row.numero_beneficio || row.num_beneficio || null,
           data_nascimento: row.dtnascimento || null,
           sexo: row.sexo || null,
           nome_mae: null,

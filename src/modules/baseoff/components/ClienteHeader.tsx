@@ -187,16 +187,16 @@ function SectionTitle({ icon: Icon, title }: { icon: React.ElementType; title: s
 
 function CopyChip({ label, value, rawValue, onCopy }: { label: string; value: string; rawValue: string; onCopy: (text: string, label: string) => void }) {
   return (
-    <div className="flex items-center gap-1.5 bg-muted/60 rounded-lg px-3 py-1.5">
-      <span className="text-xs text-muted-foreground font-medium">{label}:</span>
-      <span className="font-mono text-sm font-semibold">{value}</span>
+    <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-4 py-2">
+      <span className="text-sm text-muted-foreground font-medium">{label}:</span>
+      <span className="font-mono text-base font-bold">{value}</span>
       <Button
         variant="ghost"
         size="icon"
-        className="h-5 w-5 hover:bg-background"
+        className="h-6 w-6 hover:bg-background"
         onClick={() => onCopy(rawValue, label)}
       >
-        <Copy className="w-3 h-3" />
+        <Copy className="w-3.5 h-3.5" />
       </Button>
     </div>
   );
