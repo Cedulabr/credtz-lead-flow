@@ -1,80 +1,47 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Plano: Reformular PDF Mensal no Formato Profissional (Folha de Ponto)
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Onde gerar o PDF
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+O botao "Gerar PDF" ja existe na aba **Historico** do modulo Controle de Ponto. Quando voce seleciona um colaborador e clica em "Gerar PDF" > "Espelho Mensal", ele gera o PDF. O problema e que o formato atual nao corresponde ao modelo profissional que voce precisa.
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+### Problemas no PDF atual
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+1. **Layout nao corresponde ao modelo**: a imagem de referencia mostra uma tabela com colunas claras (Data, Dia da Semana, Hora Entrada, Hora Saida, Intervalo inicio/fim, Total Intervalo, Licenca Medica, Ferias, Total de Horas)
+2. **Falta coluna "Dia da Semana"** por extenso (Segunda, Terca, etc.)
+3. **Falta sinalizacao visual de Sabado/Domingo** com fundo diferente
+4. **Falta colunas de Licenca Medica e Ferias** (Sim/Nao)
+5. **Falta "Total de Horas" no formato HH:MM** padronizado
+6. **Cabecalho da tabela sem destaque vermelho/forte** como no modelo
+7. **Faltas nao estao sinalizadas claramente** - dia util sem registro deveria aparecer em branco com status "FALTA"
 
----
+### Alteracoes planejadas
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+**Arquivo: `src/components/TimeClock/TimeClockPDF.tsx`** - Reescrever `generateMonthlyPDF()`
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+Nova estrutura de colunas no PDF (baseada na imagem de referencia):
 
-**Arquitetura:**
+| Data | Dia da Semana | Entrada | Saida | Pausa Inicio | Pausa Fim | Total Intervalo | Atraso | Licenca Med. | Ferias | Total Horas |
+|------|--------------|---------|-------|-------------|-----------|-----------------|--------|-------------|--------|------------|
 
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
-```
+Melhorias especificas:
+- Cabecalho da tabela com fundo vermelho forte (como na imagem)
+- Dias de fim de semana com fundo cinza claro
+- Dias com falta sinalizados com texto "FALTA" na coluna de status
+- Dias com atraso mostram os minutos de atraso
+- Dias com justificativa aprovada mostram indicador visual
+- Formato de horas padronizado HH:MM (08:00:00 no modelo)
+- Coluna "Total de Horas" calculada automaticamente
+- Rodape com somatorio: Total Horas, Total Atrasos (soma em minutos/horas), Total Faltas, Total HE
+- Campos de assinatura mantidos
+- Informacao financeira (salario/desconto) mantida se disponivel
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+### Resumo
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
-
----
-
-### 3. Simplificar modulo Base OFF - apenas Consulta
-
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
-
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
-
----
-
-### Arquivos a modificar
-
-| Arquivo | Mudanca |
+| Arquivo | Acao |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
+| `src/components/TimeClock/TimeClockPDF.tsx` | Reescrever tabela mensal no formato profissional da imagem de referencia |
 
----
-
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+Apenas 1 arquivo modificado. A logica de calculo ja existe em `timeClockCalculations.ts` - so precisa reformatar a apresentacao no PDF.
 
