@@ -557,27 +557,48 @@ export function TrocoCalculator({
 
           {/* RESULTS: Port/Refin */}
           {showContractBasedUI && rateResults.length > 0 && (
-            <div className="border rounded-lg overflow-auto">
+          <div className="rounded-xl border overflow-hidden">
+              {/* Summary bar */}
+              <div className="px-4 py-3 bg-muted/40 border-b flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+                <span>Saldo devedor: <strong className="text-foreground">{formatCurrency(totals.saldoTotal)}</strong></span>
+                <span>Parcela atual: <strong className="text-foreground">{formatCurrency(totals.parcelaTotal)}</strong></span>
+                <span>Prazo: <strong className="text-foreground">{prazo}x</strong></span>
+                {operationType === 'portabilidade' && (
+                  <Badge variant="outline" className="text-xs">Parcela preservada</Badge>
+                )}
+              </div>
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/50">
+                  <TableRow className="bg-muted/30">
                     <TableHead className="text-xs font-semibold">Taxa a.m.</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">Nova Parcela</TableHead>
+                    <TableHead className="text-xs font-semibold text-right">Parcela</TableHead>
                     <TableHead className="text-xs font-semibold text-right">Vl. Financiado</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">Total Pago</TableHead>
                     <TableHead className="text-xs font-semibold text-right">IOF (~3%)</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">Troco</TableHead>
+                    <TableHead className="text-xs font-semibold text-right">💰 Troco</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rateResults.map((r) => (
-                    <TableRow key={r.taxa} className="hover:bg-muted/30">
+                    <TableRow key={r.taxa} className="hover:bg-muted/20">
                       <TableCell className="font-mono font-semibold text-sm">{r.taxa.toFixed(2)}%</TableCell>
                       <TableCell className="text-right text-sm">{formatCurrency(r.novaParcela)}</TableCell>
                       <TableCell className="text-right text-sm font-medium">{formatCurrency(r.valorContrato)}</TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.totalPago)}</TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.iof)}</TableCell>
-                      <TableCell className="text-right font-bold text-sm text-emerald-600">{formatCurrency(r.trocoLiquido)}</TableCell>
+                      <TableCell className={cn(
+                        "text-right font-bold text-sm",
+                        r.trocoLiquido >= 0 
+                          ? "text-emerald-600" 
+                          : "text-destructive"
+                      )}>
+                        <span className={cn(
+                          "inline-block px-2 py-0.5 rounded-md",
+                          r.trocoLiquido >= 0 
+                            ? "bg-emerald-50 dark:bg-emerald-950/30" 
+                            : "bg-destructive/10"
+                        )}>
+                          {formatCurrency(r.trocoLiquido)}
+                        </span>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
