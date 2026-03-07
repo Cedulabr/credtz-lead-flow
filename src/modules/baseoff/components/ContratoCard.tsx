@@ -79,7 +79,15 @@ export function ContratoCard({
                     <span className="font-bold text-lg">
                       Banco {contract.banco_emprestimo || 'N/I'}
                     </span>
-                    <StatusBadge status={status} size="sm" />
+                    {installments.pagas >= 12 ? (
+                      <Badge variant="outline" className="text-xs border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30">
+                        Disponível
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs text-muted-foreground">
+                        {installments.pagas}/{contract.prazo || 0} pagas
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground truncate">
                     {contract.tipo_emprestimo || 'Empréstimo'} • Contrato: {contract.contrato}
