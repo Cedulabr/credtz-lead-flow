@@ -26,6 +26,7 @@ export interface RadarClient {
   total_contratos: number;
   opportunity_score: number;
   classification: 'Premium' | 'Alta' | 'Média' | 'Baixa';
+  telefones: string[];
 }
 
 export interface RadarSearchResult {
@@ -34,6 +35,8 @@ export interface RadarSearchResult {
   page: number;
   per_page: number;
   total_pages: number;
+  capped: boolean;
+  total_real: number;
 }
 
 export interface RadarStats {
