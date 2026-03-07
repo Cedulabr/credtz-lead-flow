@@ -17,7 +17,7 @@ import {
   Clock
 } from 'lucide-react';
 import { BaseOffContract, ClientStatus } from '../types';
-import { StatusBadge } from './StatusBadge';
+import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatDate, calculateInstallments } from '../utils';
 import { cn } from '@/lib/utils';
 
@@ -79,7 +79,15 @@ export function ContratoCard({
                     <span className="font-bold text-lg">
                       Banco {contract.banco_emprestimo || 'N/I'}
                     </span>
-                    <StatusBadge status={status} size="sm" />
+                    {installments.pagas >= 12 ? (
+                      <Badge variant="outline" className="text-xs border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30">
+                        Disponível
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs text-muted-foreground">
+                        {installments.pagas}/{contract.prazo || 0} pagas
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground truncate">
                     {contract.tipo_emprestimo || 'Empréstimo'} • Contrato: {contract.contrato}
@@ -98,10 +106,10 @@ export function ContratoCard({
                   <p className="font-bold text-lg">{formatCurrency(contract.saldo)}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xs text-muted-foreground">Pagas/Restantes</p>
+                  <p className="text-xs text-muted-foreground">Pagas / Prazo / Restantes</p>
                   <p className="font-bold text-lg">
                     <span className="text-emerald-600">{installments.pagas}</span>
-                    <span className="text-muted-foreground">/</span>
+                    <span className="text-muted-foreground"> / {contract.prazo || 0} / </span>
                     <span className="text-orange-600">{installments.restantes}</span>
                   </p>
                 </div>
@@ -128,10 +136,10 @@ export function ContratoCard({
                 <p className="font-bold">{formatCurrency(contract.saldo)}</p>
               </div>
               <div className="flex-1 text-center">
-                <p className="text-xs text-muted-foreground">Pagas/Rest.</p>
+                <p className="text-xs text-muted-foreground">Pagas/Prazo/Rest.</p>
                 <p className="font-bold">
                   <span className="text-emerald-600">{installments.pagas}</span>
-                  /
+                  <span className="text-muted-foreground">/{contract.prazo || 0}/</span>
                   <span className="text-orange-600">{installments.restantes}</span>
                 </p>
               </div>

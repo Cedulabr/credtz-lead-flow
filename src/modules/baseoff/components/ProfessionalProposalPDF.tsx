@@ -47,12 +47,13 @@ interface ProfessionalProposalPDFProps {
 // PDF Template Configuration
 const PDF_CONFIG = {
   colors: {
-    primary: { r: 59, g: 130, b: 246 },      // Blue-500 (lighter)
-    secondary: { r: 120, g: 136, b: 159 },   // Lighter slate
+    primary: { r: 37, g: 99, b: 235 },       // Blue-600
+    secondary: { r: 100, g: 116, b: 139 },   // Slate-500
     success: { r: 16, g: 185, b: 129 },      // Emerald-500
-    dark: { r: 51, g: 65, b: 85 },           // Slate-700 (lighter than 800)
-    light: { r: 248, g: 250, b: 252 },       // Slate-50
-    border: { r: 226, g: 232, b: 240 },      // Slate-200
+    dark: { r: 15, g: 23, b: 42 },           // Slate-900 - high contrast text
+    light: { r: 255, g: 255, b: 255 },       // White backgrounds
+    border: { r: 203, g: 213, b: 225 },      // Slate-300
+    text: { r: 0, g: 0, b: 0 },              // Pure black for data
   },
   fonts: {
     title: 18,
@@ -184,7 +185,7 @@ export function ProfessionalProposalPDF({
         bold?: boolean;
         align?: 'left' | 'center' | 'right';
       }) => {
-        const { fontSize = fonts.body, color = colors.dark, bold = false, align = 'left' } = options || {};
+        const { fontSize = fonts.body, color = colors.text, bold = false, align = 'left' } = options || {};
         doc.setFontSize(fontSize);
         setColor(color);
         doc.setFont('helvetica', bold ? 'bold' : 'normal');
@@ -350,10 +351,11 @@ export function ProfessionalProposalPDF({
           y = margin;
         }
 
-        // Contract box
-        doc.setFillColor(colors.light.r, colors.light.g, colors.light.b);
+      // Contract box - white background with visible border
+        doc.setFillColor(255, 255, 255);
         doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, 42, 2, 2, 'F');
         doc.setDrawColor(colors.border.r, colors.border.g, colors.border.b);
+        doc.setLineWidth(0.8);
         doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, 42, 2, 2, 'S');
 
         // Contract header
@@ -363,7 +365,7 @@ export function ProfessionalProposalPDF({
         });
         addText(contract.banco_emprestimo || 'Banco não informado', margin + 35, y + 5, { 
           fontSize: fonts.body, 
-          color: colors.dark, 
+          color: colors.text, 
           bold: true 
         });
         

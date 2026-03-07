@@ -62,9 +62,15 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
       try {
         const offset = page * pageSize;
 
+        // Auto-pad CPF with leading zeros if numeric and < 11 digits
+        let searchTerm = query.trim();
+        if (/^\d+$/.test(searchTerm) && searchTerm.length < 11) {
+          searchTerm = searchTerm.padStart(11, '0');
+        }
+
         const { data, error } = await supabase.functions.invoke('baseoff-external-query', {
           body: {
-            search_term: query.trim(),
+            search_term: searchTerm,
             search_limit: pageSize,
             search_offset: offset,
           },

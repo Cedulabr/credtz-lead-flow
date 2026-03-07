@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { BadgeProps } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { 
   Calendar, 
@@ -64,9 +65,14 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
     <Card className="p-5 border">
       {/* Top Row: Name, CPF, NB inline */}
       <div className="flex flex-wrap items-center gap-3 mb-4 pb-4 border-b border-border/50">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <h2 className="text-xl font-bold">{client.nome}</h2>
           <StatusBadge status={client.status || 'simulado'} />
+          {age && (
+            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 text-sm px-3 py-1">
+              {age} anos
+            </Badge>
+          )}
         </div>
 
         <div className="flex items-center gap-4 ml-auto flex-wrap">
@@ -143,8 +149,8 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
 
 function SectionTitle({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
   return (
-    <h3 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-border/40">
-      <Icon className="w-3.5 h-3.5" />
+    <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-border/40">
+      <Icon className="w-4 h-4" />
       {title}
     </h3>
   );
@@ -170,9 +176,9 @@ function CopyChip({ label, value, rawValue, onCopy }: { label: string; value: st
 function InfoRow({ label, value }: { label: string; value: string | number | null | undefined }) {
   const isEmpty = !value || value === '---';
   return (
-    <div className="flex items-center justify-between py-1 border-b border-border/20">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className={`text-xs text-right max-w-[60%] truncate ${isEmpty ? 'text-muted-foreground/40' : 'font-medium'}`}>
+    <div className="flex items-center justify-between py-1.5 border-b border-border/20">
+      <span className="text-muted-foreground text-sm">{label}</span>
+      <span className={`text-sm text-right max-w-[60%] truncate ${isEmpty ? 'text-muted-foreground/40' : 'font-medium'}`}>
         {isEmpty ? '---' : value}
       </span>
     </div>
