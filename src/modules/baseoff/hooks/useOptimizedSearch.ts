@@ -78,7 +78,8 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
 
         if (error) throw error;
 
-        const results = data || [];
+        // Handle both array response and { data: [...] } wrapper
+        const results = Array.isArray(data) ? data : (data?.data || data || []);
 
         // Spread all fields from API, only compute status
         const transformedClients: BaseOffClient[] = results.map((row: any) => {
