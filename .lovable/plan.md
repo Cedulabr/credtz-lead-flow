@@ -1,80 +1,117 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Plano: Redesign Completo da Tela Consulta Base OFF — Layout Fintech Moderno
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Visão Geral
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+Reestruturar a tela de detalhe do cliente (`ClienteDetalheView`) em 4 blocos visuais claros com design fintech, substituir tabelas densas por cards informativos no simulador, e adicionar destaque automático da melhor operação. Ocultar campos avançados (IOF, CET) da interface principal.
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+### Arquivos a Modificar
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+| Arquivo | Ação |
+|---|---|
+| `ClienteDetalheView.tsx` | Reestruturar layout em 4 blocos lineares, mover contatos para inline, botão GERAR PROPOSTA grande e fixo |
+| `ClienteHeader.tsx` | Simplificar para perfil moderno: Nome, Idade, CPF, NB, Banco, Espécie, Cidade. Remover colunas detalhadas |
+| `TelefoneHotPanel.tsx` | Converter para cards horizontais inline (não mais sidebar), botões grandes WhatsApp/Ligar/Copiar |
+| `ContratoCard.tsx` | Redesign como card fintech: checkbox integrado, dados-chave visíveis sem expandir, remover collapsible |
+| `MargemCards.tsx` | Refinar visual: ícones Lucide em vez de emoji, cards com sombra suave, valores maiores |
+| `TrocoCalculator.tsx` | Resultados em cards (não tabelas), melhor operação no topo, ocultar IOF/CET, troco negativo com bolinha vermelha, botão GERAR PROPOSTA destacado |
+| `ProfessionalProposalPDF.tsx` | Redesign do PDF: logo, valor liberado em destaque, hierarquia visual clara |
 
----
+### 1. ClienteDetalheView — Nova Estrutura
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+Remover layout `grid lg:grid-cols-[1fr_320px]` (sidebar de telefones). Tudo em coluna única:
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
-
-**Arquitetura:**
-
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
+```
+1. Perfil do Cliente (ClienteHeader simplificado)
+2. Contatos (TelefoneHotPanel horizontal)  
+3. Margens e Indicadores (MargemCards)
+4. Cartões (CartoesSection)
+5. Contratos (cards com checkbox integrado)
+6. Simulador (resultados em cards, melhor operação no topo)
+7. Botão GERAR PROPOSTA (grande, fixo no mobile)
 ```
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+Remover tabs contratos/timeline — exibir contratos diretamente. Timeline fica acessível via botão secundário.
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+### 2. ClienteHeader — Perfil Moderno
 
----
+Card com avatar/ícone grande à esquerda, dados essenciais à direita:
+- **Nome** (grande) + Badge de idade
+- CPF, NB com botões copiar
+- Banco pagador, Espécie, Cidade em chips/badges
+- Remover as 3 colunas detalhadas (Dados Pessoais/Bancários/Endereço) — dados detalhados ficam em um "ver mais" colapsível
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
+### 3. TelefoneHotPanel — Cards Horizontais
 
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
+Converter de sidebar para grid horizontal `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`:
+- Cada telefone como card com número grande
+- Botões WhatsApp (verde, grande), Ligar, Copiar
+- Funciona bem em mobile com scroll horizontal ou stack
 
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+### 4. ContratoCard — Card Fintech
 
----
+Redesign sem collapsible:
+- Checkbox integrado no canto superior
+- Informações-chave visíveis: Banco, Parcela, Saldo, Taxa, Pagas/Restantes, Averbação
+- Layout em grid dentro do card
+- Badge "Disponível" verde se >= 12 parcelas pagas
+- Sem botões de ação individuais (ações ficam no simulador)
 
-### Arquivos a modificar
+### 5. MargemCards — Visual Refinado
 
-| Arquivo | Mudanca |
-|---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
+- Substituir emojis por ícones Lucide coloridos
+- Cards com `shadow-sm`, bordas mais suaves
+- Valor em `text-3xl font-bold`
+- Label em `text-xs uppercase tracking-wide`
 
----
+### 6. TrocoCalculator — Resultados em Cards
 
-### Pergunta necessaria
+**Melhor Operação** — Card destacado no topo:
+- Fundo gradiente azul/verde
+- "Melhor operação disponível"
+- Banco, Taxa, Troco líquido em destaque
 
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+**Resultados** — Grid de cards em vez de tabela:
+- Cada taxa vira um card com: Taxa, Parcela, Vl. Financiado, Vl. Liberado, Troco
+- IOF, CET ocultos (dados mantidos internamente)
+- Troco positivo: valor verde com bolinha verde
+- Troco negativo: `● -R$ 203,52` em vermelho com bolinha vermelha
+
+**Parâmetros** — Simplificados, campos de data ocultos por padrão (toggle "Avançado")
+
+**Botão GERAR PROPOSTA** — `h-14 text-lg font-bold` com gradiente primário, full-width
+
+### 7. Tratamento Visual do Troco
+
+```tsx
+<div className="flex items-center gap-2">
+  <span className={cn(
+    "w-3 h-3 rounded-full",
+    troco >= 0 ? "bg-emerald-500" : "bg-red-500"
+  )} />
+  <span className={cn(
+    "text-2xl font-bold",
+    troco >= 0 ? "text-emerald-600" : "text-red-600"
+  )}>
+    {formatCurrency(troco)}
+  </span>
+</div>
+```
+
+### 8. PDF da Proposta
+
+- Logo da empresa no topo
+- Dados do cliente em seção limpa
+- Resumo da operação com valor liberado em destaque (caixa grande azul)
+- Condições do contrato em grid organizado
+- Rodapé com disclaimers
+
+### 9. Responsividade
+
+Mobile-first: blocos empilham verticalmente na ordem Cliente → Contatos → Margens → Contratos → Simulação → Gerar Proposta. Botão GERAR PROPOSTA pode ser sticky no bottom em mobile.
+
+### Resultado
+
+Interface moderna tipo fintech com leitura rápida, hierarquia visual clara, e operação intuitiva mesmo para usuários leigos. Dados avançados (IOF, CET) preservados internamente mas ocultos da interface principal.
 
