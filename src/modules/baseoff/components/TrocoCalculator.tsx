@@ -210,13 +210,21 @@ export function TrocoCalculator({
 
     return allRates.map(taxa => {
       const saldo = totals.saldoTotal;
-      const novaParcela = calcPMT(saldo, taxa, prazo);
-      const valorContrato = calcPV(novaParcela, taxa, prazo);
-      const totalPago = novaParcela * prazo;
       const iof = saldo * IOF_PERCENT;
-      const trocoBruto = Math.max(0, valorContrato - saldo - iof);
-      // Portabilidade and refinanciamento: NO 70% rule, just IOF
-      return { taxa, novaParcela, valorContrato, totalPago, iof, trocoBruto, trocoLiquido: trocoBruto };
+      
+      if (operationType === 'portabilidade') {
+        // Portabilidade: preserve current installment, lower rate = higher PV = troco
+        const novaParcela = totals.parcelaTotal;
+        const valorContrato = calcPV(novaParcela, taxa, prazo);
+        const trocoBruto = valorContrato - saldo - iof;
+        return { taxa, novaParcela, valorContrato, iof, trocoBruto, trocoLiquido: trocoBruto };
+      } else {
+        // Refinanciamento: recalculate installment from balance
+        const novaParcela = calcPMT(saldo, taxa, prazo);
+        const valorContrato = calcPV(novaParcela, taxa, prazo);
+        const trocoBruto = valorContrato - saldo - iof;
+        return { taxa, novaParcela, valorContrato, iof, trocoBruto, trocoLiquido: trocoBruto };
+      }
     });
   }, [allRates, prazo, selectedContracts, totals, operationType]);
 
