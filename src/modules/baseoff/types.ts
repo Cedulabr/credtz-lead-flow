@@ -141,6 +141,8 @@ export interface BaseOffClient {
   status?: ClientStatus;
   last_action?: string;
   contracts?: BaseOffInlineContract[];
+  contratos?: BaseOffInlineContract[];
+  telefones?: string[];
   credit_opportunities?: BaseOffCreditOpportunities | null;
 }
 
