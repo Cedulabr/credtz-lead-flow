@@ -267,9 +267,9 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <p className="text-sm text-muted-foreground">
-                    {contracts.length} contrato(s) encontrado(s)
+                    {loanContracts.length} contrato(s) encontrado(s)
                   </p>
-                  {contracts.length > 0 && (
+                  {loanContracts.length > 0 && (
                     <Button
                       variant="ghost"
                       size="sm"
