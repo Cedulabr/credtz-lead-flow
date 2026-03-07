@@ -52,6 +52,9 @@ export const MeuNumeroModule = lazy(() => import('@/modules/meu-numero/MeuNumero
 // Client Reuse
 export const ClientReuseAlerts = lazy(() => import('./ClientReuseAlerts').then(m => ({ default: m.ClientReuseAlerts })));
 
+// Radar
+export const RadarModule = lazy(() => import('@/modules/radar/RadarModule').then(m => ({ default: m.RadarModule })));
+
 // Base OFF legacy
 export const BaseOff = lazy(() => import('./BaseOff').then(m => ({ default: m.BaseOff })));
 export const BaseOffModern = lazy(() => import('./BaseOffModern').then(m => ({ default: m.BaseOffModern })));
@@ -168,3 +171,4 @@ export const LazySmsModule = withLazyLoading(SmsModule, TableSkeleton);
 export const LazyWhatsAppConfig = withLazyLoading(WhatsAppConfig, FormSkeleton);
 export const LazyMeuNumeroModule = withLazyLoading(MeuNumeroModule, FormSkeleton);
 export const LazySystemStatus = withLazyLoading(SystemStatus, FormSkeleton);
+export const LazyRadarModule = withLazyLoading(RadarModule, TableSkeleton);

@@ -3478,6 +3478,7 @@ export type Database = {
           can_access_meus_clientes: boolean | null
           can_access_minhas_comissoes: boolean | null
           can_access_premium_leads: boolean | null
+          can_access_radar: boolean | null
           can_access_relatorio_desempenho: boolean | null
           can_access_sms: boolean | null
           can_access_tabela_comissoes: boolean | null
@@ -3515,6 +3516,7 @@ export type Database = {
           can_access_meus_clientes?: boolean | null
           can_access_minhas_comissoes?: boolean | null
           can_access_premium_leads?: boolean | null
+          can_access_radar?: boolean | null
           can_access_relatorio_desempenho?: boolean | null
           can_access_sms?: boolean | null
           can_access_tabela_comissoes?: boolean | null
@@ -3552,6 +3554,7 @@ export type Database = {
           can_access_meus_clientes?: boolean | null
           can_access_minhas_comissoes?: boolean | null
           can_access_premium_leads?: boolean | null
+          can_access_radar?: boolean | null
           can_access_relatorio_desempenho?: boolean | null
           can_access_sms?: boolean | null
           can_access_tabela_comissoes?: boolean | null
@@ -3716,6 +3719,126 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      radar_credits: {
+        Row: {
+          created_at: string
+          credits_balance: number
+          credits_used_month: number
+          current_month: string
+          id: string
+          monthly_limit: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_balance?: number
+          credits_used_month?: number
+          current_month?: string
+          id?: string
+          monthly_limit?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_balance?: number
+          credits_used_month?: number
+          current_month?: string
+          id?: string
+          monthly_limit?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      radar_credits_requests: {
+        Row: {
+          admin_id: string | null
+          admin_note: string | null
+          created_at: string
+          id: string
+          quantity: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_id?: string | null
+          admin_note?: string | null
+          created_at?: string
+          id?: string
+          quantity: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_id?: string | null
+          admin_note?: string | null
+          created_at?: string
+          id?: string
+          quantity?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      radar_credits_usage: {
+        Row: {
+          action: string
+          created_at: string
+          credits_used: number
+          filter_used: Json | null
+          id: string
+          results_count: number
+          user_id: string
+        }
+        Insert: {
+          action?: string
+          created_at?: string
+          credits_used?: number
+          filter_used?: Json | null
+          id?: string
+          results_count?: number
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          credits_used?: number
+          filter_used?: Json | null
+          id?: string
+          results_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      radar_saved_filters: {
+        Row: {
+          created_at: string
+          filters: Json
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       rate_limits: {
         Row: {
