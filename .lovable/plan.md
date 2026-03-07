@@ -1,80 +1,82 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Plano: Parcelas Pagas/Restantes, Margens Reais, Cartoes, Simulador com Tipo de Operacao e PDF
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Alteracoes
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+#### 1. Calculo de parcelas pagas e restantes (`ContratoCard.tsx`, `types.ts`)
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+- Criar funcao `calculateInstallments(dataAverbacao, prazo)`:
+  - Parsear `data_averbacao` (dd/MM/yyyy)
+  - Calcular meses decorridos entre averbacao e hoje = parcelas pagas
+  - Parcelas restantes = prazo - parcelas pagas
+- Substituir campo "Inicio Desconto" por "Data Averbacao" no ContratoCard
+- Adicionar campos visuais: **Parcelas Pagas** e **Parcelas Restantes** no header do contrato (ao lado de Parcela, Saldo, Prazo)
+- Adicionar `parcelas_pagas` e `parcelas_restantes` calculados ao `BaseOffContract` como campos opcionais
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+#### 2. Margens reais descontando emprestimos (`MargemCards.tsx`, `ClienteDetalheView.tsx`)
 
----
+- **Margem 35%** (ou 30% para LOAS/BPC esp 87/88):
+  - `margemBruta = mr * 0.35` (ou `mr * 0.30` se esp === '87' || esp === '88')
+  - `totalParcelasEmprestimo = soma de vl_parcela de contratos tipo 98 (consignado)`
+  - `margemLivre = margemBruta - totalParcelasEmprestimo`
+- **RMC**: `valor_rmc` da API ja e a margem total. Subtrair parcelas de contratos RMC existentes (tipo_emprestimo que indica cartao RMC)
+- **RCC**: Mesmo calculo, subtrair parcelas de contratos RCC
+- Passar `contracts`, `esp` para `MargemCards` para que ele faca o calculo internamente
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+#### 3. Secao "Cartoes" separada (`ClienteDetalheView.tsx`)
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+- Filtrar contratos onde `tipo_emprestimo` indica cartao (RMC/RCC - tipos comuns: cartao consignado)
+- Criar secao visual "💳 Cartoes" entre Margens e Contratos
+- Mostrar: banco, data averbacao, parcela, valor liberado (vl_emprestimo)
+- Contratos de cartao NAO aparecem na lista principal de contratos
 
-**Arquitetura:**
+#### 4. Simulador de Troco - melhorias (`TrocoCalculator.tsx`)
+
+- **Mostrar apenas 3 taxas default** (maiores): 1.85%, 1.80%, 1.75%
+- **Bancos editaveis**: Substituir array hardcoded `BANCOS_SIMULACAO` por lista editavel via Supabase (tabela `baseoff_bank_rates`)
+  - Colunas: `id`, `bank_name`, `bank_code`, `default_rate`, `is_active`, `created_by`, `created_at`
+  - Bancos iniciais: BRB, Finanto, Pic Pay, Digio
+  - CRUD inline no componente: adicionar/editar/remover bancos com suas taxas
+- **Tipo de operacao**: Selector "Portabilidade com Troco" vs "Refinanciamento"
+  - **Portabilidade**: aplica IOF (~3%) e limite de saque de 70% sobre o liquido
+  - **Refinanciamento**: aplica IOF, sem limite de 70%
+- Adicionar colunas na tabela: "Troco Bruto", "IOF", "Troco Liquido (70%)" para portabilidade
+
+#### 5. PDF mais claro (`ProfessionalProposalPDF.tsx`)
+
+- Clarear cores do header: trocar fundo azul escuro (37,99,235) por azul mais claro
+- Clarear boxes de fundo: trocar `colors.dark` por tons mais claros
+- Aumentar contraste do texto: usar preto em vez de slate-800
+- Reduzir opacidade dos boxes de fundo coloridos
+
+#### 6. Migracao SQL - tabela `baseoff_bank_rates`
 
 ```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
+Colunas:
+- id uuid PK
+- bank_name text NOT NULL
+- bank_code text
+- default_rate numeric NOT NULL
+- is_active boolean DEFAULT true
+- created_by uuid
+- company_id uuid nullable
+- created_at timestamp
+- updated_at timestamp
 ```
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+Seed com BRB, Finanto, Pic Pay, Digio e taxas iniciais.
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+### Resumo de arquivos
 
----
-
-### 3. Simplificar modulo Base OFF - apenas Consulta
-
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
-
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
-
----
-
-### Arquivos a modificar
-
-| Arquivo | Mudanca |
+| Arquivo | Acao |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
-
----
-
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+| Migracao SQL | Criar tabela `baseoff_bank_rates` com seed |
+| `types.ts` | Adicionar `parcelas_pagas?`, `parcelas_restantes?` ao BaseOffContract |
+| `utils.ts` | Criar `calculateInstallments()` |
+| `ContratoCard.tsx` | Substituir "Inicio Desconto" por "Data Averbacao", mostrar parcelas pagas/restantes |
+| `MargemCards.tsx` | Receber contracts + esp, calcular margens reais descontando emprestimos |
+| `ClienteDetalheView.tsx` | Separar contratos de cartao, passar dados para MargemCards, criar secao Cartoes |
+| `TrocoCalculator.tsx` | 3 taxas default, bancos de Supabase, selector portabilidade/refinanciamento, regra 70% |
+| `ProfessionalProposalPDF.tsx` | Clarear cores do PDF |
 
