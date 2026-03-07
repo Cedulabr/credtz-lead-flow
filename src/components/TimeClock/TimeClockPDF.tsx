@@ -554,7 +554,13 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         doc.text(workedMinutes > 0 ? fmtMinToHM(workedMinutes) : '-', cols.totalHoras, yPos);
 
         // Obs column
-        if (obsText === 'FALTA') {
+        const dayOffLabels = ['FOLGA', 'FERIADO', 'LICENÇA', 'FÉRIAS', 'ABONO'];
+        if (dayOffLabels.includes(obsText)) {
+          doc.setTextColor(59, 130, 246);
+          doc.setFont('helvetica', 'bold');
+          doc.text(obsText, cols.obs, yPos);
+          doc.setFont('helvetica', 'normal');
+        } else if (obsText === 'FALTA') {
           doc.setTextColor(239, 68, 68);
           doc.setFont('helvetica', 'bold');
           doc.text('FALTA', cols.obs, yPos);
