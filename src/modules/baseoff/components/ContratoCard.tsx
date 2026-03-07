@@ -139,7 +139,7 @@ export function ContratoCard({
               </div>
               <div className="flex-1 text-center">
                 <p className="text-xs text-muted-foreground">Saldo</p>
-                <p className="font-bold">{formatCurrency(contract.saldo)}</p>
+                <p className="font-bold">{formatCurrency(saldoCalculado)}</p>
               </div>
               <div className="flex-1 text-center">
                 <p className="text-xs text-muted-foreground">Pagas/Prazo/Rest.</p>
