@@ -164,6 +164,7 @@ const Index = () => {
     notifications: <LazyNotifications />,
     'test-functionalities': <LazyTestFunctionalities />,
     'system-status': <LazySystemStatus />,
+    radar: <LazyRadarModule />,
   }), [setActiveTab]);
 
   // ── Render active tab ──────────────────────────────────────────────

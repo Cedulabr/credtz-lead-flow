@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.baseoff-external-query]
 verify_jwt = false
+
+[functions.radar-opportunities]
+verify_jwt = false

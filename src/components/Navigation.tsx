@@ -39,6 +39,7 @@ const navItems = [
   { id: "sms", label: "Comunicação SMS", icon: MessageSquare, permissionKey: "can_access_sms" },
   { id: "whatsapp", label: "WhatsApp", icon: MessageCircle, permissionKey: "can_access_whatsapp" },
   { id: "meu-numero", label: "Meu Número", icon: Phone, permissionKey: "can_access_meu_numero" },
+  { id: "radar", label: "Radar de Oportunidades", icon: Radar, permissionKey: "can_access_radar" },
 ];
 
 // Mobile priority items - only icons
