@@ -303,7 +303,7 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
                 Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-32 rounded-xl" />
                 ))
-              ) : contracts.length === 0 ? (
+              ) : loanContracts.length === 0 ? (
                 <Card className="p-8 text-center">
                   <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                   <h4 className="text-lg font-medium">Nenhum contrato</h4>
