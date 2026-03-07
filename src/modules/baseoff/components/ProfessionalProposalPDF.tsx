@@ -365,7 +365,7 @@ export function ProfessionalProposalPDF({
         });
         addText(contract.banco_emprestimo || 'Banco não informado', margin + 35, y + 5, { 
           fontSize: fonts.body, 
-          color: colors.dark, 
+          color: colors.text, 
           bold: true 
         });
         

@@ -30,7 +30,9 @@ import {
   X,
   Settings,
   ArrowRightLeft,
-  RefreshCw
+  RefreshCw,
+  CreditCard,
+  Banknote
 } from 'lucide-react';
 import { BaseOffContract } from '../types';
 import { formatCurrency } from '../utils';
@@ -48,8 +50,10 @@ export interface TrocoSimulation {
   troco: number;
   economiaTotal: number;
   selectedContracts: string[];
-  operationType?: 'portabilidade' | 'refinanciamento';
+  operationType?: 'portabilidade' | 'refinanciamento' | 'novo_emprestimo' | 'cartao';
 }
+
+type OperationType = 'portabilidade' | 'refinanciamento' | 'novo_emprestimo' | 'cartao';
 
 interface TrocoCalculatorProps {
   contracts: BaseOffContract[];
@@ -58,6 +62,9 @@ interface TrocoCalculatorProps {
   onSimulationChange?: (simulation: TrocoSimulation | null) => void;
   onGeneratePDF?: (simulation: TrocoSimulation) => void;
   compact?: boolean;
+  margemLivre?: number | null;
+  rmcDisponivel?: number | null;
+  rccDisponivel?: number | null;
 }
 
 interface BankRate {
@@ -75,10 +82,12 @@ const FALLBACK_BANKS: BankRate[] = [
   { id: 'fb-4', bank_name: 'Digio', bank_code: 'DIGIO', default_rate: 1.65, is_active: true },
 ];
 
-const PRAZOS = [12, 24, 36, 48, 60, 72, 84, 96];
-const DEFAULT_RATES = [1.85, 1.80, 1.75]; // Only show 3 highest by default
+const PRAZOS_PORT_REFIN = [96, 84];
+const PRAZOS_MARGEM_CARTAO = [96, 84, 72];
+const DEFAULT_RATES = [1.85, 1.80, 1.75];
 const IOF_PERCENT = 0.03;
-const PORTABILIDADE_SAQUE_PERCENT = 0.70;
+const CARTAO_TAXA = 2.55;
+const CARTAO_SAQUE_PERCENT = 0.70;
 
 function calcPMT(pv: number, ratePct: number, n: number): number {
   const r = ratePct / 100;
@@ -96,24 +105,55 @@ interface RateResult {
   trocoLiquido: number;
 }
 
+interface CardResult {
+  tipo: 'RMC' | 'RCC';
+  prazo: number;
+  margem: number;
+  parcela: number;
+  limite: number;
+  iof: number;
+  saque: number;
+}
+
+const OP_LABELS: Record<OperationType, { label: string; icon: React.ElementType; description: string }> = {
+  portabilidade: { label: 'Portabilidade', icon: ArrowRightLeft, description: 'Transferir contrato com troco (IOF descontado)' },
+  refinanciamento: { label: 'Refinanciamento', icon: RefreshCw, description: 'Refinanciar contratos (IOF descontado)' },
+  novo_emprestimo: { label: 'Novo Empréstimo', icon: Banknote, description: 'Calcular empréstimo pela margem livre' },
+  cartao: { label: 'Cartões RMC/RCC', icon: CreditCard, description: 'Calcular saque do cartão (taxa 2,55%, saque 70%)' },
+};
+
 export function TrocoCalculator({ 
   contracts, 
   selectedContracts, 
   onSelectionChange,
   onSimulationChange,
   onGeneratePDF,
-  compact = false
+  compact = false,
+  margemLivre = null,
+  rmcDisponivel = null,
+  rccDisponivel = null,
 }: TrocoCalculatorProps) {
   const [banks, setBanks] = useState<BankRate[]>(FALLBACK_BANKS);
   const [banco, setBanco] = useState('BRB');
-  const [prazo, setPrazo] = useState(84);
-  const [operationType, setOperationType] = useState<'portabilidade' | 'refinanciamento'>('portabilidade');
+  const [prazo, setPrazo] = useState(96);
+  const [operationType, setOperationType] = useState<OperationType>('portabilidade');
   const [isExpanded, setIsExpanded] = useState(!compact);
   const [customRates, setCustomRates] = useState<number[]>([]);
   const [newRate, setNewRate] = useState('');
   const [showBankManager, setShowBankManager] = useState(false);
   const [newBankName, setNewBankName] = useState('');
   const [newBankRate, setNewBankRate] = useState('');
+
+  const prazos = (operationType === 'portabilidade' || operationType === 'refinanciamento') 
+    ? PRAZOS_PORT_REFIN 
+    : PRAZOS_MARGEM_CARTAO;
+
+  // Reset prazo when switching modes if current prazo is not available
+  useEffect(() => {
+    if (!prazos.includes(prazo)) {
+      setPrazo(prazos[0]);
+    }
+  }, [operationType]);
 
   // Fetch bank rates from Supabase
   useEffect(() => {
@@ -156,8 +196,10 @@ export function TrocoCalculator({
     };
   }, [contracts, selectedContracts]);
 
+  // Port/Refin results
   const rateResults = useMemo<RateResult[]>(() => {
-    if (selectedContracts.length === 0 || totals.saldoTotal <= 0) return [];
+    if ((operationType !== 'portabilidade' && operationType !== 'refinanciamento') || 
+        selectedContracts.length === 0 || totals.saldoTotal <= 0) return [];
 
     return allRates.map(taxa => {
       const saldo = totals.saldoTotal;
@@ -165,32 +207,116 @@ export function TrocoCalculator({
       const valorContrato = novaParcela * prazo;
       const iof = saldo * IOF_PERCENT;
       const trocoBruto = Math.max(0, valorContrato - saldo - iof);
-      
-      // Portabilidade: client can only withdraw 70%
-      const trocoLiquido = operationType === 'portabilidade' 
-        ? trocoBruto * PORTABILIDADE_SAQUE_PERCENT 
-        : trocoBruto;
-
-      return { taxa, novaParcela, valorContrato, iof, trocoBruto, trocoLiquido };
+      // Portabilidade and refinanciamento: NO 70% rule, just IOF
+      return { taxa, novaParcela, valorContrato, iof, trocoBruto, trocoLiquido: trocoBruto };
     });
   }, [allRates, prazo, selectedContracts, totals, operationType]);
 
-  const bestSimulation = useMemo<TrocoSimulation | null>(() => {
-    if (rateResults.length === 0) return null;
-    const best = rateResults.reduce((a, b) => a.trocoLiquido > b.trocoLiquido ? a : b);
-    return {
-      banco: bancoInfo?.bank_name || banco,
-      bancoLabel: bancoInfo?.bank_name || banco,
-      taxa: best.taxa,
-      prazo,
-      saldoDevedor: totals.saldoTotal,
-      novaParcela: best.novaParcela,
-      troco: best.trocoLiquido,
-      economiaTotal: (totals.parcelaTotal - best.novaParcela) * prazo,
-      selectedContracts,
-      operationType,
+  // Novo empréstimo results
+  const novoEmprestimoResults = useMemo<RateResult[]>(() => {
+    if (operationType !== 'novo_emprestimo' || !margemLivre || margemLivre <= 0) return [];
+
+    return allRates.map(taxa => {
+      // PMT = margemLivre, calculate PV (how much can borrow)
+      const r = taxa / 100;
+      const pv = r === 0 
+        ? margemLivre * prazo 
+        : margemLivre * (Math.pow(1 + r, prazo) - 1) / (r * Math.pow(1 + r, prazo));
+      const iof = pv * IOF_PERCENT;
+      const liquido = pv - iof;
+      return { 
+        taxa, 
+        novaParcela: margemLivre, 
+        valorContrato: pv, 
+        iof, 
+        trocoBruto: liquido, 
+        trocoLiquido: liquido 
+      };
+    });
+  }, [allRates, prazo, margemLivre, operationType]);
+
+  // Cartão results
+  const cartaoResults = useMemo<CardResult[]>(() => {
+    if (operationType !== 'cartao') return [];
+    const results: CardResult[] = [];
+    
+    const calcCard = (tipo: 'RMC' | 'RCC', margem: number | null) => {
+      if (!margem || margem <= 0) return;
+      // Margem is the installment the client can pay
+      // Limit = margem / (taxa/100) using simple card formula
+      // For card: parcela = margem, limit = parcela * prazo (simplified)
+      // Actually: limit calculated via PMT inverse at 2.55%
+      const r = CARTAO_TAXA / 100;
+      const limit = r === 0 
+        ? margem * prazo 
+        : margem * (Math.pow(1 + r, prazo) - 1) / (r * Math.pow(1 + r, prazo));
+      const iof = limit * IOF_PERCENT;
+      const saque = (limit - iof) * CARTAO_SAQUE_PERCENT;
+
+      prazos.forEach(p => {
+        const limitP = r === 0
+          ? margem * p
+          : margem * (Math.pow(1 + r, p) - 1) / (r * Math.pow(1 + r, p));
+        const iofP = limitP * IOF_PERCENT;
+        const saqueP = (limitP - iofP) * CARTAO_SAQUE_PERCENT;
+        results.push({ tipo, prazo: p, margem, parcela: margem, limite: limitP, iof: iofP, saque: saqueP });
+      });
     };
-  }, [rateResults, banco, bancoInfo, prazo, totals, selectedContracts, operationType]);
+
+    calcCard('RMC', rmcDisponivel);
+    calcCard('RCC', rccDisponivel);
+    return results;
+  }, [operationType, rmcDisponivel, rccDisponivel, prazos]);
+
+  const bestSimulation = useMemo<TrocoSimulation | null>(() => {
+    if (operationType === 'portabilidade' || operationType === 'refinanciamento') {
+      if (rateResults.length === 0) return null;
+      const best = rateResults.reduce((a, b) => a.trocoLiquido > b.trocoLiquido ? a : b);
+      return {
+        banco: bancoInfo?.bank_name || banco,
+        bancoLabel: bancoInfo?.bank_name || banco,
+        taxa: best.taxa,
+        prazo,
+        saldoDevedor: totals.saldoTotal,
+        novaParcela: best.novaParcela,
+        troco: best.trocoLiquido,
+        economiaTotal: (totals.parcelaTotal - best.novaParcela) * prazo,
+        selectedContracts,
+        operationType,
+      };
+    }
+    if (operationType === 'novo_emprestimo' && novoEmprestimoResults.length > 0) {
+      const best = novoEmprestimoResults[0];
+      return {
+        banco: bancoInfo?.bank_name || banco,
+        bancoLabel: bancoInfo?.bank_name || banco,
+        taxa: best.taxa,
+        prazo,
+        saldoDevedor: 0,
+        novaParcela: best.novaParcela,
+        troco: best.trocoLiquido,
+        economiaTotal: 0,
+        selectedContracts: [],
+        operationType,
+      };
+    }
+    if (operationType === 'cartao' && cartaoResults.length > 0) {
+      const best = cartaoResults.reduce((a, b) => a.saque > b.saque ? a : b);
+      return {
+        banco: best.tipo,
+        bancoLabel: `Cartão ${best.tipo}`,
+        taxa: CARTAO_TAXA,
+        prazo: best.prazo,
+        saldoDevedor: 0,
+        novaParcela: best.parcela,
+        troco: best.saque,
+        economiaTotal: 0,
+        selectedContracts: [],
+        operationType,
+      };
+    }
+    return null;
+  }, [rateResults, novoEmprestimoResults, cartaoResults, banco, bancoInfo, prazo, totals, selectedContracts, operationType]);
 
   useEffect(() => {
     onSimulationChange?.(bestSimulation);
@@ -214,16 +340,13 @@ export function TrocoCalculator({
       toast.error('Preencha nome e taxa válida');
       return;
     }
-    
     try {
       const { data, error } = await supabase
         .from('baseoff_bank_rates')
         .insert({ bank_name: newBankName.trim(), bank_code: newBankName.trim().toUpperCase(), default_rate: rate })
         .select()
         .single();
-      
       if (error) throw error;
-      
       setBanks(prev => [...prev, {
         id: data.id,
         bank_name: data.bank_name,
@@ -249,7 +372,9 @@ export function TrocoCalculator({
     }
   };
 
-  if (contracts.length === 0) return null;
+  if (contracts.length === 0 && operationType !== 'novo_emprestimo' && operationType !== 'cartao') return null;
+
+  const showContractBasedUI = operationType === 'portabilidade' || operationType === 'refinanciamento';
 
   return (
     <Card className="overflow-hidden">
@@ -263,12 +388,9 @@ export function TrocoCalculator({
             <Calculator className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold">Simulador de Troco</h3>
+            <h3 className="font-semibold">Simulador de Operações</h3>
             <p className="text-sm text-muted-foreground">
-              {selectedContracts.length > 0 
-                ? `${selectedContracts.length} contrato(s) • Saldo: ${formatCurrency(totals.saldoTotal)}`
-                : 'Selecione contratos para simular'
-              }
+              {OP_LABELS[operationType].description}
             </p>
           </div>
         </div>
@@ -279,88 +401,83 @@ export function TrocoCalculator({
 
       {isExpanded && (
         <div className="p-4 space-y-4">
-          {/* Operation Type */}
-          <div className="flex gap-2">
-            <Button
-              variant={operationType === 'portabilidade' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setOperationType('portabilidade')}
-              className="gap-2 flex-1"
-            >
-              <ArrowRightLeft className="w-4 h-4" />
-              Portabilidade com Troco
-            </Button>
-            <Button
-              variant={operationType === 'refinanciamento' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setOperationType('refinanciamento')}
-              className="gap-2 flex-1"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refinanciamento
-            </Button>
+          {/* Operation Type - 4 modes */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {(Object.keys(OP_LABELS) as OperationType[]).map(op => {
+              const { label, icon: Icon } = OP_LABELS[op];
+              return (
+                <Button
+                  key={op}
+                  variant={operationType === op ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setOperationType(op)}
+                  className="gap-1.5 text-xs"
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                </Button>
+              );
+            })}
           </div>
 
-          {operationType === 'portabilidade' && (
-            <div className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
-              ⚠️ Portabilidade: IOF de ~3% é descontado e o cliente pode sacar apenas <strong>70%</strong> do troco líquido (Lei do Banco Central).
+          {/* Parameters for port/refin/novo */}
+          {operationType !== 'cartao' && (
+            <div className="grid sm:grid-cols-2 gap-4">
+              {showContractBasedUI && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-2">
+                      <Wallet className="w-4 h-4" />
+                      Banco
+                    </Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs gap-1"
+                      onClick={(e) => { e.stopPropagation(); setShowBankManager(!showBankManager); }}
+                    >
+                      <Settings className="w-3 h-3" />
+                      Gerenciar
+                    </Button>
+                  </div>
+                  <Select value={banco} onValueChange={setBanco}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {banks.map(b => (
+                        <SelectItem key={b.id} value={b.bank_name}>
+                          {b.bank_name} ({b.default_rate.toFixed(2)}% a.m.)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Prazo
+                </Label>
+                <Select value={String(prazo)} onValueChange={(v) => setPrazo(Number(v))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {prazos.map(p => (
+                      <SelectItem key={p} value={String(p)}>
+                        {p} meses ({Math.floor(p / 12)} anos)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
 
-          {/* Parameters */}
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-2">
-                  <Wallet className="w-4 h-4" />
-                  Banco
-                </Label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 text-xs gap-1"
-                  onClick={(e) => { e.stopPropagation(); setShowBankManager(!showBankManager); }}
-                >
-                  <Settings className="w-3 h-3" />
-                  Gerenciar
-                </Button>
-              </div>
-              <Select value={banco} onValueChange={setBanco}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {banks.map(b => (
-                    <SelectItem key={b.id} value={b.bank_name}>
-                      {b.bank_name} ({b.default_rate.toFixed(2)}% a.m.)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                Prazo
-              </Label>
-              <Select value={String(prazo)} onValueChange={(v) => setPrazo(Number(v))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRAZOS.map(p => (
-                    <SelectItem key={p} value={String(p)}>
-                      {p} meses ({Math.floor(p / 12)} anos{p % 12 > 0 ? ` e ${p % 12} meses` : ''})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
           {/* Bank Manager */}
-          {showBankManager && (
+          {showBankManager && showContractBasedUI && (
             <Card className="p-3 space-y-3 border-dashed">
               <p className="text-sm font-semibold">Gerenciar Bancos</p>
               <div className="flex flex-wrap gap-2">
@@ -379,18 +496,8 @@ export function TrocoCalculator({
                 ))}
               </div>
               <div className="flex gap-2">
-                <Input
-                  placeholder="Nome do banco"
-                  value={newBankName}
-                  onChange={(e) => setNewBankName(e.target.value)}
-                  className="h-8 text-sm"
-                />
-                <Input
-                  placeholder="Taxa %"
-                  value={newBankRate}
-                  onChange={(e) => setNewBankRate(e.target.value)}
-                  className="h-8 text-sm w-24"
-                />
+                <Input placeholder="Nome do banco" value={newBankName} onChange={(e) => setNewBankName(e.target.value)} className="h-8 text-sm" />
+                <Input placeholder="Taxa %" value={newBankRate} onChange={(e) => setNewBankRate(e.target.value)} className="h-8 text-sm w-24" />
                 <Button variant="outline" size="sm" onClick={handleAddBank} className="h-8 gap-1">
                   <Plus className="w-3 h-3" />
                 </Button>
@@ -398,45 +505,43 @@ export function TrocoCalculator({
             </Card>
           )}
 
-          {/* Add custom rate */}
-          <div className="flex items-end gap-2">
-            <div className="space-y-1 flex-1">
-              <Label className="text-xs">Adicionar taxa personalizada (%)</Label>
-              <Input
-                type="text"
-                placeholder="Ex: 1.60"
-                value={newRate}
-                onChange={(e) => setNewRate(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddRate()}
-                className="h-9"
-              />
-            </div>
-            <Button variant="outline" size="sm" onClick={handleAddRate} className="h-9 gap-1">
-              <Plus className="w-3.5 h-3.5" />
-              Adicionar
-            </Button>
-          </div>
-
-          {customRates.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {customRates.map(rate => (
-                <Badge key={rate} variant="secondary" className="gap-1 pr-1">
-                  {rate.toFixed(2)}%
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-4 w-4 hover:bg-destructive/20"
-                    onClick={() => handleRemoveRate(rate)}
-                  >
-                    <X className="w-3 h-3" />
-                  </Button>
-                </Badge>
-              ))}
-            </div>
+          {/* Custom rate - for port/refin/novo */}
+          {operationType !== 'cartao' && (
+            <>
+              <div className="flex items-end gap-2">
+                <div className="space-y-1 flex-1">
+                  <Label className="text-xs">Adicionar taxa personalizada (%)</Label>
+                  <Input
+                    type="text"
+                    placeholder="Ex: 1.60"
+                    value={newRate}
+                    onChange={(e) => setNewRate(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddRate()}
+                    className="h-9"
+                  />
+                </div>
+                <Button variant="outline" size="sm" onClick={handleAddRate} className="h-9 gap-1">
+                  <Plus className="w-3.5 h-3.5" />
+                  Adicionar
+                </Button>
+              </div>
+              {customRates.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {customRates.map(rate => (
+                    <Badge key={rate} variant="secondary" className="gap-1 pr-1">
+                      {rate.toFixed(2)}%
+                      <Button variant="ghost" size="icon" className="h-4 w-4 hover:bg-destructive/20" onClick={() => handleRemoveRate(rate)}>
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
-          {/* Results Table */}
-          {rateResults.length > 0 ? (
+          {/* RESULTS: Port/Refin */}
+          {showContractBasedUI && rateResults.length > 0 && (
             <div className="border rounded-lg overflow-auto">
               <Table>
                 <TableHeader>
@@ -445,53 +550,125 @@ export function TrocoCalculator({
                     <TableHead className="text-xs font-semibold text-right">Nova Parcela</TableHead>
                     <TableHead className="text-xs font-semibold text-right">Vl. Contrato</TableHead>
                     <TableHead className="text-xs font-semibold text-right">IOF (~3%)</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">Troco Bruto</TableHead>
-                    {operationType === 'portabilidade' && (
-                      <TableHead className="text-xs font-semibold text-right">Líquido (70%)</TableHead>
-                    )}
+                    <TableHead className="text-xs font-semibold text-right">Troco</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rateResults.map((r) => (
                     <TableRow key={r.taxa} className="hover:bg-muted/30">
-                      <TableCell className="font-mono font-semibold text-sm">
-                        {r.taxa.toFixed(2)}%
-                      </TableCell>
-                      <TableCell className="text-right text-sm">
-                        {formatCurrency(r.novaParcela)}
-                      </TableCell>
-                      <TableCell className="text-right text-sm">
-                        {formatCurrency(r.valorContrato)}
-                      </TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">
-                        {formatCurrency(r.iof)}
-                      </TableCell>
-                      <TableCell className="text-right text-sm">
-                        {formatCurrency(r.trocoBruto)}
-                      </TableCell>
-                      {operationType === 'portabilidade' && (
-                        <TableCell className="text-right font-bold text-sm text-emerald-600">
-                          {formatCurrency(r.trocoLiquido)}
-                        </TableCell>
-                      )}
+                      <TableCell className="font-mono font-semibold text-sm">{r.taxa.toFixed(2)}%</TableCell>
+                      <TableCell className="text-right text-sm">{formatCurrency(r.novaParcela)}</TableCell>
+                      <TableCell className="text-right text-sm">{formatCurrency(r.valorContrato)}</TableCell>
+                      <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.iof)}</TableCell>
+                      <TableCell className="text-right font-bold text-sm text-emerald-600">{formatCurrency(r.trocoLiquido)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
-          ) : (
-            <div className="text-center py-6 text-muted-foreground">
-              <Calculator className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">Selecione contratos acima para calcular o troco</p>
-            </div>
+          )}
+
+          {/* RESULTS: Novo Empréstimo */}
+          {operationType === 'novo_emprestimo' && (
+            <>
+              {margemLivre && margemLivre > 0 ? (
+                <div className="border rounded-lg overflow-auto">
+                  <div className="px-3 py-2 bg-muted/30 text-sm">
+                    Margem livre disponível: <strong className="text-emerald-600">{formatCurrency(margemLivre)}</strong> /mês
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="text-xs font-semibold">Taxa a.m.</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">Parcela</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">Vl. Empréstimo</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">IOF (~3%)</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">Líquido</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {novoEmprestimoResults.map((r) => (
+                        <TableRow key={r.taxa} className="hover:bg-muted/30">
+                          <TableCell className="font-mono font-semibold text-sm">{r.taxa.toFixed(2)}%</TableCell>
+                          <TableCell className="text-right text-sm">{formatCurrency(r.novaParcela)}</TableCell>
+                          <TableCell className="text-right text-sm">{formatCurrency(r.valorContrato)}</TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.iof)}</TableCell>
+                          <TableCell className="text-right font-bold text-sm text-emerald-600">{formatCurrency(r.trocoLiquido)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Banknote className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Sem margem livre disponível para novo empréstimo</p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* RESULTS: Cartões */}
+          {operationType === 'cartao' && (
+            <>
+              {cartaoResults.length > 0 ? (
+                <div className="border rounded-lg overflow-auto">
+                  <div className="px-3 py-2 bg-muted/30 text-sm">
+                    Taxa fixa: <strong>2,55% a.m.</strong> • Saque = (Limite - IOF) × 70%
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="text-xs font-semibold">Tipo</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">Prazo</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">Parcela</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">Limite</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">IOF (~3%)</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">Saque (70%)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {cartaoResults.map((r, i) => (
+                        <TableRow key={i} className="hover:bg-muted/30">
+                          <TableCell className="font-semibold text-sm">
+                            <Badge variant={r.tipo === 'RMC' ? 'default' : 'secondary'}>{r.tipo}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right text-sm">{r.prazo}x</TableCell>
+                          <TableCell className="text-right text-sm">{formatCurrency(r.parcela)}</TableCell>
+                          <TableCell className="text-right text-sm">{formatCurrency(r.limite)}</TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.iof)}</TableCell>
+                          <TableCell className="text-right font-bold text-sm text-emerald-600">{formatCurrency(r.saque)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <div className="px-3 py-2 text-xs text-muted-foreground bg-muted/20">
+                    ℹ️ Cliente pode ter no máximo 1 RMC e 1 RCC
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <CreditCard className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Sem margem de cartão disponível (RMC/RCC)</p>
+                </div>
+              )}
+            </>
           )}
 
           {/* Summary row */}
-          {rateResults.length > 0 && (
+          {showContractBasedUI && rateResults.length > 0 && (
             <div className="flex items-center justify-between text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
               <span>Saldo quitado: <strong className="text-foreground">{formatCurrency(totals.saldoTotal)}</strong></span>
               <span>Parcela atual: <strong className="text-foreground">{formatCurrency(totals.parcelaTotal)}</strong></span>
               <span>Prazo: <strong className="text-foreground">{prazo}x</strong></span>
+            </div>
+          )}
+
+          {/* No contracts selected warning for port/refin */}
+          {showContractBasedUI && selectedContracts.length === 0 && (
+            <div className="text-center py-6 text-muted-foreground">
+              <Calculator className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Selecione contratos acima para calcular</p>
             </div>
           )}
 
@@ -500,10 +677,9 @@ export function TrocoCalculator({
             <Button 
               onClick={() => onGeneratePDF(bestSimulation)} 
               className="w-full gap-2"
-              disabled={selectedContracts.length === 0}
             >
               <Download className="w-4 h-4" />
-              Gerar Proposta com Troco
+              Gerar Proposta
             </Button>
           )}
         </div>

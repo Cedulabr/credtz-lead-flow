@@ -102,6 +102,7 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
   const [selectedContractIds, setSelectedContractIds] = useState<string[]>([]);
   const [currentSimulation, setCurrentSimulation] = useState<TrocoSimulation | null>(null);
 
+  const margemData = useMargemData(client, contracts);
   const inlineContracts = client.contratos || client.contracts;
   const hasInlineContracts = inlineContracts && inlineContracts.length > 0;
 

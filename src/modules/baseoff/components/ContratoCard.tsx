@@ -17,7 +17,7 @@ import {
   Clock
 } from 'lucide-react';
 import { BaseOffContract, ClientStatus } from '../types';
-import { StatusBadge } from './StatusBadge';
+import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatDate, calculateInstallments } from '../utils';
 import { cn } from '@/lib/utils';
 

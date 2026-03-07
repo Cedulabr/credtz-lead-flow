@@ -8,12 +8,16 @@ interface CartoesSectionProps {
   contracts: BaseOffContract[];
 }
 
-// Card contract types (RMC/RCC)
-const CARD_TYPES = ['4', '5', '6', '7', '12', '13'];
+// Card contract types (RMC/RCC) - by code or keyword
+const CARD_TYPE_CODES = ['4', '5', '6', '7', '12', '13'];
+const CARD_KEYWORDS = ['cartao', 'cartão', 'rmc', 'rcc', 'card', 'beneficio', 'benefício'];
 
 export function isCardContract(tipoEmprestimo: string | null): boolean {
   if (!tipoEmprestimo) return false;
-  return CARD_TYPES.includes(tipoEmprestimo.trim());
+  const trimmed = tipoEmprestimo.trim();
+  if (CARD_TYPE_CODES.includes(trimmed)) return true;
+  const lower = trimmed.toLowerCase();
+  return CARD_KEYWORDS.some(kw => lower.includes(kw));
 }
 
 export function CartoesSection({ contracts }: CartoesSectionProps) {
