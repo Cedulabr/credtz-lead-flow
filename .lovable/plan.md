@@ -1,80 +1,84 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Plano: Refatorar Index.tsx — Lazy Loading, Permissoes, Arquitetura
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Alteracoes
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+#### 1. `src/components/LazyComponents.tsx` — Adicionar todos os modulos faltantes
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+Adicionar lazy imports para todos os modulos que hoje sao importados diretamente no Index.tsx:
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+- `Dashboard`, `IndicateClient`, `Notifications`, `FinanceKanban`, `ProposalGenerator`, `MyClientsList`, `ClientDocuments`, `SalesWizard`, `TelevendasModule`, `BaseOffModule`, `OpportunitiesModule`, `PerformanceReport`, `Collaborative`, `MyData`, `TimeClock`, `SmsModule`, `WhatsAppConfig`, `MeuNumeroModule`, `CommissionTable`, `SystemStatus`, `BaseOffConsulta`
 
----
+Criar versoes `Lazy*` com `withLazyLoading` para cada um.
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+#### 2. `src/components/PermissionGate.tsx` — Novo componente
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
-
-**Arquitetura:**
-
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
+```tsx
+interface PermissionGateProps {
+  permissionKey: string;
+  blockedMessage: string;
+  children: React.ReactNode;
+}
 ```
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+- Usa `useAuth()` internamente
+- Admin sempre passa
+- Non-admin: `profileData?.[permissionKey] === true` (acesso explicito)
+- Se bloqueado, renderiza `<BlockedAccess message={...} />`
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+#### 3. `src/pages/Index.tsx` — Reescrita completa
 
----
+**Imports**: Apenas `Navigation`, `LoadingAuth`, `BlockedAccess`, hooks, e lazy components de `LazyComponents.tsx`. Zero imports diretos de modulos pesados.
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
+**hasPermission**: Mudar de `!== false` para `=== true`.
 
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
+**Mapa de tabs**: Substituir o switch por objeto declarativo:
 
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+```tsx
+type TabConfig = {
+  component: React.ReactNode;
+  permission?: string;
+  blockedMessage?: string;
+  wrapper?: 'p4' | null;
+};
 
----
+const TAB_MAP: Record<string, TabConfig> = {
+  'dashboard': { component: <LazyDashboard onNavigate={setActiveTab} /> },
+  'indicate': { 
+    component: <LazyIndicateClient />,
+    permission: 'can_access_indicar',
+    blockedMessage: 'Acesso à seção Indicar bloqueado...'
+  },
+  // ... all tabs
+};
+```
 
-### Arquivos a modificar
+**Render**: 
+```tsx
+const config = TAB_MAP[activeTab] || TAB_MAP['dashboard'];
+if (config.permission && !hasPermission(config.permission)) {
+  return <BlockedAccess message={config.blockedMessage} />;
+}
+return <Suspense fallback={<LoadingFallback />}>{config.component}</Suspense>;
+```
 
-| Arquivo | Mudanca |
+**Layout**: Manter estrutura atual mas remover `overflow-x-hidden` redundante do wrapper interno.
+
+#### 4. `src/components/LoadingFallback.tsx` — Componente global
+
+Extrair o LoadingFallback que hoje e definido dentro de `renderActiveComponent` para componente proprio reutilizavel.
+
+### Resumo de arquivos
+
+| Arquivo | Acao |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
+| `LazyComponents.tsx` | Adicionar ~18 lazy imports faltantes |
+| `LoadingFallback.tsx` | Novo componente global de loading |
+| `PermissionGate.tsx` | Novo wrapper de permissao |
+| `Index.tsx` | Reescrever: zero imports diretos, mapa de tabs, permissao `=== true` |
 
----
+### Nota de seguranca
 
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+A mudanca de `!== false` para `=== true` pode bloquear usuarios que nao tem o campo definido no profile. Isso e intencional (deny-by-default), mas usuarios existentes sem campos de permissao explicitamente `true` perderao acesso. Admins nao sao afetados.
 
