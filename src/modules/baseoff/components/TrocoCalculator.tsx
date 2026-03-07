@@ -698,11 +698,10 @@ export function TrocoCalculator({
           )}
 
           {/* Summary row */}
-          {showContractBasedUI && rateResults.length > 0 && (
-            <div className="flex items-center justify-between text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
-              <span>Saldo quitado: <strong className="text-foreground">{formatCurrency(totals.saldoTotal)}</strong></span>
-              <span>Parcela atual: <strong className="text-foreground">{formatCurrency(totals.parcelaTotal)}</strong></span>
-              <span>Prazo: <strong className="text-foreground">{prazo}x</strong></span>
+          {/* Cartões info */}
+          {operationType === 'cartao' && cartaoResults.length > 0 && (
+            <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+              ℹ️ Cliente pode ter no máximo 1 RMC e 1 RCC
             </div>
           )}
 
