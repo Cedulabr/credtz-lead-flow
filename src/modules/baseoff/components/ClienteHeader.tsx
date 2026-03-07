@@ -64,9 +64,14 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
     <Card className="p-5 border">
       {/* Top Row: Name, CPF, NB inline */}
       <div className="flex flex-wrap items-center gap-3 mb-4 pb-4 border-b border-border/50">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <h2 className="text-xl font-bold">{client.nome}</h2>
           <StatusBadge status={client.status || 'simulado'} />
+          {age && (
+            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 text-sm px-3 py-1">
+              {age} anos
+            </Badge>
+          )}
         </div>
 
         <div className="flex items-center gap-4 ml-auto flex-wrap">
