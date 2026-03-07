@@ -275,54 +275,92 @@ export function BaseOffConsulta() {
     setContracts([]);
 
     try {
-      let data: BaseOffClient[] | null = null;
-      let error: any = null;
-
-      if (searchType === "cpf") {
-        // Busca por CPF - normaliza removendo caracteres não numéricos
-        const cleanCpf = searchTerm.replace(/\D/g, "").padStart(11, "0").slice(0, 11);
-        const result = await supabase.from("baseoff_clients").select("*").eq("cpf", cleanCpf).limit(50);
-        data = result.data as BaseOffClient[];
-        error = result.error;
-      } else if (searchType === "telefone") {
-        // Busca por telefone - normaliza e busca em todas as colunas de telefone
-        const cleanPhone = normalizePhone(searchTerm);
-        if (cleanPhone.length < 8) {
-          toast.error("Digite pelo menos 8 dígitos do telefone");
-          setIsSearching(false);
-          return;
-        }
-        
-        // Busca telefone em qualquer uma das colunas de telefone
-        const result = await supabase
-          .from("baseoff_clients")
-          .select("*")
-          .or(`tel_cel_1.ilike.%${cleanPhone}%,tel_cel_2.ilike.%${cleanPhone}%,tel_cel_3.ilike.%${cleanPhone}%,tel_fixo_1.ilike.%${cleanPhone}%,tel_fixo_2.ilike.%${cleanPhone}%,tel_fixo_3.ilike.%${cleanPhone}%`)
-          .limit(50);
-        data = result.data as BaseOffClient[];
-        error = result.error;
-      } else if (searchType === "nb") {
-        const result = await supabase.from("baseoff_clients").select("*").ilike("nb", `%${searchTerm}%`).limit(50);
-        data = result.data as BaseOffClient[];
-        error = result.error;
-      } else {
-        // Busca por nome
-        const result = await supabase.from("baseoff_clients").select("*").ilike("nome", `%${searchTerm}%`).limit(50);
-        data = result.data as BaseOffClient[];
-        error = result.error;
-      }
+      const { data, error } = await supabase.functions.invoke('baseoff-external-query', {
+        body: { search_term: searchTerm.trim() },
+      });
 
       if (error) throw error;
 
-      if (!data || data.length === 0) {
+      const results = data || [];
+
+      // Mapear resposta da API para o formato BaseOffClient
+      const mappedClients: BaseOffClient[] = results.map((row: any) => ({
+        id: row.id || row.cpf,
+        nb: row.nb || '',
+        cpf: row.cpf || '',
+        nome: row.nome || '',
+        data_nascimento: row.data_nascimento,
+        sexo: row.sexo,
+        nome_mae: row.nome_mae,
+        nome_pai: row.nome_pai,
+        naturalidade: row.naturalidade,
+        esp: row.esp,
+        dib: row.dib,
+        mr: row.mr != null ? parseFloat(row.mr) : null,
+        banco_pagto: row.banco_pagto,
+        agencia_pagto: row.agencia_pagto,
+        orgao_pagador: row.orgao_pagador,
+        conta_corrente: row.conta_corrente,
+        meio_pagto: row.meio_pagto,
+        status_beneficio: row.status_beneficio,
+        bloqueio: row.bloqueio,
+        pensao_alimenticia: row.pensao_alimenticia,
+        representante: row.representante,
+        ddb: row.ddb,
+        banco_rmc: row.banco_rmc,
+        valor_rmc: row.valor_rmc != null ? parseFloat(row.valor_rmc) : null,
+        banco_rcc: row.banco_rcc,
+        valor_rcc: row.valor_rcc != null ? parseFloat(row.valor_rcc) : null,
+        bairro: row.bairro,
+        municipio: row.municipio,
+        uf: row.uf,
+        cep: row.cep,
+        endereco: row.endereco,
+        logr_tipo_1: row.logr_tipo_1 || null,
+        logr_titulo_1: row.logr_titulo_1 || null,
+        logr_nome_1: row.logr_nome_1 || null,
+        logr_numero_1: row.logr_numero_1 || null,
+        logr_complemento_1: row.logr_complemento_1 || null,
+        bairro_1: row.bairro_1 || null,
+        cidade_1: row.cidade_1 || null,
+        uf_1: row.uf_1 || null,
+        cep_1: row.cep_1 || null,
+        tel_fixo_1: row.tel_fixo_1 || null,
+        tel_fixo_2: row.tel_fixo_2 || null,
+        tel_fixo_3: row.tel_fixo_3 || null,
+        tel_cel_1: row.tel_cel_1,
+        tel_cel_2: row.tel_cel_2,
+        tel_cel_3: row.tel_cel_3,
+        email_1: row.email_1,
+        email_2: row.email_2 || null,
+        email_3: row.email_3 || null,
+        contratos: (row.contratos || []).map((c: any) => ({
+          id: c.id || c.contrato,
+          banco_emprestimo: c.banco_emprestimo || '',
+          contrato: c.contrato || '',
+          vl_emprestimo: c.vl_emprestimo != null ? parseFloat(c.vl_emprestimo) : null,
+          inicio_desconto: c.inicio_desconto,
+          prazo: c.prazo != null ? parseInt(c.prazo) : null,
+          vl_parcela: c.vl_parcela != null ? parseFloat(c.vl_parcela) : null,
+          tipo_emprestimo: c.tipo_emprestimo,
+          data_averbacao: c.data_averbacao,
+          situacao_emprestimo: c.situacao_emprestimo,
+          competencia: c.competencia,
+          competencia_final: c.competencia_final,
+          taxa: c.taxa != null ? parseFloat(c.taxa) : null,
+          saldo: c.saldo != null ? parseFloat(c.saldo) : null,
+        })),
+      }));
+
+      if (mappedClients.length === 0) {
         toast.info("Nenhum cliente encontrado");
         return;
       }
 
-      setSearchResults(data);
+      setSearchResults(mappedClients);
 
-      if (data.length === 1) {
-        await selectClient(data[0]);
+      if (mappedClients.length === 1) {
+        selectClient(mappedClients[0]);
       }
     } catch (error) {
       console.error("Erro na busca:", error);
