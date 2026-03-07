@@ -255,7 +255,7 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
             <TabsList className="grid w-full grid-cols-2 h-12">
               <TabsTrigger value="contratos" className="gap-2 text-base">
                 <FileText className="w-4 h-4" />
-                📄 Contratos ({contracts.length})
+                📄 Contratos ({loanContracts.length})
               </TabsTrigger>
               <TabsTrigger value="timeline" className="gap-2 text-base">
                 <Clock className="w-4 h-4" />
