@@ -7,11 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Calendar, Clock, MapPin, Loader2 } from 'lucide-react';
 import { useTimeClock } from '@/hooks/useTimeClock';
 import { clockTypeLabels, statusLabels, statusColors, type TimeClock, type TimeClockType, type TimeClockStatus } from './types';
-import { format, startOfMonth, endOfMonth, differenceInMinutes, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TimeClockPDF } from './TimeClockPDF';
 import { useWhitelabel } from '@/hooks/useWhitelabel';
 import { supabase } from '@/integrations/supabase/client';
+import { calculateTotalBreakMinutes, parseTimeToMinutes, calculateDayMetrics, formatMinutesToHM, type DaySchedule } from '@/lib/timeClockCalculations';
 
 interface MyHistoryProps {
   userId: string;
@@ -23,6 +24,8 @@ interface DailyGroup {
   date: string;
   records: TimeClock[];
   totalMinutes: number;
+  breakMinutes: number;
+  delayMinutes: number;
   status: TimeClockStatus;
   userName?: string;
 }
@@ -33,6 +36,7 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
   const [history, setHistory] = useState<TimeClock[]>([]);
   const [loading, setLoading] = useState(false);
   const [companyData, setCompanyData] = useState<{ name: string; cnpj: string | null }>({ name: '', cnpj: null });
+  const [schedules, setSchedules] = useState<Record<string, DaySchedule>>({});
 
   // Admin filters
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
@@ -76,14 +80,12 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
           .map((d: any) => d.profiles)
           .filter(Boolean)
           .map((p: any) => ({ id: p.id, name: p.name || p.email?.split('@')[0] || 'Sem nome', email: p.email }));
-        // deduplicate
         const unique = Array.from(new Map(mapped.map((u: any) => [u.id, u])).values());
         setCompanyUsers(unique as any);
       }
     })();
   }, [isAdmin, selectedCompanyId]);
 
-  // Reset user selection when company changes
   useEffect(() => {
     setSelectedUserId('all');
   }, [selectedCompanyId]);
@@ -94,7 +96,39 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
 
   useEffect(() => {
     loadCompanyData();
+    loadSchedules();
   }, [activeUserId]);
+
+  const loadSchedules = async () => {
+    // Load schedules for relevant users
+    const userIds = isAdmin && selectedUserId === 'all'
+      ? companyUsers.map(u => u.id)
+      : [activeUserId];
+
+    if (userIds.length === 0) return;
+
+    const { data } = await supabase
+      .from('time_clock_schedules')
+      .select('*')
+      .in('user_id', userIds)
+      .eq('is_active', true);
+
+    if (data) {
+      const map: Record<string, DaySchedule> = {};
+      data.forEach((s: any) => {
+        map[s.user_id] = {
+          entry_time: s.entry_time || '08:00',
+          exit_time: s.exit_time || '18:00',
+          lunch_start: s.lunch_start,
+          lunch_end: s.lunch_end,
+          daily_hours: s.daily_hours || 8,
+          tolerance_minutes: s.tolerance_minutes || 10,
+          work_days: s.work_days || [1, 2, 3, 4, 5],
+        };
+      });
+      setSchedules(map);
+    }
+  };
 
   const loadCompanyData = async () => {
     try {
@@ -126,10 +160,7 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
     setLoading(true);
 
     if (isAdmin && selectedUserId === 'all') {
-      // Load all users' records (filtered by company if selected)
-      const targetUserIds = selectedCompanyId !== 'all'
-        ? companyUsers.map(u => u.id)
-        : companyUsers.map(u => u.id);
+      const targetUserIds = companyUsers.map(u => u.id);
 
       if (targetUserIds.length === 0) {
         setHistory([]);
@@ -154,7 +185,6 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
     setLoading(false);
   };
 
-  // Map user_id -> name for "all" view
   const userNameMap = useMemo(() => {
     const map: Record<string, string> = {};
     companyUsers.forEach(u => { map[u.id] = u.name; });
@@ -176,22 +206,17 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
 
     return Object.entries(groups).map(([key, records]) => {
       const date = records[0].clock_date;
-      const entrada = records.find((r) => r.clock_type === 'entrada');
-      const saida = records.find((r) => r.clock_type === 'saida');
-      const pausaInicio = records.find((r) => r.clock_type === 'pausa_inicio');
-      const pausaFim = records.find((r) => r.clock_type === 'pausa_fim');
+      const recordUserId = records[0].user_id;
+      const dayOfWeek = new Date(date + 'T12:00:00').getDay();
+      const userSchedule = schedules[recordUserId] || null;
 
-      let totalMinutes = 0;
-      if (entrada && saida) {
-        totalMinutes = differenceInMinutes(parseISO(saida.clock_time), parseISO(entrada.clock_time));
-        if (pausaInicio && pausaFim) {
-          totalMinutes -= differenceInMinutes(parseISO(pausaFim.clock_time), parseISO(pausaInicio.clock_time));
-        }
-      }
+      const metrics = calculateDayMetrics(records, userSchedule, dayOfWeek);
 
       let status: TimeClockStatus = 'pendente';
+      const entrada = records.find(r => r.clock_type === 'entrada');
+      const saida = records.find(r => r.clock_type === 'saida');
       if (entrada && saida) {
-        status = records.some((r) => r.status === 'ajustado') ? 'ajustado' : 'completo';
+        status = records.some(r => r.status === 'ajustado') ? 'ajustado' : 'completo';
       } else if (entrada) {
         status = 'incompleto';
       }
@@ -199,22 +224,16 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
       return {
         date,
         records,
-        totalMinutes,
+        totalMinutes: metrics.workedMinutes,
+        breakMinutes: metrics.breakMinutes,
+        delayMinutes: metrics.delayMinutes,
         status,
-        userName: showAllUsers ? (userNameMap[records[0].user_id] || 'Desconhecido') : undefined,
+        userName: showAllUsers ? (userNameMap[recordUserId] || 'Desconhecido') : undefined,
       };
     }).sort((a, b) => b.date.localeCompare(a.date));
   };
 
-  const formatMinutes = (minutes: number): string => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}h ${mins}min`;
-  };
-
   const groups = groupByDate();
-
-  // PDF should only show when a single user is selected
   const showPdf = !showAllUsers;
 
   return (
@@ -241,7 +260,6 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Admin filters */}
         {isAdmin && (
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 min-w-[180px]">
@@ -275,25 +293,14 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
           </div>
         )}
 
-        {/* Date filters */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">De:</span>
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-auto"
-            />
+            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-auto" />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Até:</span>
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-auto"
-            />
+            <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-auto" />
           </div>
         </div>
 
@@ -317,6 +324,8 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
                   <TableHead>Pausa</TableHead>
                   <TableHead>Retorno</TableHead>
                   <TableHead>Saída</TableHead>
+                  <TableHead>Pausas</TableHead>
+                  <TableHead>Atraso</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -324,8 +333,8 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
               <TableBody>
                 {groups.map((group, idx) => {
                   const entrada = group.records.find((r) => r.clock_type === 'entrada');
-                  const pausa = group.records.find((r) => r.clock_type === 'pausa_inicio');
-                  const retorno = group.records.find((r) => r.clock_type === 'pausa_fim');
+                  const pausas = group.records.filter((r) => r.clock_type === 'pausa_inicio');
+                  const retornos = group.records.filter((r) => r.clock_type === 'pausa_fim');
                   const saida = group.records.find((r) => r.clock_type === 'saida');
 
                   return (
@@ -340,22 +349,30 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
                         {entrada ? (
                           <div className="flex items-center gap-1">
                             {format(parseISO(entrada.clock_time), 'HH:mm')}
-                            {entrada.city && (
-                              <MapPin className="h-3 w-3 text-muted-foreground" />
-                            )}
+                            {entrada.city && <MapPin className="h-3 w-3 text-muted-foreground" />}
                           </div>
                         ) : '-'}
                       </TableCell>
                       <TableCell>
-                        {pausa ? format(parseISO(pausa.clock_time), 'HH:mm') : '-'}
+                        {pausas.length > 0 ? format(parseISO(pausas[0].clock_time), 'HH:mm') : '-'}
                       </TableCell>
                       <TableCell>
-                        {retorno ? format(parseISO(retorno.clock_time), 'HH:mm') : '-'}
+                        {retornos.length > 0 ? format(parseISO(retornos[retornos.length - 1].clock_time), 'HH:mm') : '-'}
                       </TableCell>
                       <TableCell>
                         {saida ? format(parseISO(saida.clock_time), 'HH:mm') : '-'}
                       </TableCell>
-                      <TableCell>{formatMinutes(group.totalMinutes)}</TableCell>
+                      <TableCell>
+                        {group.breakMinutes > 0 ? formatMinutesToHM(group.breakMinutes) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {group.delayMinutes > 0 ? (
+                          <Badge variant="outline" className="text-yellow-600">
+                            {group.delayMinutes}min
+                          </Badge>
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell>{formatMinutesToHM(group.totalMinutes)}</TableCell>
                       <TableCell>
                         <Badge className={statusColors[group.status]}>
                           {statusLabels[group.status]}

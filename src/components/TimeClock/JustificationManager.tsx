@@ -8,10 +8,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   FileText, Plus, Loader2, CheckCircle, XCircle, Clock, 
-  AlertTriangle, User, Calendar, MessageSquare 
+  AlertTriangle, User, Calendar, MessageSquare, Upload, ExternalLink
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -68,6 +67,8 @@ export function JustificationManager({ isManager = false }: JustificationManager
   const [selectedJustification, setSelectedJustification] = useState<Justification | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   
   const [newJustification, setNewJustification] = useState({
     reference_date: format(new Date(), 'yyyy-MM-dd'),
@@ -123,6 +124,28 @@ export function JustificationManager({ isManager = false }: JustificationManager
     return JUSTIFICATION_TYPES.find(t => t.value === type)?.label || type;
   };
 
+  const uploadAttachment = async (): Promise<string | null> => {
+    if (!attachmentFile || !user) return null;
+    setUploadingFile(true);
+    try {
+      const ext = attachmentFile.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage
+        .from('time-clock-documents')
+        .upload(fileName, attachmentFile);
+      
+      if (error) throw error;
+      
+      const { data } = supabase.storage.from('time-clock-documents').getPublicUrl(fileName);
+      return data.publicUrl;
+    } catch (error: any) {
+      toast({ title: 'Erro ao enviar arquivo', description: error.message, variant: 'destructive' });
+      return null;
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
   const handleCreate = async () => {
     if (!newJustification.description.trim()) {
       toast({ title: 'Informe a descrição', variant: 'destructive' });
@@ -131,6 +154,11 @@ export function JustificationManager({ isManager = false }: JustificationManager
 
     setLoading(true);
     
+    let attachmentUrl: string | null = null;
+    if (attachmentFile) {
+      attachmentUrl = await uploadAttachment();
+    }
+
     const { error } = await supabase
       .from('time_clock_justifications')
       .insert({
@@ -139,6 +167,7 @@ export function JustificationManager({ isManager = false }: JustificationManager
         justification_type: newJustification.justification_type,
         description: newJustification.description,
         minutes_affected: newJustification.minutes_affected,
+        attachment_url: attachmentUrl,
       });
 
     if (error) {
@@ -156,6 +185,7 @@ export function JustificationManager({ isManager = false }: JustificationManager
         description: '',
         minutes_affected: 0,
       });
+      setAttachmentFile(null);
       loadData();
     }
 
@@ -186,7 +216,6 @@ export function JustificationManager({ isManager = false }: JustificationManager
     } else {
       toast({ 
         title: approved ? 'Justificativa aprovada!' : 'Justificativa rejeitada',
-        description: approved ? 'A justificativa foi aprovada com sucesso.' : 'A justificativa foi rejeitada.',
       });
       setShowReviewModal(false);
       setSelectedJustification(null);
@@ -236,7 +265,6 @@ export function JustificationManager({ isManager = false }: JustificationManager
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Filtros */}
           <div className="flex items-center gap-4">
             <Select value={filterStatus} onValueChange={setFilterStatus}>
               <SelectTrigger className="w-[180px]">
@@ -265,6 +293,7 @@ export function JustificationManager({ isManager = false }: JustificationManager
                     <TableHead>Data</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Descrição</TableHead>
+                    <TableHead>Anexo</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
@@ -292,6 +321,19 @@ export function JustificationManager({ isManager = false }: JustificationManager
                         </TableCell>
                         <TableCell className="max-w-[200px] truncate">
                           {justification.description}
+                        </TableCell>
+                        <TableCell>
+                          {justification.attachment_url ? (
+                            <a
+                              href={justification.attachment_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-primary hover:underline text-sm"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              Ver
+                            </a>
+                          ) : '-'}
                         </TableCell>
                         <TableCell>
                           <Badge className={STATUS_CONFIG[justification.status].color}>
@@ -334,7 +376,7 @@ export function JustificationManager({ isManager = false }: JustificationManager
         </CardContent>
       </Card>
 
-      {/* Modal de Criar Justificativa */}
+      {/* Create Modal */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -354,20 +396,14 @@ export function JustificationManager({ isManager = false }: JustificationManager
                 <Input
                   type="date"
                   value={newJustification.reference_date}
-                  onChange={(e) => setNewJustification({ 
-                    ...newJustification, 
-                    reference_date: e.target.value 
-                  })}
+                  onChange={(e) => setNewJustification({ ...newJustification, reference_date: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Tipo *</Label>
                 <Select
                   value={newJustification.justification_type}
-                  onValueChange={(value) => setNewJustification({ 
-                    ...newJustification, 
-                    justification_type: value 
-                  })}
+                  onValueChange={(value) => setNewJustification({ ...newJustification, justification_type: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -389,10 +425,7 @@ export function JustificationManager({ isManager = false }: JustificationManager
                 type="number"
                 min="0"
                 value={newJustification.minutes_affected}
-                onChange={(e) => setNewJustification({ 
-                  ...newJustification, 
-                  minutes_affected: parseInt(e.target.value) || 0 
-                })}
+                onChange={(e) => setNewJustification({ ...newJustification, minutes_affected: parseInt(e.target.value) || 0 })}
                 placeholder="Ex: 30 (para 30 minutos de atraso)"
               />
             </div>
@@ -401,29 +434,45 @@ export function JustificationManager({ isManager = false }: JustificationManager
               <Label>Descrição *</Label>
               <Textarea
                 value={newJustification.description}
-                onChange={(e) => setNewJustification({ 
-                  ...newJustification, 
-                  description: e.target.value 
-                })}
+                onChange={(e) => setNewJustification({ ...newJustification, description: e.target.value })}
                 placeholder="Descreva o motivo da justificativa..."
                 rows={4}
               />
             </div>
+
+            {/* File upload */}
+            <div className="space-y-2">
+              <Label>Anexo (atestado, comprovante)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)}
+                  className="flex-1"
+                />
+                {attachmentFile && (
+                  <Badge variant="secondary" className="text-xs">
+                    {attachmentFile.name.substring(0, 20)}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Formatos aceitos: imagens e PDF</p>
+            </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateModal(false)}>
+            <Button variant="outline" onClick={() => { setShowCreateModal(false); setAttachmentFile(null); }}>
               Cancelar
             </Button>
-            <Button onClick={handleCreate} disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            <Button onClick={handleCreate} disabled={loading || uploadingFile}>
+              {(loading || uploadingFile) ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
               Enviar
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Revisão */}
+      {/* Review Modal */}
       <Dialog open={showReviewModal} onOpenChange={setShowReviewModal}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -470,6 +519,33 @@ export function JustificationManager({ isManager = false }: JustificationManager
                   {selectedJustification.description}
                 </p>
               </div>
+
+              {/* Attachment preview */}
+              {selectedJustification.attachment_url && (
+                <div>
+                  <Label className="text-muted-foreground">Documento Anexo</Label>
+                  <div className="mt-1">
+                    {selectedJustification.attachment_url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                      <img
+                        src={selectedJustification.attachment_url}
+                        alt="Anexo"
+                        className="max-w-full max-h-[200px] rounded-md border"
+                      />
+                    ) : (
+                      <a
+                        href={selectedJustification.attachment_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-primary hover:underline p-3 bg-muted rounded-md"
+                      >
+                        <FileText className="h-5 w-5" />
+                        Abrir documento anexo
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <Label className="text-muted-foreground">Status</Label>

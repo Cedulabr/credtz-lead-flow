@@ -10,13 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Users, Clock, AlertTriangle, CheckCircle, XCircle, 
   TrendingUp, Calendar, Image, MapPin, Loader2, Eye,
-  FileText, Bell
+  FileText, Bell, Coffee
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useGestorCompany } from '@/hooks/useGestorCompany';
-import { format, parseISO, startOfMonth, endOfMonth, subDays } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { JustificationManager } from './JustificationManager';
+import { parseTimeToMinutes, hasActiveBreak, type DaySchedule } from '@/lib/timeClockCalculations';
 
 interface DailyOverview {
   user_id: string;
@@ -26,7 +27,7 @@ interface DailyOverview {
   exit_time: string | null;
   break_start: string | null;
   break_end: string | null;
-  status: 'present' | 'late' | 'absent' | 'incomplete';
+  status: 'present' | 'late' | 'absent' | 'incomplete' | 'on_break';
   delay_minutes: number;
   photo_url: string | null;
   city: string | null;
@@ -50,6 +51,7 @@ interface TeamStats {
   present_today: number;
   late_today: number;
   absent_today: number;
+  on_break_today: number;
   pending_justifications: number;
   unresolved_alerts: number;
 }
@@ -68,6 +70,7 @@ const STATUS_CONFIG = {
   late: { label: 'Atrasado', color: 'bg-yellow-100 text-yellow-800' },
   absent: { label: 'Ausente', color: 'bg-red-100 text-red-800' },
   incomplete: { label: 'Incompleto', color: 'bg-orange-100 text-orange-800' },
+  on_break: { label: 'Em Pausa', color: 'bg-blue-100 text-blue-800' },
 };
 
 export function ManagerDashboard() {
@@ -80,18 +83,17 @@ export function ManagerDashboard() {
     present_today: 0,
     late_today: 0,
     absent_today: 0,
+    on_break_today: 0,
     pending_justifications: 0,
     unresolved_alerts: 0,
   });
   const [selectedPhoto, setSelectedPhoto] = useState<{ url: string; name: string; time: string } | null>(null);
   const [users, setUsers] = useState<{ id: string; name: string; email: string }[]>([]);
 
-  // Company filter
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('all');
   const { companyId: gestorCompanyId, companyName: gestorCompanyName, isGestor, isAdmin, companyUserIds, loading: gestorLoading } = useGestorCompany();
 
-  // Load companies once - gestor sees only their company
   useEffect(() => {
     if (gestorLoading) return;
     if (isGestor && gestorCompanyId) {
@@ -112,7 +114,6 @@ export function ManagerDashboard() {
   const loadData = async () => {
     setLoading(true);
 
-    // Get user IDs filtered by company
     let filteredUserIds: string[] | null = null;
     if (selectedCompanyId !== 'all') {
       const { data: ucData } = await supabase
@@ -126,10 +127,9 @@ export function ManagerDashboard() {
     let usersQuery = supabase.from('profiles').select('id, name, email').eq('is_active', true);
     if (filteredUserIds !== null) {
       if (filteredUserIds.length === 0) {
-        // No users in this company
         setDailyOverview([]);
         setUsers([]);
-        setStats({ total_employees: 0, present_today: 0, late_today: 0, absent_today: 0, pending_justifications: 0, unresolved_alerts: 0 });
+        setStats({ total_employees: 0, present_today: 0, late_today: 0, absent_today: 0, on_break_today: 0, pending_justifications: 0, unresolved_alerts: 0 });
         setLoading(false);
         return;
       }
@@ -141,7 +141,13 @@ export function ManagerDashboard() {
       clocksQuery = clocksQuery.in('user_id', filteredUserIds);
     }
 
-    const [usersRes, clocksRes, alertsRes, justificationsRes] = await Promise.all([
+    // Also load schedules for users
+    let schedulesQuery = supabase.from('time_clock_schedules').select('*').eq('is_active', true);
+    if (filteredUserIds !== null) {
+      schedulesQuery = schedulesQuery.in('user_id', filteredUserIds);
+    }
+
+    const [usersRes, clocksRes, alertsRes, justificationsRes, schedulesRes] = await Promise.all([
       usersQuery,
       clocksQuery,
       supabase.from('time_clock_alerts')
@@ -152,13 +158,20 @@ export function ManagerDashboard() {
       supabase.from('time_clock_justifications')
         .select('*')
         .eq('status', 'pending'),
+      schedulesQuery,
     ]);
 
     if (usersRes.data) {
       setUsers(usersRes.data);
     }
 
-    // Processar visão diária
+    // Build schedule map
+    const scheduleMap: Record<string, any> = {};
+    schedulesRes.data?.forEach((s: any) => {
+      scheduleMap[s.user_id] = s;
+    });
+
+    // Process daily overview
     const overview: DailyOverview[] = [];
     const userClocks: Record<string, any[]> = {};
     
@@ -179,12 +192,21 @@ export function ManagerDashboard() {
       let status: DailyOverview['status'] = 'absent';
       let delayMinutes = 0;
 
+      // Get user schedule or use defaults
+      const userSchedule = scheduleMap[user.id];
+      const scheduledEntryTime = userSchedule?.entry_time || '08:00';
+      const toleranceMin = userSchedule?.tolerance_minutes || 10;
+
       if (entry) {
-        const entryTime = entry.clock_time.split('T')[1]?.slice(0, 5) || entry.clock_time.slice(0, 5);
-        if (entryTime > '08:10') {
+        const entryMin = parseTimeToMinutes(entry.clock_time);
+        const scheduledMin = parseTimeToMinutes(scheduledEntryTime) + toleranceMin;
+
+        // Check for active break
+        if (hasActiveBreak(clocks)) {
+          status = 'on_break';
+        } else if (entryMin > scheduledMin) {
           status = 'late';
-          const [h, m] = entryTime.split(':').map(Number);
-          delayMinutes = (h - 8) * 60 + m - 10;
+          delayMinutes = entryMin - parseTimeToMinutes(scheduledEntryTime);
         } else {
           status = exit ? 'present' : 'incomplete';
         }
@@ -208,23 +230,23 @@ export function ManagerDashboard() {
 
     setDailyOverview(overview);
 
-    // Processar alertas
     const alertsWithUsers: Alert[] = (alertsRes.data || []).map((alert: any) => ({
       ...alert,
       user_name: usersRes.data?.find(u => u.id === alert.user_id)?.name || 'Desconhecido',
     }));
     setAlerts(alertsWithUsers);
 
-    // Calcular estatísticas
     const presentCount = overview.filter(o => o.status === 'present').length;
     const lateCount = overview.filter(o => o.status === 'late').length;
     const absentCount = overview.filter(o => o.status === 'absent').length;
+    const onBreakCount = overview.filter(o => o.status === 'on_break').length;
 
     setStats({
       total_employees: usersRes.data?.length || 0,
       present_today: presentCount,
       late_today: lateCount,
       absent_today: absentCount,
+      on_break_today: onBreakCount,
       pending_justifications: justificationsRes.data?.length || 0,
       unresolved_alerts: alertsRes.data?.length || 0,
     });
@@ -254,8 +276,8 @@ export function ManagerDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Cards de Estatísticas */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -288,6 +310,18 @@ export function ManagerDashboard() {
                 <p className="text-2xl font-bold text-yellow-800">{stats.late_today}</p>
               </div>
               <Clock className="h-8 w-8 text-yellow-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-700">Em Pausa</p>
+                <p className="text-2xl font-bold text-blue-800">{stats.on_break_today}</p>
+              </div>
+              <Coffee className="h-8 w-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
@@ -519,7 +553,7 @@ export function ManagerDashboard() {
         </TabsContent>
       </Tabs>
 
-      {/* Modal de Foto */}
+      {/* Photo Modal */}
       <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>

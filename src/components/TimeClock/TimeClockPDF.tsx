@@ -10,10 +10,10 @@ import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import { format, parseISO, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { calculateTotalBreakMinutes, parseTimeToMinutes, formatMinutesToHMCompact } from '@/lib/timeClockCalculations';
 
-// Easyn brand colors
-const EASYN_NAVY = [10, 31, 68] as const;   // #0A1F44
-const EASYN_BLUE = [59, 130, 246] as const;  // #3B82F6
+const EASYN_NAVY = [10, 31, 68] as const;
+const EASYN_BLUE = [59, 130, 246] as const;
 const WHITE = [255, 255, 255] as const;
 
 interface TimeClockPDFProps {
@@ -32,20 +32,16 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
   const { toast } = useToast();
 
   const drawHeader = (doc: jsPDF, pageWidth: number) => {
-    // Navy header background
     doc.setFillColor(...EASYN_NAVY);
     doc.rect(0, 0, pageWidth, 38, 'F');
-    // Accent line
     doc.setFillColor(...EASYN_BLUE);
     doc.rect(0, 38, pageWidth, 2, 'F');
 
-    // Logo text "EASYN"
     doc.setTextColor(...WHITE);
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
     doc.text('EASYN', 14, 18);
 
-    // Subtitle
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.text('Sistema de Gestão de Ponto', 14, 26);
@@ -66,7 +62,6 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
   const drawSignatureArea = (doc: jsPDF, yPos: number) => {
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Legal text
     doc.setFontSize(8);
     doc.setTextColor(80, 80, 80);
     doc.setFont('helvetica', 'italic');
@@ -77,7 +72,6 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
 
     yPos += 15;
 
-    // Collaborator signature
     doc.setDrawColor(0, 0, 0);
     doc.line(20, yPos, 90, yPos);
     doc.setFontSize(8);
@@ -86,12 +80,10 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
     doc.text('Assinatura do Colaborador', 55, yPos + 5, { align: 'center' });
     doc.text('Data: ___/___/______', 55, yPos + 11, { align: 'center' });
 
-    // Manager signature
     doc.line(120, yPos, 190, yPos);
     doc.text('Assinatura do Gestor', 155, yPos + 5, { align: 'center' });
     doc.text('Data: ___/___/______', 155, yPos + 11, { align: 'center' });
 
-    // Company stamp area
     yPos += 22;
     doc.setDrawColor(180, 180, 180);
     doc.setLineDashPattern([2, 2], 0);
@@ -136,14 +128,12 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       drawHeader(doc, pageWidth);
       drawCompanyInfo(doc, pageWidth);
 
-      // Title
       let yPos = 50;
       doc.setTextColor(...EASYN_NAVY);
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
       doc.text('FOLHA DE PONTO DIÁRIA', pageWidth / 2, yPos, { align: 'center' });
 
-      // Employee info
       yPos += 15;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
@@ -156,7 +146,6 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       doc.setFont('helvetica', 'normal');
       doc.text(format(parseISO(selectedDate), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR }), 133, yPos);
 
-      // Records section
       yPos += 18;
       doc.setFillColor(240, 243, 248);
       doc.rect(14, yPos - 5, pageWidth - 28, 10, 'F');
@@ -167,14 +156,14 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
 
       yPos += 14;
       const entry = records?.find(r => r.clock_type === 'entrada');
-      const breakStart = records?.find(r => r.clock_type === 'pausa_inicio');
-      const breakEnd = records?.find(r => r.clock_type === 'pausa_fim');
+      const breakStarts = records?.filter(r => r.clock_type === 'pausa_inicio') || [];
+      const breakEnds = records?.filter(r => r.clock_type === 'pausa_fim') || [];
       const exit = records?.find(r => r.clock_type === 'saida');
 
       const rows = [
         { label: 'Entrada', record: entry },
-        { label: 'Início Pausa', record: breakStart },
-        { label: 'Fim Pausa', record: breakEnd },
+        { label: 'Início Pausa', record: breakStarts[0] },
+        { label: 'Fim Pausa', record: breakEnds[0] },
         { label: 'Saída', record: exit },
       ];
 
@@ -213,13 +202,10 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
 
       yPos += 14;
       let totalMinutes = 0;
-      let breakMinutes = 0;
+      const breakMinutes = calculateTotalBreakMinutes(records || []);
       if (entry && exit) {
         totalMinutes = Math.floor((parseISO(exit.clock_time).getTime() - parseISO(entry.clock_time).getTime()) / 60000);
-        if (breakStart && breakEnd) {
-          breakMinutes = Math.floor((parseISO(breakEnd.clock_time).getTime() - parseISO(breakStart.clock_time).getTime()) / 60000);
-          totalMinutes -= breakMinutes;
-        }
+        totalMinutes -= breakMinutes;
       }
 
       doc.setTextColor(...EASYN_NAVY);
@@ -233,7 +219,6 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       doc.setFont('helvetica', 'normal');
       doc.text(`${Math.floor(breakMinutes / 60)}h ${breakMinutes % 60}min`, 140, yPos);
 
-      // Justifications
       if (justifications && justifications.length > 0) {
         yPos += 16;
         doc.setFillColor(255, 243, 205);
@@ -270,18 +255,20 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const startDate = `${selectedMonth}-01`;
       const endDate = format(endOfMonth(parseISO(startDate)), 'yyyy-MM-dd');
 
-      const [recordsRes, justRes, scheduleRes] = await Promise.all([
+      const [recordsRes, justRes, scheduleRes, profileRes] = await Promise.all([
         supabase.from('time_clock').select('*').eq('user_id', userId)
           .gte('clock_date', startDate).lte('clock_date', endDate)
           .order('clock_date', { ascending: true }).order('clock_time', { ascending: true }),
         supabase.from('time_clock_justifications').select('*').eq('user_id', userId)
           .gte('reference_date', startDate).lte('reference_date', endDate),
         supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).single(),
+        supabase.from('profiles').select('name, email, cpf, role').eq('id', userId).single(),
       ]);
 
       const records = recordsRes.data || [];
       const justifications = justRes.data || [];
       const schedule = scheduleRes.data;
+      const profile = profileRes.data;
 
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -296,7 +283,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       doc.setFont('helvetica', 'bold');
       doc.text('ESPELHO DE PONTO MENSAL', pageWidth / 2, yPos, { align: 'center' });
 
-      // Employee info
+      // Employee info with CPF and Cargo
       yPos += 12;
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
@@ -304,7 +291,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       doc.text('Colaborador:', 14, yPos);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(0, 0, 0);
-      doc.text(userName || 'Não informado', 45, yPos);
+      doc.text(userName || profile?.name || 'Não informado', 45, yPos);
 
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...EASYN_NAVY);
@@ -314,31 +301,53 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       doc.text(format(parseISO(startDate), "MMMM 'de' yyyy", { locale: ptBR }), 142, yPos);
 
       yPos += 7;
+      // CPF
+      if (profile?.cpf) {
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...EASYN_NAVY);
+        doc.text('CPF:', 14, yPos);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        const cpf = profile.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+        doc.text(cpf, 28, yPos);
+      }
+
+      // Cargo
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...EASYN_NAVY);
+      doc.text('Cargo:', 70, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
+      doc.text(profile?.role === 'admin' ? 'Administrador' : 'Colaborador', 88, yPos);
+
+      // Schedule info
       if (schedule) {
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(...EASYN_NAVY);
-        doc.text('Jornada:', 14, yPos);
+        doc.text('Jornada:', 120, yPos);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(0, 0, 0);
-        doc.text(`${schedule.entry_time?.slice(0, 5)} às ${schedule.exit_time?.slice(0, 5)} | ${schedule.daily_hours}h/dia`, 38, yPos);
+        doc.text(`${schedule.entry_time?.slice(0, 5)} às ${schedule.exit_time?.slice(0, 5)} | ${schedule.daily_hours}h/dia`, 142, yPos);
       }
 
-      // Table header
+      // Table header - with Pausas and Atraso columns
       yPos += 12;
       doc.setFillColor(...EASYN_NAVY);
       doc.rect(14, yPos - 4, pageWidth - 28, 10, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
+      doc.setFontSize(6.5);
       doc.setTextColor(...WHITE);
       doc.text('Data', 16, yPos + 2);
-      doc.text('Dia', 36, yPos + 2);
-      doc.text('Entrada', 52, yPos + 2);
-      doc.text('Pausa', 75, yPos + 2);
-      doc.text('Retorno', 95, yPos + 2);
-      doc.text('Saída', 118, yPos + 2);
-      doc.text('Total', 138, yPos + 2);
-      doc.text('Status', 158, yPos + 2);
-      doc.text('Obs', 180, yPos + 2);
+      doc.text('Dia', 33, yPos + 2);
+      doc.text('Entrada', 48, yPos + 2);
+      doc.text('Pausa', 67, yPos + 2);
+      doc.text('Retorno', 83, yPos + 2);
+      doc.text('Saída', 100, yPos + 2);
+      doc.text('Pausas', 116, yPos + 2);
+      doc.text('Atraso', 133, yPos + 2);
+      doc.text('Total', 150, yPos + 2);
+      doc.text('Status', 167, yPos + 2);
+      doc.text('Obs', 185, yPos + 2);
 
       yPos += 12;
       doc.setFont('helvetica', 'normal');
@@ -348,6 +357,8 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const expectedDailyMinutes = (schedule?.daily_hours || 8) * 60;
 
       let totalWorkedMinutes = 0;
+      let totalDelayMinutes = 0;
+      let totalBreakMinutesAll = 0;
       let totalDelays = 0;
       let totalAbsences = 0;
       let totalOvertime = 0;
@@ -365,23 +376,29 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         }
 
         const entry = dayRecords.find(r => r.clock_type === 'entrada');
-        const breakStart = dayRecords.find(r => r.clock_type === 'pausa_inicio');
-        const breakEnd = dayRecords.find(r => r.clock_type === 'pausa_fim');
+        const breakStarts = dayRecords.filter(r => r.clock_type === 'pausa_inicio');
+        const breakEnds = dayRecords.filter(r => r.clock_type === 'pausa_fim');
         const exit = dayRecords.find(r => r.clock_type === 'saida');
 
+        const breakMinutes = calculateTotalBreakMinutes(dayRecords);
+        totalBreakMinutesAll += breakMinutes;
+
         let workedMinutes = 0;
+        let delayMinutes = 0;
         let status = isWorkDay ? (entry ? (exit ? 'OK' : 'INC') : 'FALTA') : 'FDS';
 
         if (entry && exit) {
           workedMinutes = Math.floor((parseISO(exit.clock_time).getTime() - parseISO(entry.clock_time).getTime()) / 60000);
-          if (breakStart && breakEnd) {
-            workedMinutes -= Math.floor((parseISO(breakEnd.clock_time).getTime() - parseISO(breakStart.clock_time).getTime()) / 60000);
-          }
+          workedMinutes -= breakMinutes;
           if (schedule) {
-            const [h, m] = schedule.entry_time.split(':').map(Number);
-            const scheduledMin = h * 60 + m + (schedule.tolerance_minutes || 0);
-            const actualMin = parseISO(entry.clock_time).getHours() * 60 + parseISO(entry.clock_time).getMinutes();
-            if (actualMin > scheduledMin) { status = 'ATR'; totalDelays++; }
+            const scheduledMin = parseTimeToMinutes(schedule.entry_time) + (schedule.tolerance_minutes || 0);
+            const actualMin = parseTimeToMinutes(entry.clock_time);
+            if (actualMin > scheduledMin) {
+              delayMinutes = actualMin - parseTimeToMinutes(schedule.entry_time);
+              status = 'ATR';
+              totalDelays++;
+              totalDelayMinutes += delayMinutes;
+            }
           }
           totalWorkedMinutes += workedMinutes;
           if (workedMinutes > expectedDailyMinutes) totalOvertime += workedMinutes - expectedDailyMinutes;
@@ -395,46 +412,44 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           return t.includes('T') ? format(parseISO(t), 'HH:mm') : t.slice(0, 5);
         };
 
-        // Alternate row bg
         if (!isWorkDay) {
           doc.setFillColor(245, 247, 250);
           doc.rect(14, yPos - 3, pageWidth - 28, 6, 'F');
         }
 
-        doc.setFontSize(7);
+        doc.setFontSize(6.5);
         doc.setTextColor(0, 0, 0);
         doc.text(format(day, 'dd/MM'), 16, yPos);
-        doc.text(format(day, 'EEE', { locale: ptBR }), 36, yPos);
-        doc.text(fmtTime(entry), 52, yPos);
-        doc.text(fmtTime(breakStart), 75, yPos);
-        doc.text(fmtTime(breakEnd), 95, yPos);
-        doc.text(fmtTime(exit), 118, yPos);
-        doc.text(workedMinutes > 0 ? `${Math.floor(workedMinutes / 60)}h${(workedMinutes % 60).toString().padStart(2, '0')}` : '-', 138, yPos);
+        doc.text(format(day, 'EEE', { locale: ptBR }), 33, yPos);
+        doc.text(fmtTime(entry), 48, yPos);
+        doc.text(fmtTime(breakStarts[0]), 67, yPos);
+        doc.text(fmtTime(breakEnds[breakEnds.length - 1]), 83, yPos);
+        doc.text(fmtTime(exit), 100, yPos);
+        doc.text(breakMinutes > 0 ? formatMinutesToHMCompact(breakMinutes) : '-', 116, yPos);
+        doc.text(delayMinutes > 0 ? `${delayMinutes}min` : '-', 133, yPos);
+        doc.text(workedMinutes > 0 ? formatMinutesToHMCompact(workedMinutes) : '-', 150, yPos);
 
-        // Status colors
         const statusColors: Record<string, [number, number, number]> = {
-          'OK': [16, 185, 129],    // green
-          'ATR': [245, 158, 11],   // amber
-          'FALTA': [239, 68, 68],  // red
-          'INC': [249, 115, 22],   // orange
-          'FDS': [156, 163, 175],  // gray
+          'OK': [16, 185, 129],
+          'ATR': [245, 158, 11],
+          'FALTA': [239, 68, 68],
+          'INC': [249, 115, 22],
+          'FDS': [156, 163, 175],
         };
         doc.setTextColor(...(statusColors[status] || [0, 0, 0]));
-        doc.text(status, 160, yPos);
+        doc.text(status, 169, yPos);
         doc.setTextColor(0, 0, 0);
 
         const dayJust = justifications.find(j => j.reference_date === dateStr);
-        if (dayJust) doc.text('✓', 185, yPos);
+        if (dayJust) doc.text('✓', 188, yPos);
 
         yPos += 6;
       });
 
-      // Summary bar with gradient effect (navy to blue)
+      // Summary bar
       yPos += 8;
       doc.setFillColor(...EASYN_NAVY);
-      doc.rect(14, yPos - 4, (pageWidth - 28) / 2, 22, 'F');
-      doc.setFillColor(...EASYN_BLUE);
-      doc.rect(14 + (pageWidth - 28) / 2, yPos - 4, (pageWidth - 28) / 2, 22, 'F');
+      doc.rect(14, yPos - 4, (pageWidth - 28), 28, 'F');
 
       doc.setTextColor(...WHITE);
       doc.setFontSize(8);
@@ -446,18 +461,24 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const expectedHours = workDaysInMonth * (schedule?.daily_hours || 8);
       const overtimeH = Math.floor(totalOvertime / 60);
       const overtimeM = totalOvertime % 60;
+      const balanceMinutes = totalWorkedMinutes - (expectedHours * 60);
+      const balanceH = Math.floor(Math.abs(balanceMinutes) / 60);
+      const balanceM = Math.abs(balanceMinutes) % 60;
 
       doc.text(`Total Trabalhado: ${totalH}h ${totalM}min`, 18, yPos + 4);
       doc.text(`Carga Prevista: ${expectedHours}h`, 18, yPos + 12);
-      doc.text(`Horas Extras: ${overtimeH}h ${overtimeM}min`, pageWidth / 2 + 4, yPos + 4);
-      doc.text(`Atrasos: ${totalDelays} | Faltas: ${totalAbsences}`, pageWidth / 2 + 4, yPos + 12);
+      doc.text(`Total Pausas: ${formatMinutesToHMCompact(totalBreakMinutesAll)}`, 18, yPos + 20);
 
+      doc.text(`Horas Extras: ${overtimeH}h ${overtimeM}min`, pageWidth / 2 - 10, yPos + 4);
+      doc.text(`Atrasos: ${totalDelays} (${totalDelayMinutes}min)`, pageWidth / 2 - 10, yPos + 12);
+      doc.text(`Faltas: ${totalAbsences}`, pageWidth / 2 - 10, yPos + 20);
+
+      doc.text(`Banco de Horas: ${balanceMinutes >= 0 ? '+' : '-'}${balanceH}h ${balanceM}min`, pageWidth - 70, yPos + 4);
       const approvedJust = justifications.filter(j => j.status === 'approved').length;
-      doc.setFontSize(7);
-      doc.text(`Just. Aprovadas: ${approvedJust}`, pageWidth - 50, yPos + 12);
+      doc.text(`Just. Aprovadas: ${approvedJust}`, pageWidth - 70, yPos + 12);
 
       // Signature area
-      drawSignatureArea(doc, yPos + 32);
+      drawSignatureArea(doc, yPos + 38);
       drawFooter(doc);
 
       doc.save(`espelho-ponto-${selectedMonth}.pdf`);
