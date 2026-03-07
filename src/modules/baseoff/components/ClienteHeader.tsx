@@ -60,10 +60,10 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
           {/* Main Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h2 className="text-xl font-bold truncate">{client.nome}</h2>
+              <h2 className="text-2xl font-bold truncate">{client.nome}</h2>
               <StatusBadge status={client.status || 'simulado'} />
               {age && (
-                <Badge variant="secondary" className="text-sm font-semibold">
+                <Badge variant="secondary" className="text-sm py-1 px-3 font-semibold">
                   {age} anos
                 </Badge>
               )}
@@ -78,20 +78,20 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
             {/* Info Badges */}
             <div className="flex items-center gap-2 flex-wrap mt-3">
               {client.banco_pagto && (
-                <Badge variant="outline" className="gap-1.5 text-xs font-normal">
-                  <Landmark className="w-3 h-3" />
+                <Badge variant="outline" className="gap-1.5 text-sm py-1 px-3 font-normal">
+                  <Landmark className="w-3.5 h-3.5" />
                   {client.banco_pagto}
                 </Badge>
               )}
               {client.esp && (
-                <Badge variant="outline" className="gap-1.5 text-xs font-normal">
-                  <Shield className="w-3 h-3" />
+                <Badge variant="outline" className="gap-1.5 text-sm py-1 px-3 font-normal">
+                  <Shield className="w-3.5 h-3.5" />
                   Esp. {client.esp}
                 </Badge>
               )}
               {(client.municipio || client.cidade_1) && (
-                <Badge variant="outline" className="gap-1.5 text-xs font-normal">
-                  <MapPin className="w-3 h-3" />
+                <Badge variant="outline" className="gap-1.5 text-sm py-1 px-3 font-normal">
+                  <MapPin className="w-3.5 h-3.5" />
                   {client.municipio || client.cidade_1}{client.uf || client.uf_1 ? ` - ${client.uf || client.uf_1}` : ''}
                 </Badge>
               )}
@@ -187,16 +187,16 @@ function SectionTitle({ icon: Icon, title }: { icon: React.ElementType; title: s
 
 function CopyChip({ label, value, rawValue, onCopy }: { label: string; value: string; rawValue: string; onCopy: (text: string, label: string) => void }) {
   return (
-    <div className="flex items-center gap-1.5 bg-muted/60 rounded-lg px-3 py-1.5">
-      <span className="text-xs text-muted-foreground font-medium">{label}:</span>
-      <span className="font-mono text-sm font-semibold">{value}</span>
+    <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-4 py-2">
+      <span className="text-sm text-muted-foreground font-medium">{label}:</span>
+      <span className="font-mono text-base font-bold">{value}</span>
       <Button
         variant="ghost"
         size="icon"
-        className="h-5 w-5 hover:bg-background"
+        className="h-6 w-6 hover:bg-background"
         onClick={() => onCopy(rawValue, label)}
       >
-        <Copy className="w-3 h-3" />
+        <Copy className="w-3.5 h-3.5" />
       </Button>
     </div>
   );

@@ -84,7 +84,6 @@ const FALLBACK_BANKS: BankRate[] = [
 
 const PRAZOS_PORT_REFIN = [96, 84];
 const PRAZOS_MARGEM_CARTAO = [96, 84, 72];
-const DEFAULT_RATES = [1.85, 1.80, 1.75];
 const CARTAO_TAXA = 2.55;
 const CARTAO_SAQUE_PERCENT = 0.70;
 
@@ -142,6 +141,7 @@ function calcCETMensal(valorLiberado: number, pmt: number, n: number): number {
 
 interface RateResult {
   taxa: number;
+  bancoNome: string;
   novaParcela: number;
   valorContrato: number;
   iof: number;
@@ -186,8 +186,6 @@ export function TrocoCalculator({
   const [prazo, setPrazo] = useState(96);
   const [operationType, setOperationType] = useState<OperationType>('portabilidade');
   const [isExpanded, setIsExpanded] = useState(!compact);
-  const [customRates, setCustomRates] = useState<number[]>([]);
-  const [newRate, setNewRate] = useState('');
   const [showBankManager, setShowBankManager] = useState(false);
   const [newBankName, setNewBankName] = useState('');
   const [newBankRate, setNewBankRate] = useState('');
@@ -235,7 +233,8 @@ export function TrocoCalculator({
   }, []);
 
   const bancoInfo = banks.find(b => b.bank_name === banco);
-  const allRates = [...DEFAULT_RATES, ...customRates];
+  // Use bank rates instead of static DEFAULT_RATES
+  const bankRates = banks.map(b => ({ taxa: b.default_rate, nome: b.bank_name }));
 
   const totals = useMemo(() => {
     const selected = contracts.filter(c => selectedContracts.includes(c.id));
@@ -253,36 +252,23 @@ export function TrocoCalculator({
   const rateResults = useMemo<RateResult[]>(() => {
     if ((operationType !== 'portabilidade' && operationType !== 'refinanciamento') || 
         selectedContracts.length === 0 || totals.saldoTotal <= 0) return [];
-    return allRates.map(taxa => {
+    return bankRates.map(({ taxa, nome }) => {
       const saldo = totals.saldoTotal;
-      if (operationType === 'portabilidade') {
-        const novaParcela = totals.parcelaTotal;
-        const valorContrato = calcPVDiario(novaParcela, taxa, prazo, diasAtePrimeiraParcela);
-        const iof = calcIOFFederal(valorContrato, prazo);
-        const valorLiberado = valorContrato - iof;
-        const trocoBruto = valorContrato - saldo - iof;
-        const totalOperacao = novaParcela * prazo;
-        const cetM = calcCETMensal(valorLiberado, novaParcela, prazo);
-        const cetA = Math.pow(1 + cetM, 12) - 1;
-        return { taxa, novaParcela, valorContrato, iof, valorLiberado, trocoBruto, trocoLiquido: trocoBruto, cetMensal: cetM * 100, cetAnual: cetA * 100, totalOperacao };
-      } else {
-        // Refinanciamento: mantém parcela atual e calcula PV no novo prazo/taxa
-        const novaParcela = totals.parcelaTotal;
-        const valorContrato = calcPVDiario(novaParcela, taxa, prazo, diasAtePrimeiraParcela);
-        const iof = calcIOFFederal(valorContrato, prazo);
-        const valorLiberado = valorContrato - iof;
-        const trocoBruto = valorContrato - saldo - iof;
-        const totalOperacao = novaParcela * prazo;
-        const cetM = calcCETMensal(valorLiberado, novaParcela, prazo);
-        const cetA = Math.pow(1 + cetM, 12) - 1;
-        return { taxa, novaParcela, valorContrato, iof, valorLiberado, trocoBruto, trocoLiquido: trocoBruto, cetMensal: cetM * 100, cetAnual: cetA * 100, totalOperacao };
-      }
+      const novaParcela = totals.parcelaTotal;
+      const valorContrato = calcPVDiario(novaParcela, taxa, prazo, diasAtePrimeiraParcela);
+      const iof = calcIOFFederal(valorContrato, prazo);
+      const valorLiberado = valorContrato - iof;
+      const trocoBruto = valorContrato - saldo - iof;
+      const totalOperacao = novaParcela * prazo;
+      const cetM = calcCETMensal(valorLiberado, novaParcela, prazo);
+      const cetA = Math.pow(1 + cetM, 12) - 1;
+      return { taxa, bancoNome: nome, novaParcela, valorContrato, iof, valorLiberado, trocoBruto, trocoLiquido: trocoBruto, cetMensal: cetM * 100, cetAnual: cetA * 100, totalOperacao };
     });
-  }, [allRates, prazo, selectedContracts, totals, operationType, diasAtePrimeiraParcela]);
+  }, [bankRates, prazo, selectedContracts, totals, operationType, diasAtePrimeiraParcela]);
 
   const novoEmprestimoResults = useMemo<RateResult[]>(() => {
     if (operationType !== 'novo_emprestimo' || !margemLivre || margemLivre <= 0) return [];
-    return allRates.map(taxa => {
+    return bankRates.map(({ taxa, nome }) => {
       const novaParcela = margemLivre;
       const valorContrato = calcPVDiario(novaParcela, taxa, prazo, diasAtePrimeiraParcela);
       const iof = calcIOFFederal(valorContrato, prazo);
@@ -290,9 +276,9 @@ export function TrocoCalculator({
       const totalOperacao = novaParcela * prazo;
       const cetM = calcCETMensal(valorLiberado, novaParcela, prazo);
       const cetA = Math.pow(1 + cetM, 12) - 1;
-      return { taxa, novaParcela, valorContrato, iof, valorLiberado, trocoBruto: valorLiberado, trocoLiquido: valorLiberado, cetMensal: cetM * 100, cetAnual: cetA * 100, totalOperacao };
+      return { taxa, bancoNome: nome, novaParcela, valorContrato, iof, valorLiberado, trocoBruto: valorLiberado, trocoLiquido: valorLiberado, cetMensal: cetM * 100, cetAnual: cetA * 100, totalOperacao };
     });
-  }, [allRates, prazo, margemLivre, operationType, diasAtePrimeiraParcela]);
+  }, [bankRates, prazo, margemLivre, operationType, diasAtePrimeiraParcela]);
 
   const cartaoResults = useMemo<CardResult[]>(() => {
     if (operationType !== 'cartao') return [];
@@ -315,18 +301,25 @@ export function TrocoCalculator({
   const bestSimulation = useMemo<TrocoSimulation | null>(() => {
     if (operationType === 'portabilidade' || operationType === 'refinanciamento') {
       if (rateResults.length === 0) return null;
-      const best = rateResults.reduce((a, b) => a.trocoLiquido > b.trocoLiquido ? a : b);
+      // Best = highest viable rate (maximizes vendor commission)
+      const viable = rateResults.filter(r => r.trocoLiquido > 0);
+      const best = viable.length > 0
+        ? viable.reduce((a, b) => a.taxa > b.taxa ? a : b)
+        : rateResults.reduce((a, b) => a.trocoLiquido > b.trocoLiquido ? a : b);
       return {
-        banco: bancoInfo?.bank_name || banco, bancoLabel: bancoInfo?.bank_name || banco,
+        banco: best.bancoNome, bancoLabel: best.bancoNome,
         taxa: best.taxa, prazo, saldoDevedor: totals.saldoTotal, novaParcela: best.novaParcela,
         troco: best.trocoLiquido, economiaTotal: (totals.parcelaTotal - best.novaParcela) * prazo,
         selectedContracts, operationType,
       };
     }
     if (operationType === 'novo_emprestimo' && novoEmprestimoResults.length > 0) {
-      const best = novoEmprestimoResults[0];
+      const viable = novoEmprestimoResults.filter(r => r.trocoLiquido > 0);
+      const best = viable.length > 0
+        ? viable.reduce((a, b) => a.taxa > b.taxa ? a : b)
+        : novoEmprestimoResults[0];
       return {
-        banco: bancoInfo?.bank_name || banco, bancoLabel: bancoInfo?.bank_name || banco,
+        banco: best.bancoNome, bancoLabel: best.bancoNome,
         taxa: best.taxa, prazo, saldoDevedor: 0, novaParcela: best.novaParcela,
         troco: best.trocoLiquido, economiaTotal: 0, selectedContracts: [], operationType,
       };
@@ -343,16 +336,6 @@ export function TrocoCalculator({
   }, [rateResults, novoEmprestimoResults, cartaoResults, banco, bancoInfo, prazo, totals, selectedContracts, operationType]);
 
   useEffect(() => { onSimulationChange?.(bestSimulation); }, [bestSimulation, onSimulationChange]);
-
-  const handleAddRate = () => {
-    const rate = parseFloat(newRate.replace(',', '.'));
-    if (!isNaN(rate) && rate > 0 && rate < 10 && !allRates.includes(rate)) {
-      setCustomRates([...customRates, rate]);
-      setNewRate('');
-    }
-  };
-
-  const handleRemoveRate = (rate: number) => setCustomRates(customRates.filter(r => r !== rate));
 
   const handleAddBank = async () => {
     const rate = parseFloat(newBankRate.replace(',', '.'));
@@ -382,9 +365,14 @@ export function TrocoCalculator({
   const showContractBasedUI = operationType === 'portabilidade' || operationType === 'refinanciamento';
   const currentResults = showContractBasedUI ? rateResults : novoEmprestimoResults;
 
-  // Find best result across all
+  // Best result = highest viable rate (for commission)
   const bestResult = currentResults.length > 0 
-    ? currentResults.reduce((a, b) => a.trocoLiquido > b.trocoLiquido ? a : b) 
+    ? (() => {
+        const viable = currentResults.filter(r => r.trocoLiquido > 0);
+        return viable.length > 0
+          ? viable.reduce((a, b) => a.taxa > b.taxa ? a : b)
+          : currentResults.reduce((a, b) => a.trocoLiquido > b.trocoLiquido ? a : b);
+      })()
     : null;
 
   return (
@@ -547,37 +535,6 @@ export function TrocoCalculator({
                   <span>Último vencimento: <strong className="text-foreground">{format(ultimoVencimento, "dd/MM/yyyy", { locale: ptBR })}</strong></span>
                 </div>
               </Card>
-
-              {/* ─── Bloco 3: Taxas da Simulação ─── */}
-              <Card className="p-4 shadow-sm">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-3">
-                  <Calculator className="w-3.5 h-3.5" /> Taxas da Simulação
-                </h4>
-
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {DEFAULT_RATES.map(rate => (
-                    <Badge key={rate} variant="outline" className="text-sm font-mono py-1 px-3">
-                      {rate.toFixed(2)}%
-                    </Badge>
-                  ))}
-                  {customRates.map(rate => (
-                    <Badge key={rate} variant="secondary" className="text-sm font-mono py-1 px-3 gap-1 pr-1.5">
-                      {rate.toFixed(2)}%
-                      <Button variant="ghost" size="icon" className="h-4 w-4 hover:bg-destructive/20" onClick={() => handleRemoveRate(rate)}>
-                        <X className="w-3 h-3" />
-                      </Button>
-                    </Badge>
-                  ))}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Input type="text" placeholder="Ex: 1.60" value={newRate} onChange={(e) => setNewRate(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddRate()} className="h-9 flex-1" />
-                  <Button variant="outline" size="sm" onClick={handleAddRate} className="h-9 gap-1 shrink-0">
-                    <Plus className="w-3.5 h-3.5" /> Adicionar taxa
-                  </Button>
-                </div>
-              </Card>
             </div>
           )}
 
@@ -723,8 +680,11 @@ function ResultCard({ result: r, isBest, type }: { result: RateResult; isBest: b
       )}
       
       <div className="flex items-center justify-between mb-3">
-        <span className="text-lg font-bold font-mono">{r.taxa.toFixed(2)}%</span>
-        <span className="text-sm text-muted-foreground">a.m.</span>
+        <div>
+          <span className="text-lg font-bold font-mono">{r.taxa.toFixed(2)}%</span>
+          <span className="text-sm text-muted-foreground ml-1">a.m.</span>
+        </div>
+        <Badge variant="outline" className="text-xs">{r.bancoNome}</Badge>
       </div>
 
       <div className="grid grid-cols-2 gap-2 mb-3">

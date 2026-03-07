@@ -1,56 +1,80 @@
 
 
-## Plano: Ajustes no Simulador Base OFF
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Problemas Identificados
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-1. **NB nao carrega**: A edge function (`baseoff-external-query`) faz `SELECT *` e acessa `row.nb`. Se a coluna no banco externo tiver nome diferente (ex: `numero_beneficio`, `NB` uppercase), o valor fica `null`. Preciso adicionar fallback no mapeamento da edge function para cobrir variações de nome de coluna. Tambem vou adicionar log para debug.
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-2. **Bloco "Taxas da Simulação"**: Remover completamente. As taxas de simulação devem ser derivadas dos bancos cadastrados — cada banco tem sua `default_rate`, e o simulador deve calcular para cada banco/taxa cadastrado.
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
 
-3. **Header pequeno**: Aumentar tamanho dos chips CPF/NB e badges (fonte maior, padding maior), conforme imagem de referência.
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
 
-4. **Melhor operação = maior taxa**: A lógica atual seleciona a simulação com maior troco. Para o vendedor, a maior comissão vem da maior taxa. Alterar `bestSimulation` para priorizar a maior taxa (desde que o troco seja positivo/viável).
+---
 
-### Alterações
+### 2. Conectar Base OFF ao PostgreSQL externo
 
-#### 1. Edge Function — NB fallback (`baseoff-external-query/index.ts`)
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
 
-Adicionar fallbacks na linha 89:
-```ts
-nb: row.nb || row.NB || row.numero_beneficio || row.num_beneficio || null,
+**Arquitetura:**
+
+```text
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
 ```
 
-#### 2. `TrocoCalculator.tsx` — Remover Taxas, usar bancos como taxas
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
 
-- Remover `DEFAULT_RATES`, `customRates`, `newRate`, `handleAddRate`, `handleRemoveRate`
-- `allRates` passa a ser `banks.map(b => b.default_rate)` — cada banco vira uma simulação
-- Remover o Bloco 3 (Taxas da Simulação) inteiro da UI
-- Nos ResultCards, exibir o nome do banco junto à taxa
-- Atualizar `RateResult` para incluir `bancoNome: string`
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
 
-#### 3. `TrocoCalculator.tsx` — Melhor operação = maior taxa viável
+---
 
-Alterar `bestSimulation` e `bestResult`:
-```ts
-// Filtrar apenas viáveis (troco > 0), depois pegar maior taxa
-const viable = rateResults.filter(r => r.trocoLiquido > 0);
-const best = viable.length > 0 
-  ? viable.reduce((a, b) => a.taxa > b.taxa ? a : b)
-  : null;
-```
+### 3. Simplificar modulo Base OFF - apenas Consulta
 
-#### 4. `ClienteHeader.tsx` — Aumentar visual dos chips
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
 
-- CopyChip: aumentar padding (`px-4 py-2`), fonte do valor (`text-base font-bold`), label (`text-sm`)
-- Badges de banco/espécie/cidade: `text-sm py-1 px-3`
-- Nome: `text-2xl`
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
 
-### Arquivos
+---
 
-| Arquivo | Ação |
+### Arquivos a modificar
+
+| Arquivo | Mudanca |
 |---|---|
-| `supabase/functions/baseoff-external-query/index.ts` | Fallbacks para NB |
-| `src/modules/baseoff/components/TrocoCalculator.tsx` | Remover taxas, usar bancos, melhor op = maior taxa |
-| `src/modules/baseoff/components/ClienteHeader.tsx` | Aumentar tamanho visual |
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
+
+---
+
+### Pergunta necessaria
+
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 
