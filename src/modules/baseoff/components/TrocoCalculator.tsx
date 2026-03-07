@@ -269,7 +269,7 @@ export function TrocoCalculator({
 
   const novoEmprestimoResults = useMemo<RateResult[]>(() => {
     if (operationType !== 'novo_emprestimo' || !margemLivre || margemLivre <= 0) return [];
-    return allRates.map(taxa => {
+    return bankRates.map(({ taxa, nome }) => {
       const novaParcela = margemLivre;
       const valorContrato = calcPVDiario(novaParcela, taxa, prazo, diasAtePrimeiraParcela);
       const iof = calcIOFFederal(valorContrato, prazo);
@@ -277,9 +277,9 @@ export function TrocoCalculator({
       const totalOperacao = novaParcela * prazo;
       const cetM = calcCETMensal(valorLiberado, novaParcela, prazo);
       const cetA = Math.pow(1 + cetM, 12) - 1;
-      return { taxa, novaParcela, valorContrato, iof, valorLiberado, trocoBruto: valorLiberado, trocoLiquido: valorLiberado, cetMensal: cetM * 100, cetAnual: cetA * 100, totalOperacao };
+      return { taxa, bancoNome: nome, novaParcela, valorContrato, iof, valorLiberado, trocoBruto: valorLiberado, trocoLiquido: valorLiberado, cetMensal: cetM * 100, cetAnual: cetA * 100, totalOperacao };
     });
-  }, [allRates, prazo, margemLivre, operationType, diasAtePrimeiraParcela]);
+  }, [bankRates, prazo, margemLivre, operationType, diasAtePrimeiraParcela]);
 
   const cartaoResults = useMemo<CardResult[]>(() => {
     if (operationType !== 'cartao') return [];
