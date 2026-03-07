@@ -266,7 +266,8 @@ export function TrocoCalculator({
         const cetA = Math.pow(1 + cetM, 12) - 1;
         return { taxa, novaParcela, valorContrato, iof, valorLiberado, trocoBruto, trocoLiquido: trocoBruto, cetMensal: cetM * 100, cetAnual: cetA * 100, totalOperacao };
       } else {
-        const novaParcela = calcPMTDiario(saldo, taxa, prazo, diasAtePrimeiraParcela);
+        // Refinanciamento: mantém parcela atual e calcula PV no novo prazo/taxa
+        const novaParcela = totals.parcelaTotal;
         const valorContrato = calcPVDiario(novaParcela, taxa, prazo, diasAtePrimeiraParcela);
         const iof = calcIOFFederal(valorContrato, prazo);
         const valorLiberado = valorContrato - iof;
