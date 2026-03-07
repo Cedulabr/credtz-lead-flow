@@ -654,24 +654,24 @@ export function TrocoCalculator({
           {operationType === 'cartao' && (
             <>
               {cartaoResults.length > 0 ? (
-                <div className="border rounded-lg overflow-auto">
-                  <div className="px-3 py-2 bg-muted/30 text-sm">
+                <div className="rounded-xl border overflow-hidden">
+                  <div className="px-4 py-2 bg-muted/30 text-sm border-b">
                     Taxa fixa: <strong>2,55% a.m.</strong> • Saque = (Limite - IOF) × 70%
                   </div>
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-muted/50">
+                      <TableRow className="bg-muted/30">
                         <TableHead className="text-xs font-semibold">Tipo</TableHead>
                         <TableHead className="text-xs font-semibold text-right">Prazo</TableHead>
                         <TableHead className="text-xs font-semibold text-right">Parcela</TableHead>
                         <TableHead className="text-xs font-semibold text-right">Limite</TableHead>
                         <TableHead className="text-xs font-semibold text-right">IOF (~3%)</TableHead>
-                        <TableHead className="text-xs font-semibold text-right">Saque (70%)</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">💰 Saque (70%)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {cartaoResults.map((r, i) => (
-                        <TableRow key={i} className="hover:bg-muted/30">
+                        <TableRow key={i} className="hover:bg-muted/20">
                           <TableCell className="font-semibold text-sm">
                             <Badge variant={r.tipo === 'RMC' ? 'default' : 'secondary'}>{r.tipo}</Badge>
                           </TableCell>
@@ -679,14 +679,15 @@ export function TrocoCalculator({
                           <TableCell className="text-right text-sm">{formatCurrency(r.parcela)}</TableCell>
                           <TableCell className="text-right text-sm">{formatCurrency(r.limite)}</TableCell>
                           <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.iof)}</TableCell>
-                          <TableCell className="text-right font-bold text-sm text-emerald-600">{formatCurrency(r.saque)}</TableCell>
+                          <TableCell className="text-right font-bold text-sm">
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600">
+                              {formatCurrency(r.saque)}
+                            </span>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
-                  <div className="px-3 py-2 text-xs text-muted-foreground bg-muted/20">
-                    ℹ️ Cliente pode ter no máximo 1 RMC e 1 RCC
-                  </div>
                 </div>
               ) : (
                 <div className="text-center py-6 text-muted-foreground">
