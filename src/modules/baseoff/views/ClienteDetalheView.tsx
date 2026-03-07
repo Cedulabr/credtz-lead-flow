@@ -313,7 +313,7 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
                 </Card>
               ) : (
                 <div className="space-y-3">
-                  {contracts.map(contract => (
+                  {loanContracts.map(contract => (
                     <div key={contract.id} className="flex items-start gap-3">
                       <div className="pt-4">
                         <Checkbox
