@@ -535,37 +535,6 @@ export function TrocoCalculator({
                   <span>Último vencimento: <strong className="text-foreground">{format(ultimoVencimento, "dd/MM/yyyy", { locale: ptBR })}</strong></span>
                 </div>
               </Card>
-
-              {/* ─── Bloco 3: Taxas da Simulação ─── */}
-              <Card className="p-4 shadow-sm">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-3">
-                  <Calculator className="w-3.5 h-3.5" /> Taxas da Simulação
-                </h4>
-
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {DEFAULT_RATES.map(rate => (
-                    <Badge key={rate} variant="outline" className="text-sm font-mono py-1 px-3">
-                      {rate.toFixed(2)}%
-                    </Badge>
-                  ))}
-                  {customRates.map(rate => (
-                    <Badge key={rate} variant="secondary" className="text-sm font-mono py-1 px-3 gap-1 pr-1.5">
-                      {rate.toFixed(2)}%
-                      <Button variant="ghost" size="icon" className="h-4 w-4 hover:bg-destructive/20" onClick={() => handleRemoveRate(rate)}>
-                        <X className="w-3 h-3" />
-                      </Button>
-                    </Badge>
-                  ))}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Input type="text" placeholder="Ex: 1.60" value={newRate} onChange={(e) => setNewRate(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddRate()} className="h-9 flex-1" />
-                  <Button variant="outline" size="sm" onClick={handleAddRate} className="h-9 gap-1 shrink-0">
-                    <Plus className="w-3.5 h-3.5" /> Adicionar taxa
-                  </Button>
-                </div>
-              </Card>
             </div>
           )}
 
