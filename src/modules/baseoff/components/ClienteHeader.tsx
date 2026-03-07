@@ -148,8 +148,8 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
 
 function SectionTitle({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
   return (
-    <h3 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-border/40">
-      <Icon className="w-3.5 h-3.5" />
+    <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-border/40">
+      <Icon className="w-4 h-4" />
       {title}
     </h3>
   );
