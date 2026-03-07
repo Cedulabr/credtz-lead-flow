@@ -67,13 +67,9 @@ export function formatDate(date: string | null | undefined): string {
 
 export function formatDateTime(date: string | null | undefined): string {
   if (!date) return '---';
-  try {
-    const parsed = parseISO(date);
-    if (!isValid(parsed)) return '---';
-    return format(parsed, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-  } catch {
-    return '---';
-  }
+  const parsed = parseBRDate(date);
+  if (!parsed) return '---';
+  return format(parsed, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
 }
 
 export function formatFileSize(bytes: number): string {

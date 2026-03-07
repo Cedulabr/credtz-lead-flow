@@ -50,7 +50,8 @@ export interface ImportJob {
 export interface BaseOffInlineContract {
   banco_emprestimo?: string;
   contrato: string;
-  vl_emprestimo?: number | null;
+  vl_emprestimo?: number | string | null;
+  valor_emprestimo?: number | string | null;
   inicio_desconto?: string | null;
   prazo?: number | string | null;
   vl_parcela?: number | string | null;
