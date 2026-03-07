@@ -341,9 +341,9 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
                 </div>
               )}
 
-              {contracts.length > 0 && (
+              {loanContracts.length > 0 && (
                 <TrocoCalculator
-                  contracts={contracts}
+                  contracts={loanContracts}
                   selectedContracts={selectedContractIds}
                   onSelectionChange={setSelectedContractIds}
                   onSimulationChange={setCurrentSimulation}
