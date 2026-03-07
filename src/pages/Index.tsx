@@ -37,6 +37,7 @@ import {
   LazyTestFunctionalities,
   LazySystemStatus,
   LazyMyData,
+  LazyRadarModule,
 } from "@/components/LazyComponents";
 
 // ── Types ─────────────────────────────────────────────────────────────
