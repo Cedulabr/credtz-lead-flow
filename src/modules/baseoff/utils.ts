@@ -155,3 +155,19 @@ export function calculateInstallments(dataAverbacao: string | null | undefined, 
   
   return { pagas, restantes };
 }
+
+/**
+ * Calculate outstanding balance (saldo devedor) using the Price system formula.
+ * SD = PMT × (1 − (1 + i)^(−n)) / i
+ * This matches the Central Bank of Brazil official calculator.
+ */
+export function calcSaldoDevedor(
+  parcela: number | null | undefined,
+  taxaMensal: number | null | undefined,
+  parcelasRestantes: number
+): number | null {
+  if (!parcela || !taxaMensal || parcelasRestantes <= 0) return null;
+  const i = Number(taxaMensal) / 100; // convert percentage to decimal
+  if (i <= 0) return parcela * parcelasRestantes;
+  return parcela * (1 - Math.pow(1 + i, -parcelasRestantes)) / i;
+}

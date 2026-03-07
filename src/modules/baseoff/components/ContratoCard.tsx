@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { BaseOffContract, ClientStatus } from '../types';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency, formatDate, calculateInstallments } from '../utils';
+import { formatCurrency, formatDate, calculateInstallments, calcSaldoDevedor } from '../utils';
 import { cn } from '@/lib/utils';
 
 interface ContratoCardProps {
@@ -63,6 +63,12 @@ export function ContratoCard({
     [contract.data_averbacao, contract.prazo]
   );
 
+  // Calculate saldo devedor using Price formula (matches Central Bank calculator)
+  const saldoCalculado = useMemo(() => {
+    const sd = calcSaldoDevedor(contract.vl_parcela, contract.taxa, installments.restantes);
+    return sd !== null ? sd : contract.saldo;
+  }, [contract.vl_parcela, contract.taxa, installments.restantes, contract.saldo]);
+
   return (
     <Card className="overflow-hidden border-2 hover:border-primary/30 transition-all">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -103,7 +109,7 @@ export function ContratoCard({
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground">Saldo</p>
-                  <p className="font-bold text-lg">{formatCurrency(contract.saldo)}</p>
+                  <p className="font-bold text-lg">{formatCurrency(saldoCalculado)}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground">Pagas / Prazo / Restantes</p>
@@ -133,7 +139,7 @@ export function ContratoCard({
               </div>
               <div className="flex-1 text-center">
                 <p className="text-xs text-muted-foreground">Saldo</p>
-                <p className="font-bold">{formatCurrency(contract.saldo)}</p>
+                <p className="font-bold">{formatCurrency(saldoCalculado)}</p>
               </div>
               <div className="flex-1 text-center">
                 <p className="text-xs text-muted-foreground">Pagas/Prazo/Rest.</p>
