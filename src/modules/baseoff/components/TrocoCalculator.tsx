@@ -301,18 +301,25 @@ export function TrocoCalculator({
   const bestSimulation = useMemo<TrocoSimulation | null>(() => {
     if (operationType === 'portabilidade' || operationType === 'refinanciamento') {
       if (rateResults.length === 0) return null;
-      const best = rateResults.reduce((a, b) => a.trocoLiquido > b.trocoLiquido ? a : b);
+      // Best = highest viable rate (maximizes vendor commission)
+      const viable = rateResults.filter(r => r.trocoLiquido > 0);
+      const best = viable.length > 0
+        ? viable.reduce((a, b) => a.taxa > b.taxa ? a : b)
+        : rateResults.reduce((a, b) => a.trocoLiquido > b.trocoLiquido ? a : b);
       return {
-        banco: bancoInfo?.bank_name || banco, bancoLabel: bancoInfo?.bank_name || banco,
+        banco: best.bancoNome, bancoLabel: best.bancoNome,
         taxa: best.taxa, prazo, saldoDevedor: totals.saldoTotal, novaParcela: best.novaParcela,
         troco: best.trocoLiquido, economiaTotal: (totals.parcelaTotal - best.novaParcela) * prazo,
         selectedContracts, operationType,
       };
     }
     if (operationType === 'novo_emprestimo' && novoEmprestimoResults.length > 0) {
-      const best = novoEmprestimoResults[0];
+      const viable = novoEmprestimoResults.filter(r => r.trocoLiquido > 0);
+      const best = viable.length > 0
+        ? viable.reduce((a, b) => a.taxa > b.taxa ? a : b)
+        : novoEmprestimoResults[0];
       return {
-        banco: bancoInfo?.bank_name || banco, bancoLabel: bancoInfo?.bank_name || banco,
+        banco: best.bancoNome, bancoLabel: best.bancoNome,
         taxa: best.taxa, prazo, saldoDevedor: 0, novaParcela: best.novaParcela,
         troco: best.trocoLiquido, economiaTotal: 0, selectedContracts: [], operationType,
       };
@@ -329,16 +336,6 @@ export function TrocoCalculator({
   }, [rateResults, novoEmprestimoResults, cartaoResults, banco, bancoInfo, prazo, totals, selectedContracts, operationType]);
 
   useEffect(() => { onSimulationChange?.(bestSimulation); }, [bestSimulation, onSimulationChange]);
-
-  const handleAddRate = () => {
-    const rate = parseFloat(newRate.replace(',', '.'));
-    if (!isNaN(rate) && rate > 0 && rate < 10 && !allRates.includes(rate)) {
-      setCustomRates([...customRates, rate]);
-      setNewRate('');
-    }
-  };
-
-  const handleRemoveRate = (rate: number) => setCustomRates(customRates.filter(r => r !== rate));
 
   const handleAddBank = async () => {
     const rate = parseFloat(newBankRate.replace(',', '.'));
