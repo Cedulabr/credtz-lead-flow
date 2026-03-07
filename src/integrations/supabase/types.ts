@@ -851,6 +851,50 @@ export type Database = {
         }
         Relationships: []
       }
+      baseoff_bank_rates: {
+        Row: {
+          bank_code: string | null
+          bank_name: string
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          default_rate: number
+          id: string
+          is_active: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          bank_code?: string | null
+          bank_name: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          default_rate: number
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          bank_code?: string | null
+          bank_name?: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          default_rate?: number
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "baseoff_bank_rates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       baseoff_clients: {
         Row: {
           agencia_pagto: string | null
