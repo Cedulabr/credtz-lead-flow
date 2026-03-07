@@ -6,6 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+const MAX_RESULTS = 5000;
+
 interface RadarFilters {
   uf?: string;
   cidade?: string;
@@ -55,7 +57,6 @@ function buildWhereClause(filters: RadarFilters): { where: string; params: (stri
     conditions.push(`(representante IS NULL OR representante = '' OR representante = 'NAO TEM')`);
   }
 
-  // Espécie filters
   if (filters.esp_filter) {
     switch (filters.esp_filter) {
       case 'consignaveis_exceto_32_92':
@@ -73,7 +74,6 @@ function buildWhereClause(filters: RadarFilters): { where: string; params: (stri
     }
   }
 
-  // DDB range filter
   if (filters.ddb_range) {
     switch (filters.ddb_range) {
       case 'ate_1_ano':
@@ -88,7 +88,6 @@ function buildWhereClause(filters: RadarFilters): { where: string; params: (stri
     }
   }
 
-  // Smart filters (presets)
   if (filters.smart_filter) {
     switch (filters.smart_filter) {
       case 'alta_rentabilidade':
@@ -101,7 +100,6 @@ function buildWhereClause(filters: RadarFilters): { where: string; params: (stri
         conditions.push(`CAST(NULLIF(vlparcela, '') AS numeric) >= 600`);
         break;
       case 'muitos_contratos':
-        // This is handled at aggregation level
         break;
       case 'contratos_antigos':
         conditions.push(`CAST(NULLIF(prazo, '') AS integer) >= 24`);
@@ -161,7 +159,6 @@ serve(async (req) => {
 
     try {
       if (mode === 'stats') {
-        // Return counts for summary cards
         const statsQueries = [
           { key: 'alta_rentabilidade', sql: `SELECT COUNT(DISTINCT cpf) as cnt FROM mailing_inss WHERE (CAST(NULLIF(vlparcela, '') AS numeric) >= 400 OR CAST(NULLIF(saldo, '') AS numeric) >= 5000)` },
           { key: 'refinanciamento_forte', sql: `SELECT COUNT(DISTINCT cpf) as cnt FROM mailing_inss WHERE CAST(NULLIF(prazo, '') AS integer) >= 36` },
@@ -192,63 +189,58 @@ serve(async (req) => {
       const offset = (page - 1) * per_page;
       const isMuitosContratos = filters.smart_filter === 'muitos_contratos';
 
-      // Aggregated query: group by CPF
-      let query: string;
-      let queryParams: (string | number)[];
+      // First get total count (real count, uncapped)
+      let countQuery: string;
+      let countParams: (string | number)[];
 
       if (isMuitosContratos) {
-        query = `
-          SELECT 
-            cpf, 
-            MAX(nome) as nome, 
-            MAX(uf) as uf, 
-            MAX(municipio) as municipio,
-            MAX(esp) as esp,
-            MAX(dtnascimento) as dtnascimento,
-            MAX(bancoemprestimo) as banco_principal,
-            MAX(CAST(NULLIF(vlparcela, '') AS numeric)) as max_parcela,
-            MAX(CAST(NULLIF(saldo, '') AS numeric)) as max_saldo,
-            MAX(CAST(NULLIF(prazo, '') AS integer)) as max_prazo,
-            COUNT(*) as total_contratos,
-            COUNT(*) OVER() as total_clients
-          FROM mailing_inss
-          ${where}
-          GROUP BY cpf
-          HAVING COUNT(*) >= 6
-          ORDER BY MAX(CAST(NULLIF(vlparcela, '') AS numeric)) DESC NULLS LAST
-          LIMIT $${params.length + 1} OFFSET $${params.length + 2}
-        `;
-        queryParams = [...params, per_page, offset];
+        countQuery = `SELECT COUNT(*) as cnt FROM (SELECT cpf FROM mailing_inss ${where} GROUP BY cpf HAVING COUNT(*) >= 6) sub`;
+        countParams = [...params];
       } else {
-        query = `
-          SELECT 
-            cpf, 
-            MAX(nome) as nome, 
-            MAX(uf) as uf, 
-            MAX(municipio) as municipio,
-            MAX(esp) as esp,
-            MAX(dtnascimento) as dtnascimento,
-            MAX(bancoemprestimo) as banco_principal,
-            MAX(CAST(NULLIF(vlparcela, '') AS numeric)) as max_parcela,
-            MAX(CAST(NULLIF(saldo, '') AS numeric)) as max_saldo,
-            MAX(CAST(NULLIF(prazo, '') AS integer)) as max_prazo,
-            COUNT(*) as total_contratos,
-            COUNT(*) OVER() as total_clients
-          FROM mailing_inss
-          ${where}
-          GROUP BY cpf
-          ORDER BY MAX(CAST(NULLIF(vlparcela, '') AS numeric)) DESC NULLS LAST
-          LIMIT $${params.length + 1} OFFSET $${params.length + 2}
-        `;
-        queryParams = [...params, per_page, offset];
+        countQuery = `SELECT COUNT(DISTINCT cpf) as cnt FROM mailing_inss ${where}`;
+        countParams = [...params];
       }
 
+      const countResult = await connection.queryObject(countQuery, countParams);
+      const totalReal = parseInt((countResult.rows[0] as any)?.cnt || '0');
+      const totalCapped = Math.min(totalReal, MAX_RESULTS);
+      const capped = totalReal > MAX_RESULTS;
+
+      // Now fetch paginated data within the cap
+      const effectiveOffset = Math.min(offset, Math.max(0, totalCapped - per_page));
+
+      let query: string;
+      let queryParams: (string | number)[];
+      const havingClause = isMuitosContratos ? 'HAVING COUNT(*) >= 6' : '';
+
+      query = `
+        SELECT 
+          cpf, 
+          MAX(nome) as nome, 
+          MAX(uf) as uf, 
+          MAX(municipio) as municipio,
+          MAX(esp) as esp,
+          MAX(dtnascimento) as dtnascimento,
+          MAX(bancoemprestimo) as banco_principal,
+          MAX(CAST(NULLIF(vlparcela, '') AS numeric)) as max_parcela,
+          MAX(CAST(NULLIF(saldo, '') AS numeric)) as max_saldo,
+          MAX(CAST(NULLIF(prazo, '') AS integer)) as max_prazo,
+          COUNT(*) as total_contratos,
+          array_agg(DISTINCT NULLIF(COALESCE(telefone1, ''), '')) FILTER (WHERE telefone1 IS NOT NULL AND telefone1 != '') as telefones_1,
+          array_agg(DISTINCT NULLIF(COALESCE(telefone2, ''), '')) FILTER (WHERE telefone2 IS NOT NULL AND telefone2 != '') as telefones_2
+        FROM mailing_inss
+        ${where}
+        GROUP BY cpf
+        ${havingClause}
+        ORDER BY MAX(CAST(NULLIF(vlparcela, '') AS numeric)) DESC NULLS LAST
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `;
+      queryParams = [...params, per_page, effectiveOffset];
+
       console.log('Radar query:', query);
-      console.log('Radar params:', queryParams);
 
       const result = await connection.queryObject(query, queryParams);
       const rows = result.rows as any[];
-      const totalClients = rows.length > 0 ? parseInt(rows[0].total_clients || '0') : 0;
 
       const clients = rows.map((row) => {
         const { score, classification } = calculateScore({
@@ -258,7 +250,6 @@ serve(async (req) => {
           max_prazo: parseInt(row.max_prazo) || 0,
         });
 
-        // Calculate age from dtnascimento
         let idade = null;
         if (row.dtnascimento) {
           try {
@@ -269,6 +260,17 @@ serve(async (req) => {
               idade = Math.floor(ageDiff / (365.25 * 24 * 60 * 60 * 1000));
             }
           } catch { /* ignore */ }
+        }
+
+        // Merge phone arrays
+        const phones: string[] = [];
+        const seen = new Set<string>();
+        for (const arr of [row.telefones_1, row.telefones_2]) {
+          if (Array.isArray(arr)) {
+            for (const p of arr) {
+              if (p && !seen.has(p)) { seen.add(p); phones.push(p); }
+            }
+          }
         }
 
         return {
@@ -285,18 +287,23 @@ serve(async (req) => {
           total_contratos: parseInt(row.total_contratos) || 0,
           opportunity_score: score,
           classification,
+          telefones: phones,
         };
       });
 
       connection.release();
       await pool.end();
 
+      const totalPages = Math.ceil(totalCapped / per_page);
+
       return new Response(JSON.stringify({
         clients,
-        total: totalClients,
+        total: totalCapped,
+        total_real: totalReal,
+        capped,
         page,
         per_page,
-        total_pages: Math.ceil(totalClients / per_page),
+        total_pages: totalPages,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

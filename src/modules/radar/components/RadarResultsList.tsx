@@ -2,7 +2,7 @@ import { RadarSearchResult } from '../types';
 import { RadarResultCard } from './RadarResultCard';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Props {
@@ -13,9 +13,11 @@ interface Props {
   onPageChange: (page: number) => void;
   onPerPageChange: (perPage: number) => void;
   onViewClient?: (cpf: string) => void;
+  onViewContracts?: (cpf: string, nome: string) => void;
+  onSendSms?: (phone: string, nome: string) => void;
 }
 
-export function RadarResultsList({ results, loading, page, perPage, onPageChange, onPerPageChange, onViewClient }: Props) {
+export function RadarResultsList({ results, loading, page, perPage, onPageChange, onPerPageChange, onViewClient, onViewContracts, onSendSms }: Props) {
   if (loading) {
     return (
       <div className="space-y-3">
@@ -39,10 +41,21 @@ export function RadarResultsList({ results, loading, page, perPage, onPageChange
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <p className="text-sm text-muted-foreground">
-          <span className="font-semibold text-foreground">{results.total.toLocaleString('pt-BR')}</span> clientes encontrados
-          {' · '}Página {results.page} de {results.total_pages}
-        </p>
+        <div>
+          <p className="text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">{results.total.toLocaleString('pt-BR')}</span> clientes carregados
+            {' · '}Página {results.page} de {results.total_pages}
+          </p>
+          {results.capped && (
+            <div className="flex items-center gap-2 mt-1 text-sm text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-4 w-4" />
+              <span>
+                Existem <strong>{results.total_real.toLocaleString('pt-BR')}</strong> oportunidades no total. 
+                Exibindo até 5.000 para performance. Refine os filtros para encontrar mais.
+              </span>
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Mostrar:</span>
           <Select value={String(perPage)} onValueChange={v => onPerPageChange(parseInt(v))}>
@@ -65,6 +78,8 @@ export function RadarResultsList({ results, loading, page, perPage, onPageChange
             key={client.cpf}
             client={client}
             onViewClient={onViewClient}
+            onViewContracts={onViewContracts}
+            onSendSms={onSendSms}
           />
         ))}
       </div>

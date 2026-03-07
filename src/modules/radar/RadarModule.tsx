@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Radar } from 'lucide-react';
 import { useRadarSearch } from './hooks/useRadarSearch';
@@ -9,6 +9,8 @@ import { RadarAdvancedFilters } from './components/RadarAdvancedFilters';
 import { RadarResultsList } from './components/RadarResultsList';
 import { RadarCreditsBar } from './components/RadarCreditsBar';
 import { RadarSavedFilters } from './components/RadarSavedFilters';
+import { CreditPromptDialog } from './components/CreditPromptDialog';
+import { ContractsDrawer } from './components/ContractsDrawer';
 import { RadarFilters } from './types';
 import { toast } from 'sonner';
 
@@ -20,27 +22,43 @@ export function RadarModule() {
 
   const { credits, loading: creditsLoading, consumeCredit, requestRecharge } = useRadarCredits();
 
+  // Credit prompt state
+  const [creditPromptOpen, setCreditPromptOpen] = useState(false);
+  const [pendingSearch, setPendingSearch] = useState<{ filters: RadarFilters; page: number; perPage: number } | null>(null);
+
+  // Contracts drawer
+  const [contractsOpen, setContractsOpen] = useState(false);
+  const [contractsCpf, setContractsCpf] = useState('');
+  const [contractsNome, setContractsNome] = useState('');
+
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
 
-  const handleSearch = useCallback(async (searchFilters?: RadarFilters, searchPage?: number, searchPerPage?: number) => {
-    const ok = await consumeCredit(1, searchFilters || filters);
-    if (!ok) return;
-    search(searchFilters, searchPage, searchPerPage);
-  }, [consumeCredit, search, filters]);
+  // When user triggers a search, show credit prompt first
+  const promptAndSearch = useCallback((searchFilters: RadarFilters, searchPage: number = 1, searchPerPage?: number) => {
+    setPendingSearch({ filters: searchFilters, page: searchPage, perPage: searchPerPage || perPage });
+    setCreditPromptOpen(true);
+  }, [perPage]);
 
-  const handleSmartFilter = useCallback(async (filterId: string) => {
-    const ok = await consumeCredit(1, { smart_filter: filterId });
+  const handleCreditConfirm = useCallback(async (creditsToUse: number) => {
+    if (!pendingSearch) return;
+    const ok = await consumeCredit(creditsToUse, pendingSearch.filters);
     if (!ok) return;
-    applySmartFilter(filterId);
-  }, [consumeCredit, applySmartFilter]);
+    search(pendingSearch.filters, pendingSearch.page, pendingSearch.perPage);
+    setPendingSearch(null);
+  }, [consumeCredit, search, pendingSearch]);
+
+  const handleSmartFilter = useCallback((filterId: string) => {
+    promptAndSearch({ smart_filter: filterId }, 1);
+  }, [promptAndSearch]);
 
   const handleCardClick = useCallback((key: string) => {
     handleSmartFilter(key);
   }, [handleSmartFilter]);
 
   const handlePageChange = useCallback((newPage: number) => {
+    // Pagination doesn't re-prompt, just navigates
     search(filters, newPage, perPage);
   }, [search, filters, perPage]);
 
@@ -49,16 +67,35 @@ export function RadarModule() {
   }, [search, filters]);
 
   const handleAdvancedApply = useCallback((advFilters: RadarFilters) => {
-    handleSearch(advFilters, 1);
-  }, [handleSearch]);
+    promptAndSearch(advFilters, 1);
+  }, [promptAndSearch]);
 
   const handleSavedFilterApply = useCallback((savedFilters: RadarFilters) => {
-    handleSearch(savedFilters, 1);
-  }, [handleSearch]);
+    promptAndSearch(savedFilters, 1);
+  }, [promptAndSearch]);
 
   const handleViewClient = useCallback((cpf: string) => {
     toast.info(`Abrindo cliente CPF: ${cpf}`);
   }, []);
+
+  const handleViewContracts = useCallback((cpf: string, nome: string) => {
+    setContractsCpf(cpf);
+    setContractsNome(nome);
+    setContractsOpen(true);
+  }, []);
+
+  const handleSendSms = useCallback((phone: string, nome: string) => {
+    if (!phone) {
+      toast.error('Telefone não disponível');
+      return;
+    }
+    toast.info(`SMS para ${nome}: funcionalidade em breve`);
+  }, []);
+
+  // Estimate total from stats for the prompt
+  const estimatedTotal = stats
+    ? Math.max(stats.alta_rentabilidade, stats.refinanciamento_forte, stats.parcelas_altas, stats.muitos_contratos)
+    : 0;
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
@@ -127,6 +164,25 @@ export function RadarModule() {
         onPageChange={handlePageChange}
         onPerPageChange={handlePerPageChange}
         onViewClient={handleViewClient}
+        onViewContracts={handleViewContracts}
+        onSendSms={handleSendSms}
+      />
+
+      {/* Credit Prompt */}
+      <CreditPromptDialog
+        open={creditPromptOpen}
+        onOpenChange={setCreditPromptOpen}
+        credits={credits}
+        totalAvailable={estimatedTotal}
+        onConfirm={handleCreditConfirm}
+      />
+
+      {/* Contracts Drawer */}
+      <ContractsDrawer
+        open={contractsOpen}
+        onOpenChange={setContractsOpen}
+        cpf={contractsCpf}
+        nome={contractsNome}
       />
     </div>
   );
