@@ -107,7 +107,6 @@ interface RateResult {
   taxa: number;
   novaParcela: number;
   valorContrato: number;
-  totalPago: number;
   iof: number;
   trocoBruto: number;
   trocoLiquido: number;
@@ -211,13 +210,21 @@ export function TrocoCalculator({
 
     return allRates.map(taxa => {
       const saldo = totals.saldoTotal;
-      const novaParcela = calcPMT(saldo, taxa, prazo);
-      const valorContrato = calcPV(novaParcela, taxa, prazo);
-      const totalPago = novaParcela * prazo;
       const iof = saldo * IOF_PERCENT;
-      const trocoBruto = Math.max(0, valorContrato - saldo - iof);
-      // Portabilidade and refinanciamento: NO 70% rule, just IOF
-      return { taxa, novaParcela, valorContrato, totalPago, iof, trocoBruto, trocoLiquido: trocoBruto };
+      
+      if (operationType === 'portabilidade') {
+        // Portabilidade: preserve current installment, lower rate = higher PV = troco
+        const novaParcela = totals.parcelaTotal;
+        const valorContrato = calcPV(novaParcela, taxa, prazo);
+        const trocoBruto = valorContrato - saldo - iof;
+        return { taxa, novaParcela, valorContrato, iof, trocoBruto, trocoLiquido: trocoBruto };
+      } else {
+        // Refinanciamento: recalculate installment from balance
+        const novaParcela = calcPMT(saldo, taxa, prazo);
+        const valorContrato = calcPV(novaParcela, taxa, prazo);
+        const trocoBruto = valorContrato - saldo - iof;
+        return { taxa, novaParcela, valorContrato, iof, trocoBruto, trocoLiquido: trocoBruto };
+      }
     });
   }, [allRates, prazo, selectedContracts, totals, operationType]);
 
@@ -226,19 +233,16 @@ export function TrocoCalculator({
     if (operationType !== 'novo_emprestimo' || !margemLivre || margemLivre <= 0) return [];
 
     return allRates.map(taxa => {
-      // PMT = margemLivre, calculate PV (how much can borrow)
       const r = taxa / 100;
       const pv = r === 0 
         ? margemLivre * prazo 
         : margemLivre * (Math.pow(1 + r, prazo) - 1) / (r * Math.pow(1 + r, prazo));
-      const totalPago = margemLivre * prazo;
       const iof = pv * IOF_PERCENT;
       const liquido = pv - iof;
       return { 
         taxa, 
         novaParcela: margemLivre, 
         valorContrato: pv, 
-        totalPago,
         iof, 
         trocoBruto: liquido, 
         trocoLiquido: liquido 
@@ -553,27 +557,48 @@ export function TrocoCalculator({
 
           {/* RESULTS: Port/Refin */}
           {showContractBasedUI && rateResults.length > 0 && (
-            <div className="border rounded-lg overflow-auto">
+          <div className="rounded-xl border overflow-hidden">
+              {/* Summary bar */}
+              <div className="px-4 py-3 bg-muted/40 border-b flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+                <span>Saldo devedor: <strong className="text-foreground">{formatCurrency(totals.saldoTotal)}</strong></span>
+                <span>Parcela atual: <strong className="text-foreground">{formatCurrency(totals.parcelaTotal)}</strong></span>
+                <span>Prazo: <strong className="text-foreground">{prazo}x</strong></span>
+                {operationType === 'portabilidade' && (
+                  <Badge variant="outline" className="text-xs">Parcela preservada</Badge>
+                )}
+              </div>
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/50">
+                  <TableRow className="bg-muted/30">
                     <TableHead className="text-xs font-semibold">Taxa a.m.</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">Nova Parcela</TableHead>
+                    <TableHead className="text-xs font-semibold text-right">Parcela</TableHead>
                     <TableHead className="text-xs font-semibold text-right">Vl. Financiado</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">Total Pago</TableHead>
                     <TableHead className="text-xs font-semibold text-right">IOF (~3%)</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">Troco</TableHead>
+                    <TableHead className="text-xs font-semibold text-right">💰 Troco</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rateResults.map((r) => (
-                    <TableRow key={r.taxa} className="hover:bg-muted/30">
+                    <TableRow key={r.taxa} className="hover:bg-muted/20">
                       <TableCell className="font-mono font-semibold text-sm">{r.taxa.toFixed(2)}%</TableCell>
                       <TableCell className="text-right text-sm">{formatCurrency(r.novaParcela)}</TableCell>
                       <TableCell className="text-right text-sm font-medium">{formatCurrency(r.valorContrato)}</TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.totalPago)}</TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.iof)}</TableCell>
-                      <TableCell className="text-right font-bold text-sm text-emerald-600">{formatCurrency(r.trocoLiquido)}</TableCell>
+                      <TableCell className={cn(
+                        "text-right font-bold text-sm",
+                        r.trocoLiquido >= 0 
+                          ? "text-emerald-600" 
+                          : "text-destructive"
+                      )}>
+                        <span className={cn(
+                          "inline-block px-2 py-0.5 rounded-md",
+                          r.trocoLiquido >= 0 
+                            ? "bg-emerald-50 dark:bg-emerald-950/30" 
+                            : "bg-destructive/10"
+                        )}>
+                          {formatCurrency(r.trocoLiquido)}
+                        </span>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -585,30 +610,32 @@ export function TrocoCalculator({
           {operationType === 'novo_emprestimo' && (
             <>
               {margemLivre && margemLivre > 0 ? (
-                <div className="border rounded-lg overflow-auto">
-                  <div className="px-3 py-2 bg-muted/30 text-sm">
+                <div className="rounded-xl border overflow-hidden">
+                  <div className="px-4 py-2 bg-muted/30 text-sm border-b">
                     Margem livre disponível: <strong className="text-emerald-600">{formatCurrency(margemLivre)}</strong> /mês
                   </div>
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-muted/50">
+                      <TableRow className="bg-muted/30">
                         <TableHead className="text-xs font-semibold">Taxa a.m.</TableHead>
                         <TableHead className="text-xs font-semibold text-right">Parcela</TableHead>
                         <TableHead className="text-xs font-semibold text-right">Vl. Financiado</TableHead>
-                        <TableHead className="text-xs font-semibold text-right">Total Pago</TableHead>
                         <TableHead className="text-xs font-semibold text-right">IOF (~3%)</TableHead>
-                        <TableHead className="text-xs font-semibold text-right">Líquido</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">💰 Líquido</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {novoEmprestimoResults.map((r) => (
-                        <TableRow key={r.taxa} className="hover:bg-muted/30">
+                        <TableRow key={r.taxa} className="hover:bg-muted/20">
                           <TableCell className="font-mono font-semibold text-sm">{r.taxa.toFixed(2)}%</TableCell>
                           <TableCell className="text-right text-sm">{formatCurrency(r.novaParcela)}</TableCell>
                           <TableCell className="text-right text-sm font-medium">{formatCurrency(r.valorContrato)}</TableCell>
-                          <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.totalPago)}</TableCell>
                           <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.iof)}</TableCell>
-                          <TableCell className="text-right font-bold text-sm text-emerald-600">{formatCurrency(r.trocoLiquido)}</TableCell>
+                          <TableCell className="text-right font-bold text-sm">
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600">
+                              {formatCurrency(r.trocoLiquido)}
+                            </span>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -627,24 +654,24 @@ export function TrocoCalculator({
           {operationType === 'cartao' && (
             <>
               {cartaoResults.length > 0 ? (
-                <div className="border rounded-lg overflow-auto">
-                  <div className="px-3 py-2 bg-muted/30 text-sm">
+                <div className="rounded-xl border overflow-hidden">
+                  <div className="px-4 py-2 bg-muted/30 text-sm border-b">
                     Taxa fixa: <strong>2,55% a.m.</strong> • Saque = (Limite - IOF) × 70%
                   </div>
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-muted/50">
+                      <TableRow className="bg-muted/30">
                         <TableHead className="text-xs font-semibold">Tipo</TableHead>
                         <TableHead className="text-xs font-semibold text-right">Prazo</TableHead>
                         <TableHead className="text-xs font-semibold text-right">Parcela</TableHead>
                         <TableHead className="text-xs font-semibold text-right">Limite</TableHead>
                         <TableHead className="text-xs font-semibold text-right">IOF (~3%)</TableHead>
-                        <TableHead className="text-xs font-semibold text-right">Saque (70%)</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">💰 Saque (70%)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {cartaoResults.map((r, i) => (
-                        <TableRow key={i} className="hover:bg-muted/30">
+                        <TableRow key={i} className="hover:bg-muted/20">
                           <TableCell className="font-semibold text-sm">
                             <Badge variant={r.tipo === 'RMC' ? 'default' : 'secondary'}>{r.tipo}</Badge>
                           </TableCell>
@@ -652,14 +679,15 @@ export function TrocoCalculator({
                           <TableCell className="text-right text-sm">{formatCurrency(r.parcela)}</TableCell>
                           <TableCell className="text-right text-sm">{formatCurrency(r.limite)}</TableCell>
                           <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.iof)}</TableCell>
-                          <TableCell className="text-right font-bold text-sm text-emerald-600">{formatCurrency(r.saque)}</TableCell>
+                          <TableCell className="text-right font-bold text-sm">
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600">
+                              {formatCurrency(r.saque)}
+                            </span>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
-                  <div className="px-3 py-2 text-xs text-muted-foreground bg-muted/20">
-                    ℹ️ Cliente pode ter no máximo 1 RMC e 1 RCC
-                  </div>
                 </div>
               ) : (
                 <div className="text-center py-6 text-muted-foreground">
@@ -671,11 +699,10 @@ export function TrocoCalculator({
           )}
 
           {/* Summary row */}
-          {showContractBasedUI && rateResults.length > 0 && (
-            <div className="flex items-center justify-between text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
-              <span>Saldo quitado: <strong className="text-foreground">{formatCurrency(totals.saldoTotal)}</strong></span>
-              <span>Parcela atual: <strong className="text-foreground">{formatCurrency(totals.parcelaTotal)}</strong></span>
-              <span>Prazo: <strong className="text-foreground">{prazo}x</strong></span>
+          {/* Cartões info */}
+          {operationType === 'cartao' && cartaoResults.length > 0 && (
+            <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+              ℹ️ Cliente pode ter no máximo 1 RMC e 1 RCC
             </div>
           )}
 
