@@ -128,10 +128,10 @@ export function ContratoCard({
                 <p className="font-bold">{formatCurrency(contract.saldo)}</p>
               </div>
               <div className="flex-1 text-center">
-                <p className="text-xs text-muted-foreground">Pagas/Rest.</p>
+                <p className="text-xs text-muted-foreground">Pagas/Prazo/Rest.</p>
                 <p className="font-bold">
                   <span className="text-emerald-600">{installments.pagas}</span>
-                  /
+                  <span className="text-muted-foreground">/{contract.prazo || 0}/</span>
                   <span className="text-orange-600">{installments.restantes}</span>
                 </p>
               </div>
