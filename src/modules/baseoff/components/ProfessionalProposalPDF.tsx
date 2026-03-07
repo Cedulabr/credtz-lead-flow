@@ -185,7 +185,7 @@ export function ProfessionalProposalPDF({
         bold?: boolean;
         align?: 'left' | 'center' | 'right';
       }) => {
-        const { fontSize = fonts.body, color = colors.dark, bold = false, align = 'left' } = options || {};
+        const { fontSize = fonts.body, color = colors.text, bold = false, align = 'left' } = options || {};
         doc.setFontSize(fontSize);
         setColor(color);
         doc.setFont('helvetica', bold ? 'bold' : 'normal');
