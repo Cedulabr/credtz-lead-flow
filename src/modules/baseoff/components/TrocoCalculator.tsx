@@ -680,8 +680,11 @@ function ResultCard({ result: r, isBest, type }: { result: RateResult; isBest: b
       )}
       
       <div className="flex items-center justify-between mb-3">
-        <span className="text-lg font-bold font-mono">{r.taxa.toFixed(2)}%</span>
-        <span className="text-sm text-muted-foreground">a.m.</span>
+        <div>
+          <span className="text-lg font-bold font-mono">{r.taxa.toFixed(2)}%</span>
+          <span className="text-sm text-muted-foreground ml-1">a.m.</span>
+        </div>
+        <Badge variant="outline" className="text-xs">{r.bancoNome}</Badge>
       </div>
 
       <div className="grid grid-cols-2 gap-2 mb-3">
