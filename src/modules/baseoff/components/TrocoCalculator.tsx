@@ -187,7 +187,6 @@ export function TrocoCalculator({
   const [operationType, setOperationType] = useState<OperationType>('portabilidade');
   const [isExpanded, setIsExpanded] = useState(!compact);
   const [showBankManager, setShowBankManager] = useState(false);
-  const [showBankManager, setShowBankManager] = useState(false);
   const [newBankName, setNewBankName] = useState('');
   const [newBankRate, setNewBankRate] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
