@@ -84,7 +84,6 @@ const FALLBACK_BANKS: BankRate[] = [
 
 const PRAZOS_PORT_REFIN = [96, 84];
 const PRAZOS_MARGEM_CARTAO = [96, 84, 72];
-const DEFAULT_RATES = [1.85, 1.80, 1.75];
 const CARTAO_TAXA = 2.55;
 const CARTAO_SAQUE_PERCENT = 0.70;
 
