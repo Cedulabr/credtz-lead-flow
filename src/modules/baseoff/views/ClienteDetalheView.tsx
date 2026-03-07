@@ -12,7 +12,7 @@ import {
   Download
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { BaseOffClient, BaseOffContract, TimelineEvent } from '../types';
+import { BaseOffClient, BaseOffContract, BaseOffInlineContract, TimelineEvent } from '../types';
 import { ClienteHeader } from '../components/ClienteHeader';
 import { MargemCards } from '../components/MargemCards';
 import { TelefoneHotPanel } from '../components/TelefoneHotPanel';
@@ -30,6 +30,30 @@ interface ClienteDetalheViewProps {
   onBack: () => void;
 }
 
+// Convert inline contracts from API to BaseOffContract format
+function inlineToContract(inline: BaseOffInlineContract, clientId: string, cpf: string, index: number): BaseOffContract {
+  return {
+    id: `inline-${index}`,
+    client_id: clientId,
+    cpf,
+    banco_emprestimo: inline.banco_emprestimo,
+    contrato: inline.contrato,
+    vl_emprestimo: inline.vl_emprestimo,
+    inicio_desconto: inline.inicio_desconto,
+    prazo: inline.prazo,
+    vl_parcela: inline.vl_parcela,
+    tipo_emprestimo: inline.tipo_emprestimo,
+    data_averbacao: inline.data_averbacao,
+    situacao_emprestimo: inline.situacao_emprestimo,
+    competencia: inline.competencia,
+    competencia_final: inline.competencia_final,
+    taxa: inline.taxa,
+    saldo: inline.saldo,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
 export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) {
   const [contracts, setContracts] = useState<BaseOffContract[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -40,47 +64,59 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
   const [selectedContractIds, setSelectedContractIds] = useState<string[]>([]);
   const [currentSimulation, setCurrentSimulation] = useState<TrocoSimulation | null>(null);
 
+  const hasInlineContracts = client.contracts && client.contracts.length > 0;
+
   const fetchContracts = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('baseoff_contracts')
-        .select('*')
-        .eq('client_id', client.id)
-        .order('created_at', { ascending: false });
+      // Use inline contracts from API if available
+      if (hasInlineContracts) {
+        const mapped = client.contracts!.map((c, i) => inlineToContract(c, client.id, client.cpf, i));
+        setContracts(mapped);
+      } else {
+        // Fallback: query from Supabase
+        const { data, error } = await supabase
+          .from('baseoff_contracts')
+          .select('*')
+          .eq('client_id', client.id)
+          .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setContracts(data || []);
+        if (error) throw error;
+        setContracts(data || []);
+      }
     } catch (error) {
       console.error('Error fetching contracts:', error);
       toast.error('Erro ao carregar contratos');
     } finally {
       setIsLoading(false);
     }
-  }, [client.id]);
+  }, [client.id, client.cpf, client.contracts, hasInlineContracts]);
 
   useEffect(() => {
     fetchContracts();
   }, [fetchContracts]);
 
-  // Build phone list with validation
+  // Build phone list with validation - include all phones
   const telefones = useMemo(() => {
     const phones: { numero: string; tipo: 'celular' | 'fixo'; principal?: boolean; valido?: boolean }[] = [];
     
-    const addPhone = (phone: string | null, isPrincipal: boolean = false) => {
+    const addPhone = (phone: string | null, tipo: 'celular' | 'fixo', isPrincipal: boolean = false) => {
       if (!phone) return;
       const validation = validatePhone(phone);
       phones.push({
         numero: phone,
-        tipo: validation.tipo === 'celular' ? 'celular' : 'fixo',
+        tipo: validation.tipo === 'celular' ? 'celular' : tipo,
         principal: isPrincipal,
         valido: validation.isValid,
       });
     };
 
-    addPhone(client.tel_cel_1, true);
-    addPhone(client.tel_cel_2);
-    addPhone(client.tel_fixo_1);
+    addPhone(client.tel_cel_1, 'celular', true);
+    addPhone(client.tel_cel_2, 'celular');
+    addPhone(client.tel_cel_3, 'celular');
+    addPhone(client.tel_fixo_1, 'fixo');
+    addPhone(client.tel_fixo_2, 'fixo');
+    addPhone(client.tel_fixo_3, 'fixo');
     
     return phones;
   }, [client]);
@@ -89,7 +125,6 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
   const timelineEvents = useMemo<TimelineEvent[]>(() => {
     const events: TimelineEvent[] = [];
     
-    // Add contract events
     contracts.forEach(contract => {
       events.push({
         id: contract.id,
@@ -104,7 +139,6 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
       });
     });
     
-    // Sort by date descending
     return events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [contracts]);
 
@@ -132,7 +166,6 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
 
   const handleMarcarPrincipal = async (numero: string) => {
     try {
-      // Update client with new principal phone
       const { error } = await supabase
         .from('baseoff_clients')
         .update({ tel_cel_1: numero })
@@ -148,7 +181,6 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
 
   return (
     <div className="space-y-6">
-      {/* Modals */}
       {selectedContract && (
         <SimulationModal
           isOpen={showSimulation}
@@ -169,7 +201,6 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
         selectedContractIds={selectedContractIds}
       />
 
-      {/* Back Button */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={onBack} className="gap-2">
           <ArrowLeft className="w-4 h-4" />
@@ -181,14 +212,10 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
         </Button>
       </div>
 
-      {/* Main Layout: Content + Sticky Phone Panel */}
       <div className="grid lg:grid-cols-[1fr_320px] gap-6">
-        {/* Left Column - Client Info */}
         <div className="space-y-6">
-          {/* Client Header Card */}
           <ClienteHeader client={client} />
 
-          {/* Margin Cards */}
           <div>
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
               💰 Margens e Indicadores
@@ -196,10 +223,11 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
             <MargemCards 
               mr={client.mr}
               baseCalculo={client.mr ? client.mr * 1.3 : null}
+              margemCartao={client.valor_rmc}
+              cartaoBeneficio={client.valor_rcc}
             />
           </div>
 
-          {/* Tabs: Contracts & Timeline */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
             <TabsList className="grid w-full grid-cols-2 h-12">
               <TabsTrigger value="contratos" className="gap-2 text-base">
@@ -212,7 +240,6 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
               </TabsTrigger>
             </TabsList>
 
-            {/* Contracts Tab */}
             <TabsContent value="contratos" className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -236,15 +263,17 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
                     </Button>
                   )}
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={fetchContracts}
-                  className="gap-2"
-                >
-                  <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-                  Atualizar
-                </Button>
+                {!hasInlineContracts && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchContracts}
+                    className="gap-2"
+                  >
+                    <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
+                    Atualizar
+                  </Button>
+                )}
               </div>
 
               {isLoading ? (
@@ -289,7 +318,6 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
                 </div>
               )}
 
-              {/* Troco Calculator Panel */}
               {contracts.length > 0 && (
                 <TrocoCalculator
                   contracts={contracts}
@@ -301,7 +329,6 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
               )}
             </TabsContent>
 
-            {/* Timeline Tab */}
             <TabsContent value="timeline" className="space-y-4">
               {timelineEvents.length === 0 ? (
                 <Card className="p-8 text-center">
@@ -315,7 +342,6 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
                 <div className="relative pl-6 border-l-2 border-muted space-y-6">
                   {timelineEvents.map((event) => (
                     <div key={event.id} className="relative">
-                      {/* Timeline dot */}
                       <div className={cn(
                         "absolute -left-[25px] w-4 h-4 rounded-full border-2 bg-background",
                         event.type === 'contrato' && "border-primary",
@@ -349,7 +375,6 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
           </Tabs>
         </div>
 
-        {/* Right Column - Sticky Phone Panel */}
         <div className="hidden lg:block">
           <TelefoneHotPanel 
             telefones={telefones}
@@ -359,7 +384,6 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
         </div>
       </div>
 
-      {/* Mobile Phone Panel */}
       <div className="lg:hidden">
         <TelefoneHotPanel 
           telefones={telefones}

@@ -62,7 +62,6 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
       try {
         const offset = page * pageSize;
 
-        // Call edge function that queries external PG
         const { data, error } = await supabase.functions.invoke('baseoff-external-query', {
           body: {
             search_term: query.trim(),
@@ -75,7 +74,7 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
 
         const results = data || [];
 
-        // Transform results
+        // Spread all fields from API, only compute status
         const transformedClients: BaseOffClient[] = results.map((row: any) => {
           let status: ClientStatus = 'simulado';
           if (row.status_beneficio) {
@@ -90,25 +89,7 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
           }
 
           return {
-            id: row.id,
-            nb: row.nb,
-            cpf: row.cpf,
-            nome: row.nome,
-            data_nascimento: row.data_nascimento,
-            sexo: row.sexo,
-            nome_mae: row.nome_mae,
-            esp: row.esp,
-            mr: row.mr,
-            banco_pagto: row.banco_pagto,
-            status_beneficio: row.status_beneficio,
-            municipio: row.municipio,
-            uf: row.uf,
-            tel_cel_1: row.tel_cel_1,
-            tel_cel_2: row.tel_cel_2,
-            tel_fixo_1: row.tel_fixo_1,
-            email_1: row.email_1,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
+            ...row,
             status,
             total_contracts: row.total_contracts || 0,
             contracts: row.contracts || [],
