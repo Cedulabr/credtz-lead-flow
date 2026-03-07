@@ -96,6 +96,13 @@ function calcPMT(pv: number, ratePct: number, n: number): number {
   return pv * factor;
 }
 
+// Price System: Calculate Present Value (financed amount) from installment
+function calcPV(pmt: number, ratePct: number, n: number): number {
+  const r = ratePct / 100;
+  if (r === 0) return pmt * n;
+  return pmt * (1 - Math.pow(1 + r, -n)) / r;
+}
+
 interface RateResult {
   taxa: number;
   novaParcela: number;
