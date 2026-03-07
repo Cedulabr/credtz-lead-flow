@@ -351,10 +351,11 @@ export function ProfessionalProposalPDF({
           y = margin;
         }
 
-        // Contract box
-        doc.setFillColor(colors.light.r, colors.light.g, colors.light.b);
+      // Contract box - white background with visible border
+        doc.setFillColor(255, 255, 255);
         doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, 42, 2, 2, 'F');
         doc.setDrawColor(colors.border.r, colors.border.g, colors.border.b);
+        doc.setLineWidth(0.8);
         doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, 42, 2, 2, 'S');
 
         // Contract header
