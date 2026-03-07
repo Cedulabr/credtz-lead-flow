@@ -111,6 +111,10 @@ const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMes
     permission: 'can_access_meu_numero',
     blockedMessage: 'Acesso ao módulo Meu Número bloqueado pelo administrador',
   },
+  radar: {
+    permission: 'can_access_radar',
+    blockedMessage: 'Acesso ao Radar de Oportunidades bloqueado pelo administrador',
+  },
 };
 
 // ── Main Component ────────────────────────────────────────────────────
