@@ -78,20 +78,20 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
             {/* Info Badges */}
             <div className="flex items-center gap-2 flex-wrap mt-3">
               {client.banco_pagto && (
-                <Badge variant="outline" className="gap-1.5 text-xs font-normal">
-                  <Landmark className="w-3 h-3" />
+                <Badge variant="outline" className="gap-1.5 text-sm py-1 px-3 font-normal">
+                  <Landmark className="w-3.5 h-3.5" />
                   {client.banco_pagto}
                 </Badge>
               )}
               {client.esp && (
-                <Badge variant="outline" className="gap-1.5 text-xs font-normal">
-                  <Shield className="w-3 h-3" />
+                <Badge variant="outline" className="gap-1.5 text-sm py-1 px-3 font-normal">
+                  <Shield className="w-3.5 h-3.5" />
                   Esp. {client.esp}
                 </Badge>
               )}
               {(client.municipio || client.cidade_1) && (
-                <Badge variant="outline" className="gap-1.5 text-xs font-normal">
-                  <MapPin className="w-3 h-3" />
+                <Badge variant="outline" className="gap-1.5 text-sm py-1 px-3 font-normal">
+                  <MapPin className="w-3.5 h-3.5" />
                   {client.municipio || client.cidade_1}{client.uf || client.uf_1 ? ` - ${client.uf || client.uf_1}` : ''}
                 </Badge>
               )}
