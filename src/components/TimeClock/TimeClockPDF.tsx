@@ -36,12 +36,10 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
     doc.rect(0, 0, pageWidth, 38, 'F');
     doc.setFillColor(...EASYN_BLUE);
     doc.rect(0, 38, pageWidth, 2, 'F');
-
     doc.setTextColor(...WHITE);
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
     doc.text('EASYN', 14, 18);
-
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.text('Sistema de Gestão de Ponto', 14, 26);
@@ -61,17 +59,11 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
 
   const drawSignatureArea = (doc: jsPDF, yPos: number) => {
     const pageWidth = doc.internal.pageSize.getWidth();
-
     doc.setFontSize(8);
     doc.setTextColor(80, 80, 80);
     doc.setFont('helvetica', 'italic');
-    doc.text(
-      'Declaro que as informações acima são verdadeiras e conferem com meu registro de ponto.',
-      pageWidth / 2, yPos, { align: 'center' }
-    );
-
+    doc.text('Declaro que as informações acima são verdadeiras e conferem com meu registro de ponto.', pageWidth / 2, yPos, { align: 'center' });
     yPos += 15;
-
     doc.setDrawColor(0, 0, 0);
     doc.line(20, yPos, 90, yPos);
     doc.setFontSize(8);
@@ -79,11 +71,9 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
     doc.setTextColor(0, 0, 0);
     doc.text('Assinatura do Colaborador', 55, yPos + 5, { align: 'center' });
     doc.text('Data: ___/___/______', 55, yPos + 11, { align: 'center' });
-
     doc.line(120, yPos, 190, yPos);
     doc.text('Assinatura do Gestor', 155, yPos + 5, { align: 'center' });
     doc.text('Data: ___/___/______', 155, yPos + 11, { align: 'center' });
-
     yPos += 22;
     doc.setDrawColor(180, 180, 180);
     doc.setLineDashPattern([2, 2], 0);
@@ -100,31 +90,22 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
     doc.rect(0, 282, pageWidth, 15, 'F');
     doc.setFontSize(7);
     doc.setTextColor(...WHITE);
-    doc.text(
-      `Easyn — Sistema de Gestão de Ponto | Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
-      pageWidth / 2, 290, { align: 'center' }
-    );
+    doc.text(`Easyn — Sistema de Gestão de Ponto | Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`, pageWidth / 2, 290, { align: 'center' });
   };
 
   const generateDailyPDF = async () => {
     setLoading(true);
     try {
       const { data: records } = await supabase
-        .from('time_clock')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('clock_date', selectedDate)
-        .order('clock_time', { ascending: true });
+        .from('time_clock').select('*').eq('user_id', userId)
+        .eq('clock_date', selectedDate).order('clock_time', { ascending: true });
 
       const { data: justifications } = await supabase
-        .from('time_clock_justifications')
-        .select('*')
-        .eq('user_id', userId)
+        .from('time_clock_justifications').select('*').eq('user_id', userId)
         .eq('reference_date', selectedDate);
 
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
-
       drawHeader(doc, pageWidth);
       drawCompanyInfo(doc, pageWidth);
 
@@ -140,7 +121,6 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       doc.text('Colaborador:', 14, yPos);
       doc.setFont('helvetica', 'normal');
       doc.text(userName || 'Não informado', 48, yPos);
-
       doc.setFont('helvetica', 'bold');
       doc.text('Data:', 120, yPos);
       doc.setFont('helvetica', 'normal');
@@ -173,7 +153,6 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         doc.setTextColor(...EASYN_NAVY);
         doc.text(row.label + ':', 20, yPos);
         doc.setFont('helvetica', 'normal');
-
         if (row.record) {
           const time = row.record.clock_time;
           const timeStr = time.includes('T') ? format(parseISO(time), 'HH:mm:ss') : time.slice(0, 8);
@@ -192,7 +171,6 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         yPos += 10;
       });
 
-      // Summary
       yPos += 8;
       doc.setFillColor(...EASYN_BLUE);
       doc.rect(14, yPos - 5, pageWidth - 28, 10, 'F');
@@ -213,7 +191,6 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       doc.text('Total Trabalhado:', 20, yPos);
       doc.setFont('helvetica', 'normal');
       doc.text(`${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}min`, 65, yPos);
-
       doc.setFont('helvetica', 'bold');
       doc.text('Intervalo:', 110, yPos);
       doc.setFont('helvetica', 'normal');
@@ -239,7 +216,6 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
 
       drawSignatureArea(doc, yPos + 20);
       drawFooter(doc);
-
       doc.save(`ponto-diario-${selectedDate}.pdf`);
       toast({ title: 'PDF gerado com sucesso!' });
     } catch (error: any) {
@@ -255,7 +231,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const startDate = `${selectedMonth}-01`;
       const endDate = format(endOfMonth(parseISO(startDate)), 'yyyy-MM-dd');
 
-      const [recordsRes, justRes, scheduleRes, profileRes] = await Promise.all([
+      const [recordsRes, justRes, scheduleRes, profileRes, salaryRes] = await Promise.all([
         supabase.from('time_clock').select('*').eq('user_id', userId)
           .gte('clock_date', startDate).lte('clock_date', endDate)
           .order('clock_date', { ascending: true }).order('clock_time', { ascending: true }),
@@ -263,16 +239,17 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           .gte('reference_date', startDate).lte('reference_date', endDate),
         supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).single(),
         supabase.from('profiles').select('name, email, cpf, role').eq('id', userId).single(),
+        supabase.from('employee_salaries').select('*').eq('user_id', userId).eq('is_active', true).single(),
       ]);
 
       const records = recordsRes.data || [];
       const justifications = justRes.data || [];
       const schedule = scheduleRes.data;
       const profile = profileRes.data;
+      const salary = salaryRes.data;
 
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
-
       drawHeader(doc, pageWidth);
       drawCompanyInfo(doc, pageWidth);
 
@@ -283,7 +260,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       doc.setFont('helvetica', 'bold');
       doc.text('ESPELHO DE PONTO MENSAL', pageWidth / 2, yPos, { align: 'center' });
 
-      // Employee info with CPF and Cargo
+      // Employee info
       yPos += 12;
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
@@ -312,13 +289,14 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         doc.text(cpf, 28, yPos);
       }
 
-      // Cargo
+      // Cargo - use salary cargo or fallback
+      const cargoText = salary?.cargo || (profile?.role === 'admin' ? 'Administrador' : 'Colaborador');
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...EASYN_NAVY);
       doc.text('Cargo:', 70, yPos);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(0, 0, 0);
-      doc.text(profile?.role === 'admin' ? 'Administrador' : 'Colaborador', 88, yPos);
+      doc.text(cargoText, 88, yPos);
 
       // Schedule info
       if (schedule) {
@@ -330,7 +308,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         doc.text(`${schedule.entry_time?.slice(0, 5)} às ${schedule.exit_time?.slice(0, 5)} | ${schedule.daily_hours}h/dia`, 142, yPos);
       }
 
-      // Table header - with Pausas and Atraso columns
+      // Table header
       yPos += 12;
       doc.setFillColor(...EASYN_NAVY);
       doc.rect(14, yPos - 4, pageWidth - 28, 10, 'F');
@@ -344,10 +322,11 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       doc.text('Retorno', 83, yPos + 2);
       doc.text('Saída', 100, yPos + 2);
       doc.text('Pausas', 116, yPos + 2);
-      doc.text('Atraso', 133, yPos + 2);
-      doc.text('Total', 150, yPos + 2);
-      doc.text('Status', 167, yPos + 2);
-      doc.text('Obs', 185, yPos + 2);
+      doc.text('Atraso', 131, yPos + 2);
+      doc.text('Total', 146, yPos + 2);
+      doc.text('Status', 162, yPos + 2);
+      doc.text('Just.', 178, yPos + 2);
+      doc.text('Obs', 191, yPos + 2);
 
       yPos += 12;
       doc.setFont('helvetica', 'normal');
@@ -362,6 +341,8 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       let totalDelays = 0;
       let totalAbsences = 0;
       let totalOvertime = 0;
+      let justifiedDelays = 0;
+      let unjustifiedDelays = 0;
 
       days.forEach((day) => {
         const dateStr = format(day, 'yyyy-MM-dd');
@@ -369,7 +350,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         const dayOfWeek = day.getDay();
         const isWorkDay = workDays.includes(dayOfWeek);
 
-        if (yPos > 260) {
+        if (yPos > 258) {
           drawFooter(doc);
           doc.addPage();
           yPos = 20;
@@ -379,7 +360,6 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         const breakStarts = dayRecords.filter(r => r.clock_type === 'pausa_inicio');
         const breakEnds = dayRecords.filter(r => r.clock_type === 'pausa_fim');
         const exit = dayRecords.find(r => r.clock_type === 'saida');
-
         const breakMinutes = calculateTotalBreakMinutes(dayRecords);
         totalBreakMinutesAll += breakMinutes;
 
@@ -406,6 +386,24 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           totalAbsences++;
         }
 
+        // Justification for this day
+        const dayJust = justifications.find(j => j.reference_date === dateStr);
+        let justLabel = '';
+        if (dayJust) {
+          if (dayJust.status === 'approved') {
+            justLabel = 'Apr';
+            if (status === 'ATR') justifiedDelays++;
+          } else if (dayJust.status === 'rejected') {
+            justLabel = 'Rej';
+            if (status === 'ATR') unjustifiedDelays++;
+          } else {
+            justLabel = 'Pend';
+            if (status === 'ATR') unjustifiedDelays++;
+          }
+        } else {
+          if (status === 'ATR') unjustifiedDelays++;
+        }
+
         const fmtTime = (r: any) => {
           if (!r) return '-';
           const t = r.clock_time;
@@ -426,8 +424,8 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         doc.text(fmtTime(breakEnds[breakEnds.length - 1]), 83, yPos);
         doc.text(fmtTime(exit), 100, yPos);
         doc.text(breakMinutes > 0 ? formatMinutesToHMCompact(breakMinutes) : '-', 116, yPos);
-        doc.text(delayMinutes > 0 ? `${delayMinutes}min` : '-', 133, yPos);
-        doc.text(workedMinutes > 0 ? formatMinutesToHMCompact(workedMinutes) : '-', 150, yPos);
+        doc.text(delayMinutes > 0 ? `${delayMinutes}min` : '-', 131, yPos);
+        doc.text(workedMinutes > 0 ? formatMinutesToHMCompact(workedMinutes) : '-', 146, yPos);
 
         const statusColors: Record<string, [number, number, number]> = {
           'OK': [16, 185, 129],
@@ -437,19 +435,42 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           'FDS': [156, 163, 175],
         };
         doc.setTextColor(...(statusColors[status] || [0, 0, 0]));
-        doc.text(status, 169, yPos);
+        doc.text(status, 164, yPos);
         doc.setTextColor(0, 0, 0);
 
-        const dayJust = justifications.find(j => j.reference_date === dateStr);
-        if (dayJust) doc.text('✓', 188, yPos);
+        // Justification indicator
+        if (justLabel) {
+          const justColors: Record<string, [number, number, number]> = {
+            'Apr': [16, 185, 129],
+            'Pend': [245, 158, 11],
+            'Rej': [239, 68, 68],
+          };
+          const justSymbols: Record<string, string> = {
+            'Apr': '✓',
+            'Pend': '⏳',
+            'Rej': '✗',
+          };
+          doc.setTextColor(...(justColors[justLabel] || [0, 0, 0]));
+          doc.text(`${justSymbols[justLabel]} ${justLabel}`, 178, yPos);
+          doc.setTextColor(0, 0, 0);
+        }
 
         yPos += 6;
       });
 
-      // Summary bar
+      // Summary bar - expanded to include salary info
       yPos += 8;
+      const summaryHeight = salary ? 44 : 28;
+      
+      // Check if we need a new page for summary + signature
+      if (yPos + summaryHeight + 60 > 280) {
+        drawFooter(doc);
+        doc.addPage();
+        yPos = 20;
+      }
+
       doc.setFillColor(...EASYN_NAVY);
-      doc.rect(14, yPos - 4, (pageWidth - 28), 28, 'F');
+      doc.rect(14, yPos - 4, (pageWidth - 28), summaryHeight, 'F');
 
       doc.setTextColor(...WHITE);
       doc.setFontSize(8);
@@ -464,21 +485,44 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const balanceMinutes = totalWorkedMinutes - (expectedHours * 60);
       const balanceH = Math.floor(Math.abs(balanceMinutes) / 60);
       const balanceM = Math.abs(balanceMinutes) % 60;
+      const delayH = Math.floor(totalDelayMinutes / 60);
+      const delayM = totalDelayMinutes % 60;
 
+      // Row 1
       doc.text(`Total Trabalhado: ${totalH}h ${totalM}min`, 18, yPos + 4);
       doc.text(`Carga Prevista: ${expectedHours}h`, 18, yPos + 12);
       doc.text(`Total Pausas: ${formatMinutesToHMCompact(totalBreakMinutesAll)}`, 18, yPos + 20);
 
+      // Row 2
       doc.text(`Horas Extras: ${overtimeH}h ${overtimeM}min`, pageWidth / 2 - 10, yPos + 4);
-      doc.text(`Atrasos: ${totalDelays} (${totalDelayMinutes}min)`, pageWidth / 2 - 10, yPos + 12);
+      doc.text(`Atrasos: ${totalDelays} ocorrências | Total: ${delayH}h ${delayM}min`, pageWidth / 2 - 10, yPos + 12);
       doc.text(`Faltas: ${totalAbsences}`, pageWidth / 2 - 10, yPos + 20);
 
-      doc.text(`Banco de Horas: ${balanceMinutes >= 0 ? '+' : '-'}${balanceH}h ${balanceM}min`, pageWidth - 70, yPos + 4);
-      const approvedJust = justifications.filter(j => j.status === 'approved').length;
-      doc.text(`Just. Aprovadas: ${approvedJust}`, pageWidth - 70, yPos + 12);
+      // Row 3
+      doc.text(`Banco de Horas: ${balanceMinutes >= 0 ? '+' : '-'}${balanceH}h ${balanceM}min`, pageWidth - 80, yPos + 4);
+      doc.text(`Atr. Justificados: ${justifiedDelays}`, pageWidth - 80, yPos + 12);
+      doc.text(`Atr. Não Justificados: ${unjustifiedDelays}`, pageWidth - 80, yPos + 20);
+
+      // Salary row (if available)
+      if (salary) {
+        const baseSalary = Number(salary.base_salary);
+        const discountPerMinute = baseSalary / 176 / 60;
+        const totalDiscount = unjustifiedDelays > 0 ? totalDelayMinutes * discountPerMinute : 0;
+        const netPay = baseSalary - totalDiscount;
+
+        doc.setFillColor(...EASYN_BLUE);
+        doc.rect(14, yPos + summaryHeight - 18, pageWidth - 28, 0.5, 'F');
+
+        doc.text(`Salário Base: R$ ${baseSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 18, yPos + summaryHeight - 10);
+        doc.text(`Desconto Atrasos: R$ ${totalDiscount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth / 2 - 10, yPos + summaryHeight - 10);
+
+        doc.setFontSize(9);
+        doc.text(`Valor Líquido Estimado: R$ ${netPay.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - 80, yPos + summaryHeight - 10);
+        doc.setFontSize(8);
+      }
 
       // Signature area
-      drawSignatureArea(doc, yPos + 38);
+      drawSignatureArea(doc, yPos + summaryHeight + 10);
       drawFooter(doc);
 
       doc.save(`espelho-ponto-${selectedMonth}.pdf`);
@@ -508,31 +552,21 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
               Escolha o tipo de relatório que deseja gerar
             </DialogDescription>
           </DialogHeader>
-
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Tipo de Relatório</Label>
               <Select value={reportType} onValueChange={(v) => setReportType(v as 'daily' | 'monthly')}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="daily">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Folha Diária
-                    </div>
+                    <div className="flex items-center gap-2"><Calendar className="h-4 w-4" />Folha Diária</div>
                   </SelectItem>
                   <SelectItem value="monthly">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Espelho Mensal
-                    </div>
+                    <div className="flex items-center gap-2"><FileText className="h-4 w-4" />Espelho Mensal</div>
                   </SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
             {reportType === 'daily' ? (
               <div className="space-y-2">
                 <Label>Data</Label>
@@ -545,7 +579,6 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
               </div>
             )}
           </div>
-
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
             <Button onClick={reportType === 'daily' ? generateDailyPDF : generateMonthlyPDF} disabled={loading}>
