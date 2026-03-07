@@ -52,6 +52,9 @@ export const MeuNumeroModule = lazy(() => import('@/modules/meu-numero/MeuNumero
 // Client Reuse
 export const ClientReuseAlerts = lazy(() => import('./ClientReuseAlerts').then(m => ({ default: m.ClientReuseAlerts })));
 
+// Radar
+export const RadarModule = lazy(() => import('@/modules/radar/RadarModule').then(m => ({ default: m.RadarModule })));
+
 // Base OFF legacy
 export const BaseOff = lazy(() => import('./BaseOff').then(m => ({ default: m.BaseOff })));
 export const BaseOffModern = lazy(() => import('./BaseOffModern').then(m => ({ default: m.BaseOffModern })));
