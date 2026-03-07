@@ -263,7 +263,11 @@ export function TrocoCalculator({
   const totals = useMemo(() => {
     const selected = contracts.filter(c => selectedContracts.includes(c.id));
     return {
-      saldoTotal: selected.reduce((sum, c) => sum + (c.saldo || 0), 0),
+      saldoTotal: selected.reduce((sum, c) => {
+        const inst = calculateInstallments(c.data_averbacao, c.prazo);
+        const sd = calcSaldoDevedor(c.vl_parcela, c.taxa, inst.restantes);
+        return sum + (sd !== null ? sd : (c.saldo || 0));
+      }, 0),
       parcelaTotal: selected.reduce((sum, c) => sum + (c.vl_parcela || 0), 0),
       qtdContratos: selected.length,
     };
