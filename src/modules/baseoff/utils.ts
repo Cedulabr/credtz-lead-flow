@@ -1,5 +1,5 @@
 // Utility functions for BaseOff Module
-import { format, subDays, startOfMonth, endOfMonth, parseISO, isValid } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, parseISO, isValid, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BaseOffFilters } from './types';
 
@@ -37,15 +37,32 @@ export function formatCurrency(value: number | null | undefined): string {
   }).format(value);
 }
 
+/**
+ * Parse a date string that may be in BR format (dd/MM/yyyy) or ISO format.
+ */
+export function parseBRDate(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  
+  // BR format: dd/MM/yyyy
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+    const parsed = parse(dateStr, 'dd/MM/yyyy', new Date());
+    return isValid(parsed) ? parsed : null;
+  }
+  
+  // ISO format
+  try {
+    const parsed = parseISO(dateStr);
+    return isValid(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export function formatDate(date: string | null | undefined): string {
   if (!date) return '---';
-  try {
-    const parsed = parseISO(date);
-    if (!isValid(parsed)) return '---';
-    return format(parsed, 'dd/MM/yyyy', { locale: ptBR });
-  } catch {
-    return '---';
-  }
+  const parsed = parseBRDate(date);
+  if (!parsed) return '---';
+  return format(parsed, 'dd/MM/yyyy', { locale: ptBR });
 }
 
 export function formatDateTime(date: string | null | undefined): string {
