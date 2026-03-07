@@ -65,23 +65,37 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
   useEffect(() => {
     if (!isAdmin) return;
     (async () => {
+      // Step 1: get user_ids from user_companies
       let query = supabase
         .from('user_companies')
-        .select('user_id, profiles:user_id(id, name, email)')
+        .select('user_id')
         .eq('is_active', true);
 
       if (selectedCompanyId !== 'all') {
         query = query.eq('company_id', selectedCompanyId);
       }
 
-      const { data } = await query;
-      if (data) {
-        const mapped = data
-          .map((d: any) => d.profiles)
-          .filter(Boolean)
-          .map((p: any) => ({ id: p.id, name: p.name || p.email?.split('@')[0] || 'Sem nome', email: p.email }));
-        const unique = Array.from(new Map(mapped.map((u: any) => [u.id, u])).values());
-        setCompanyUsers(unique as any);
+      const { data: relData } = await query;
+      if (!relData || relData.length === 0) {
+        setCompanyUsers([]);
+        return;
+      }
+
+      const userIds = [...new Set(relData.map((r: any) => r.user_id))];
+
+      // Step 2: get profiles separately
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .in('id', userIds);
+
+      if (profiles) {
+        const mapped = profiles.map((p: any) => ({
+          id: p.id,
+          name: p.name || p.email?.split('@')[0] || 'Sem nome',
+          email: p.email,
+        }));
+        setCompanyUsers(mapped);
       }
     })();
   }, [isAdmin, selectedCompanyId]);
