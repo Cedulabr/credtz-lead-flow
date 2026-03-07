@@ -5063,6 +5063,50 @@ export type Database = {
         }
         Relationships: []
       }
+      time_clock_hour_bank: {
+        Row: {
+          balance_minutes: number
+          company_id: string | null
+          created_at: string | null
+          expected_minutes: number
+          id: string
+          reference_month: string
+          updated_at: string | null
+          user_id: string
+          worked_minutes: number
+        }
+        Insert: {
+          balance_minutes?: number
+          company_id?: string | null
+          created_at?: string | null
+          expected_minutes?: number
+          id?: string
+          reference_month: string
+          updated_at?: string | null
+          user_id: string
+          worked_minutes?: number
+        }
+        Update: {
+          balance_minutes?: number
+          company_id?: string | null
+          created_at?: string | null
+          expected_minutes?: number
+          id?: string
+          reference_month?: string
+          updated_at?: string | null
+          user_id?: string
+          worked_minutes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_clock_hour_bank_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_clock_justifications: {
         Row: {
           attachment_url: string | null
@@ -5260,6 +5304,7 @@ export type Database = {
           lunch_start: string | null
           max_overtime_daily_minutes: number | null
           monthly_hours: number
+          schedule_name: string | null
           schedule_type: string
           tolerance_minutes: number
           updated_at: string | null
@@ -5281,6 +5326,7 @@ export type Database = {
           lunch_start?: string | null
           max_overtime_daily_minutes?: number | null
           monthly_hours?: number
+          schedule_name?: string | null
           schedule_type?: string
           tolerance_minutes?: number
           updated_at?: string | null
@@ -5302,6 +5348,7 @@ export type Database = {
           lunch_start?: string | null
           max_overtime_daily_minutes?: number | null
           monthly_hours?: number
+          schedule_name?: string | null
           schedule_type?: string
           tolerance_minutes?: number
           updated_at?: string | null
