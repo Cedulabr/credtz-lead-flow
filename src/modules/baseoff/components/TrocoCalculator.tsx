@@ -234,7 +234,8 @@ export function TrocoCalculator({
   }, []);
 
   const bancoInfo = banks.find(b => b.bank_name === banco);
-  const allRates = [...DEFAULT_RATES, ...customRates];
+  // Use bank rates instead of static DEFAULT_RATES
+  const bankRates = banks.map(b => ({ taxa: b.default_rate, nome: b.bank_name }));
 
   const totals = useMemo(() => {
     const selected = contracts.filter(c => selectedContracts.includes(c.id));
