@@ -39,10 +39,10 @@ export const AdminPanel = lazy(() => import('./AdminPanel').then(m => ({ default
 export const TestFunctionalities = lazy(() => import('./TestFunctionalities').then(m => ({ default: m.TestFunctionalities })));
 
 // Performance & Collaboration
-export const PerformanceReport = lazy(() => import('./PerformanceReport').then(m => ({ default: m.default || m.PerformanceReport })));
-export const Collaborative = lazy(() => import('./Collaborative').then(m => ({ default: m.default || m.Collaborative })));
-export const MyData = lazy(() => import('./MyData').then(m => ({ default: m.default || m.MyData })));
-export const TimeClock = lazy(() => import('./TimeClock').then(m => ({ default: m.default || m.TimeClock })));
+export const PerformanceReport = lazy(() => import('./PerformanceReport').then(m => ({ default: m.PerformanceReport })));
+export const Collaborative = lazy(() => import('./Collaborative').then(m => ({ default: m.Collaborative })));
+export const MyData = lazy(() => import('./MyData').then(m => ({ default: m.MyData })));
+export const TimeClock = lazy(() => import('./TimeClock').then(m => ({ default: m.TimeClock })));
 
 // Communication
 export const SmsModule = lazy(() => import('@/modules/sms/SmsModule').then(m => ({ default: m.SmsModule || m.default })));
