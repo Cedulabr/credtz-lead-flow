@@ -134,6 +134,11 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
     return phones;
   }, [client]);
 
+  // Separate loan contracts from card contracts
+  const loanContracts = useMemo(() => 
+    contracts.filter(c => !isCardContract(c.tipo_emprestimo)),
+    [contracts]
+  );
   // Generate timeline events
   const timelineEvents = useMemo<TimelineEvent[]>(() => {
     const events: TimelineEvent[] = [];
