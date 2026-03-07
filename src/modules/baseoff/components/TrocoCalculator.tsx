@@ -231,12 +231,14 @@ export function TrocoCalculator({
       const pv = r === 0 
         ? margemLivre * prazo 
         : margemLivre * (Math.pow(1 + r, prazo) - 1) / (r * Math.pow(1 + r, prazo));
+      const totalPago = margemLivre * prazo;
       const iof = pv * IOF_PERCENT;
       const liquido = pv - iof;
       return { 
         taxa, 
         novaParcela: margemLivre, 
         valorContrato: pv, 
+        totalPago,
         iof, 
         trocoBruto: liquido, 
         trocoLiquido: liquido 
