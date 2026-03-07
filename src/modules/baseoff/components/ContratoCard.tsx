@@ -63,6 +63,12 @@ export function ContratoCard({
     [contract.data_averbacao, contract.prazo]
   );
 
+  // Calculate saldo devedor using Price formula (matches Central Bank calculator)
+  const saldoCalculado = useMemo(() => {
+    const sd = calcSaldoDevedor(contract.vl_parcela, contract.taxa, installments.restantes);
+    return sd !== null ? sd : contract.saldo;
+  }, [contract.vl_parcela, contract.taxa, installments.restantes, contract.saldo]);
+
   return (
     <Card className="overflow-hidden border-2 hover:border-primary/30 transition-all">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
