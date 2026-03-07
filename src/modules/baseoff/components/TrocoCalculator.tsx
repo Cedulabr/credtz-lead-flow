@@ -212,11 +212,12 @@ export function TrocoCalculator({
     return allRates.map(taxa => {
       const saldo = totals.saldoTotal;
       const novaParcela = calcPMT(saldo, taxa, prazo);
-      const valorContrato = novaParcela * prazo;
+      const valorContrato = calcPV(novaParcela, taxa, prazo);
+      const totalPago = novaParcela * prazo;
       const iof = saldo * IOF_PERCENT;
       const trocoBruto = Math.max(0, valorContrato - saldo - iof);
       // Portabilidade and refinanciamento: NO 70% rule, just IOF
-      return { taxa, novaParcela, valorContrato, iof, trocoBruto, trocoLiquido: trocoBruto };
+      return { taxa, novaParcela, valorContrato, totalPago, iof, trocoBruto, trocoLiquido: trocoBruto };
     });
   }, [allRates, prazo, selectedContracts, totals, operationType]);
 
