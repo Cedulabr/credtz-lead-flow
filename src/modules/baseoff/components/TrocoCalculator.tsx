@@ -38,7 +38,7 @@ import {
   Banknote
 } from 'lucide-react';
 import { BaseOffContract } from '../types';
-import { formatCurrency } from '../utils';
+import { formatCurrency, calculateInstallments, calcSaldoDevedor } from '../utils';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
