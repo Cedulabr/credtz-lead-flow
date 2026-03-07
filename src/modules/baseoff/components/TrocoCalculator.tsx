@@ -559,7 +559,8 @@ export function TrocoCalculator({
                   <TableRow className="bg-muted/50">
                     <TableHead className="text-xs font-semibold">Taxa a.m.</TableHead>
                     <TableHead className="text-xs font-semibold text-right">Nova Parcela</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">Vl. Contrato</TableHead>
+                    <TableHead className="text-xs font-semibold text-right">Vl. Financiado</TableHead>
+                    <TableHead className="text-xs font-semibold text-right">Total Pago</TableHead>
                     <TableHead className="text-xs font-semibold text-right">IOF (~3%)</TableHead>
                     <TableHead className="text-xs font-semibold text-right">Troco</TableHead>
                   </TableRow>
@@ -569,7 +570,8 @@ export function TrocoCalculator({
                     <TableRow key={r.taxa} className="hover:bg-muted/30">
                       <TableCell className="font-mono font-semibold text-sm">{r.taxa.toFixed(2)}%</TableCell>
                       <TableCell className="text-right text-sm">{formatCurrency(r.novaParcela)}</TableCell>
-                      <TableCell className="text-right text-sm">{formatCurrency(r.valorContrato)}</TableCell>
+                      <TableCell className="text-right text-sm font-medium">{formatCurrency(r.valorContrato)}</TableCell>
+                      <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.totalPago)}</TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.iof)}</TableCell>
                       <TableCell className="text-right font-bold text-sm text-emerald-600">{formatCurrency(r.trocoLiquido)}</TableCell>
                     </TableRow>
