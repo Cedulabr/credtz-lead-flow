@@ -468,7 +468,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           if (isWorkDay && workedMinutes > expectedDailyMinutes) {
             totalOvertime += workedMinutes - expectedDailyMinutes;
           }
-        } else if (isWorkDay && !entry) {
+        } else if (isWorkDay && !entry && !dayOffType) {
           totalAbsences++;
           obsText = 'FALTA';
         } else if (isWorkDay && entry && !exit) {
