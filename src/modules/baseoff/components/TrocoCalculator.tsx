@@ -141,6 +141,7 @@ function calcCETMensal(valorLiberado: number, pmt: number, n: number): number {
 
 interface RateResult {
   taxa: number;
+  bancoNome: string;
   novaParcela: number;
   valorContrato: number;
   iof: number;
