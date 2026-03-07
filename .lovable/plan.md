@@ -1,71 +1,80 @@
 
 
-## Plano: Corrigir Valor do Contrato para usar PV (Price) no Simulador
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Problema
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-Na linha 207 do `TrocoCalculator.tsx`, o cálculo atual é:
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
+
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+
+---
+
+### 2. Conectar Base OFF ao PostgreSQL externo
+
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+
+**Arquitetura:**
+
+```text
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
 ```
-valorContrato = novaParcela * prazo  // ERRADO: isso é o total pago
-```
 
-O correto é calcular o **Valor Financiado (PV)** usando a fórmula Price:
-```
-PV = PMT × (1 - (1 + i)^-n) / i
-```
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
 
-Isso afeta diretamente o cálculo do troco:
-```
-Troco = Valor Financiado (PV) - Saldo Devedor - IOF
-```
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
 
-### Alterações
+---
 
-#### 1. `TrocoCalculator.tsx` — Corrigir cálculos e adicionar colunas
+### 3. Simplificar modulo Base OFF - apenas Consulta
 
-**Nova função `calcPV`:**
-```ts
-function calcPV(pmt: number, ratePct: number, n: number): number {
-  const r = ratePct / 100;
-  if (r === 0) return pmt * n;
-  return pmt * (1 - Math.pow(1 + r, -n)) / r;
-}
-```
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
 
-**Corrigir `rateResults` (linhas 200-213):**
-- `valorContrato` (valor financiado) = `calcPV(novaParcela, taxa, prazo)` — o PV correto
-- `totalPago` = `novaParcela * prazo` — novo campo separado
-- `troco` = `valorContrato - saldoDevedor - iof`
-- IOF calculado sobre o saldo devedor: `iof = saldo * IOF_PERCENT`
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
 
-**Atualizar interface `RateResult`:**
-- Adicionar campo `totalPago: number`
+---
 
-**Atualizar tabela de resultados (linhas 544-568):**
-- Renomear coluna "Vl. Contrato" para "Vl. Financiado"
-- Adicionar coluna "Total Pago"
-- Troco = Vl. Financiado - Saldo Devedor - IOF
+### Arquivos a modificar
 
-**Mesma correção para `novoEmprestimoResults`:**
-- `valorContrato` já usa `calcPV` (PV inverso) — está correto
-- Adicionar `totalPago = margemLivre * prazo`
-
-#### 2. `ContratoCard.tsx` — Exibir Valor Financiado separado do Total Pago
-
-No detalhe expandido do contrato, o campo "Valor Empréstimo" (`vl_emprestimo`) já representa o valor financiado original do banco. Manter como está — é o dado real da API.
-
-Adicionar campo "Total Pago (estimado)" = `vl_parcela * prazo` como informação complementar nos detalhes expandidos.
-
-### Resumo de arquivos
-
-| Arquivo | Ação |
+| Arquivo | Mudanca |
 |---|---|
-| `TrocoCalculator.tsx` | Adicionar `calcPV`, corrigir `valorContrato` para usar PV, adicionar coluna "Total Pago", corrigir fórmula do troco |
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
 
-### Exemplo de validação
+---
 
-Parcela: 400, Taxa: 1.85%, Prazo: 96
-- PV = 400 × (1 - (1.0185)^-96) / 0.0185 = ~R$ 17.900,90
-- Total Pago = 400 × 96 = R$ 38.400,00
-- Troco = PV - Saldo Devedor - IOF
+### Pergunta necessaria
+
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 
