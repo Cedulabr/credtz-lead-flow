@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, History, Users, Settings as SettingsIcon, CalendarClock, FileText, LayoutDashboard, Timer, BarChart3 } from 'lucide-react';
+import { Clock, History, Users, Settings as SettingsIcon, CalendarClock, FileText, LayoutDashboard, Timer, BarChart3, DollarSign } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ClockButton } from './ClockButton';
@@ -12,6 +12,7 @@ import { JustificationManager } from './JustificationManager';
 import { ManagerDashboard } from './ManagerDashboard';
 import { HourBank } from './HourBank';
 import { Reports } from './Reports';
+import { SalaryManager } from './SalaryManager';
 import { BlockedAccess } from '@/components/BlockedAccess';
 import { Loader2 } from 'lucide-react';
 
@@ -69,7 +70,7 @@ export function TimeClock() {
       </div>
 
       <Tabs defaultValue="clock" className="space-y-6">
-        <TabsList className={`grid w-full ${canManage ? 'grid-cols-3 lg:grid-cols-9' : 'grid-cols-4'}`}>
+        <TabsList className={`grid w-full ${canManage ? 'grid-cols-3 lg:grid-cols-10' : 'grid-cols-4'}`}>
           <TabsTrigger value="clock" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             <span className="hidden sm:inline">Ponto</span>
@@ -96,6 +97,10 @@ export function TimeClock() {
                 <BarChart3 className="h-4 w-4" />
                 <span className="hidden sm:inline">Relatórios</span>
               </TabsTrigger>
+              <TabsTrigger value="salaries" className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                <span className="hidden sm:inline">Salários</span>
+              </TabsTrigger>
               <TabsTrigger value="schedules" className="flex items-center gap-2">
                 <CalendarClock className="h-4 w-4" />
                 <span className="hidden sm:inline">Jornadas</span>
@@ -115,20 +120,13 @@ export function TimeClock() {
         <TabsContent value="clock" className="space-y-6">
           <div className="flex justify-center">
             <div className="w-full max-w-md">
-              <ClockButton
-                userId={user.id}
-                companyId={companyId}
-              />
+              <ClockButton userId={user.id} companyId={companyId} />
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="history">
-          <MyHistory
-            userId={user.id}
-            userName={profile?.name || profile?.email || 'Usuário'}
-            isAdmin={canManage}
-          />
+          <MyHistory userId={user.id} userName={profile?.name || profile?.email || 'Usuário'} isAdmin={canManage} />
         </TabsContent>
 
         <TabsContent value="justifications">
@@ -146,6 +144,9 @@ export function TimeClock() {
             </TabsContent>
             <TabsContent value="reports">
               <Reports />
+            </TabsContent>
+            <TabsContent value="salaries">
+              <SalaryManager />
             </TabsContent>
             <TabsContent value="schedules">
               <ScheduleManager />
