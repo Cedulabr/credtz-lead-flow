@@ -107,7 +107,6 @@ interface RateResult {
   taxa: number;
   novaParcela: number;
   valorContrato: number;
-  totalPago: number;
   iof: number;
   trocoBruto: number;
   trocoLiquido: number;
