@@ -175,9 +175,9 @@ function CopyChip({ label, value, rawValue, onCopy }: { label: string; value: st
 function InfoRow({ label, value }: { label: string; value: string | number | null | undefined }) {
   const isEmpty = !value || value === '---';
   return (
-    <div className="flex items-center justify-between py-1 border-b border-border/20">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className={`text-xs text-right max-w-[60%] truncate ${isEmpty ? 'text-muted-foreground/40' : 'font-medium'}`}>
+    <div className="flex items-center justify-between py-1.5 border-b border-border/20">
+      <span className="text-muted-foreground text-sm">{label}</span>
+      <span className={`text-sm text-right max-w-[60%] truncate ${isEmpty ? 'text-muted-foreground/40' : 'font-medium'}`}>
         {isEmpty ? '---' : value}
       </span>
     </div>
