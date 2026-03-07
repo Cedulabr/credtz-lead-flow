@@ -440,7 +440,18 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           doc.rect(14, yPos - 3.5, pageWidth - 28, 6, 'F');
         }
 
-        if (entry && exit) {
+        // Check day-off
+        const dayOffType = dayOffMap[dateStr];
+        const DAY_OFF_LABELS: Record<string, string> = {
+          folga: 'FOLGA', feriado: 'FERIADO', licenca: 'LICENÇA', ferias: 'FÉRIAS', abono: 'ABONO',
+        };
+
+        if (dayOffType) {
+          // Day-off row background
+          doc.setFillColor(220, 240, 255);
+          doc.rect(14, yPos - 3.5, pageWidth - 28, 6, 'F');
+          obsText = DAY_OFF_LABELS[dayOffType] || 'FOLGA';
+        } else if (entry && exit) {
           workedMinutes = Math.floor((parseISO(exit.clock_time).getTime() - parseISO(entry.clock_time).getTime()) / 60000);
           workedMinutes -= breakMinutes;
           if (workedMinutes < 0) workedMinutes = 0;
