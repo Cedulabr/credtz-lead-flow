@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { BaseOffClient, BaseOffContract, BaseOffInlineContract, TimelineEvent } from '../types';
 import { ClienteHeader } from '../components/ClienteHeader';
 import { MargemCards } from '../components/MargemCards';
+import { CartoesSection, isCardContract } from '../components/CartoesSection';
 import { TelefoneHotPanel } from '../components/TelefoneHotPanel';
 import { ContratoCard } from '../components/ContratoCard';
 import { SimulationModal } from '../components/SimulationModal';
