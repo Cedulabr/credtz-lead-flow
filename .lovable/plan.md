@@ -1,80 +1,59 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Plano: Expandir BaseOffClient com todos os 59 campos da API
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Problema
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+A interface `BaseOffClient` em `types.ts` tem apenas ~18 campos, mas a Edge Function ja retorna ~45+ campos do banco externo. O hook `useOptimizedSearch` descarta a maioria dos campos na transformacao (linhas 92-116), e os componentes `ClienteHeader` e `ClienteDetalheView` so exibem um subconjunto minimo.
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+### Alteracoes
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+**1. `src/modules/baseoff/types.ts`** - Expandir `BaseOffClient`
 
----
+Adicionar todos os campos retornados pela Edge Function:
+- Beneficio: `dib`, `ddb`, `bloqueio`, `pensao_alimenticia`, `representante`
+- Bancarios: `agencia_pagto`, `orgao_pagador`, `conta_corrente`, `meio_pagto`
+- RMC/RCC: `banco_rmc`, `valor_rmc`, `banco_rcc`, `valor_rcc`
+- Endereco: `bairro`, `cep`, `endereco`, `logr_tipo_1`, `logr_titulo_1`, `logr_nome_1`, `logr_numero_1`, `logr_complemento_1`, `bairro_1`, `cidade_1`, `uf_1`, `cep_1`
+- Contato extra: `tel_cel_3`, `tel_fixo_2`, `tel_fixo_3`, `email_2`, `email_3`
+- Contratos inline: `contratos` array, `credit_opportunities` object
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+Adicionar interface `BaseOffCreditOpportunities` e `BaseOffInlineContract`.
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+Atualizar `BaseOffContract` para incluir campo `competencia`.
 
-**Arquitetura:**
+**2. `src/modules/baseoff/hooks/useOptimizedSearch.ts`** - Preservar todos os campos
 
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
-```
+Substituir o mapeamento manual (linhas 92-116) por spread do objeto da API (`...row`), mantendo apenas o calculo de `status`.
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+**3. `src/modules/baseoff/components/ClienteHeader.tsx`** - Exibir campos adicionais
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+Adicionar secoes:
+- Dados do Beneficio: DIB, DDB, Bloqueio, Pensao Alimenticia, Representante
+- Dados Bancarios completos: Agencia, Orgao Pagador, Conta Corrente, Meio Pagamento, Banco RMC/RCC, Valor RMC/RCC
+- Endereco completo: Logradouro, Bairro, Cidade, UF, CEP (ambos enderecos)
 
----
+Layout em 3 colunas no desktop.
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
+**4. `src/modules/baseoff/views/ClienteDetalheView.tsx`** - Usar contratos inline
 
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
+Quando `client.contratos` existir (vindo da API externa), usar diretamente ao inves de buscar de `baseoff_contracts`. Isso elimina a query vazia que retorna 0 contratos.
 
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+Atualizar `telefones` para incluir `tel_cel_3`, `tel_fixo_2`, `tel_fixo_3`.
 
----
+**5. `src/modules/baseoff/components/MargemCards.tsx`** - Usar valor_rmc/valor_rcc
 
-### Arquivos a modificar
+Passar `valor_rmc` e `valor_rcc` do client para os cards de Margem Cartao e Cartao Beneficio.
 
-| Arquivo | Mudanca |
+### Resumo de arquivos
+
+| Arquivo | Acao |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
+| `src/modules/baseoff/types.ts` | Expandir interfaces com todos os campos |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Spread completo dos dados da API |
+| `src/modules/baseoff/components/ClienteHeader.tsx` | Exibir todos os dados em 3 colunas |
+| `src/modules/baseoff/views/ClienteDetalheView.tsx` | Usar contratos inline, telefones extras |
+| `src/modules/baseoff/components/MargemCards.tsx` | Integrar RMC/RCC do client |
 
----
-
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+Nenhuma migracao SQL necessaria. Nenhuma alteracao na Edge Function.
 
