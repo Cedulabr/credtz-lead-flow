@@ -60,10 +60,10 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
           {/* Main Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h2 className="text-xl font-bold truncate">{client.nome}</h2>
+              <h2 className="text-2xl font-bold truncate">{client.nome}</h2>
               <StatusBadge status={client.status || 'simulado'} />
               {age && (
-                <Badge variant="secondary" className="text-sm font-semibold">
+                <Badge variant="secondary" className="text-sm py-1 px-3 font-semibold">
                   {age} anos
                 </Badge>
               )}
