@@ -1,28 +1,80 @@
 
 
-## Plano: Corrigir filtros de Empresa/Colaborador no Historico e garantir PDF funcional
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Problema identificado
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-Os filtros de **Empresa** e **Colaborador** na aba Historico nao funcionam porque a query na linha 70 de `MyHistory.tsx` usa um JOIN direto entre `user_companies` e `profiles` via `profiles:user_id(...)`, que falha com erro 400:
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
+
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+
+---
+
+### 2. Conectar Base OFF ao PostgreSQL externo
+
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+
+**Arquitetura:**
+
+```text
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
 ```
-"Could not find a relationship between 'user_companies' and 'user_id' in the schema cache"
-```
 
-Isso faz com que `companyUsers` fique sempre vazio, os selects nao mostram colaboradores, e o botao "Gerar PDF" so aparece quando um colaborador esta selecionado (condicao `showPdf = !showAllUsers`).
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
 
-### Alteracoes
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
 
-**Arquivo: `src/components/TimeClock/MyHistory.tsx`**
+---
 
-1. **Corrigir query de usuarios** (linhas 65-87): Substituir o JOIN `profiles:user_id(...)` pelo padrao de busca em duas etapas:
-   - Etapa 1: buscar `user_id` de `user_companies` com filtro de empresa
-   - Etapa 2: buscar `id, name, email` de `profiles` usando `.in('id', userIds)`
+### 3. Simplificar modulo Base OFF - apenas Consulta
 
-2. **Mostrar botao PDF sempre que houver um usuario selecionado OU quando for o proprio usuario**: Atualmente o PDF so aparece quando `showAllUsers` e false. Manter essa logica mas garantir que funcione apos a correcao dos filtros.
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
 
-3. **Corrigir `loadSchedules`** (linhas 102-131): Mesma dependencia de `companyUsers` que pode estar vazio - garantir que a funcao e chamada apos os usuarios serem carregados.
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
 
-Apenas 1 arquivo modificado. Nenhuma migracao SQL necessaria.
+---
+
+### Arquivos a modificar
+
+| Arquivo | Mudanca |
+|---|---|
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
+
+---
+
+### Pergunta necessaria
+
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 
