@@ -91,8 +91,10 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
           return {
             ...row,
             status,
-            total_contracts: row.total_contracts || 0,
+            total_contracts: row.contratos?.length || row.contracts?.length || row.total_contracts || 0,
             contracts: row.contracts || [],
+            contratos: row.contratos || [],
+            telefones: row.telefones || [],
             credit_opportunities: row.credit_opportunities || null,
           };
         });

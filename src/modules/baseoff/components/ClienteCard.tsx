@@ -69,7 +69,7 @@ export function ClienteCard({ client, onClick }: ClienteCardProps) {
             <StatusBadge status={status} size="sm" />
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <FileText className="w-3.5 h-3.5" />
-              <span>{client.total_contracts || 0} contratos</span>
+              <span>{contractCount} contratos</span>
             </div>
           </div>
         </div>

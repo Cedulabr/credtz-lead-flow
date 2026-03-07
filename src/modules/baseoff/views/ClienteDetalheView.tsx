@@ -96,27 +96,39 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
     fetchContracts();
   }, [fetchContracts]);
 
-  // Build phone list with validation - include all phones
+  // Build phone list - prefer `telefones` array from API, fallback to individual fields
   const telefones = useMemo(() => {
     const phones: { numero: string; tipo: 'celular' | 'fixo'; principal?: boolean; valido?: boolean }[] = [];
     
-    const addPhone = (phone: string | null, tipo: 'celular' | 'fixo', isPrincipal: boolean = false) => {
-      if (!phone) return;
-      const validation = validatePhone(phone);
-      phones.push({
-        numero: phone,
-        tipo: validation.tipo === 'celular' ? 'celular' : tipo,
-        principal: isPrincipal,
-        valido: validation.isValid,
+    if (client.telefones && client.telefones.length > 0) {
+      client.telefones.forEach((phone, index) => {
+        if (!phone) return;
+        const validation = validatePhone(phone);
+        phones.push({
+          numero: phone,
+          tipo: validation.tipo === 'celular' ? 'celular' : 'fixo',
+          principal: index === 0,
+          valido: validation.isValid,
+        });
       });
-    };
-
-    addPhone(client.tel_cel_1, 'celular', true);
-    addPhone(client.tel_cel_2, 'celular');
-    addPhone(client.tel_cel_3, 'celular');
-    addPhone(client.tel_fixo_1, 'fixo');
-    addPhone(client.tel_fixo_2, 'fixo');
-    addPhone(client.tel_fixo_3, 'fixo');
+    } else {
+      const addPhone = (phone: string | null, tipo: 'celular' | 'fixo', isPrincipal: boolean = false) => {
+        if (!phone) return;
+        const validation = validatePhone(phone);
+        phones.push({
+          numero: phone,
+          tipo: validation.tipo === 'celular' ? 'celular' : tipo,
+          principal: isPrincipal,
+          valido: validation.isValid,
+        });
+      };
+      addPhone(client.tel_cel_1, 'celular', true);
+      addPhone(client.tel_cel_2, 'celular');
+      addPhone(client.tel_cel_3, 'celular');
+      addPhone(client.tel_fixo_1, 'fixo');
+      addPhone(client.tel_fixo_2, 'fixo');
+      addPhone(client.tel_fixo_3, 'fixo');
+    }
     
     return phones;
   }, [client]);
