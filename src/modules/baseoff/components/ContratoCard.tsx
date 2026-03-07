@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { BaseOffContract, ClientStatus } from '../types';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency, formatDate, calculateInstallments } from '../utils';
+import { formatCurrency, formatDate, calculateInstallments, calcSaldoDevedor } from '../utils';
 import { cn } from '@/lib/utils';
 
 interface ContratoCardProps {
