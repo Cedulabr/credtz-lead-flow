@@ -90,7 +90,7 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
     } finally {
       setIsLoading(false);
     }
-  }, [client.id, client.cpf, client.contracts, hasInlineContracts]);
+  }, [client.id, client.cpf, inlineContracts, hasInlineContracts]);
 
   useEffect(() => {
     fetchContracts();
