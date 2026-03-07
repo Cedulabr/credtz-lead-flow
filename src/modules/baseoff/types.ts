@@ -48,19 +48,20 @@ export interface ImportJob {
 
 // Inline contract returned by external API
 export interface BaseOffInlineContract {
-  banco_emprestimo: string;
+  banco_emprestimo?: string;
   contrato: string;
-  vl_emprestimo: number | null;
-  inicio_desconto: string | null;
-  prazo: number | null;
-  vl_parcela: number | null;
-  tipo_emprestimo: string | null;
-  data_averbacao: string | null;
-  situacao_emprestimo: string | null;
-  competencia: string | null;
-  competencia_final: string | null;
-  taxa: number | null;
-  saldo: number | null;
+  vl_emprestimo?: number | null;
+  inicio_desconto?: string | null;
+  prazo?: number | string | null;
+  vl_parcela?: number | string | null;
+  valor_parcela?: number | string | null;
+  tipo_emprestimo?: string | null;
+  data_averbacao?: string | null;
+  situacao_emprestimo?: string | null;
+  competencia?: string | null;
+  competencia_final?: string | null;
+  taxa?: number | string | null;
+  saldo?: number | string | null;
 }
 
 // Credit opportunities calculated by external API
@@ -140,6 +141,8 @@ export interface BaseOffClient {
   status?: ClientStatus;
   last_action?: string;
   contracts?: BaseOffInlineContract[];
+  contratos?: BaseOffInlineContract[];
+  telefones?: string[];
   credit_opportunities?: BaseOffCreditOpportunities | null;
 }
 

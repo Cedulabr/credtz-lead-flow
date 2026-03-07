@@ -36,19 +36,19 @@ function inlineToContract(inline: BaseOffInlineContract, clientId: string, cpf: 
     id: `inline-${index}`,
     client_id: clientId,
     cpf,
-    banco_emprestimo: inline.banco_emprestimo,
+    banco_emprestimo: inline.banco_emprestimo || '',
     contrato: inline.contrato,
-    vl_emprestimo: inline.vl_emprestimo,
-    inicio_desconto: inline.inicio_desconto,
-    prazo: inline.prazo,
-    vl_parcela: inline.vl_parcela,
-    tipo_emprestimo: inline.tipo_emprestimo,
-    data_averbacao: inline.data_averbacao,
-    situacao_emprestimo: inline.situacao_emprestimo,
-    competencia: inline.competencia,
-    competencia_final: inline.competencia_final,
-    taxa: inline.taxa,
-    saldo: inline.saldo,
+    vl_emprestimo: inline.vl_emprestimo ? Number(inline.vl_emprestimo) : null,
+    inicio_desconto: inline.inicio_desconto || null,
+    prazo: inline.prazo ? Number(inline.prazo) : null,
+    vl_parcela: Number(inline.valor_parcela || inline.vl_parcela) || null,
+    tipo_emprestimo: inline.tipo_emprestimo || null,
+    data_averbacao: inline.data_averbacao || null,
+    situacao_emprestimo: inline.situacao_emprestimo || null,
+    competencia: inline.competencia || null,
+    competencia_final: inline.competencia_final || null,
+    taxa: inline.taxa ? Number(inline.taxa) : null,
+    saldo: inline.saldo ? Number(inline.saldo) : null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -64,14 +64,14 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
   const [selectedContractIds, setSelectedContractIds] = useState<string[]>([]);
   const [currentSimulation, setCurrentSimulation] = useState<TrocoSimulation | null>(null);
 
-  const hasInlineContracts = client.contracts && client.contracts.length > 0;
+  const inlineContracts = client.contratos || client.contracts;
+  const hasInlineContracts = inlineContracts && inlineContracts.length > 0;
 
   const fetchContracts = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Use inline contracts from API if available
       if (hasInlineContracts) {
-        const mapped = client.contracts!.map((c, i) => inlineToContract(c, client.id, client.cpf, i));
+        const mapped = inlineContracts!.map((c, i) => inlineToContract(c, client.id, client.cpf, i));
         setContracts(mapped);
       } else {
         // Fallback: query from Supabase
@@ -90,33 +90,45 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
     } finally {
       setIsLoading(false);
     }
-  }, [client.id, client.cpf, client.contracts, hasInlineContracts]);
+  }, [client.id, client.cpf, inlineContracts, hasInlineContracts]);
 
   useEffect(() => {
     fetchContracts();
   }, [fetchContracts]);
 
-  // Build phone list with validation - include all phones
+  // Build phone list - prefer `telefones` array from API, fallback to individual fields
   const telefones = useMemo(() => {
     const phones: { numero: string; tipo: 'celular' | 'fixo'; principal?: boolean; valido?: boolean }[] = [];
     
-    const addPhone = (phone: string | null, tipo: 'celular' | 'fixo', isPrincipal: boolean = false) => {
-      if (!phone) return;
-      const validation = validatePhone(phone);
-      phones.push({
-        numero: phone,
-        tipo: validation.tipo === 'celular' ? 'celular' : tipo,
-        principal: isPrincipal,
-        valido: validation.isValid,
+    if (client.telefones && client.telefones.length > 0) {
+      client.telefones.forEach((phone, index) => {
+        if (!phone) return;
+        const validation = validatePhone(phone);
+        phones.push({
+          numero: phone,
+          tipo: validation.tipo === 'celular' ? 'celular' : 'fixo',
+          principal: index === 0,
+          valido: validation.isValid,
+        });
       });
-    };
-
-    addPhone(client.tel_cel_1, 'celular', true);
-    addPhone(client.tel_cel_2, 'celular');
-    addPhone(client.tel_cel_3, 'celular');
-    addPhone(client.tel_fixo_1, 'fixo');
-    addPhone(client.tel_fixo_2, 'fixo');
-    addPhone(client.tel_fixo_3, 'fixo');
+    } else {
+      const addPhone = (phone: string | null, tipo: 'celular' | 'fixo', isPrincipal: boolean = false) => {
+        if (!phone) return;
+        const validation = validatePhone(phone);
+        phones.push({
+          numero: phone,
+          tipo: validation.tipo === 'celular' ? 'celular' : tipo,
+          principal: isPrincipal,
+          valido: validation.isValid,
+        });
+      };
+      addPhone(client.tel_cel_1, 'celular', true);
+      addPhone(client.tel_cel_2, 'celular');
+      addPhone(client.tel_cel_3, 'celular');
+      addPhone(client.tel_fixo_1, 'fixo');
+      addPhone(client.tel_fixo_2, 'fixo');
+      addPhone(client.tel_fixo_3, 'fixo');
+    }
     
     return phones;
   }, [client]);
