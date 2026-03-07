@@ -1,80 +1,157 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Plano: Evolucao Completa do Modulo Controle de Ponto
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Diagnostico do Estado Atual
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+O modulo ja possui uma estrutura solida com 8 subcomponentes. Os problemas sao pontuais:
 
-| Modulo | Chave | Faltando |
+| Funcionalidade | Estado Atual | Problema |
 |---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+| PDF mensal | Existe (`TimeClockPDF`) | Falta CPF, cargo, coluna pausa/atraso |
+| Pausas | Funciona parcialmente | So considera 1 pausa por dia |
+| Atrasos | Hardcoded `08:10` no dashboard | Nao usa jornada do colaborador |
+| Jornadas | `ScheduleManager` existe | Funciona por usuario, nao por template |
+| Relatorios | PDF basico no `AdminControl` | Falta relatorios de pausas, HE, presenca |
+| Banco de horas | Nao existe | Precisa criar |
+| Justificativas | `JustificationManager` existe | Falta upload de atestado |
+| Dashboard presenca | `ManagerDashboard` existe | Falta status "em pausa" |
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+### Alteracoes Planejadas
+
+Devido ao tamanho, o trabalho sera dividido em etapas incrementais. Abaixo o plano completo:
 
 ---
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+**Etapa 1: Corrigir calculo de pausas e atrasos (core logic)**
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+Arquivo: `src/components/TimeClock/MyHistory.tsx`
+- Alterar `groupByDate()` para somar TODAS as pausas do dia (multiplos pares pausa_inicio/pausa_fim), nao apenas a primeira
+- Calcular atraso comparando hora de entrada com a jornada do colaborador (buscar de `time_clock_schedules`)
 
-**Arquitetura:**
+Arquivo: `src/components/TimeClock/ManagerDashboard.tsx`
+- Remover hardcode `08:10` na linha 184
+- Buscar jornada de cada colaborador via `time_clock_schedules` e usar `entry_time + tolerance_minutes` para calcular atraso
+- Adicionar status `on_break` (em pausa) quando ha `pausa_inicio` sem `pausa_fim`
+- Adicionar card "Em Pausa" no dashboard de estatisticas
 
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
+Arquivo: `src/hooks/useTimeClock.ts`
+- Criar funcao `calculateDayMetrics(records, schedule)` que retorna: `{ workedMinutes, breakMinutes, delayMinutes, overtimeMinutes, status }`
+
+---
+
+**Etapa 2: Melhorar PDF mensal**
+
+Arquivo: `src/components/TimeClock/TimeClockPDF.tsx`
+- Adicionar busca de CPF e cargo do colaborador via `profiles`
+- Adicionar colunas no PDF mensal: "Pausas" (tempo total) e "Atraso" (minutos)
+- Usar jornada do colaborador para calcular atraso por dia
+- Melhorar rodape com: Total horas extras, Total atrasos, Total faltas, Banco de horas
+- Adicionar campo CPF e Cargo no cabecalho do colaborador
+
+---
+
+**Etapa 3: Jornadas como templates + escala semanal**
+
+A tabela `time_clock_schedules` ja tem `work_days`, `entry_time`, `exit_time`, `lunch_start`, `lunch_end`, `tolerance_minutes`. Ja suporta jornadas personalizadas por colaborador com dias da semana.
+
+Arquivo: `src/components/TimeClock/ScheduleManager.tsx`
+- Adicionar campo "Nome da Jornada" para facilitar identificacao
+- Permitir duplicar jornada para outro colaborador
+- Melhorar UX mostrando resumo visual da escala semanal
+
+Migracao SQL:
+```sql
+ALTER TABLE time_clock_schedules ADD COLUMN IF NOT EXISTS schedule_name text DEFAULT 'Jornada Padrao';
 ```
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+---
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+**Etapa 4: Banco de horas**
+
+Migracao SQL:
+```sql
+CREATE TABLE IF NOT EXISTS time_clock_hour_bank (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  company_id uuid REFERENCES companies(id),
+  reference_month text NOT NULL, -- '2026-03'
+  expected_minutes integer NOT NULL DEFAULT 0,
+  worked_minutes integer NOT NULL DEFAULT 0,
+  balance_minutes integer NOT NULL DEFAULT 0, -- positivo = extra, negativo = devedor
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(user_id, reference_month)
+);
+ALTER TABLE time_clock_hour_bank ENABLE ROW LEVEL SECURITY;
+```
+
+Criar novo componente: `src/components/TimeClock/HourBank.tsx`
+- Exibir saldo de horas por mes (positivo/negativo)
+- Calcular automaticamente baseado nos registros do mes vs jornada esperada
+- Mostrar acumulado geral
+
+Adicionar aba "Banco de Horas" no `index.tsx`
 
 ---
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
+**Etapa 5: Relatorios avancados**
 
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
+Criar novo componente: `src/components/TimeClock/Reports.tsx`
 
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+4 tipos de relatorio com filtro por empresa, colaborador, periodo:
+1. **Atrasos**: lista de atrasos por colaborador com minutos e total
+2. **Pausas**: tempo total de pausas por dia/colaborador
+3. **Horas extras**: dias com HE, total por colaborador
+4. **Presenca mensal**: grid mes completo com status por dia
+
+Cada relatorio exportavel em:
+- PDF (jsPDF, ja disponivel)
+- Excel (xlsx, ja disponivel)
+
+Adicionar aba "Relatorios" no `index.tsx` para gestores/admin
 
 ---
 
-### Arquivos a modificar
+**Etapa 6: Upload de atestado nas justificativas**
 
-| Arquivo | Mudanca |
+Arquivo: `src/components/TimeClock/JustificationManager.tsx`
+- Adicionar campo de upload de arquivo (imagem/PDF) no modal de criacao
+- Fazer upload para Supabase Storage bucket `time-clock-documents`
+- Salvar URL no campo `attachment_url` (ja existe na tabela)
+- Exibir preview/link do documento na revisao
+
+---
+
+**Etapa 7: Atualizar navegacao do modulo**
+
+Arquivo: `src/components/TimeClock/index.tsx`
+- Adicionar abas: "Banco de Horas" e "Relatorios" para gestores
+- Reorganizar tabs para melhor UX
+
+---
+
+### Resumo de arquivos modificados
+
+| Arquivo | Acao |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
+| `src/hooks/useTimeClock.ts` | Adicionar `calculateDayMetrics()` |
+| `src/components/TimeClock/MyHistory.tsx` | Corrigir calculo multiplas pausas |
+| `src/components/TimeClock/ManagerDashboard.tsx` | Usar jornada real, status "em pausa" |
+| `src/components/TimeClock/TimeClockPDF.tsx` | CPF, cargo, pausas, atraso, banco horas |
+| `src/components/TimeClock/ScheduleManager.tsx` | Nome da jornada, duplicar |
+| `src/components/TimeClock/JustificationManager.tsx` | Upload de atestado |
+| `src/components/TimeClock/HourBank.tsx` | **Novo** - banco de horas |
+| `src/components/TimeClock/Reports.tsx` | **Novo** - relatorios avancados |
+| `src/components/TimeClock/index.tsx` | Novas abas |
 
----
+### Migracoes SQL
 
-### Pergunta necessaria
+1. `ALTER TABLE time_clock_schedules ADD COLUMN schedule_name text`
+2. `CREATE TABLE time_clock_hour_bank` com RLS
+3. Criar bucket `time-clock-documents` no Storage (se nao existir)
 
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+### Ordem de implementacao
+
+Etapas 1-2 primeiro (core fixes), depois 3-7 incrementalmente. Total estimado: ~7 arquivos modificados, 2 novos componentes, 2 migracoes.
 
