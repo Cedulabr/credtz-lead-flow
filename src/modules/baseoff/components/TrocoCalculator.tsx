@@ -365,9 +365,14 @@ export function TrocoCalculator({
   const showContractBasedUI = operationType === 'portabilidade' || operationType === 'refinanciamento';
   const currentResults = showContractBasedUI ? rateResults : novoEmprestimoResults;
 
-  // Find best result across all
+  // Best result = highest viable rate (for commission)
   const bestResult = currentResults.length > 0 
-    ? currentResults.reduce((a, b) => a.trocoLiquido > b.trocoLiquido ? a : b) 
+    ? (() => {
+        const viable = currentResults.filter(r => r.trocoLiquido > 0);
+        return viable.length > 0
+          ? viable.reduce((a, b) => a.taxa > b.taxa ? a : b)
+          : currentResults.reduce((a, b) => a.trocoLiquido > b.trocoLiquido ? a : b);
+      })()
     : null;
 
   return (
