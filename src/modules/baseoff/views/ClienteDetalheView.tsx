@@ -38,7 +38,7 @@ function inlineToContract(inline: BaseOffInlineContract, clientId: string, cpf: 
     cpf,
     banco_emprestimo: inline.banco_emprestimo || '',
     contrato: inline.contrato,
-    vl_emprestimo: inline.vl_emprestimo ? Number(inline.vl_emprestimo) : null,
+    vl_emprestimo: Number(inline.valor_emprestimo || inline.vl_emprestimo) || null,
     inicio_desconto: inline.inicio_desconto || null,
     prazo: inline.prazo ? Number(inline.prazo) : null,
     vl_parcela: Number(inline.valor_parcela || inline.vl_parcela) || null,

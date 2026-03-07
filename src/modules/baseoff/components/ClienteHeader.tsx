@@ -3,7 +3,6 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { 
-  User, 
   Calendar, 
   MapPin, 
   Building, 
@@ -14,11 +13,12 @@ import {
   Shield,
   Home,
   Landmark,
-  Banknote
+  Banknote,
+  User
 } from 'lucide-react';
 import { BaseOffClient } from '../types';
 import { StatusBadge } from './StatusBadge';
-import { formatCPFFull, formatDate, formatCurrency } from '../utils';
+import { formatCPFFull, formatDate, formatCurrency, parseBRDate } from '../utils';
 import { toast } from 'sonner';
 
 interface ClienteHeaderProps {
@@ -33,7 +33,8 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
 
   const calculateAge = (birthDate: string | null): number | null => {
     if (!birthDate) return null;
-    const birth = new Date(birthDate);
+    const birth = parseBRDate(birthDate);
+    if (!birth) return null;
     const today = new Date();
     let age = today.getFullYear() - birth.getFullYear();
     const m = today.getMonth() - birth.getMonth();
@@ -45,7 +46,6 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
 
   const age = calculateAge(client.data_nascimento);
 
-  // Build full address string
   const buildAddress = () => {
     const parts = [
       client.logr_tipo_1,
@@ -58,101 +58,80 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
     return client.endereco;
   };
 
+  const contractCount = client.contratos?.length || client.total_contracts || 0;
+
   return (
-    <Card className="p-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-      {/* Header Row */}
-      <div className="flex items-start justify-between gap-4 mb-6">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center shrink-0">
-            <User className="w-8 h-8 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold">{client.nome}</h2>
-            <div className="flex items-center gap-3 mt-1 flex-wrap">
-              <span className="text-muted-foreground font-mono text-lg">
-                {formatCPFFull(client.cpf)}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => copyToClipboard(client.cpf, 'CPF')}
-              >
-                <Copy className="w-4 h-4" />
-              </Button>
-              <StatusBadge status={client.status || 'simulado'} />
-            </div>
-          </div>
+    <Card className="p-5 border">
+      {/* Top Row: Name, CPF, NB inline */}
+      <div className="flex flex-wrap items-center gap-3 mb-4 pb-4 border-b border-border/50">
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-bold">{client.nome}</h2>
+          <StatusBadge status={client.status || 'simulado'} />
         </div>
-        <Badge variant="outline" className="text-base px-4 py-2 bg-background">
-          {client.total_contracts || 0} contratos
-        </Badge>
+
+        <div className="flex items-center gap-4 ml-auto flex-wrap">
+          <CopyChip label="CPF" value={formatCPFFull(client.cpf)} rawValue={client.cpf} onCopy={copyToClipboard} />
+          <CopyChip label="NB" value={client.nb} rawValue={client.nb} onCopy={copyToClipboard} />
+          <Badge variant="outline" className="text-sm px-3 py-1.5">
+            {contractCount} contrato{contractCount !== 1 ? 's' : ''}
+          </Badge>
+        </div>
       </div>
 
       {/* Three Column Layout */}
-      <div className="grid md:grid-cols-3 gap-6">
-        {/* Column 1 - Personal & Benefit Info */}
-        <div className="space-y-4">
-          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            <User className="w-4 h-4" />
-            Dados Pessoais / Benefício
-          </h3>
-          <div className="grid gap-2">
-            <InfoRow icon={Calendar} label="Nascimento" value={client.data_nascimento ? `${formatDate(client.data_nascimento)}${age ? ` (${age} anos)` : ''}` : null} />
-            <InfoRow icon={User} label="Sexo" value={client.sexo} />
-            <InfoRow icon={User} label="Nome da Mãe" value={client.nome_mae} />
-            <InfoRow icon={Hash} label="NB" value={client.nb} />
-            <InfoRow icon={FileText} label="Espécie" value={client.esp} />
-            <InfoRow icon={Calendar} label="DIB" value={formatDate(client.dib)} />
-            <InfoRow icon={Calendar} label="DDB" value={formatDate(client.ddb)} />
-            <InfoRow icon={FileText} label="Situação" value={client.status_beneficio} />
-            <InfoRow icon={Shield} label="Bloqueio" value={client.bloqueio} />
-            <InfoRow icon={FileText} label="Pensão" value={client.pensao_alimenticia} />
-            <InfoRow icon={User} label="Representante" value={client.representante} />
+      <div className="grid md:grid-cols-3 gap-5">
+        {/* Column 1 - Personal & Benefit */}
+        <div className="space-y-2">
+          <SectionTitle icon={User} title="Dados Pessoais / Benefício" />
+          <div className="grid gap-1">
+            <InfoRow label="Nascimento" value={client.data_nascimento ? `${formatDate(client.data_nascimento)}${age ? ` (${age} anos)` : ''}` : null} />
+            <InfoRow label="Sexo" value={client.sexo} />
+            <InfoRow label="Nome da Mãe" value={client.nome_mae} />
+            <InfoRow label="Espécie" value={client.esp} />
+            <InfoRow label="DIB" value={formatDate(client.dib)} />
+            <InfoRow label="DDB" value={formatDate(client.ddb)} />
+            <InfoRow label="Situação" value={client.status_beneficio} />
+            <InfoRow label="Bloqueio" value={client.bloqueio} />
+            <InfoRow label="Pensão" value={client.pensao_alimenticia} />
+            <InfoRow label="Representante" value={client.representante} />
           </div>
         </div>
 
-        {/* Column 2 - Banking Info */}
-        <div className="space-y-4">
-          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            <Landmark className="w-4 h-4" />
-            Dados Bancários
-          </h3>
-          <div className="grid gap-2">
-            <InfoRow icon={Building} label="Banco Pagto" value={client.banco_pagto} />
-            <InfoRow icon={Hash} label="Agência" value={client.agencia_pagto} />
-            <InfoRow icon={Hash} label="Conta Corrente" value={client.conta_corrente} />
-            <InfoRow icon={FileText} label="Meio Pagto" value={client.meio_pagto} />
-            <InfoRow icon={Building} label="Órgão Pagador" value={client.orgao_pagador} />
-            <InfoRow icon={Banknote} label="MR" value={client.mr ? formatCurrency(client.mr) : null} />
-            <InfoRow icon={CreditCard} label="Banco RMC" value={client.banco_rmc} />
-            <InfoRow icon={Banknote} label="Valor RMC" value={client.valor_rmc ? formatCurrency(client.valor_rmc) : null} />
-            <InfoRow icon={CreditCard} label="Banco RCC" value={client.banco_rcc} />
-            <InfoRow icon={Banknote} label="Valor RCC" value={client.valor_rcc ? formatCurrency(client.valor_rcc) : null} />
+        {/* Column 2 - Banking */}
+        <div className="space-y-2">
+          <SectionTitle icon={Landmark} title="Dados Bancários" />
+          <div className="grid gap-1">
+            <InfoRow label="Banco Pagto" value={client.banco_pagto} />
+            <InfoRow label="Agência" value={client.agencia_pagto} />
+            <InfoRow label="Conta Corrente" value={client.conta_corrente} />
+            <InfoRow label="Meio Pagto" value={client.meio_pagto} />
+            <InfoRow label="Órgão Pagador" value={client.orgao_pagador} />
+            <InfoRow label="MR" value={client.mr ? formatCurrency(client.mr) : null} />
+            <InfoRow label="Banco RMC" value={client.banco_rmc} />
+            <InfoRow label="Valor RMC" value={client.valor_rmc ? formatCurrency(client.valor_rmc) : null} />
+            <InfoRow label="Banco RCC" value={client.banco_rcc} />
+            <InfoRow label="Valor RCC" value={client.valor_rcc ? formatCurrency(client.valor_rcc) : null} />
           </div>
         </div>
 
-        {/* Column 3 - Address Info */}
-        <div className="space-y-4">
-          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            <Home className="w-4 h-4" />
-            Endereço
-          </h3>
-          <div className="grid gap-2">
-            <InfoRow icon={MapPin} label="Endereço" value={buildAddress()} />
-            <InfoRow icon={MapPin} label="Bairro" value={client.bairro || client.bairro_1} />
-            <InfoRow icon={MapPin} label="Município" value={client.municipio || client.cidade_1} />
-            <InfoRow icon={MapPin} label="UF" value={client.uf || client.uf_1} />
-            <InfoRow icon={MapPin} label="CEP" value={client.cep || client.cep_1} />
+        {/* Column 3 - Address */}
+        <div className="space-y-2">
+          <SectionTitle icon={Home} title="Endereço" />
+          <div className="grid gap-1">
+            <InfoRow label="Endereço" value={buildAddress()} />
+            <InfoRow label="Bairro" value={client.bairro || client.bairro_1} />
+            <InfoRow label="Município" value={client.municipio || client.cidade_1} />
+            <InfoRow label="UF" value={client.uf || client.uf_1} />
+            <InfoRow label="CEP" value={client.cep || client.cep_1} />
             {client.bairro_1 && client.bairro && client.bairro_1 !== client.bairro && (
               <>
                 <div className="pt-2 border-t border-border/50">
                   <span className="text-xs text-muted-foreground font-semibold">Endereço Alternativo</span>
                 </div>
-                <InfoRow icon={MapPin} label="Bairro" value={client.bairro_1} />
-                <InfoRow icon={MapPin} label="Cidade" value={client.cidade_1} />
-                <InfoRow icon={MapPin} label="UF" value={client.uf_1} />
-                <InfoRow icon={MapPin} label="CEP" value={client.cep_1} />
+                <InfoRow label="Bairro" value={client.bairro_1} />
+                <InfoRow label="Cidade" value={client.cidade_1} />
+                <InfoRow label="UF" value={client.uf_1} />
+                <InfoRow label="CEP" value={client.cep_1} />
               </>
             )}
           </div>
@@ -162,33 +141,40 @@ export function ClienteHeader({ client }: ClienteHeaderProps) {
   );
 }
 
-function InfoRow({ 
-  icon: Icon, 
-  label, 
-  value 
-}: { 
-  icon: React.ElementType;
-  label: string; 
-  value: string | number | null | undefined;
-}) {
-  if (!value || value === '---') {
-    return (
-      <div className="flex items-center justify-between py-1.5 border-b border-border/30">
-        <span className="text-muted-foreground flex items-center gap-2 text-xs">
-          <Icon className="w-3.5 h-3.5" />
-          {label}
-        </span>
-        <span className="text-muted-foreground/50 text-xs">---</span>
-      </div>
-    );
-  }
+function SectionTitle({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
   return (
-    <div className="flex items-center justify-between py-1.5 border-b border-border/30">
-      <span className="text-muted-foreground flex items-center gap-2 text-xs">
-        <Icon className="w-3.5 h-3.5" />
-        {label}
+    <h3 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-border/40">
+      <Icon className="w-3.5 h-3.5" />
+      {title}
+    </h3>
+  );
+}
+
+function CopyChip({ label, value, rawValue, onCopy }: { label: string; value: string; rawValue: string; onCopy: (text: string, label: string) => void }) {
+  return (
+    <div className="flex items-center gap-1.5 bg-muted/50 rounded-md px-2.5 py-1">
+      <span className="text-xs text-muted-foreground">{label}:</span>
+      <span className="font-mono text-sm font-medium">{value}</span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6"
+        onClick={() => onCopy(rawValue, label)}
+      >
+        <Copy className="w-3 h-3" />
+      </Button>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string | number | null | undefined }) {
+  const isEmpty = !value || value === '---';
+  return (
+    <div className="flex items-center justify-between py-1 border-b border-border/20">
+      <span className="text-muted-foreground text-xs">{label}</span>
+      <span className={`text-xs text-right max-w-[60%] truncate ${isEmpty ? 'text-muted-foreground/40' : 'font-medium'}`}>
+        {isEmpty ? '---' : value}
       </span>
-      <span className="font-medium text-sm text-right max-w-[60%] truncate">{value}</span>
     </div>
   );
 }
