@@ -253,32 +253,19 @@ export function TrocoCalculator({
   const rateResults = useMemo<RateResult[]>(() => {
     if ((operationType !== 'portabilidade' && operationType !== 'refinanciamento') || 
         selectedContracts.length === 0 || totals.saldoTotal <= 0) return [];
-    return allRates.map(taxa => {
+    return bankRates.map(({ taxa, nome }) => {
       const saldo = totals.saldoTotal;
-      if (operationType === 'portabilidade') {
-        const novaParcela = totals.parcelaTotal;
-        const valorContrato = calcPVDiario(novaParcela, taxa, prazo, diasAtePrimeiraParcela);
-        const iof = calcIOFFederal(valorContrato, prazo);
-        const valorLiberado = valorContrato - iof;
-        const trocoBruto = valorContrato - saldo - iof;
-        const totalOperacao = novaParcela * prazo;
-        const cetM = calcCETMensal(valorLiberado, novaParcela, prazo);
-        const cetA = Math.pow(1 + cetM, 12) - 1;
-        return { taxa, novaParcela, valorContrato, iof, valorLiberado, trocoBruto, trocoLiquido: trocoBruto, cetMensal: cetM * 100, cetAnual: cetA * 100, totalOperacao };
-      } else {
-        // Refinanciamento: mantém parcela atual e calcula PV no novo prazo/taxa
-        const novaParcela = totals.parcelaTotal;
-        const valorContrato = calcPVDiario(novaParcela, taxa, prazo, diasAtePrimeiraParcela);
-        const iof = calcIOFFederal(valorContrato, prazo);
-        const valorLiberado = valorContrato - iof;
-        const trocoBruto = valorContrato - saldo - iof;
-        const totalOperacao = novaParcela * prazo;
-        const cetM = calcCETMensal(valorLiberado, novaParcela, prazo);
-        const cetA = Math.pow(1 + cetM, 12) - 1;
-        return { taxa, novaParcela, valorContrato, iof, valorLiberado, trocoBruto, trocoLiquido: trocoBruto, cetMensal: cetM * 100, cetAnual: cetA * 100, totalOperacao };
-      }
+      const novaParcela = totals.parcelaTotal;
+      const valorContrato = calcPVDiario(novaParcela, taxa, prazo, diasAtePrimeiraParcela);
+      const iof = calcIOFFederal(valorContrato, prazo);
+      const valorLiberado = valorContrato - iof;
+      const trocoBruto = valorContrato - saldo - iof;
+      const totalOperacao = novaParcela * prazo;
+      const cetM = calcCETMensal(valorLiberado, novaParcela, prazo);
+      const cetA = Math.pow(1 + cetM, 12) - 1;
+      return { taxa, bancoNome: nome, novaParcela, valorContrato, iof, valorLiberado, trocoBruto, trocoLiquido: trocoBruto, cetMensal: cetM * 100, cetAnual: cetA * 100, totalOperacao };
     });
-  }, [allRates, prazo, selectedContracts, totals, operationType, diasAtePrimeiraParcela]);
+  }, [bankRates, prazo, selectedContracts, totals, operationType, diasAtePrimeiraParcela]);
 
   const novoEmprestimoResults = useMemo<RateResult[]>(() => {
     if (operationType !== 'novo_emprestimo' || !margemLivre || margemLivre <= 0) return [];
