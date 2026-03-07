@@ -610,30 +610,32 @@ export function TrocoCalculator({
           {operationType === 'novo_emprestimo' && (
             <>
               {margemLivre && margemLivre > 0 ? (
-                <div className="border rounded-lg overflow-auto">
-                  <div className="px-3 py-2 bg-muted/30 text-sm">
+                <div className="rounded-xl border overflow-hidden">
+                  <div className="px-4 py-2 bg-muted/30 text-sm border-b">
                     Margem livre disponível: <strong className="text-emerald-600">{formatCurrency(margemLivre)}</strong> /mês
                   </div>
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-muted/50">
+                      <TableRow className="bg-muted/30">
                         <TableHead className="text-xs font-semibold">Taxa a.m.</TableHead>
                         <TableHead className="text-xs font-semibold text-right">Parcela</TableHead>
                         <TableHead className="text-xs font-semibold text-right">Vl. Financiado</TableHead>
-                        <TableHead className="text-xs font-semibold text-right">Total Pago</TableHead>
                         <TableHead className="text-xs font-semibold text-right">IOF (~3%)</TableHead>
-                        <TableHead className="text-xs font-semibold text-right">Líquido</TableHead>
+                        <TableHead className="text-xs font-semibold text-right">💰 Líquido</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {novoEmprestimoResults.map((r) => (
-                        <TableRow key={r.taxa} className="hover:bg-muted/30">
+                        <TableRow key={r.taxa} className="hover:bg-muted/20">
                           <TableCell className="font-mono font-semibold text-sm">{r.taxa.toFixed(2)}%</TableCell>
                           <TableCell className="text-right text-sm">{formatCurrency(r.novaParcela)}</TableCell>
                           <TableCell className="text-right text-sm font-medium">{formatCurrency(r.valorContrato)}</TableCell>
-                          <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.totalPago)}</TableCell>
                           <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(r.iof)}</TableCell>
-                          <TableCell className="text-right font-bold text-sm text-emerald-600">{formatCurrency(r.trocoLiquido)}</TableCell>
+                          <TableCell className="text-right font-bold text-sm">
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600">
+                              {formatCurrency(r.trocoLiquido)}
+                            </span>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
