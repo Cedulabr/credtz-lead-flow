@@ -135,3 +135,23 @@ export function calculateProgress(processed: number | null, total: number | null
   if (!total || total === 0) return 0;
   return Math.min(100, Math.round(((processed || 0) / total) * 100));
 }
+
+/**
+ * Calculate paid and remaining installments based on data_averbacao and prazo.
+ */
+export function calculateInstallments(dataAverbacao: string | null | undefined, prazo: number | null | undefined): { pagas: number; restantes: number } {
+  if (!dataAverbacao || !prazo) return { pagas: 0, restantes: prazo || 0 };
+  
+  const parsedDate = parseBRDate(dataAverbacao);
+  if (!parsedDate) return { pagas: 0, restantes: prazo };
+  
+  const now = new Date();
+  const diffYears = now.getFullYear() - parsedDate.getFullYear();
+  const diffMonths = now.getMonth() - parsedDate.getMonth();
+  const totalMonths = diffYears * 12 + diffMonths;
+  
+  const pagas = Math.max(0, Math.min(prazo, totalMonths));
+  const restantes = Math.max(0, prazo - pagas);
+  
+  return { pagas, restantes };
+}

@@ -166,6 +166,9 @@ export interface BaseOffContract {
   saldo: number | null;
   created_at: string;
   updated_at: string;
+  // Calculated fields
+  parcelas_pagas?: number | null;
+  parcelas_restantes?: number | null;
 }
 
 export interface TimelineEvent {
