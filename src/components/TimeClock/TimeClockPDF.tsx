@@ -231,7 +231,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const startDate = `${selectedMonth}-01`;
       const endDate = format(endOfMonth(parseISO(startDate)), 'yyyy-MM-dd');
 
-      const [recordsRes, justRes, scheduleRes, profileRes, salaryRes] = await Promise.all([
+      const [recordsRes, justRes, scheduleRes, profileRes, salaryRes, dayOffsRes] = await Promise.all([
         supabase.from('time_clock').select('*').eq('user_id', userId)
           .gte('clock_date', startDate).lte('clock_date', endDate)
           .order('clock_date', { ascending: true }).order('clock_time', { ascending: true }),
@@ -240,6 +240,8 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).single(),
         supabase.from('profiles').select('name, email, cpf, role').eq('id', userId).single(),
         supabase.from('employee_salaries').select('*').eq('user_id', userId).eq('is_active', true).single(),
+        supabase.from('time_clock_day_offs').select('off_date, off_type').eq('user_id', userId)
+          .gte('off_date', startDate).lte('off_date', endDate),
       ]);
 
       const records = recordsRes.data || [];
@@ -247,6 +249,8 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const schedule = scheduleRes.data;
       const profile = profileRes.data;
       const salary = salaryRes.data;
+      const dayOffMap: Record<string, string> = {};
+      (dayOffsRes.data || []).forEach((d: any) => { dayOffMap[d.off_date] = d.off_type; });
 
       const doc = new jsPDF({ orientation: 'landscape' });
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -436,7 +440,18 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           doc.rect(14, yPos - 3.5, pageWidth - 28, 6, 'F');
         }
 
-        if (entry && exit) {
+        // Check day-off
+        const dayOffType = dayOffMap[dateStr];
+        const DAY_OFF_LABELS: Record<string, string> = {
+          folga: 'FOLGA', feriado: 'FERIADO', licenca: 'LICENÇA', ferias: 'FÉRIAS', abono: 'ABONO',
+        };
+
+        if (dayOffType) {
+          // Day-off row background
+          doc.setFillColor(220, 240, 255);
+          doc.rect(14, yPos - 3.5, pageWidth - 28, 6, 'F');
+          obsText = DAY_OFF_LABELS[dayOffType] || 'FOLGA';
+        } else if (entry && exit) {
           workedMinutes = Math.floor((parseISO(exit.clock_time).getTime() - parseISO(entry.clock_time).getTime()) / 60000);
           workedMinutes -= breakMinutes;
           if (workedMinutes < 0) workedMinutes = 0;
@@ -453,7 +468,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           if (isWorkDay && workedMinutes > expectedDailyMinutes) {
             totalOvertime += workedMinutes - expectedDailyMinutes;
           }
-        } else if (isWorkDay && !entry) {
+        } else if (isWorkDay && !entry && !dayOffType) {
           totalAbsences++;
           obsText = 'FALTA';
         } else if (isWorkDay && entry && !exit) {
@@ -539,7 +554,13 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         doc.text(workedMinutes > 0 ? fmtMinToHM(workedMinutes) : '-', cols.totalHoras, yPos);
 
         // Obs column
-        if (obsText === 'FALTA') {
+        const dayOffLabels = ['FOLGA', 'FERIADO', 'LICENÇA', 'FÉRIAS', 'ABONO'];
+        if (dayOffLabels.includes(obsText)) {
+          doc.setTextColor(59, 130, 246);
+          doc.setFont('helvetica', 'bold');
+          doc.text(obsText, cols.obs, yPos);
+          doc.setFont('helvetica', 'normal');
+        } else if (obsText === 'FALTA') {
           doc.setTextColor(239, 68, 68);
           doc.setFont('helvetica', 'bold');
           doc.text('FALTA', cols.obs, yPos);

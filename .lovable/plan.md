@@ -1,93 +1,80 @@
 
 
-## Plano: Gestao de Folgas, Calculadora de Descontos e Limpeza de Abas
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Problema atual
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-1. Nao existe forma de lancar **folgas, feriados ou licencas** - qualquer dia sem registro e tratado como falta
-2. Nao existe **calculadora de descontos** que consolide horas negativas + faltas e calcule o valor monetario
-3. A aba **"Controle"** (AdminControl) duplica grande parte da aba **"Painel"** (ManagerDashboard) - ambas mostram registros diarios, filtro de empresa/usuario e ajustes
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-### Alteracoes
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
 
-#### 1. Criar tabela `time_clock_day_offs` (migracao SQL)
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+
+---
+
+### 2. Conectar Base OFF ao PostgreSQL externo
+
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+
+**Arquitetura:**
 
 ```text
-Colunas:
-- id uuid PK
-- user_id uuid FK profiles
-- company_id uuid nullable
-- off_date date NOT NULL
-- off_type: 'folga' | 'feriado' | 'licenca' | 'ferias' | 'abono'
-- reason text nullable
-- created_by uuid (quem lancou)
-- created_at timestamp
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
 ```
 
-RLS: gestores podem inserir/editar para usuarios da sua empresa, admins para todos.
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
 
-#### 2. Novo componente `DayOffManager.tsx` - Substituir aba "Controle"
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
 
-A aba "Controle" (AdminControl) sera substituida por **"Folgas"** com:
-- Selecao de empresa e colaborador(es)
-- Calendario visual onde clicar em um dia abre modal para lancar folga/feriado/ferias/licenca
-- Lista de folgas lancadas com opcao de editar/excluir
-- Botao "Lancar feriado para todos" (aplica a todos os colaboradores da empresa de uma vez)
-- Tipos com cores: folga (azul), feriado (verde), licenca (roxo), ferias (laranja), abono (cinza)
+---
 
-#### 3. Novo componente `DiscountCalculator.tsx` - Nova aba ou substituir aba existente
+### 3. Simplificar modulo Base OFF - apenas Consulta
 
-Consolidar em uma tela de **"Descontos"** que substitui a aba "Relatórios" (que ja tem relatorios de atraso/falta):
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
 
-- Seleciona mes e colaborador (ou todos)
-- Calcula automaticamente:
-  - **Horas negativas** (esperado - trabalhado, descontando folgas/feriados/ferias)
-  - **Faltas injustificadas** (dias uteis sem registro e sem folga/justificativa aprovada)
-  - **Valor desconto por hora negativa** = horas_negativas x (salario / 176)
-  - **Valor desconto por falta** = faltas x (salario / 22)
-  - **Total descontos**
-  - **Liquido estimado** = salario - total_descontos
-- Tabela por colaborador com todas essas colunas
-- Botao exportar PDF/Excel
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
 
-#### 4. Atualizar `HourBank.tsx`
+---
 
-Descontar dias de folga/feriado/ferias do calculo de "horas esperadas":
-- Buscar `time_clock_day_offs` do usuario no periodo
-- Subtrair esses dias do `workDayCount`
+### Arquivos a modificar
 
-#### 5. Atualizar `TimeClockPDF.tsx`
-
-Na geracao do espelho mensal, marcar dias com folga como "FOLGA", "FERIADO", "FERIAS" etc. ao inves de "FALTA".
-
-#### 6. Reorganizar abas do modulo
-
-De 10 abas para 8 (remover redundancias):
-
-| Antes | Depois | Motivo |
-|---|---|---|
-| Ponto | Ponto | Mantido |
-| Historico | Historico | Mantido |
-| Justificativas | Justificativas | Mantido |
-| Banco Horas | Banco Horas | Mantido (atualizado) |
-| Painel | Painel | Mantido |
-| **Relatorios** | **Descontos** | Substituido pela calculadora de descontos |
-| Salarios | Salarios | Mantido |
-| Jornadas | Jornadas | Mantido |
-| **Controle** | **Folgas** | Substituido pelo gestor de folgas |
-| Config | Config | Mantido |
-
-A funcionalidade de ajuste manual de ponto do AdminControl sera movida para o Painel (ManagerDashboard) que ja tem acesso aos registros.
-
-### Resumo de arquivos
-
-| Arquivo | Acao |
+| Arquivo | Mudanca |
 |---|---|
-| Migracao SQL | Criar tabela `time_clock_day_offs` com RLS |
-| `src/components/TimeClock/DayOffManager.tsx` | Novo componente para lancar folgas/feriados |
-| `src/components/TimeClock/DiscountCalculator.tsx` | Novo componente calculadora de descontos |
-| `src/components/TimeClock/index.tsx` | Reorganizar abas (Controle → Folgas, Relatorios → Descontos) |
-| `src/components/TimeClock/HourBank.tsx` | Descontar folgas do calculo de horas esperadas |
-| `src/components/TimeClock/TimeClockPDF.tsx` | Marcar folgas corretamente no PDF mensal |
-| `src/components/TimeClock/ManagerDashboard.tsx` | Adicionar botao de ajuste manual (vindo do AdminControl) |
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
+
+---
+
+### Pergunta necessaria
+
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 

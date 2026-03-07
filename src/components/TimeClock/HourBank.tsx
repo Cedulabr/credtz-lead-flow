@@ -71,16 +71,25 @@ export function HourBank() {
     const startDate = `${year}-01-01`;
     const endDate = `${year}-12-31`;
 
-    const { data: records } = await supabase
-      .from('time_clock')
-      .select('*')
-      .eq('user_id', selectedUserId)
-      .gte('clock_date', startDate)
-      .lte('clock_date', endDate)
-      .order('clock_date', { ascending: true })
-      .order('clock_time', { ascending: true });
+    const [recordsRes, dayOffsRes] = await Promise.all([
+      supabase
+        .from('time_clock')
+        .select('*')
+        .eq('user_id', selectedUserId)
+        .gte('clock_date', startDate)
+        .lte('clock_date', endDate)
+        .order('clock_date', { ascending: true })
+        .order('clock_time', { ascending: true }),
+      supabase
+        .from('time_clock_day_offs')
+        .select('off_date')
+        .eq('user_id', selectedUserId)
+        .gte('off_date', startDate)
+        .lte('off_date', endDate),
+    ]);
 
-    const allRecords = records || [];
+    const allRecords = recordsRes.data || [];
+    const dayOffDates = new Set((dayOffsRes.data || []).map((d: any) => d.off_date));
 
     for (let month = 0; month < 12; month++) {
       const monthStart = new Date(year, month, 1);
@@ -92,7 +101,12 @@ export function HourBank() {
       const monthStr = format(monthStart, 'yyyy-MM');
       const days = eachDayOfInterval({ start: monthStart, end: monthEnd > new Date() ? new Date() : monthEnd });
       
-      const workDayCount = days.filter(d => workDays.includes(d.getDay())).length;
+      const workDayCount = days.filter(d => {
+        if (!workDays.includes(d.getDay())) return false;
+        // Exclude day-offs from expected work days
+        const dateStr = format(d, 'yyyy-MM-dd');
+        return !dayOffDates.has(dateStr);
+      }).length;
       const expectedMinutes = workDayCount * dailyHours * 60;
 
       let workedMinutes = 0;
