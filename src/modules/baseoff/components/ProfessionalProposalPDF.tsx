@@ -297,35 +297,34 @@ export function ProfessionalProposalPDF({
         });
         y += 12;
 
-        // Simulation highlight box
-        doc.setFillColor(colors.success.r, colors.success.g, colors.success.b, 0.1);
-        doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, 45, 3, 3, 'F');
-        doc.setDrawColor(colors.success.r, colors.success.g, colors.success.b);
-        doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, 45, 3, 3, 'S');
+        // Big valor liberado box
+        doc.setFillColor(colors.primary.r, colors.primary.g, colors.primary.b);
+        doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, 30, 3, 3, 'F');
+        
+        doc.setFontSize(fonts.small);
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'normal');
+        doc.text('VALOR LIBERADO AO CLIENTE', margin + 5, y + 8);
+        
+        doc.setFontSize(fonts.title);
+        doc.setFont('helvetica', 'bold');
+        doc.text(formatCurrency(trocoSimulation.troco), margin + 5, y + 20);
+        
+        y += 35;
 
-        // Troco (highlighted)
-        addText('TROCO ESTIMADO:', margin + 5, y + 8, { 
-          fontSize: fonts.body, 
-          color: colors.success 
+        // Simulation details grid
+        doc.setFillColor(245, 245, 245);
+        doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, 22, 3, 3, 'F');
+        
+        addText(`Banco: ${trocoSimulation.bancoLabel}`, margin + 5, y + 5, { fontSize: fonts.small });
+        addText(`Taxa: ${trocoSimulation.taxa.toFixed(2)}% a.m.`, margin + 55, y + 5, { fontSize: fonts.small });
+        addText(`Prazo: ${trocoSimulation.prazo} meses`, margin + 105, y + 5, { fontSize: fonts.small });
+        
+        y += 8;
+        addText(`Nova Parcela: ${formatCurrency(trocoSimulation.novaParcela)}`, margin + 5, y + 5, { 
+          fontSize: fonts.body, bold: true 
         });
-        addText(formatCurrency(trocoSimulation.troco), margin + 55, y + 8, { 
-          fontSize: fonts.subtitle, 
-          color: colors.success, 
-          bold: true 
-        });
-
-        // Simulation details row
-        y += 18;
-        addText(`Banco: ${trocoSimulation.bancoLabel}`, margin + 5, y, { fontSize: fonts.small });
-        addText(`Taxa: ${trocoSimulation.taxa.toFixed(2)}% a.m.`, margin + 60, y, { fontSize: fonts.small });
-        addText(`Prazo: ${trocoSimulation.prazo} meses`, margin + 115, y, { fontSize: fonts.small });
-
-        y += 10;
-        addText(`Nova Parcela: ${formatCurrency(trocoSimulation.novaParcela)}`, margin + 5, y, { 
-          fontSize: fonts.body, 
-          bold: true 
-        });
-        addText(`Saldo Refinanciado: ${formatCurrency(trocoSimulation.saldoDevedor)}`, margin + 80, y, { 
+        addText(`Saldo Refinanciado: ${formatCurrency(trocoSimulation.saldoDevedor)}`, margin + 75, y + 5, { 
           fontSize: fonts.body 
         });
 
