@@ -71,8 +71,23 @@ export function DayOffManager() {
           setSelectedCompanyId(data[0].id);
         }
       })();
+    } else if (user?.id) {
+      // Fallback for regular collaborators
+      (async () => {
+        const { data } = await supabase
+          .from('user_companies')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .limit(1)
+          .single();
+        if (data?.company_id) {
+          setCompanies([{ id: data.company_id, name: 'Minha Empresa' }]);
+          setSelectedCompanyId(data.company_id);
+        }
+      })();
     }
-  }, [gestorLoading, companyId, isGestor, isAdmin]);
+  }, [gestorLoading, companyId, isGestor, isAdmin, user?.id]);
 
   useEffect(() => {
     if (selectedCompanyId) {
