@@ -1,33 +1,80 @@
 
 
-## Plano: Corrigir Lançamento de Folgas no Controle de Ponto
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Diagnóstico
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-Analisei a tabela `time_clock_day_offs`, suas constraints, políticas RLS e o componente `DayOffManager.tsx`. Os problemas identificados são:
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-1. **Unique constraint `(user_id, off_date)`**: Cada usuário só pode ter UM registro por data. Ao tentar lançar uma folga em uma data que já tem registro (mesmo de tipo diferente), o `upsert` tenta fazer UPDATE, mas as políticas RLS podem bloquear o update se as condições mudaram.
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
 
-2. **Bulk upsert com RLS**: Ao lançar para todos os colaboradores, o `upsert` de array com `onConflict` pode falhar parcialmente — se alguns usuários já têm registros naquela data, o UPDATE é bloqueado por RLS no contexto de batch.
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
 
-3. **Falta de tratamento para usuários regulares (não admin/não gestor)**: O componente não trata o caso de um colaborador comum, deixando `selectedCompanyId` vazio.
+---
 
-### Correções
+### 2. Conectar Base OFF ao PostgreSQL externo
 
-#### 1. `DayOffManager.tsx` — Melhorar lógica de save
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
 
-- Para **individual**: Primeiro verificar se já existe registro (`select` por `user_id` + `off_date`). Se existir, fazer `update` explícito em vez de `upsert`. Se não existir, fazer `insert`.
-- Para **bulk**: Usar a mesma abordagem — deletar registros existentes naquela data para os usuários e inserir novos, em vez de `upsert`.
-- Adicionar fallback para carregar `companyId` de usuários regulares (colaboradores) via `user_companies`.
+**Arquitetura:**
 
-#### 2. Melhorar feedback de erro
+```text
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
+```
 
-- Exibir mensagem de erro mais clara quando RLS bloqueia.
-- Adicionar log no console para debug.
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
 
-### Arquivo
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
 
-| Arquivo | Ação |
+---
+
+### 3. Simplificar modulo Base OFF - apenas Consulta
+
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
+
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+
+---
+
+### Arquivos a modificar
+
+| Arquivo | Mudanca |
 |---|---|
-| `src/components/TimeClock/DayOffManager.tsx` | Substituir upsert por delete+insert, adicionar suporte a colaboradores |
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
+
+---
+
+### Pergunta necessaria
+
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 

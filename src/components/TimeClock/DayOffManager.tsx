@@ -71,8 +71,23 @@ export function DayOffManager() {
           setSelectedCompanyId(data[0].id);
         }
       })();
+    } else if (user?.id) {
+      // Fallback for regular collaborators
+      (async () => {
+        const { data } = await supabase
+          .from('user_companies')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .limit(1)
+          .single();
+        if (data?.company_id) {
+          setCompanies([{ id: data.company_id, name: 'Minha Empresa' }]);
+          setSelectedCompanyId(data.company_id);
+        }
+      })();
     }
-  }, [gestorLoading, companyId, isGestor, isAdmin]);
+  }, [gestorLoading, companyId, isGestor, isAdmin, user?.id]);
 
   useEffect(() => {
     if (selectedCompanyId) {
@@ -122,12 +137,29 @@ export function DayOffManager() {
   };
 
   const handleSave = async () => {
-    if (!modalDate || !modalOffType) return;
+    if (!modalDate || !modalOffType || !selectedCompanyId) {
+      toast({ title: 'Dados incompletos', description: 'Selecione empresa, data e tipo.', variant: 'destructive' });
+      return;
+    }
     setSaving(true);
 
     try {
       if (modalBulk) {
-        // Bulk: insert for all users in company
+        // Bulk: delete existing then insert for all users
+        const userIds = users.map(u => u.id);
+
+        // Delete existing records for this date (avoids unique constraint + RLS UPDATE issues)
+        const { error: delError } = await supabase
+          .from('time_clock_day_offs')
+          .delete()
+          .in('user_id', userIds)
+          .eq('off_date', modalDate)
+          .eq('company_id', selectedCompanyId);
+
+        if (delError) {
+          console.error('Delete error (bulk):', delError);
+        }
+
         const inserts = users.map(u => ({
           user_id: u.id,
           company_id: selectedCompanyId,
@@ -137,19 +169,32 @@ export function DayOffManager() {
           created_by: user?.id,
         }));
 
-        const { error } = await supabase.from('time_clock_day_offs').upsert(inserts, { onConflict: 'user_id,off_date' });
+        const { error } = await supabase.from('time_clock_day_offs').insert(inserts);
         if (error) throw error;
         toast({ title: `${OFF_TYPE_CONFIG[modalOffType].label} lançado para ${users.length} colaboradores!` });
       } else {
         if (!modalUserId) return;
-        const { error } = await supabase.from('time_clock_day_offs').upsert({
+
+        // Delete existing record for this user+date first
+        const { error: delError } = await supabase
+          .from('time_clock_day_offs')
+          .delete()
+          .eq('user_id', modalUserId)
+          .eq('off_date', modalDate)
+          .eq('company_id', selectedCompanyId);
+
+        if (delError) {
+          console.error('Delete error (individual):', delError);
+        }
+
+        const { error } = await supabase.from('time_clock_day_offs').insert({
           user_id: modalUserId,
           company_id: selectedCompanyId,
           off_date: modalDate,
           off_type: modalOffType,
           reason: modalReason || null,
           created_by: user?.id,
-        }, { onConflict: 'user_id,off_date' });
+        });
         if (error) throw error;
         toast({ title: `${OFF_TYPE_CONFIG[modalOffType].label} lançado com sucesso!` });
       }
@@ -159,6 +204,7 @@ export function DayOffManager() {
       setModalBulk(false);
       loadDayOffs();
     } catch (error: any) {
+      console.error('Erro ao lançar folga:', error);
       toast({ title: 'Erro ao lançar', description: error.message, variant: 'destructive' });
     }
     setSaving(false);
