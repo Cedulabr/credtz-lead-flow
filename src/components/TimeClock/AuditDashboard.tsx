@@ -183,6 +183,137 @@ export function AuditDashboard() {
     }
   };
 
+  // Re-analyze photos for face detection on historical records
+  const handlePhotoReanalysis = async () => {
+    if (!faceDetectionReady) {
+      toast({
+        title: 'Detecção facial não disponível',
+        description: 'Aguarde o carregamento do modelo de detecção facial.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setReanalyzingPhotos(true);
+    setPhotoReanalysisProgress({ current: 0, total: 0 });
+
+    try {
+      // Get records with photos but no face-related audit flags
+      const { data: recordsWithPhotos } = await supabase
+        .from('time_clock')
+        .select('id, photo_url, trust_score, audit_flags, audit_status')
+        .not('photo_url', 'is', null)
+        .gte('clock_date', dateFrom)
+        .lte('clock_date', dateTo)
+        .order('clock_date', { ascending: false });
+
+      if (!recordsWithPhotos || recordsWithPhotos.length === 0) {
+        toast({
+          title: 'Nenhuma foto para analisar',
+          description: 'Não há registros com fotos no período selecionado.',
+        });
+        return;
+      }
+
+      // Filter to only unprocessed (no face flags)
+      const unprocessed = recordsWithPhotos.filter(r => {
+        const flags = Array.isArray(r.audit_flags) ? r.audit_flags : [];
+        const hasFaceFlag = flags.some((f: any) => 
+          f.code?.startsWith('foto_') || f.code === 'multiplos_rostos'
+        );
+        return !hasFaceFlag;
+      });
+
+      setPhotoReanalysisProgress({ current: 0, total: unprocessed.length });
+
+      let processed = 0;
+      let flagged = 0;
+
+      for (const record of unprocessed) {
+        try {
+          // Load the image
+          const img = new window.Image();
+          img.crossOrigin = 'anonymous';
+          
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error('Failed to load image'));
+            img.src = record.photo_url;
+          });
+
+          // Create canvas and run detection
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) continue;
+          ctx.drawImage(img, 0, 0);
+
+          const faceResult = await detectFaces(canvas);
+
+          // Merge new face flags with existing audit data
+          const existingFlags: AuditFlag[] = Array.isArray(record.audit_flags) 
+            ? record.audit_flags as AuditFlag[] 
+            : [];
+          const newFlags = [...existingFlags, ...faceResult.flags];
+          
+          // Recalculate score
+          let newScore = record.trust_score ?? 100;
+          for (const flag of faceResult.flags) {
+            newScore += flag.scoreDelta;
+          }
+          newScore = Math.max(0, Math.min(100, newScore));
+
+          // Determine new status
+          let newStatus: AuditStatus = 'normal';
+          if (newScore < 40) newStatus = 'irregular';
+          else if (newScore < 80) newStatus = 'suspicious';
+
+          // Update the record
+          await supabase
+            .from('time_clock')
+            .update({
+              trust_score: newScore,
+              audit_flags: newFlags as any,
+              audit_status: newStatus,
+            })
+            .eq('id', record.id);
+
+          if (faceResult.flags.length > 0) {
+            flagged++;
+          }
+        } catch (err) {
+          console.error('[AuditDashboard] Photo reanalysis error for record:', record.id, err);
+        }
+
+        processed++;
+        setPhotoReanalysisProgress({ current: processed, total: unprocessed.length });
+
+        // Small delay to prevent overwhelming
+        if (processed % 10 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      toast({
+        title: 'Análise de fotos concluída',
+        description: `${processed} fotos analisadas, ${flagged} com alertas detectados.`,
+      });
+
+      await loadRecords();
+    } catch (error) {
+      console.error('[AuditDashboard] Photo reanalysis failed:', error);
+      toast({
+        title: 'Erro na análise de fotos',
+        description: 'Ocorreu um erro ao processar as fotos.',
+        variant: 'destructive',
+      });
+    } finally {
+      setReanalyzingPhotos(false);
+      setPhotoReanalysisProgress({ current: 0, total: 0 });
+    }
+  };
+
   const filteredRecords = records.filter(r => {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
