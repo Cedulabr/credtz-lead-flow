@@ -84,7 +84,11 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
         // Spread all fields from API, only compute status
         // Resilient: handle both transformed (snake_case) and raw (lowercase) field names
         const transformedClients: BaseOffClient[] = results.map((row: any) => {
-          const statusBeneficio = row.status_beneficio || row.statusbeneficio || '';
+          // Flatten beneficios[0] into root if nested structure from API
+          const beneficio = row.beneficios?.[0] || {};
+          const flat = { ...row, ...beneficio };
+
+          const statusBeneficio = flat.status_beneficio || flat.statusbeneficio || '';
           let status: ClientStatus = 'simulado';
           if (statusBeneficio) {
             const statusLower = statusBeneficio.toLowerCase();
@@ -97,38 +101,58 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
             }
           }
 
-          // Map raw DB field names to expected names when transformed version is missing
-          const nb = row.nb || row.NB || row.numero_beneficio || row.num_beneficio || null;
-          const mr = parseFloat(row.mr) || 0;
-          const contratos = row.contratos || [];
+          const nb = flat.nb || flat.NB || flat.numero_beneficio || flat.num_beneficio || null;
+          const mr = parseFloat(flat.mr) || 0;
+
+          // Normalize contract field names from API (banco→banco_emprestimo, valor→vl_emprestimo, etc.)
+          const rawContratos = flat.contratos || [];
+          const contratos = rawContratos.map((c: any) => ({
+            ...c,
+            banco_emprestimo: c.banco_emprestimo || c.banco || '',
+            contrato: c.contrato || '',
+            vl_emprestimo: Number(c.vl_emprestimo || c.valor_emprestimo || c.valor) || null,
+            vl_parcela: Number(c.vl_parcela || c.valor_parcela || c.parcela) || null,
+            prazo: c.prazo ? Number(c.prazo) : null,
+            taxa: c.taxa ? Number(c.taxa) : null,
+            saldo: c.saldo ? Number(c.saldo) : null,
+            situacao_emprestimo: c.situacao_emprestimo || c.situacao || null,
+            tipo_emprestimo: c.tipo_emprestimo || null,
+            data_averbacao: c.data_averbacao || null,
+            inicio_desconto: c.inicio_desconto || null,
+            competencia: c.competencia || null,
+            competencia_final: c.competencia_final || null,
+          }));
+
+          // Map telefones array to individual fields
+          const tels = (flat.telefones || []).filter(Boolean);
 
           return {
-            ...row,
+            ...flat,
             status,
             status_beneficio: statusBeneficio,
             nb,
             mr,
-            data_nascimento: row.data_nascimento || row.dtnascimento || null,
-            banco_pagto: row.banco_pagto || row.bancopagto || null,
-            agencia_pagto: row.agencia_pagto || row.agenciapagto || null,
-            orgao_pagador: row.orgao_pagador || row.orgaopagador || null,
-            conta_corrente: row.conta_corrente || row.contacorrente || null,
-            meio_pagto: row.meio_pagto || row.meiopagto || null,
-            banco_rmc: row.banco_rmc || row.bancormc || null,
-            valor_rmc: parseFloat(row.valor_rmc || row.valorrmc) || 0,
-            banco_rcc: row.banco_rcc || row.bancorcc || null,
-            valor_rcc: parseFloat(row.valor_rcc || row.valorrcc) || 0,
-            tel_cel_1: row.tel_cel_1 || row.telcel_1 || null,
-            tel_cel_2: row.tel_cel_2 || row.telcel_2 || null,
-            tel_cel_3: row.tel_cel_3 || row.telcel_3 || null,
-            tel_fixo_1: row.tel_fixo_1 || row.telfixo_1 || null,
-            tel_fixo_2: row.tel_fixo_2 || row.telfixo_2 || null,
-            tel_fixo_3: row.tel_fixo_3 || row.telfixo_3 || null,
-            total_contracts: contratos.length || row.total_contracts || 0,
-            contracts: row.contracts || [],
+            data_nascimento: flat.data_nascimento || flat.dtnascimento || null,
+            banco_pagto: flat.banco_pagto || flat.bancopagto || null,
+            agencia_pagto: flat.agencia_pagto || flat.agenciapagto || null,
+            orgao_pagador: flat.orgao_pagador || flat.orgaopagador || null,
+            conta_corrente: flat.conta_corrente || flat.contacorrente || null,
+            meio_pagto: flat.meio_pagto || flat.meiopagto || null,
+            banco_rmc: flat.banco_rmc || flat.bancormc || null,
+            valor_rmc: parseFloat(flat.valor_rmc || flat.valorrmc) || 0,
+            banco_rcc: flat.banco_rcc || flat.bancorcc || null,
+            valor_rcc: parseFloat(flat.valor_rcc || flat.valorrcc) || 0,
+            tel_cel_1: flat.tel_cel_1 || flat.telcel_1 || tels[0] || null,
+            tel_cel_2: flat.tel_cel_2 || flat.telcel_2 || tels[1] || null,
+            tel_cel_3: flat.tel_cel_3 || flat.telcel_3 || tels[2] || null,
+            tel_fixo_1: flat.tel_fixo_1 || flat.telfixo_1 || tels[3] || null,
+            tel_fixo_2: flat.tel_fixo_2 || flat.telfixo_2 || tels[4] || null,
+            tel_fixo_3: flat.tel_fixo_3 || flat.telfixo_3 || tels[5] || null,
+            total_contracts: contratos.length || flat.total_contracts || 0,
+            contracts: flat.contracts || [],
             contratos,
-            telefones: row.telefones || [],
-            credit_opportunities: row.credit_opportunities || null,
+            telefones: tels,
+            credit_opportunities: flat.credit_opportunities || null,
           };
         });
 

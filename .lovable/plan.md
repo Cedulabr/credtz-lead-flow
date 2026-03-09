@@ -1,94 +1,80 @@
 
 
-## Correção: Front do Consulta Base OFF não carrega dados da API
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Causa Raiz
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-A API retorna dados com estrutura **aninhada** (`beneficios[]`), mas o hook `useOptimizedSearch` espera campos **flat**. Além disso, os nomes dos campos dos contratos diferem.
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-**Estrutura real da API:**
-```json
-{
-  "cpf": "08861342426",
-  "nome": "MARINA GOMES DE MELO",
-  "dtnascimento": "15/01/1955",
-  "beneficios": [{
-    "nb": "7048597535",
-    "esp": "88",
-    "mr": "1518",
-    "telefones": ["82991318083", ...],
-    "contratos": [{ "banco": "237", "valor": "1800", "parcela": "273.31", ... }]
-  }]
-}
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
+
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+
+---
+
+### 2. Conectar Base OFF ao PostgreSQL externo
+
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+
+**Arquitetura:**
+
+```text
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
 ```
 
-**O que o frontend espera:** `row.nb`, `row.mr`, `row.contratos`, `row.telefones` (campos flat no root)
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
 
-**Campos de contrato divergentes:**
-| API retorna | Frontend espera |
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+
+---
+
+### 3. Simplificar modulo Base OFF - apenas Consulta
+
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
+
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+
+---
+
+### Arquivos a modificar
+
+| Arquivo | Mudanca |
 |---|---|
-| `banco` | `banco_emprestimo` |
-| `valor` | `vl_emprestimo` |
-| `parcela` | `vl_parcela` |
-| `situacao` | `situacao_emprestimo` |
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
 
-### Correção (2 arquivos, sem tocar no edge function)
+---
 
-**1. `src/modules/baseoff/hooks/useOptimizedSearch.ts`**
+### Pergunta necessaria
 
-Na transformação dos resultados (linha 86), antes de mapear os campos, achatar a estrutura `beneficios[0]` para o nível raiz:
-
-```typescript
-results.map((row: any) => {
-  // Flatten beneficios[0] into root if present
-  const beneficio = row.beneficios?.[0] || {};
-  const flat = { ...row, ...beneficio };
-  // Now use 'flat' instead of 'row' for all field mappings
-  // Map contratos with correct field names
-  const rawContratos = flat.contratos || [];
-  const contratos = rawContratos.map(c => ({
-    banco_emprestimo: c.banco_emprestimo || c.banco || '',
-    contrato: c.contrato || '',
-    vl_emprestimo: c.vl_emprestimo || c.valor_emprestimo || c.valor || null,
-    vl_parcela: c.vl_parcela || c.valor_parcela || c.parcela || null,
-    prazo: c.prazo || null,
-    taxa: c.taxa || null,
-    saldo: c.saldo || null,
-    situacao_emprestimo: c.situacao_emprestimo || c.situacao || null,
-    // keep other fields
-    ...c,
-  }));
-  // Map telefones array to tel_cel_1/2/3
-  const tels = flat.telefones || [];
-  return {
-    ...flat,
-    nb: flat.nb || ...,
-    mr: parseFloat(flat.mr) || 0,
-    tel_cel_1: flat.tel_cel_1 || tels[0] || null,
-    tel_cel_2: flat.tel_cel_2 || tels[1] || null,
-    tel_cel_3: flat.tel_cel_3 || tels[2] || null,
-    contratos,
-    telefones: tels.filter(Boolean),
-    ...
-  };
-});
-```
-
-**2. `src/modules/baseoff/views/ClienteDetalheView.tsx`**
-
-Na função `inlineToContract` (linha 32), adicionar fallbacks para os novos nomes de campos:
-
-```typescript
-banco_emprestimo: inline.banco_emprestimo || inline.banco || '',
-vl_emprestimo: Number(inline.valor_emprestimo || inline.vl_emprestimo || inline.valor) || null,
-vl_parcela: Number(inline.valor_parcela || inline.vl_parcela || inline.parcela) || null,
-situacao_emprestimo: inline.situacao_emprestimo || inline.situacao || null,
-```
-
-### Arquivos Modificados
-
-| Arquivo | Ação |
-|---|---|
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Achatar `beneficios[]` + mapear nomes de campos de contratos |
-| `src/modules/baseoff/views/ClienteDetalheView.tsx` | Adicionar fallbacks de nomes de campos em `inlineToContract` |
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 
