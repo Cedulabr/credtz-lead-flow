@@ -220,6 +220,9 @@ export function HourBank() {
 
   return (
     <div className="space-y-4">
+      {/* Employee Alert */}
+      {!isGestor && <HourBankEmployeeAlert />}
+
       {/* Summary Cards */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Card className={totalBalance >= 0 ? 'border-green-200' : 'border-red-200'}>
