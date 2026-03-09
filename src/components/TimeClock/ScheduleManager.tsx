@@ -134,65 +134,77 @@ export function ScheduleManager({ companyId }: ScheduleManagerProps) {
 
   const handleOpenCreate = () => {
     setEditingSchedule({ ...defaultSchedule });
+    setApplyToAll(false);
     setShowModal(true);
   };
 
   const handleOpenEdit = (schedule: Schedule) => {
     setEditingSchedule({ ...schedule });
+    setApplyToAll(false);
     setShowModal(true);
   };
 
+  const buildScheduleData = (targetUserId: string) => ({
+    user_id: targetUserId,
+    company_id: companyId,
+    daily_hours: editingSchedule?.daily_hours || 8,
+    monthly_hours: editingSchedule?.monthly_hours || 176,
+    entry_time: editingSchedule?.entry_time || '08:00',
+    exit_time: editingSchedule?.exit_time || '18:00',
+    lunch_start: editingSchedule?.lunch_start || '12:00',
+    lunch_end: editingSchedule?.lunch_end || '13:00',
+    lunch_duration_minutes: editingSchedule?.lunch_duration_minutes || 60,
+    tolerance_minutes: editingSchedule?.tolerance_minutes || 10,
+    schedule_type: editingSchedule?.schedule_type || 'fixed',
+    work_days: editingSchedule?.work_days || [1, 2, 3, 4, 5],
+    allow_overtime: editingSchedule?.allow_overtime || false,
+    max_overtime_daily_minutes: editingSchedule?.max_overtime_daily_minutes || 120,
+    is_active: editingSchedule?.is_active !== false,
+    created_by: user?.id,
+  });
+
   const handleSave = async () => {
-    if (!editingSchedule?.user_id) {
-      toast({ title: 'Selecione um colaborador', variant: 'destructive' });
+    if (!applyToAll && !editingSchedule?.user_id) {
+      toast({ title: 'Selecione um colaborador ou marque "Aplicar para todos"', variant: 'destructive' });
       return;
     }
 
     setSaving(true);
-    
-    const scheduleData = {
-      user_id: editingSchedule.user_id,
-      daily_hours: editingSchedule.daily_hours || 8,
-      monthly_hours: editingSchedule.monthly_hours || 176,
-      entry_time: editingSchedule.entry_time || '08:00',
-      exit_time: editingSchedule.exit_time || '18:00',
-      lunch_start: editingSchedule.lunch_start || '12:00',
-      lunch_end: editingSchedule.lunch_end || '13:00',
-      lunch_duration_minutes: editingSchedule.lunch_duration_minutes || 60,
-      tolerance_minutes: editingSchedule.tolerance_minutes || 10,
-      schedule_type: editingSchedule.schedule_type || 'fixed',
-      work_days: editingSchedule.work_days || [1, 2, 3, 4, 5],
-      allow_overtime: editingSchedule.allow_overtime || false,
-      max_overtime_daily_minutes: editingSchedule.max_overtime_daily_minutes || 120,
-      is_active: editingSchedule.is_active !== false,
-      created_by: user?.id,
-    };
 
-    let error;
-    if (editingSchedule.id) {
-      const result = await supabase
-        .from('time_clock_schedules')
-        .update(scheduleData)
-        .eq('id', editingSchedule.id);
-      error = result.error;
-    } else {
-      const result = await supabase
-        .from('time_clock_schedules')
-        .insert(scheduleData);
-      error = result.error;
-    }
+    try {
+      if (applyToAll) {
+        // Upsert a jornada para todos os colaboradores da empresa
+        const records = users.map(u => buildScheduleData(u.id));
+        const { error } = await supabase
+          .from('time_clock_schedules')
+          .upsert(records, { onConflict: 'user_id' });
+        if (error) throw error;
+        toast({ title: `Jornada aplicada para ${users.length} colaborador(es)!` });
+      } else if (editingSchedule?.id) {
+        const { error } = await supabase
+          .from('time_clock_schedules')
+          .update(buildScheduleData(editingSchedule.user_id!))
+          .eq('id', editingSchedule.id);
+        if (error) throw error;
+        toast({ title: 'Jornada atualizada com sucesso!' });
+      } else {
+        const { error } = await supabase
+          .from('time_clock_schedules')
+          .upsert([buildScheduleData(editingSchedule!.user_id!)], { onConflict: 'user_id' });
+        if (error) throw error;
+        toast({ title: 'Jornada salva com sucesso!' });
+      }
 
-    if (error) {
-      toast({ 
-        title: 'Erro ao salvar jornada', 
-        description: error.message, 
-        variant: 'destructive' 
-      });
-    } else {
-      toast({ title: 'Jornada salva com sucesso!' });
       setShowModal(false);
       setEditingSchedule(null);
+      setApplyToAll(false);
       loadData();
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao salvar jornada',
+        description: err.message,
+        variant: 'destructive',
+      });
     }
 
     setSaving(false);
