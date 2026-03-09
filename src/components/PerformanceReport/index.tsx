@@ -391,10 +391,21 @@ export function PerformanceReport() {
         user.savedProposals++;
       });
 
-      // Calculate conversion rates
+      // Calculate conversion rates and activity status
       userMap.forEach((user) => {
         if (user.proposalsCreated > 0) {
           user.conversionRate = (user.proposalsPaid / user.proposalsCreated) * 100;
+        }
+        // Calculate activity status
+        if (user.lastActivity) {
+          user.daysSinceLastActivity = differenceInDays(new Date(), new Date(user.lastActivity));
+        }
+        if (user.daysSinceLastActivity <= 2) {
+          user.activityStatus = 'active';
+        } else if (user.daysSinceLastActivity <= 6) {
+          user.activityStatus = 'warning';
+        } else {
+          user.activityStatus = 'critical';
         }
       });
 
