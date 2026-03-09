@@ -111,6 +111,11 @@ export function OpportunityList({
                       <div className="flex items-center gap-2">
                         <div className={cn('w-2 h-2 rounded-full', priorityConfig.dotColor)} />
                         <span className="font-medium text-sm">{client.nome}</span>
+                        {client.source && client.source !== 'televendas' && (
+                          <Badge variant="outline" className="text-[9px] h-4 px-1">
+                            {client.source === 'propostas' ? 'Proposta' : 'Lead'}
+                          </Badge>
+                        )}
                       </div>
                       <Badge className={cn('text-[10px]', priorityConfig.className)}>
                         {client.status === 'eligible' 
