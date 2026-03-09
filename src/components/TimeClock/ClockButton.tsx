@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Clock, MapPin, Wifi, Camera, CheckCircle2, Loader2, Coffee } from 'lucide-react';
+import { Clock, MapPin, Wifi, Camera, CheckCircle2, Loader2, Coffee, AlertTriangle } from 'lucide-react';
 import { useTimeClock } from '@/hooks/useTimeClock';
 import { useAuditEngine } from './useAuditEngine';
 import { useFaceDetection } from './useFaceDetection';
@@ -38,7 +38,7 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
   
   const { toast } = useToast();
   const { calculateAudit, shouldBlockRegistration } = useAuditEngine();
-  const { initialize: initFaceDetection, validatePhoto } = useFaceDetection();
+  const { initialize: initFaceDetection, validatePhoto, isReady: faceDetectionReady, error: faceDetectionError } = useFaceDetection();
   const {
     loading,
     checkConsent,
@@ -168,10 +168,22 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
       if (ctx) {
         ctx.drawImage(img, 0, 0);
         faceResult = await validatePhoto(canvas);
+        console.log('[ClockButton] Face detection result:', faceResult);
       }
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Face detection failed:', err);
+      console.error('[ClockButton] Face detection failed:', err);
+      // Add fallback flag when detection completely fails
+      faceResult = {
+        faceCount: 0,
+        confidence: 0,
+        isBlurry: false,
+        flags: [{
+          code: 'foto_nao_validada',
+          label: 'Validação facial indisponível',
+          scoreDelta: -10,
+        }],
+      };
     }
 
     // Calculate audit score
@@ -271,9 +283,20 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
               <Wifi className="h-4 w-4 text-green-500" />
               <span>IP</span>
             </div>
-            <div className="flex items-center gap-1">
-              <Camera className="h-4 w-4 text-green-500" />
+            <div className="flex items-center gap-1 relative group">
+              {faceDetectionReady ? (
+                <Camera className="h-4 w-4 text-green-500" />
+              ) : faceDetectionError ? (
+                <Camera className="h-4 w-4 text-red-500" />
+              ) : (
+                <Camera className="h-4 w-4 text-yellow-500" />
+              )}
               <span>Foto</span>
+              {!faceDetectionReady && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                  {faceDetectionError ? 'Detecção facial indisponível' : 'Carregando detecção facial...'}
+                </div>
+              )}
             </div>
           </div>
 

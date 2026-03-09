@@ -7,16 +7,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
 import { 
   ShieldAlert, ShieldCheck, ShieldX, MapPin, Wifi, Camera, 
-  Search, Calendar, Loader2, Eye, TrendingUp, Users, AlertTriangle 
+  Search, Calendar, Loader2, Eye, TrendingUp, Users, AlertTriangle,
+  RefreshCw, CheckCircle
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { TrustScoreBadge } from './TrustScoreBadge';
+import { useAuditEngine } from './useAuditEngine';
 import { clockTypeLabels, type TimeClock, type AuditStatus, type AuditFlag } from './types';
+import { useToast } from '@/hooks/use-toast';
 
 interface AuditRecord extends TimeClock {
   user_name?: string;
@@ -28,6 +32,10 @@ export function AuditDashboard() {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  
+  // Re-audit state
+  const [reauditing, setReauditing] = useState(false);
+  const [reauditProgress, setReauditProgress] = useState({ current: 0, total: 0 });
   
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -44,6 +52,9 @@ export function AuditDashboard() {
     irregular: 0,
     outsideGeofence: 0,
   });
+
+  const { bulkReaudit } = useAuditEngine();
+  const { toast } = useToast();
 
   useEffect(() => {
     loadUsers();
@@ -118,6 +129,34 @@ export function AuditDashboard() {
     }
 
     setLoading(false);
+  };
+
+  const handleReaudit = async () => {
+    setReauditing(true);
+    setReauditProgress({ current: 0, total: 0 });
+    
+    try {
+      const result = await bulkReaudit(dateFrom, dateTo, (current, total) => {
+        setReauditProgress({ current, total });
+      });
+      
+      toast({
+        title: 'Re-auditoria concluída',
+        description: `${result.processed} registros processados, ${result.flagged} com alertas detectados.`,
+      });
+      
+      // Reload records to show updated data
+      await loadRecords();
+    } catch (error) {
+      toast({
+        title: 'Erro na re-auditoria',
+        description: 'Ocorreu um erro ao processar os registros.',
+        variant: 'destructive',
+      });
+    } finally {
+      setReauditing(false);
+      setReauditProgress({ current: 0, total: 0 });
+    }
   };
 
   const filteredRecords = records.filter(r => {
@@ -297,6 +336,50 @@ export function AuditDashboard() {
                       className="pl-8"
                     />
                   </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Re-audit Section */}
+          <Card>
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Re-auditar Registros Históricos</p>
+                  <p className="text-xs text-muted-foreground">
+                    Reprocessa análise de IP e localização para todos os registros no período selecionado
+                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                  {reauditing && (
+                    <div className="flex items-center gap-3 min-w-[200px]">
+                      <Progress 
+                        value={reauditProgress.total > 0 ? (reauditProgress.current / reauditProgress.total) * 100 : 0} 
+                        className="w-32"
+                      />
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {reauditProgress.current}/{reauditProgress.total}
+                      </span>
+                    </div>
+                  )}
+                  <Button 
+                    onClick={handleReaudit} 
+                    disabled={reauditing || loading}
+                    variant="outline"
+                  >
+                    {reauditing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Processando...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Re-auditar Período
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
             </CardContent>
