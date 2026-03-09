@@ -2652,6 +2652,51 @@ export type Database = {
           },
         ]
       }
+      hour_bank_compensation_requests: {
+        Row: {
+          company_id: string | null
+          compensated_minutes: number | null
+          compensation_type: string
+          created_at: string | null
+          daily_limit_minutes: number | null
+          id: string
+          reason: string | null
+          requested_by: string
+          status: string
+          total_minutes: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          compensated_minutes?: number | null
+          compensation_type?: string
+          created_at?: string | null
+          daily_limit_minutes?: number | null
+          id?: string
+          reason?: string | null
+          requested_by: string
+          status?: string
+          total_minutes: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          compensated_minutes?: number | null
+          compensation_type?: string
+          created_at?: string | null
+          daily_limit_minutes?: number | null
+          id?: string
+          reason?: string | null
+          requested_by?: string
+          status?: string
+          total_minutes?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       hour_bank_entries: {
         Row: {
           company_id: string | null
