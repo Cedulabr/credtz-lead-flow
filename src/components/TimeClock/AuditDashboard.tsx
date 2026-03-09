@@ -341,6 +341,50 @@ export function AuditDashboard() {
             </CardContent>
           </Card>
 
+          {/* Re-audit Section */}
+          <Card>
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Re-auditar Registros Históricos</p>
+                  <p className="text-xs text-muted-foreground">
+                    Reprocessa análise de IP e localização para todos os registros no período selecionado
+                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                  {reauditing && (
+                    <div className="flex items-center gap-3 min-w-[200px]">
+                      <Progress 
+                        value={reauditProgress.total > 0 ? (reauditProgress.current / reauditProgress.total) * 100 : 0} 
+                        className="w-32"
+                      />
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {reauditProgress.current}/{reauditProgress.total}
+                      </span>
+                    </div>
+                  )}
+                  <Button 
+                    onClick={handleReaudit} 
+                    disabled={reauditing || loading}
+                    variant="outline"
+                  >
+                    {reauditing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Processando...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Re-auditar Período
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Records Table */}
           <Card>
             <CardContent className="pt-6">
