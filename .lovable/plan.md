@@ -1,66 +1,80 @@
 
 
-## Correção: Consulta Base OFF - Dados não carregam no front
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Causa Raiz
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-O erro `"invalid input syntax for type uuid: "undefined""` ocorre em `ClienteDetalheView.tsx` linha 94-98.
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-A edge function retorna `id: cpf` (string numérica, não UUID). Quando o cliente não tem contratos (array `contratos` vazio), o código entra no `else` (linha 93) e tenta consultar a tabela Supabase `baseoff_contracts` usando `client.id` = CPF — que não é um UUID válido.
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
 
-**Fluxo do bug:**
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+
+---
+
+### 2. Conectar Base OFF ao PostgreSQL externo
+
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+
+**Arquitetura:**
+
 ```text
-Edge Function retorna → { id: "42763541453", contratos: [] }
-                              ↓
-useOptimizedSearch transforma → client.contratos = []
-                              ↓
-ClienteDetalheView → hasInlineContracts = false (array vazio)
-                              ↓
-Fallback: supabase.from('baseoff_contracts').eq('client_id', "42763541453")
-                              ↓
-ERRO: "invalid input syntax for type uuid"
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
 ```
 
-### Correção
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
 
-**Arquivo:** `src/modules/baseoff/views/ClienteDetalheView.tsx`
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
 
-Na função `fetchContracts` (linhas 87-108), alterar a lógica para:
+---
 
-1. Se `hasInlineContracts` → usar contratos inline (já funciona)
-2. Se o `client.id` **não** é um UUID válido (vem da API externa) → definir contratos como array vazio, sem consultar Supabase
-3. Apenas consultar `baseoff_contracts` quando o `client.id` for um UUID real
+### 3. Simplificar modulo Base OFF - apenas Consulta
 
-```typescript
-const fetchContracts = useCallback(async () => {
-  setIsLoading(true);
-  try {
-    if (hasInlineContracts) {
-      const mapped = inlineContracts!.map((c, i) => inlineToContract(c, client.id, client.cpf, i));
-      setContracts(mapped);
-    } else {
-      // Se o ID não é UUID (vem da API externa), não consultar Supabase
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(client.id)) {
-        setContracts([]);
-      } else {
-        const { data, error } = await supabase
-          .from('baseoff_contracts')
-          .select('*')
-          .eq('client_id', client.id)
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        setContracts(data || []);
-      }
-    }
-  } catch (error) {
-    console.error('Error fetching contracts:', error);
-    toast.error('Erro ao carregar contratos');
-  } finally {
-    setIsLoading(false);
-  }
-}, [client.id, client.cpf, inlineContracts, hasInlineContracts]);
-```
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
 
-Essa mudança é mínima e cirúrgica — apenas adiciona uma verificação de UUID antes de consultar o Supabase, eliminando o erro sem alterar nenhuma outra funcionalidade.
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+
+---
+
+### Arquivos a modificar
+
+| Arquivo | Mudanca |
+|---|---|
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
+
+---
+
+### Pergunta necessaria
+
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 
