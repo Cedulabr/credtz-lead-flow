@@ -357,6 +357,13 @@ export function HourBank() {
           <HourBankEntries users={users} selectedUserId={selectedUserId} onEntryAdded={loadBalances} />
         </TabsContent>
 
+        {/* GESTÃO (admin/gestor only) */}
+        {isGestor && (
+          <TabsContent value="gestao">
+            <HourBankCompanyOverview />
+          </TabsContent>
+        )}
+
         {/* LANÇAMENTOS (admin only) */}
         {isGestor && (
           <TabsContent value="lancamentos">
