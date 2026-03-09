@@ -58,6 +58,7 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
     loadData();
     loadBreakTypes();
     checkLocationPermission();
+    initFaceDetection(); // Preload face detection models
   }, [userId]);
 
   const loadData = async () => {
