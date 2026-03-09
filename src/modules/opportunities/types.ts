@@ -1,5 +1,7 @@
 // Types for Opportunities Panel Module
 
+export type OpportunitySource = 'televendas' | 'propostas' | 'leads';
+
 export interface OpportunityContract {
   id: string;
   nome: string;
@@ -20,11 +22,64 @@ export interface OpportunityContract {
   updated_at: string;
 }
 
+export interface PropostaOpportunity {
+  id: number;
+  nome: string;
+  cpf: string | null;
+  telefone: string | null;
+  banco: string | null;
+  produto: string | null;
+  client_status: string | null;
+  future_contact_date: string | null;
+  notes: string | null;
+  company_id: string | null;
+  assigned_to: string | null;
+  created_at: string | null;
+  valor_proposta: number | null;
+}
+
+export interface LeadOpportunity {
+  id: string;
+  nome: string;
+  cpf: string;
+  telefone: string;
+  banco_operacao: string | null;
+  status: string | null;
+  future_contact_date: string | null;
+  notes: string | null;
+  company_id: string | null;
+  assigned_to: string | null;
+  created_at: string | null;
+  valor_operacao: number | null;
+  convenio: string | null;
+}
+
 export interface BankReuseRule {
   id: string;
   bank_name: string;
   reuse_months: number;
   is_active: boolean;
+}
+
+export interface UnifiedStats {
+  // Televendas (refinanciamento/portabilidade)
+  televendasTotal: number;
+  televendasEligible: number;
+  televendasSoon: number;
+  // Propostas (contatos agendados)
+  propostasTotal: number;
+  propostasToday: number;
+  propostasSoon: number; // next 5 days
+  propostasOverdue: number;
+  // Leads (contatos agendados)
+  leadsTotal: number;
+  leadsToday: number;
+  leadsSoon: number;
+  leadsOverdue: number;
+  // Grand totals
+  totalOpportunities: number;
+  actionToday: number;
+  actionSoon: number;
 }
 
 export interface OpportunityStats {
@@ -73,6 +128,9 @@ export interface OpportunityClient {
   isPriorized?: boolean;
   assignedTo?: string;
   status: 'eligible' | 'soon' | 'monitoring';
+  source: OpportunitySource;
+  futureContactDate?: string | null;
+  notes?: string | null;
 }
 
 export interface OpportunityFilter {
@@ -81,6 +139,7 @@ export interface OpportunityFilter {
   status: 'all' | 'eligible' | 'soon' | 'monitoring';
   priority: 'all' | 'high' | 'medium' | 'low';
   search: string;
+  source: 'all' | 'televendas' | 'propostas' | 'leads';
 }
 
 export const DEFAULT_FILTERS: OpportunityFilter = {
@@ -89,6 +148,7 @@ export const DEFAULT_FILTERS: OpportunityFilter = {
   status: 'all',
   priority: 'all',
   search: '',
+  source: 'all',
 };
 
 // Portabilidade: sempre 12 parcelas
