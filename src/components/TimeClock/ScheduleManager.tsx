@@ -343,23 +343,47 @@ export function ScheduleManager({ companyId }: ScheduleManagerProps) {
             <div className="space-y-6 py-4">
               {/* Seleção de Colaborador */}
               {!editingSchedule.id && (
-                <div className="space-y-2">
-                  <Label>Colaborador *</Label>
-                  <Select
-                    value={editingSchedule.user_id || ''}
-                    onValueChange={(value) => setEditingSchedule({ ...editingSchedule, user_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um colaborador" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getUsersWithoutSchedule().map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.name || u.email}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-3">
+                  {/* Aplicar para todos */}
+                  <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/40">
+                    <Checkbox
+                      id="applyToAll"
+                      checked={applyToAll}
+                      onCheckedChange={(checked) => {
+                        setApplyToAll(!!checked);
+                        if (checked) setEditingSchedule(prev => ({ ...prev, user_id: undefined }));
+                      }}
+                    />
+                    <div>
+                      <Label htmlFor="applyToAll" className="cursor-pointer font-medium">
+                        Aplicar para todos os colaboradores da empresa
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        A jornada será criada/atualizada para todos os {users.length} colaboradores
+                      </p>
+                    </div>
+                  </div>
+
+                  {!applyToAll && (
+                    <div className="space-y-2">
+                      <Label>Colaborador *</Label>
+                      <Select
+                        value={editingSchedule.user_id || ''}
+                        onValueChange={(value) => setEditingSchedule({ ...editingSchedule, user_id: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um colaborador" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {users.map((u) => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.name || u.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               )}
 
