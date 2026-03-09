@@ -13,7 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 
 // Import existing components
-import { UsersList } from '@/components/UsersList';
+import { UsersManagement } from '@/components/UsersManagement';
 import { AdminCompanies } from '@/components/AdminCompanies';
 import AdminIndicationsManagement from '@/components/AdminIndicationsManagement';
 
@@ -61,7 +61,7 @@ export function AdminPeople() {
   const renderContent = () => {
     switch (activeSection) {
       case 'users':
-        return <UsersList />;
+        return <UsersManagement />;
       case 'companies':
         return <AdminCompanies />;
       case 'indications':
