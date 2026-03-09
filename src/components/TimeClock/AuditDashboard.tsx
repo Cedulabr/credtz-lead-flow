@@ -66,7 +66,24 @@ export function AuditDashboard() {
   useEffect(() => {
     loadUsers();
     loadRecords();
+    initFaceDetection();
   }, [dateFrom, dateTo, statusFilter, userFilter]);
+
+  // Count records with photos but no face validation flags
+  useEffect(() => {
+    const countUnprocessed = async () => {
+      const { count } = await supabase
+        .from('time_clock')
+        .select('*', { count: 'exact', head: true })
+        .not('photo_url', 'is', null)
+        .or('audit_flags.is.null,audit_flags.eq.[]')
+        .gte('clock_date', dateFrom)
+        .lte('clock_date', dateTo);
+      
+      setUnprocessedPhotoCount(count || 0);
+    };
+    countUnprocessed();
+  }, [dateFrom, dateTo, records]);
 
   const loadUsers = async () => {
     const { data } = await supabase
