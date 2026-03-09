@@ -54,7 +54,14 @@ const originOptions = [
   { value: "outros", label: "Outros" },
 ];
 
-export function ReportFilters({ filters, onFiltersChange, users }: ReportFiltersProps) {
+const activityStatusOptions = [
+  { value: "all", label: "Todos" },
+  { value: "active", label: "🟢 Ativos" },
+  { value: "warning", label: "🟡 Alertas" },
+  { value: "critical", label: "🔴 Críticos" },
+];
+
+export function ReportFilters({ filters, onFiltersChange, users, activityFilter, onActivityFilterChange }: ReportFiltersProps) {
   const [isCustomDateOpen, setIsCustomDateOpen] = useState(false);
 
   const handleDateTypeChange = (value: string) => {
