@@ -24,6 +24,7 @@ import { DashboardCards } from "./components/DashboardCards";
 import { BankingPipeline, mapToPipelineStatus } from "./components/BankingPipeline";
 import { ProductionBar } from "./components/ProductionBar";
 import { StalledAlertBanner } from "./components/StalledAlertBanner";
+import { useTelevendasStats } from "./hooks/useTelevendasStats";
 import { SmartSearch } from "./components/SmartSearch";
 import { StatusChangeModal } from "./components/StatusChangeModal";
 import { FiltersDrawer } from "./components/FiltersDrawer";
