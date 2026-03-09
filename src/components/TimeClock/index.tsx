@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, History, Settings as SettingsIcon, CalendarClock, FileText, LayoutDashboard, Timer, DollarSign, CalendarOff, Calculator } from 'lucide-react';
+import { Clock, History, Settings as SettingsIcon, CalendarClock, FileText, LayoutDashboard, Timer, DollarSign, CalendarOff, Calculator, ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ClockButton } from './ClockButton';
