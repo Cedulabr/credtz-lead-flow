@@ -1,5 +1,12 @@
 export type TimeClockType = 'entrada' | 'pausa_inicio' | 'pausa_fim' | 'saida';
 export type TimeClockStatus = 'completo' | 'incompleto' | 'ajustado' | 'pendente';
+export type AuditStatus = 'normal' | 'suspicious' | 'irregular';
+
+export interface AuditFlag {
+  code: string;
+  label: string;
+  scoreDelta: number;
+}
 
 export interface TimeClock {
   id: string;
@@ -19,6 +26,9 @@ export interface TimeClock {
   status: TimeClockStatus;
   notes: string | null;
   break_type_id: string | null;
+  trust_score: number | null;
+  audit_flags: AuditFlag[] | null;
+  audit_status: AuditStatus | null;
   created_at: string;
   updated_at: string;
 }
@@ -45,6 +55,11 @@ export interface TimeClockSettings {
   allow_manual_adjustment: boolean;
   block_duplicate_clock: boolean;
   retention_years: number;
+  company_latitude: number | null;
+  company_longitude: number | null;
+  geofence_radius_meters: number | null;
+  block_on_invalid_photo: boolean;
+  block_on_geofence_violation: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -78,6 +93,19 @@ export interface DailyRecord {
   status: TimeClockStatus;
 }
 
+export interface FaceDetectionResult {
+  faceCount: number;
+  confidence: number;
+  isBlurry: boolean;
+  flags: AuditFlag[];
+}
+
+export interface AuditResult {
+  score: number;
+  status: AuditStatus;
+  flags: AuditFlag[];
+}
+
 export const clockTypeLabels: Record<TimeClockType, string> = {
   entrada: 'Entrada',
   pausa_inicio: 'Início Pausa',
@@ -97,4 +125,16 @@ export const statusColors: Record<TimeClockStatus, string> = {
   incompleto: 'bg-yellow-100 text-yellow-800',
   ajustado: 'bg-blue-100 text-blue-800',
   pendente: 'bg-gray-100 text-gray-800',
+};
+
+export const auditStatusLabels: Record<AuditStatus, string> = {
+  normal: 'Confiável',
+  suspicious: 'Suspeito',
+  irregular: 'Irregular',
+};
+
+export const auditStatusColors: Record<AuditStatus, string> = {
+  normal: 'bg-green-100 text-green-800 border-green-200',
+  suspicious: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  irregular: 'bg-red-100 text-red-800 border-red-200',
 };
