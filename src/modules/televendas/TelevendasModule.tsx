@@ -664,22 +664,19 @@ export const TelevendasModule = () => {
 
       {/* ALERTA: Propostas paradas */}
       <StalledAlertBanner
-        televendas={televendas}
+        criticos={centralStats.criticos}
+        alertas={centralStats.alertas}
         onFilterByPriority={handleFilterByPriority}
       />
 
       {/* BLOCO 1 — Visão Executiva */}
-      <DashboardCards
-        televendas={televendas}
-        onFilterByStatus={handleFilterByStatus}
-        selectedStatus={filters.status !== "all" ? filters.status : undefined}
-        isGestorOrAdmin={isGestorOrAdmin}
-        dateMode={filters.dateMode}
-      />
+      <DashboardCards stats={centralStats} />
 
       {/* BLOCO 2 — Pipeline Operacional */}
       <BankingPipeline
-        televendas={televendas}
+        pipelineCounts={centralStats.pipelineCounts}
+        criticos={centralStats.criticos}
+        alertas={centralStats.alertas}
         onFilterByBankStatus={handleFilterByBankStatus}
         selectedBankStatus={bankStatusFilter}
         onFilterByPriority={handleFilterByPriority}
@@ -688,7 +685,7 @@ export const TelevendasModule = () => {
 
       {/* BLOCO 3 — Produção do Mês */}
       <ProductionBar
-        televendas={televendas}
+        stats={centralStats}
         isGestorOrAdmin={isGestorOrAdmin}
       />
 
