@@ -565,6 +565,4 @@ export function PerformanceReport() {
       />
     </div>
   );
-    </div>
-  );
 }
