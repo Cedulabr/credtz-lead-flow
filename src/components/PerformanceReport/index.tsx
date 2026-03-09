@@ -1,13 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
-import { BarChart3, RefreshCw } from "lucide-react";
+import { BarChart3, RefreshCw, Building2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ReportFilters } from "./ReportFilters";
 import { SummaryCards } from "./SummaryCards";
 import { PerformanceTable } from "./PerformanceTable";
 import { ActivityDetailsModal } from "./ActivityDetailsModal";
 import { ExportButtons } from "./ExportButtons";
+import { TeamOverviewCards } from "./TeamOverviewCards";
+import { InactivityAlertBanner } from "./InactivityAlertBanner";
+import { TeamRanking } from "./TeamRanking";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGestorCompany } from "@/hooks/useGestorCompany";
 import { BlockedAccess } from "@/components/BlockedAccess";
 import { toast } from "sonner";
 import {
@@ -15,8 +20,9 @@ import {
   ReportFilters as ReportFiltersType,
   UserPerformance,
   ReportSummary,
+  ActivityStatus,
 } from "./types";
-import { startOfDay, endOfDay, subDays, startOfMonth } from "date-fns";
+import { startOfDay, endOfDay, subDays, startOfMonth, differenceInDays } from "date-fns";
 
 export function PerformanceReport() {
   const { profile, isAdmin } = useAuth();
