@@ -6,8 +6,8 @@ import { auditStatusLabels } from './types';
 
 interface TrustScoreBadgeProps {
   score: number | null;
-  status: AuditStatus | null;
-  flags?: AuditFlag[] | null;
+  status: string | null;
+  flags?: any;
   showScore?: boolean;
   size?: 'sm' | 'md' | 'lg';
 }
