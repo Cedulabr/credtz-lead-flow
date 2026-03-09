@@ -27,7 +27,7 @@ export interface TimeClock {
   notes: string | null;
   break_type_id: string | null;
   trust_score: number | null;
-  audit_flags: AuditFlag[] | null;
+  audit_flags: any;
   audit_status: AuditStatus | null;
   created_at: string;
   updated_at: string;
