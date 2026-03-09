@@ -17,6 +17,8 @@ import { HourBankEntries } from './HourBankEntries';
 import { HourBankCompensation } from './HourBankCompensation';
 import { HourBankSettingsPanel } from './HourBankSettings';
 import { HourBankReport } from './HourBankReport';
+import { HourBankCompanyOverview } from './HourBankCompanyOverview';
+import { HourBankEmployeeAlert } from './HourBankEmployeeAlert';
 
 export function HourBank() {
   const { user, isAdmin, profile } = useAuth();
@@ -218,6 +220,9 @@ export function HourBank() {
 
   return (
     <div className="space-y-4">
+      {/* Employee Alert */}
+      {!isGestor && <HourBankEmployeeAlert />}
+
       {/* Summary Cards */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Card className={totalBalance >= 0 ? 'border-green-200' : 'border-red-200'}>
@@ -271,9 +276,10 @@ export function HourBank() {
       {/* Main Content with Sub-tabs */}
       <Tabs defaultValue="resumo">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <TabsList className={`grid w-full ${isGestor ? 'grid-cols-5' : 'grid-cols-2'}`}>
+          <TabsList className={`grid w-full ${isGestor ? 'grid-cols-6' : 'grid-cols-2'}`}>
             <TabsTrigger value="resumo" className="text-xs">Resumo</TabsTrigger>
             <TabsTrigger value="historico" className="text-xs">Histórico</TabsTrigger>
+            {isGestor && <TabsTrigger value="gestao" className="text-xs">Gestão</TabsTrigger>}
             {isGestor && <TabsTrigger value="lancamentos" className="text-xs">Lançamentos</TabsTrigger>}
             {isGestor && <TabsTrigger value="compensacoes" className="text-xs">Compensações</TabsTrigger>}
             {isGestor && <TabsTrigger value="config" className="text-xs">Regras</TabsTrigger>}
@@ -350,6 +356,13 @@ export function HourBank() {
         <TabsContent value="historico">
           <HourBankEntries users={users} selectedUserId={selectedUserId} onEntryAdded={loadBalances} />
         </TabsContent>
+
+        {/* GESTÃO (admin/gestor only) */}
+        {isGestor && (
+          <TabsContent value="gestao">
+            <HourBankCompanyOverview />
+          </TabsContent>
+        )}
 
         {/* LANÇAMENTOS (admin only) */}
         {isGestor && (
