@@ -26,7 +26,8 @@ import { startOfDay, endOfDay, subDays, startOfMonth, differenceInDays } from "d
 
 export function PerformanceReport() {
   const { profile, isAdmin } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
+  const gestorCompany = useGestorCompany();
+  const [activityFilter, setActivityFilter] = useState<'all' | 'active' | 'warning' | 'critical'>('all');
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [performanceData, setPerformanceData] = useState<UserPerformance[]>([]);
