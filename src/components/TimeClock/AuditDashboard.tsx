@@ -95,7 +95,7 @@ export function AuditDashboard() {
       const enrichedRecords = data.map(r => ({
         ...r,
         user_name: userMap.get(r.user_id) || 'Usuário',
-        audit_flags: (Array.isArray(r.audit_flags) ? r.audit_flags : []) as AuditFlag[],
+        audit_flags: (Array.isArray(r.audit_flags) ? r.audit_flags : []) as unknown as AuditFlag[],
       })) as AuditRecord[];
 
       setRecords(enrichedRecords);
