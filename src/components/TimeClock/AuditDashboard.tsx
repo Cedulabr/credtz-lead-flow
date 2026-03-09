@@ -7,16 +7,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
 import { 
   ShieldAlert, ShieldCheck, ShieldX, MapPin, Wifi, Camera, 
-  Search, Calendar, Loader2, Eye, TrendingUp, Users, AlertTriangle 
+  Search, Calendar, Loader2, Eye, TrendingUp, Users, AlertTriangle,
+  RefreshCw, CheckCircle
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { TrustScoreBadge } from './TrustScoreBadge';
+import { useAuditEngine } from './useAuditEngine';
 import { clockTypeLabels, type TimeClock, type AuditStatus, type AuditFlag } from './types';
+import { useToast } from '@/hooks/use-toast';
 
 interface AuditRecord extends TimeClock {
   user_name?: string;
