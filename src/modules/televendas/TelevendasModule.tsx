@@ -24,6 +24,7 @@ import { DashboardCards } from "./components/DashboardCards";
 import { BankingPipeline, mapToPipelineStatus } from "./components/BankingPipeline";
 import { ProductionBar } from "./components/ProductionBar";
 import { StalledAlertBanner } from "./components/StalledAlertBanner";
+import { useTelevendasStats } from "./hooks/useTelevendasStats";
 import { SmartSearch } from "./components/SmartSearch";
 import { StatusChangeModal } from "./components/StatusChangeModal";
 import { FiltersDrawer } from "./components/FiltersDrawer";
@@ -97,6 +98,9 @@ export const TelevendasModule = () => {
   const [userCompanyIds, setUserCompanyIds] = useState<string[]>([]);
 
   const isGestorOrAdmin = isAdmin || isGestor;
+
+  // Centralized stats
+  const centralStats = useTelevendasStats(televendas, bankCalculationModel);
 
   // Check gestor role
   useEffect(() => {
@@ -400,44 +404,10 @@ export const TelevendasModule = () => {
     }
   };
 
-  // Direct status change (without modal - for quick actions)
+  // Direct status change — uses confirmStatusChange with empty reason
   const handleQuickStatusChange = async (tv: Televenda, newStatus: string) => {
-    try {
-      console.log("Quick status change for:", tv.id, "to:", newStatus);
-      
-      const { error: updateError } = await supabase
-        .from("televendas")
-        .update({ 
-          status: newStatus, 
-          status_updated_at: new Date().toISOString(),
-          status_updated_by: user?.id 
-        })
-        .eq("id", tv.id);
-
-      if (updateError) {
-        console.error("Update error:", updateError);
-        throw updateError;
-      }
-
-      const { error: historyError } = await supabase
-        .from("televendas_status_history")
-        .insert({
-          televendas_id: tv.id,
-          from_status: tv.status,
-          to_status: newStatus,
-          changed_by: user?.id,
-        });
-
-      if (historyError) {
-        console.error("History error:", historyError);
-      }
-
-      toast({ title: "✅ Status atualizado" });
-      await fetchTelevendas();
-    } catch (error) {
-      console.error("Quick status change error:", error);
-      toast({ title: "Erro", description: "Erro ao atualizar", variant: "destructive" });
-    }
+    setStatusChangeModal({ open: false, televenda: tv, newStatus });
+    await confirmStatusChange("", undefined);
   };
 
   // Delete handler (physical delete after manager approval)
@@ -575,26 +545,29 @@ export const TelevendasModule = () => {
   const handleApproveCancellation = (tv: Televenda) => handleStatusChange(tv, "proposta_cancelada");
   const handleRejectCancellation = (tv: Televenda) => handleStatusChange(tv, "devolvido");
 
-  // Bulk approve cancellations
+  // Bulk approve cancellations — chunked Promise.all
   const handleBulkApproveCancellation = async (items: Televenda[]) => {
     try {
-      for (const tv of items) {
-        const updateData: Record<string, unknown> = {
-          status: "proposta_cancelada",
-          status_bancario: "cancelado_banco",
-          status_updated_at: new Date().toISOString(),
-          status_updated_by: user?.id,
-          data_cancelamento: new Date().toISOString().split("T")[0],
-        };
-
-        await supabase.from("televendas").update(updateData).eq("id", tv.id);
-        await supabase.from("televendas_status_history").insert({
-          televendas_id: tv.id,
-          from_status: tv.status,
-          to_status: "proposta_cancelada",
-          changed_by: user?.id,
-          reason: "Aprovação em massa de cancelamento",
-        });
+      const CHUNK_SIZE = 5;
+      for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+        const chunk = items.slice(i, i + CHUNK_SIZE);
+        await Promise.all(chunk.map(async (tv) => {
+          const updateData: Record<string, unknown> = {
+            status: "proposta_cancelada",
+            status_bancario: "cancelado_banco",
+            status_updated_at: new Date().toISOString(),
+            status_updated_by: user?.id,
+            data_cancelamento: new Date().toISOString().split("T")[0],
+          };
+          await supabase.from("televendas").update(updateData).eq("id", tv.id);
+          await supabase.from("televendas_status_history").insert({
+            televendas_id: tv.id,
+            from_status: tv.status,
+            to_status: "proposta_cancelada",
+            changed_by: user?.id,
+            reason: "Aprovação em massa de cancelamento",
+          });
+        }));
       }
 
       toast({ title: "✅ Cancelamentos aprovados", description: `${items.length} propostas canceladas com sucesso` });
@@ -691,22 +664,19 @@ export const TelevendasModule = () => {
 
       {/* ALERTA: Propostas paradas */}
       <StalledAlertBanner
-        televendas={televendas}
+        criticos={centralStats.criticos}
+        alertas={centralStats.alertas}
         onFilterByPriority={handleFilterByPriority}
       />
 
       {/* BLOCO 1 — Visão Executiva */}
-      <DashboardCards
-        televendas={televendas}
-        onFilterByStatus={handleFilterByStatus}
-        selectedStatus={filters.status !== "all" ? filters.status : undefined}
-        isGestorOrAdmin={isGestorOrAdmin}
-        dateMode={filters.dateMode}
-      />
+      <DashboardCards stats={centralStats} />
 
       {/* BLOCO 2 — Pipeline Operacional */}
       <BankingPipeline
-        televendas={televendas}
+        pipelineCounts={centralStats.pipelineCounts}
+        criticos={centralStats.criticos}
+        alertas={centralStats.alertas}
         onFilterByBankStatus={handleFilterByBankStatus}
         selectedBankStatus={bankStatusFilter}
         onFilterByPriority={handleFilterByPriority}
@@ -715,7 +685,7 @@ export const TelevendasModule = () => {
 
       {/* BLOCO 3 — Produção do Mês */}
       <ProductionBar
-        televendas={televendas}
+        stats={centralStats}
         isGestorOrAdmin={isGestorOrAdmin}
       />
 

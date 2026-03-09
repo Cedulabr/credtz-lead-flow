@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Televenda } from "../types";
-import { calcDiasParado, getPriorityFromDays } from "./PriorityBadge";
 
 // Simplified 6-status pipeline matching the reference system
 export const BANKING_STATUS_CONFIG: Record<string, {
@@ -96,7 +95,9 @@ const PRIORITY_FILTER_CONFIG = {
 };
 
 interface BankingPipelineProps {
-  televendas: Televenda[];
+  pipelineCounts: Record<string, number>;
+  criticos: number;
+  alertas: number;
   onFilterByBankStatus: (status: string) => void;
   selectedBankStatus?: string;
   onFilterByPriority?: (priority: string) => void;
@@ -130,37 +131,17 @@ export const mapToPipelineStatus = (tv: Televenda): string => {
   }
 };
 
-export const BankingPipeline = ({ televendas, onFilterByBankStatus, selectedBankStatus, onFilterByPriority, selectedPriority }: BankingPipelineProps) => {
+export const BankingPipeline = ({ pipelineCounts, criticos, alertas, onFilterByBankStatus, selectedBankStatus, onFilterByPriority, selectedPriority }: BankingPipelineProps) => {
 
   const stats = useMemo(() => {
-    const byStatus = televendas.reduce((acc, tv) => {
-      const status = mapToPipelineStatus(tv);
-      if (!acc[status]) acc[status] = { count: 0 };
-      acc[status].count += 1;
-      return acc;
-    }, {} as Record<string, { count: number }>);
-
     return Object.entries(BANKING_STATUS_CONFIG).map(([key, config]) => ({
       key,
       ...config,
-      count: byStatus[key]?.count || 0,
+      count: pipelineCounts[key] || 0,
     }));
-  }, [televendas]);
+  }, [pipelineCounts]);
 
-  // Priority counts for active proposals
-  const priorityCounts = useMemo(() => {
-    const finalStatuses = ["proposta_paga", "proposta_cancelada", "exclusao_aprovada"];
-    let alertas = 0;
-    let criticos = 0;
-    televendas.forEach((tv) => {
-      if (finalStatuses.includes(tv.status)) return;
-      const dias = calcDiasParado(tv.updated_at);
-      const prio = tv.prioridade_operacional || getPriorityFromDays(dias);
-      if (prio === "critico") criticos++;
-      else if (prio === "alerta") alertas++;
-    });
-    return { alerta: alertas, critico: criticos };
-  }, [televendas]);
+  const priorityCounts = { alerta: alertas, critico: criticos };
 
   return (
     <div className="space-y-2">
