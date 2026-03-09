@@ -1,54 +1,80 @@
 
-## Diagnóstico
 
-A tabela `time_clock_day_offs` não possui colunas para:
-- Horário de início/fim de folga parcial (ex: folga das 14h às 18h)
-- Tipo "home_office" 
-- Flag se é dia completo ou parcial
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-## O que será feito
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-### 1. Migração do banco — adicionar colunas à `time_clock_day_offs`
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-Novas colunas:
-```sql
-is_partial_day   BOOLEAN DEFAULT false   -- se é folga parcial (com horário)
-start_time       TIME                    -- horário início (null = dia todo)
-end_time         TIME                    -- horário fim (null = dia todo)
-```
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
 
-E novo tipo na lista de `off_type`: **`home_office`**
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
 
-### 2. Atualizar `DayOffManager.tsx`
+---
 
-**Modal:**
-- Adicionar tipo `home_office` no `OFF_TYPE_CONFIG` (badge amarelo)
-- Adicionar checkbox **"Folga parcial (horário específico)"**
-- Quando marcado, exibir campos de **Hora Início** e **Hora Fim** (input `time`)
-- Validar que horário início < horário fim
+### 2. Conectar Base OFF ao PostgreSQL externo
 
-**Tabela de listagem:**
-- Nova coluna **"Horário"** mostrando:
-  - "Dia todo" se `is_partial_day = false`
-  - "14:00 – 18:00" se parcial
-- Badge especial para `home_office`
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
 
-**Payload do INSERT:**
-- Incluir `is_partial_day`, `start_time`, `end_time` em todos os inserts (individual e bulk)
-
-### 3. Configuração dos tipos
+**Arquitetura:**
 
 ```text
-folga       → Folga (azul)         — suporta dia todo ou horário parcial
-feriado     → Feriado (verde)      — sempre dia todo
-licenca     → Licença (roxo)       — sempre dia todo  
-ferias      → Férias (laranja)     — sempre dia todo
-abono       → Abono (cinza)        — suporta parcial
-home_office → Home Office (amarelo) — suporta parcial
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
 ```
 
-Tipos com dia todo obrigatório (`feriado`, `licenca`, `ferias`) ocultam automaticamente o checkbox de folga parcial.
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+
+---
+
+### 3. Simplificar modulo Base OFF - apenas Consulta
+
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
+
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+
+---
 
 ### Arquivos a modificar
-- **Migração SQL** — adicionar colunas `is_partial_day`, `start_time`, `end_time` na tabela `time_clock_day_offs`
-- **`src/components/TimeClock/DayOffManager.tsx`** — novo tipo, campos de horário, lógica parcial
+
+| Arquivo | Mudanca |
+|---|---|
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
+
+---
+
+### Pergunta necessaria
+
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+

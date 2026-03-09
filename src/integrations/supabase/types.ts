@@ -5276,30 +5276,39 @@ export type Database = {
           company_id: string | null
           created_at: string
           created_by: string | null
+          end_time: string | null
           id: string
+          is_partial_day: boolean
           off_date: string
           off_type: string
           reason: string | null
+          start_time: string | null
           user_id: string
         }
         Insert: {
           company_id?: string | null
           created_at?: string
           created_by?: string | null
+          end_time?: string | null
           id?: string
+          is_partial_day?: boolean
           off_date: string
           off_type: string
           reason?: string | null
+          start_time?: string | null
           user_id: string
         }
         Update: {
           company_id?: string | null
           created_at?: string
           created_by?: string | null
+          end_time?: string | null
           id?: string
+          is_partial_day?: boolean
           off_date?: string
           off_type?: string
           reason?: string | null
+          start_time?: string | null
           user_id?: string
         }
         Relationships: [
