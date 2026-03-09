@@ -110,6 +110,10 @@ export function TimeClock() {
                 <CalendarClock className="h-4 w-4" />
                 <span className="hidden sm:inline">Jornadas</span>
               </TabsTrigger>
+              <TabsTrigger value="audit" className="flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4" />
+                <span className="hidden sm:inline">Auditoria</span>
+              </TabsTrigger>
             </>
           )}
         </TabsList>
