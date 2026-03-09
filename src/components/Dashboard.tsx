@@ -131,8 +131,116 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   useEffect(() => {
     if (user && showSimpleDashboard === false) {
       fetchActivityData();
+      fetchModuleMetrics();
     }
   }, [user, isAdmin, isGestor, selectedMonth, selectedCompany, userCompanyIds, showSimpleDashboard]);
+
+  // Fetch module metrics for admin/gestor cards
+  const fetchModuleMetrics = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { startDate, endDate } = getDateRange();
+      const startISO = startDate.toISOString();
+      const endISO = endDate.toISOString();
+      const visibleCompanyIds = getVisibleCompanyIds();
+
+      // Build queries based on scope (admin = global, gestor = company)
+      const queries: Promise<any>[] = [];
+
+      // Leads Premium count
+      let leadsQuery = supabase.from('leads').select('id', { count: 'exact', head: true })
+        .neq('status', 'new_lead')
+        .gte('created_at', startISO)
+        .lte('created_at', endISO);
+      if (!isAdmin && visibleCompanyIds.length > 0) {
+        leadsQuery = leadsQuery.in('company_id', visibleCompanyIds);
+      }
+      queries.push(leadsQuery);
+
+      // Radar Credits (sum)
+      let radarQuery = supabase.from('radar_credits').select('credits_balance');
+      if (!isAdmin && visibleCompanyIds.length > 0) {
+        radarQuery = radarQuery.in('company_id', visibleCompanyIds);
+      }
+      queries.push(radarQuery);
+
+      // Activate Leads count
+      let activateQuery = supabase.from('activate_leads').select('id', { count: 'exact', head: true })
+        .neq('status', 'novo')
+        .gte('created_at', startISO)
+        .lte('created_at', endISO);
+      if (!isAdmin && visibleCompanyIds.length > 0) {
+        activateQuery = activateQuery.in('company_id', visibleCompanyIds);
+      }
+      queries.push(activateQuery);
+
+      // Televendas Pagas count
+      let tvQuery = supabase.from('televendas').select('id', { count: 'exact', head: true })
+        .eq('status', 'pago')
+        .gte('created_at', startISO)
+        .lte('created_at', endISO);
+      if (!isAdmin && visibleCompanyIds.length > 0) {
+        tvQuery = tvQuery.in('company_id', visibleCompanyIds);
+      }
+      queries.push(tvQuery);
+
+      // Documents count
+      let docsQuery = supabase.from('client_documents').select('id', { count: 'exact', head: true });
+      if (!isAdmin && visibleCompanyIds.length > 0) {
+        docsQuery = docsQuery.in('company_id', visibleCompanyIds);
+      }
+      queries.push(docsQuery);
+
+      // SMS Credits (sum)
+      let smsQuery = supabase.from('sms_credits').select('credits_balance');
+      if (!isAdmin && visibleCompanyIds.length > 0) {
+        smsQuery = smsQuery.in('company_id', visibleCompanyIds);
+      }
+      queries.push(smsQuery);
+
+      // WhatsApp instances
+      let waQuery = supabase.from('whatsapp_instances').select('id, token').not('token', 'is', null);
+      if (!isAdmin && visibleCompanyIds.length > 0) {
+        waQuery = waQuery.in('company_id', visibleCompanyIds);
+      }
+      queries.push(waQuery);
+
+      const [leadsRes, radarRes, activateRes, tvRes, docsRes, smsRes, waRes] = await Promise.all(queries);
+
+      // Calculate totals
+      const radarTotal = (radarRes.data || []).reduce((sum: number, r: any) => sum + (r.credits_balance || 0), 0);
+      const smsTotal = (smsRes.data || []).reduce((sum: number, r: any) => sum + (r.credits_balance || 0), 0);
+      const waConnected = (waRes.data || []).length > 0;
+
+      setModuleMetrics({
+        leadsPremium: leadsRes.count || 0,
+        radarCredits: radarTotal,
+        activateLeads: activateRes.count || 0,
+        televendasPagas: tvRes.count || 0,
+        documentos: docsRes.count || 0,
+        smsCredits: smsTotal,
+        whatsappConnected: waConnected,
+      });
+    } catch (error) {
+      console.error('Error fetching module metrics:', error);
+    }
+  };
+
+  const checkWhatsAppConnection = async () => {
+    setCheckingWhatsApp(true);
+    try {
+      const visibleCompanyIds = getVisibleCompanyIds();
+      let query = supabase.from('whatsapp_instances').select('id, token').not('token', 'is', null);
+      if (!isAdmin && visibleCompanyIds.length > 0) {
+        query = query.in('company_id', visibleCompanyIds);
+      }
+      const { data } = await query;
+      setModuleMetrics(prev => ({ ...prev, whatsappConnected: (data || []).length > 0 }));
+    } finally {
+      setCheckingWhatsApp(false);
+    }
+  };
 
   const getDateRange = () => {
     const [year, month] = selectedMonth.split('-').map(Number);
