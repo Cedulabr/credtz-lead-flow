@@ -540,7 +540,64 @@ export function AuditDashboard() {
             </CardContent>
           </Card>
 
-          {/* Records Table */}
+          {/* Photo Re-analysis Section */}
+          <Card>
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <Image className="h-4 w-4" />
+                    Re-analisar Fotos (Detecção Facial)
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Executa detecção facial nas fotos de registros sem validação facial
+                    {unprocessedPhotoCount > 0 && (
+                      <Badge variant="destructive" className="ml-2 text-xs">
+                        {unprocessedPhotoCount} sem análise
+                      </Badge>
+                    )}
+                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                  {reanalyzingPhotos && (
+                    <div className="flex items-center gap-3 min-w-[200px]">
+                      <Progress 
+                        value={photoReanalysisProgress.total > 0 ? (photoReanalysisProgress.current / photoReanalysisProgress.total) * 100 : 0} 
+                        className="w-32"
+                      />
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {photoReanalysisProgress.current}/{photoReanalysisProgress.total}
+                      </span>
+                    </div>
+                  )}
+                  <Button 
+                    onClick={handlePhotoReanalysis} 
+                    disabled={reanalyzingPhotos || loading || !faceDetectionReady}
+                    variant="outline"
+                  >
+                    {reanalyzingPhotos ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Analisando...
+                      </>
+                    ) : !faceDetectionReady ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Carregando modelo...
+                      </>
+                    ) : (
+                      <>
+                        <Camera className="h-4 w-4 mr-2" />
+                        Analisar Fotos
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+
           <Card>
             <CardContent className="pt-6">
               {loading ? (
