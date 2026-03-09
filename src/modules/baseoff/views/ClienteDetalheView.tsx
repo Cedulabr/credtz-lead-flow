@@ -91,13 +91,18 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
         const mapped = inlineContracts!.map((c, i) => inlineToContract(c, client.id, client.cpf, i));
         setContracts(mapped);
       } else {
-        const { data, error } = await supabase
-          .from('baseoff_contracts')
-          .select('*')
-          .eq('client_id', client.id)
-          .order('created_at', { ascending: false });
-        if (error) throw error;
-        setContracts(data || []);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(client.id)) {
+          setContracts([]);
+        } else {
+          const { data, error } = await supabase
+            .from('baseoff_contracts')
+            .select('*')
+            .eq('client_id', client.id)
+            .order('created_at', { ascending: false });
+          if (error) throw error;
+          setContracts(data || []);
+        }
       }
     } catch (error) {
       console.error('Error fetching contracts:', error);
