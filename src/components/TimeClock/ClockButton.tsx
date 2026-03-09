@@ -216,7 +216,7 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
           .from('time_clock')
           .update({
             trust_score: auditResult.score,
-            audit_flags: auditResult.flags,
+            audit_flags: auditResult.flags as any,
             audit_status: auditResult.status,
           })
           .eq('id', latestRecord.id);
