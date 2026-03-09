@@ -16,6 +16,7 @@ import { ReportSummary } from "./types";
 interface SummaryCardsProps {
   summary: ReportSummary;
   isLoading?: boolean;
+  teamStats?: { active: number; warning: number; critical: number; total: number };
 }
 
 export function SummaryCards({ summary, isLoading }: SummaryCardsProps) {
