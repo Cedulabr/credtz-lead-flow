@@ -83,6 +83,7 @@ export function useAuditEngine() {
   };
 
   // Analyze location variation - compare with user's typical locations
+  // Now more sensitive: requires only 1 previous record, 2km threshold
   const analyzeLocationVariation = (
     currentLat: number | null,
     currentLon: number | null,
@@ -95,9 +96,10 @@ export function useAuditEngine() {
       r => r.latitude !== null && r.longitude !== null
     );
     
-    if (recordsWithGPS.length < 3) return null; // Need at least 3 records
+    // Now only need 1 previous record (was 3)
+    if (recordsWithGPS.length < 1) return null;
     
-    // Calculate distances to previous locations
+    // Calculate distances to previous locations (up to 5 most recent)
     const distances = recordsWithGPS.slice(0, 5).map(r => 
       haversineDistance(currentLat, currentLon, r.latitude!, r.longitude!)
     );
@@ -105,11 +107,11 @@ export function useAuditEngine() {
     // Calculate average distance
     const avgDistance = distances.reduce((a, b) => a + b, 0) / distances.length;
     
-    // If average distance to recent locations > 5km, flag as suspicious
-    if (avgDistance > 5000) {
+    // Reduced threshold from 5km to 2km for better detection
+    if (avgDistance > 2000) {
       return {
         code: 'localizacao_diferente',
-        label: `Localização ${Math.round(avgDistance / 1000)}km distante do habitual`,
+        label: `Localização ${avgDistance >= 1000 ? Math.round(avgDistance / 1000) + 'km' : Math.round(avgDistance) + 'm'} distante do habitual`,
         scoreDelta: -30,
       };
     }

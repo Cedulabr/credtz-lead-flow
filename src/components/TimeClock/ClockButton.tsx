@@ -11,7 +11,7 @@ import { useFaceDetection } from './useFaceDetection';
 import { CameraCapture } from './CameraCapture';
 import { ConsentModal } from './ConsentModal';
 import { TrustScoreBadge } from './TrustScoreBadge';
-import { clockTypeLabels, type TimeClockType, type TimeClock, type TimeClockBreakType } from './types';
+import { clockTypeLabels, type TimeClockType, type TimeClock, type TimeClockBreakType, type FaceDetectionResult } from './types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -38,7 +38,7 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
   
   const { toast } = useToast();
   const { calculateAudit, shouldBlockRegistration } = useAuditEngine();
-  const { initialize: initFaceDetection, validatePhoto, isReady: faceDetectionReady, error: faceDetectionError } = useFaceDetection();
+  const { initialize: initFaceDetection, validatePhoto, isReady: faceDetectionReady, isLoading: faceDetectionLoading, error: faceDetectionError } = useFaceDetection();
   const {
     loading,
     checkConsent,
@@ -149,11 +149,13 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
     });
   };
 
-  const handlePhotoCapture = async (blob: Blob) => {
+  const handlePhotoCapture = async (blob: Blob, faceDetectedInCamera: boolean) => {
     setShowCamera(false);
     
-    // Run face detection on captured photo
-    let faceResult = null;
+    console.log('[ClockButton] Photo captured, face detected in camera:', faceDetectedInCamera);
+    
+    // Run face detection again on the final blob for audit
+    let faceResult: FaceDetectionResult;
     try {
       const img = new Image();
       const url = URL.createObjectURL(blob);
@@ -168,7 +170,9 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
       if (ctx) {
         ctx.drawImage(img, 0, 0);
         faceResult = await validatePhoto(canvas);
-        console.log('[ClockButton] Face detection result:', faceResult);
+        console.log('[ClockButton] Final face detection result:', faceResult);
+      } else {
+        throw new Error('Could not get canvas context');
       }
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -186,7 +190,7 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
       };
     }
 
-    // Calculate audit score
+    // Get IP and location in parallel
     const [ip, location] = await Promise.all([
       getPublicIP(),
       new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
@@ -199,6 +203,14 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
       }),
     ]);
 
+    console.log('[ClockButton] Calculating audit with:', {
+      userId,
+      latitude: location?.latitude,
+      longitude: location?.longitude,
+      ip,
+      faceFlags: faceResult.flags,
+    });
+
     const auditResult = await calculateAudit({
       userId,
       latitude: location?.latitude ?? null,
@@ -206,6 +218,8 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
       ipAddress: ip,
       faceResult,
     });
+
+    console.log('[ClockButton] Audit result:', auditResult);
 
     // Check if registration should be blocked
     const blockCheck = await shouldBlockRegistration(auditResult);
@@ -224,7 +238,8 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
       const records = await getTodayRecords();
       const latestRecord = records[records.length - 1];
       if (latestRecord) {
-        await supabase
+        console.log('[ClockButton] Updating record with audit data:', latestRecord.id);
+        const { error: updateError } = await supabase
           .from('time_clock')
           .update({
             trust_score: auditResult.score,
@@ -232,6 +247,12 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
             audit_status: auditResult.status,
           })
           .eq('id', latestRecord.id);
+        
+        if (updateError) {
+          console.error('[ClockButton] Failed to update audit data:', updateError);
+        } else {
+          console.log('[ClockButton] Audit data saved successfully');
+        }
       }
 
       setSelectedBreakType(null);
@@ -262,6 +283,15 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
     return `Registrar ${clockTypeLabels[nextClockType]}`;
   };
 
+  const getFaceDetectionStatus = () => {
+    if (faceDetectionLoading) return 'loading';
+    if (faceDetectionError) return 'error';
+    if (faceDetectionReady) return 'ready';
+    return 'loading';
+  };
+
+  const faceStatus = getFaceDetectionStatus();
+
   return (
     <>
       <Card>
@@ -284,17 +314,15 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
               <span>IP</span>
             </div>
             <div className="flex items-center gap-1 relative group">
-              {faceDetectionReady ? (
-                <Camera className="h-4 w-4 text-green-500" />
-              ) : faceDetectionError ? (
-                <Camera className="h-4 w-4 text-red-500" />
-              ) : (
-                <Camera className="h-4 w-4 text-yellow-500" />
-              )}
+              <Camera className={`h-4 w-4 ${
+                faceStatus === 'ready' ? 'text-green-500' : 
+                faceStatus === 'error' ? 'text-red-500' : 
+                'text-yellow-500'
+              }`} />
               <span>Foto</span>
-              {!faceDetectionReady && (
+              {faceStatus !== 'ready' && (
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                  {faceDetectionError ? 'Detecção facial indisponível' : 'Carregando detecção facial...'}
+                  {faceStatus === 'error' ? 'Detecção facial indisponível' : 'Carregando detecção facial...'}
                 </div>
               )}
             </div>
