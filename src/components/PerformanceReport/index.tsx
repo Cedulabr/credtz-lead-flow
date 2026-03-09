@@ -449,12 +449,6 @@ export function PerformanceReport() {
     });
   };
 
-  if (!hasAccess) {
-    return (
-      <BlockedAccess message="Acesso ao Relatório de Desempenho restrito a Administradores e Gestores" />
-    );
-  }
-
   // Filter data by activity status
   const filteredPerformanceData = useMemo(() => {
     if (activityFilter === 'all') return performanceData;
@@ -473,6 +467,12 @@ export function PerformanceReport() {
     const critical = performanceData.filter((u) => u.activityStatus === 'critical').length;
     return { active, warning, critical, total: performanceData.length };
   }, [performanceData]);
+
+  if (!hasAccess) {
+    return (
+      <BlockedAccess message="Acesso ao Relatório de Desempenho restrito a Administradores e Gestores" />
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 pt-16 md:pt-6 pb-24 md:pb-6 space-y-6">
