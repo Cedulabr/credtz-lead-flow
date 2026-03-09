@@ -1,80 +1,66 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Plano: Gestão de Horas por Empresa + Compensação com Limite Diário
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### O que será construído
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+1. **Nova aba "Gestão" no Banco de Horas** (admin/gestor) — Painel panorâmico com todos os colaboradores da empresa, mostrando saldo positivo/negativo de cada um. Filtros por empresa e por status (positivo/negativo). Ações diretas: lançar desconto ou solicitar compensação.
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+2. **Nova tabela `hour_bank_compensation_requests`** — Quando o admin lança uma solicitação de compensação, ela fica registrada com `status: pending`, `total_minutes` (total a compensar), `daily_limit_minutes: 30`, e o colaborador vê um alerta no seu painel.
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+3. **Visão do colaborador** — No tab "Banco Horas", o colaborador vê um banner de alerta quando tem horas pendentes de compensação, mostrando: total que deve, quanto já compensou, quanto falta. A regra de 30min/dia é aplicada automaticamente.
 
----
+4. **Controle automático de 30min/dia** — Ao registrar ponto, se o colaborador tem uma solicitação ativa de compensação, o sistema calcula automaticamente até 30min de compensação por dia trabalhado e registra em `hour_bank_entries`.
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+### Database Changes
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
-
-**Arquitetura:**
-
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
+**Nova tabela `hour_bank_compensation_requests`:**
+```sql
+CREATE TABLE public.hour_bank_compensation_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  company_id UUID,
+  requested_by UUID NOT NULL,
+  total_minutes INTEGER NOT NULL,
+  compensated_minutes INTEGER DEFAULT 0,
+  daily_limit_minutes INTEGER DEFAULT 30,
+  compensation_type TEXT NOT NULL DEFAULT 'compensacao', -- 'compensacao' or 'desconto_folha'
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'in_progress', 'completed', 'cancelled'
+  reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
 ```
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+### File Changes
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+| File | Action |
+|------|--------|
+| Migration SQL | New table + RLS |
+| `HourBank.tsx` | Add "Gestão" tab for admin/gestor with company-wide view |
+| `HourBankCompensation.tsx` | Add "Solicitar Compensação" option that creates request with 30min/day limit |
+| New: `HourBankCompanyOverview.tsx` | Table of all employees with balances, filter by positive/negative, actions to discount or request compensation |
+| New: `HourBankEmployeeAlert.tsx` | Banner shown to collaborator when they have pending compensation requests |
+| `HourBank.tsx` (collaborator view) | Show alert banner with pending compensation details |
 
----
+### Company-wide Overview (Gestão tab)
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
+The admin/gestor sees a table:
+- **Columns**: Colaborador | Saldo Acumulado | Horas Extras | Atrasos | Ações
+- **Filters**: Empresa (admin only), Tipo (Positivo/Negativo/Todos)
+- **Actions per row**: "Lançar Desconto" (opens discount form) | "Solicitar Compensação" (creates request with 30min/day rule)
+- Data comes from `time_clock_hour_bank` aggregated per user, with profiles joined for names
 
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
+### Collaborator Alert Flow
 
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+When collaborator opens "Banco Horas":
+1. System checks `hour_bank_compensation_requests` where `user_id = current_user` and `status IN ('pending', 'in_progress')`
+2. Shows red banner: "Você possui X horas para compensar. Compensação de 30min/dia será aplicada automaticamente. Já compensado: Yh Zmim | Restante: Wh Vmim"
+3. The compensation happens automatically each work day — when the day's balance is calculated, up to 30min is deducted and recorded
 
----
+### Key Implementation Details
 
-### Arquivos a modificar
-
-| Arquivo | Mudanca |
-|---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
-
----
-
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+- `loadUsers` in `HourBank.tsx` already loads all users; for company filtering, use `useGestorCompany` to get `companyUserIds`
+- The 30min/day compensation is tracked via `hour_bank_entries` with `entry_type: 'compensacao_diaria'` and linked to the request
+- When `compensated_minutes >= total_minutes`, status changes to `'completed'`
 
