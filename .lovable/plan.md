@@ -1,80 +1,121 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Evolução do Banco de Horas — Plano de Implementação
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Estado Atual
+- `time_clock_hour_bank` existe mas só tem campos básicos (expected/worked/balance_minutes por mês). Sem lançamentos manuais, compensações, ou histórico detalhado.
+- `HourBank.tsx` calcula tudo client-side a cada render — não persiste detalhes (atrasos, extras, saída antecipada).
+- `DiscountCalculator.tsx` já faz cálculo de descontos por horas negativas/faltas.
+- `employee_salaries` já tem `base_salary` por colaborador.
+- `time_clock_schedules` tem `daily_hours`, `work_days`, `tolerance_minutes`, `max_overtime_daily_minutes`.
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+### Database Changes (Migration)
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
-
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
-
----
-
-### 2. Conectar Base OFF ao PostgreSQL externo
-
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
-
-**Arquitetura:**
-
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
+**1. Expandir `time_clock_hour_bank`** — adicionar colunas de detalhamento:
+```sql
+ALTER TABLE time_clock_hour_bank ADD COLUMN IF NOT EXISTS
+  overtime_minutes INTEGER DEFAULT 0,
+  delay_minutes INTEGER DEFAULT 0,
+  early_exit_minutes INTEGER DEFAULT 0,
+  absence_count INTEGER DEFAULT 0,
+  manual_adjustments_minutes INTEGER DEFAULT 0,
+  compensations_minutes INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'open'; -- open, closed, paid
 ```
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+**2. Nova tabela `hour_bank_entries`** — lançamentos manuais e compensações:
+```sql
+CREATE TABLE public.hour_bank_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  company_id UUID,
+  entry_date DATE NOT NULL,
+  entry_type TEXT NOT NULL, -- 'hora_extra', 'atraso', 'saida_antecipada', 'falta', 'ajuste_manual', 'compensacao_folga', 'compensacao_pagamento', 'desconto_folha'
+  minutes INTEGER NOT NULL, -- positive = credit, negative = debit
+  reason TEXT,
+  reference_month TEXT NOT NULL, -- 'YYYY-MM'
+  performed_by UUID NOT NULL,
+  -- compensation-specific
+  hourly_rate NUMERIC(10,2),
+  total_value NUMERIC(10,2),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+**3. Nova tabela `hour_bank_settings`** — regras configuráveis por empresa:
+```sql
+CREATE TABLE public.hour_bank_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID UNIQUE,
+  tolerance_delay_minutes INTEGER DEFAULT 10,
+  max_overtime_monthly_minutes INTEGER DEFAULT 2400, -- 40h
+  max_bank_balance_minutes INTEGER DEFAULT 7200, -- 120h
+  allow_negative_discount BOOLEAN DEFAULT true,
+  overtime_multiplier NUMERIC(3,2) DEFAULT 1.50,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+```
 
----
+**4. RLS policies** on both new tables (admin/gestor full access, collaborator read-only on own entries).
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
+### UI Components
 
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
+**1. Rewrite `HourBank.tsx`** — Complete overhaul with sub-tabs:
 
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+- **Resumo** (default): Summary cards (Saldo Atual, Horas Extras, Atrasos, Compensações) + monthly table with expanded columns (extras, atrasos, saída antecipada, faltas, ajustes, saldo).
+- **Histórico**: Detailed entry log from `hour_bank_entries` — date, type (color-coded badges), minutes, reason, who performed.
+- **Lançamentos** (admin/gestor only): Form to add manual entries — select collaborator, type dropdown, minutes, date, reason. Supports both credit and debit.
+- **Compensações** (admin/gestor only): Dedicated compensation flow:
+  - "Compensar com Folga" — select hours to convert to day-off
+  - "Compensar com Pagamento" — enter hourly rate, calculate total, register
+  - "Desconto em Folha" — register negative hours as payroll deduction
 
----
+**2. New `HourBankSettings.tsx`** — configurable rules (tolerance, max overtime, max bank balance, negative discount toggle, overtime multiplier). Accessible from Settings tab.
 
-### Arquivos a modificar
+**3. Enhanced `HourBank` calculation** — on "Recalcular Mês":
+- Iterate all days in month
+- For each day: calculate `workedMinutes`, compare with schedule
+- Compute: overtime, delay, early exit (exit before `exit_time - tolerance`)
+- Sum manual entries from `hour_bank_entries`
+- Persist to `time_clock_hour_bank` with all detail columns
+- This replaces the current client-only calculation
 
-| Arquivo | Mudanca |
-|---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
+**4. Reports** — Monthly report with PDF/Excel export:
+- Total worked, expected, overtime, delays, balance, compensations
+- Per-collaborator breakdown
+- Uses existing jsPDF + xlsx libraries
 
----
+### File Plan
 
-### Pergunta necessaria
+| File | Action |
+|------|--------|
+| `supabase/migrations/...` | New tables + columns + RLS |
+| `src/components/TimeClock/HourBank.tsx` | Full rewrite with sub-tabs |
+| `src/components/TimeClock/HourBankEntries.tsx` | New — manual entries form + list |
+| `src/components/TimeClock/HourBankCompensation.tsx` | New — compensation workflows |
+| `src/components/TimeClock/HourBankSettings.tsx` | New — configurable rules |
+| `src/components/TimeClock/HourBankReport.tsx` | New — PDF/Excel monthly report |
+| `src/lib/timeClockCalculations.ts` | Add `calculateEarlyExitMinutes` function |
+| `src/components/TimeClock/Settings.tsx` | Link to hour bank settings |
+| `src/components/TimeClock/types.ts` | Add new types |
 
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+### Calculation Logic (Enhanced)
+
+For each work day:
+1. `workedMinutes = exitTime - entryTime - breaks`
+2. `delayMinutes = max(0, entryTime - scheduledEntry - tolerance)`
+3. `earlyExitMinutes = max(0, scheduledExit - exitTime - tolerance)` (NEW)
+4. `overtimeMinutes = max(0, workedMinutes - dailyHoursExpected)`
+5. `balanceMinutes = workedMinutes - dailyHoursExpected + manualAdjustments`
+
+Monthly summary persists all these aggregated values to `time_clock_hour_bank`.
+
+### Tab Structure
+The existing "Banco Horas" tab becomes the enhanced module. No new top-level tabs needed — all sub-features live inside `HourBank` via internal tabs (Resumo, Histórico, Lançamentos, Compensações).
+
+For admin, the Settings tab gets a new "Banco de Horas" section for configurable rules.
+
+### Payroll Integration (Future-Ready)
+The `hour_bank_entries` table with `entry_type`, `hourly_rate`, and `total_value` columns enables future payroll export. The monthly report already calculates the financial values needed.
 
