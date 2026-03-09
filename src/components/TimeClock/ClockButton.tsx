@@ -37,6 +37,8 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
   const [activeBreak, setActiveBreak] = useState<TimeClock | null>(null);
   
   const { toast } = useToast();
+  const { calculateAudit, shouldBlockRegistration } = useAuditEngine();
+  const { initialize: initFaceDetection, validatePhoto } = useFaceDetection();
   const {
     loading,
     checkConsent,
