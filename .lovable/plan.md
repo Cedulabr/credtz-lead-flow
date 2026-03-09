@@ -1,80 +1,58 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Plano: Seção de Feriados Nacionais + Lançamento em Múltiplos Dias
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### O que será construído
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+1. **Seção "Feriados Nacionais"** no DayOffManager — lista hardcoded dos feriados nacionais do Brasil para o ano selecionado. Cada feriado tem um checkbox para selecionar e um botão "Aplicar Selecionados" que lança como `feriado` para todos os colaboradores da empresa.
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+2. **Lançamento em múltiplos dias** — no modal de lançamento, trocar o campo de data única por dois campos (Data Início / Data Fim), permitindo lançar folga em um intervalo de datas de uma vez.
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+### Feriados Nacionais do Brasil (hardcoded, calculados por ano)
 
----
+Feriados fixos:
+- 01/01 — Confraternização Universal
+- 21/04 — Tiradentes
+- 01/05 — Dia do Trabalho
+- 07/09 — Independência do Brasil
+- 12/10 — Nossa Senhora Aparecida
+- 02/11 — Finados
+- 15/11 — Proclamação da República
+- 25/12 — Natal
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+Feriados móveis (calculados via Páscoa):
+- Carnaval (47 dias antes da Páscoa)
+- Sexta-feira Santa (2 dias antes da Páscoa)
+- Corpus Christi (60 dias após a Páscoa)
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+A Páscoa será calculada pelo algoritmo de Meeus/Jones/Butcher (client-side, sem API externa).
 
-**Arquitetura:**
+### Alterações no `DayOffManager.tsx`
 
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
-```
+**1. Seção de Feriados Nacionais** (novo Card abaixo do card principal):
+- Selecionar o ano (extraído do mês selecionado)
+- Tabela com todos os feriados: Data | Nome | Dia da Semana | Checkbox de seleção
+- Feriados que já foram lançados na empresa aparecem com badge "Já lançado"
+- Botão "Aplicar Feriados Selecionados" — lança para todos os colaboradores como `off_type: 'feriado'` com reason = nome do feriado
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+**2. Modal com intervalo de datas**:
+- Trocar `modalDate` (campo único) por `modalDateStart` e `modalDateEnd`
+- Quando `modalDateEnd` estiver preenchido e for diferente de `modalDateStart`, o sistema gera todas as datas entre início e fim
+- No `handleSave`, iterar sobre todas as datas do intervalo e inserir um registro para cada dia
+- Manter compatibilidade: se `modalDateEnd` estiver vazio, usa apenas `modalDateStart`
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+### Arquivos modificados
 
----
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/TimeClock/DayOffManager.tsx` | Adicionar seção de feriados, suporte a intervalo de datas no modal |
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
+Nenhuma alteração de banco necessária — usa a tabela `time_clock_day_offs` existente.
 
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
+### Detalhes de implementação
 
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
-
----
-
-### Arquivos a modificar
-
-| Arquivo | Mudanca |
-|---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
-
----
-
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+- Função `getBrazilianHolidays(year: number)` que retorna array `{ date: string, name: string }` com todos os feriados
+- Função `getEasterDate(year: number)` implementando o algoritmo de Meeus para calcular a Páscoa
+- `eachDayOfInterval` do `date-fns` para gerar as datas entre início e fim
+- Para verificar "já lançado", comparar com os `dayOffs` carregados onde `off_type === 'feriado'`
 
