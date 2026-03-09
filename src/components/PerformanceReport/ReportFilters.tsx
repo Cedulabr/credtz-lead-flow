@@ -23,6 +23,8 @@ interface ReportFiltersProps {
   filters: ReportFiltersType;
   onFiltersChange: (filters: ReportFiltersType) => void;
   users: { id: string; name: string }[];
+  activityFilter?: 'all' | 'active' | 'warning' | 'critical';
+  onActivityFilterChange?: (value: 'all' | 'active' | 'warning' | 'critical') => void;
 }
 
 const dateOptions = [
