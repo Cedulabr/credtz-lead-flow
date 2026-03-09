@@ -28,6 +28,7 @@ export function PerformanceReport() {
   const { profile, isAdmin } = useAuth();
   const gestorCompany = useGestorCompany();
   const [activityFilter, setActivityFilter] = useState<'all' | 'active' | 'warning' | 'critical'>('all');
+  const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [performanceData, setPerformanceData] = useState<UserPerformance[]>([]);
