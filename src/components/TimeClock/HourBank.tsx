@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Clock, TrendingUp, TrendingDown, Loader2, RefreshCw, Timer, AlertTriangle, ArrowDownUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGestorCompany } from '@/hooks/useGestorCompany';
 import { format, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calculateTotalBreakMinutes, parseTimeToMinutes, formatMinutesToHM, calculateEarlyExitMinutes } from '@/lib/timeClockCalculations';
