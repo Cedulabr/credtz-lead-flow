@@ -1,80 +1,100 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Redesign Moderno: Gestão de Usuários (SaaS-style)
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Resumo
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+Substituir o `UsersList.tsx` atual (953 linhas, tabela básica) por um módulo moderno inspirado em Stripe/Vercel/Supabase com: cards de métricas, filtros avançados, tabela com avatar e menu de ações, modal de permissões categorizado, modos lista/grid, e responsividade mobile-first.
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+### Arquitetura
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
-
----
-
-### 2. Conectar Base OFF ao PostgreSQL externo
-
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
-
-**Arquitetura:**
+Dividir o monolito `UsersList.tsx` em componentes menores dentro de uma nova pasta:
 
 ```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
+src/components/UsersManagement/
+├── index.tsx              # Orquestrador principal
+├── UserMetricsCards.tsx    # 4 cards de resumo
+├── UserFiltersBar.tsx      # Busca + filtros (empresa, função, status, permissões)
+├── UserTable.tsx           # Tabela moderna com avatar, badges, menu ⋯
+├── UserGridView.tsx        # Grid de cards para modo alternativo
+├── UserAvatar.tsx          # Avatar com iniciais coloridas
+├── UserActionMenu.tsx      # Dropdown menu de 3 pontos
+├── UserPermissionsModal.tsx # Modal com permissões categorizadas
+├── UserEditModal.tsx       # Modal de edição
+├── UserPasswordModal.tsx   # Modal de senha
+└── types.ts               # Interfaces compartilhadas
 ```
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+### Detalhes por Seção
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+**1. Cards de Métricas** (`UserMetricsCards.tsx`)
+- 4 cards: Total de Usuários, Ativos, Gestores, Colaboradores
+- Calculados via `useMemo` sobre a lista de users + userCompanies
+- Design: borda suave, sombra leve, número grande, label pequeno
 
----
+**2. Filtros** (`UserFiltersBar.tsx`)
+- Campo de busca com ícone (nome, email, CPF)
+- Select de Empresa (lista de companies)
+- Select de Função (Admin, Parceiro, Gestor, Colaborador)
+- Select de Status (Ativo, Inativo)
+- Toggle de modo visualização (List/Grid)
+- Botão "+ Novo Usuário"
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
+**3. Tabela Moderna** (`UserTable.tsx`)
+- Colunas: Avatar+Nome+Email | Empresa | Função (badge) | Status (dot colorido 🟢⚪) | Permissões (tags) | Ações (⋯)
+- `UserAvatar`: círculo com iniciais, cores geradas por hash do nome
+- Hover nas linhas com transição suave
+- No mobile: transforma cada row em card
 
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
+**4. Grid View** (`UserGridView.tsx`)
+- Cards de usuário com avatar, nome, empresa, badges de função/status
+- Menu de ações no canto do card
 
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+**5. Menu de Ações** (`UserActionMenu.tsx`)
+- DropdownMenu com: Editar, Permissões, Resetar senha, Definir senha, Vincular empresa, Ativar/Desativar, Excluir
+- Ícones + labels, separador antes de ações destrutivas
 
----
+**6. Modal de Permissões** (`UserPermissionsModal.tsx`)
+- Título: "Gerenciar Permissões — [Nome]"
+- Permissões agrupadas em categorias:
+  - **Comercial**: Gerador de Propostas, Meus Clientes, Televendas, Gestão Televendas
+  - **Leads**: Leads Premium, Activate Leads, Indicar
+  - **Financeiro**: Finanças, Tabela Comissões, Minhas Comissões
+  - **Sistema**: Consulta Base OFF, Documentos, Alertas, Colaborativo, Controle de Ponto
+  - **Comunicação**: SMS, WhatsApp, Meu Número
+  - **Relatórios**: Relatório de Desempenho
+- Cada permissão: nome + descrição curta + toggle moderno
+- Skeleton loading durante carregamento
 
-### Arquivos a modificar
+**7. Skeleton Loading**
+- Skeleton cards para métricas durante load
+- Skeleton rows/cards para lista durante load
 
-| Arquivo | Mudanca |
-|---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
+### Lógica Preservada
 
----
+Toda a lógica de negócio existente será mantida intacta:
+- `loadUsers`, `loadUserCompanies`, `loadCompanies`
+- `handleSaveUser`, `toggleUserStatus`, `deleteUser`
+- `handleUpdatePassword`, `resetUserPassword`
+- `updateUserPermissions`, `handleRolePromotion`
+- `PERMISSION_MODULES` array
+- `CreateUser` component (reutilizado)
 
-### Pergunta necessaria
+### Arquivos Modificados
 
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+| Arquivo | Ação |
+|---------|------|
+| `src/components/UsersManagement/index.tsx` | **Criar** — componente principal |
+| `src/components/UsersManagement/UserMetricsCards.tsx` | **Criar** — cards de resumo |
+| `src/components/UsersManagement/UserFiltersBar.tsx` | **Criar** — busca e filtros |
+| `src/components/UsersManagement/UserTable.tsx` | **Criar** — tabela moderna |
+| `src/components/UsersManagement/UserGridView.tsx` | **Criar** — grid de cards |
+| `src/components/UsersManagement/UserAvatar.tsx` | **Criar** — avatar com iniciais |
+| `src/components/UsersManagement/UserActionMenu.tsx` | **Criar** — menu dropdown |
+| `src/components/UsersManagement/UserPermissionsModal.tsx` | **Criar** — modal categorizado |
+| `src/components/UsersManagement/UserEditModal.tsx` | **Criar** — modal de edição |
+| `src/components/UsersManagement/UserPasswordModal.tsx` | **Criar** — modal de senha |
+| `src/components/UsersManagement/types.ts` | **Criar** — interfaces |
+| `src/components/admin/AdminPeople.tsx` | **Atualizar** — importar novo componente |
+| `src/components/UsersList.tsx` | Manter como fallback, mas admin usa o novo |
 
