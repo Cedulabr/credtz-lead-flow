@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { 
   ShieldAlert, ShieldCheck, ShieldX, MapPin, Wifi, Camera, 
   Search, Calendar, Loader2, Eye, TrendingUp, Users, AlertTriangle,
-  RefreshCw, CheckCircle
+  RefreshCw, CheckCircle, Image
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
@@ -19,6 +19,7 @@ import { ptBR } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { TrustScoreBadge } from './TrustScoreBadge';
 import { useAuditEngine } from './useAuditEngine';
+import { useFaceDetection } from './useFaceDetection';
 import { clockTypeLabels, type TimeClock, type AuditStatus, type AuditFlag } from './types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -37,6 +38,11 @@ export function AuditDashboard() {
   const [reauditing, setReauditing] = useState(false);
   const [reauditProgress, setReauditProgress] = useState({ current: 0, total: 0 });
   
+  // Photo re-analysis state
+  const [reanalyzingPhotos, setReanalyzingPhotos] = useState(false);
+  const [photoReanalysisProgress, setPhotoReanalysisProgress] = useState({ current: 0, total: 0 });
+  const [unprocessedPhotoCount, setUnprocessedPhotoCount] = useState(0);
+  
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [userFilter, setUserFilter] = useState<string>('all');
@@ -54,6 +60,7 @@ export function AuditDashboard() {
   });
 
   const { bulkReaudit } = useAuditEngine();
+  const { initialize: initFaceDetection, detectFaces, isReady: faceDetectionReady } = useFaceDetection();
   const { toast } = useToast();
 
   useEffect(() => {
