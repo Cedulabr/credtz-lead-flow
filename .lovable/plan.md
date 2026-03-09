@@ -1,95 +1,80 @@
 
 
-## Plano: Dashboard Modular com Cards Interativos
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Objetivo
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-Criar um dashboard moderno com cards informativos para os módulos solicitados, incluindo dados em tempo real, status de API e navegação integrada.
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-### Arquitetura Proposta
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
 
-O dashboard será implementado no `ConsultorDashboard.tsx` (para colaboradores) e opcionalmente integrado ao `Dashboard.tsx` (para admin/gestor), seguindo o padrão visual existente com `motion` e cards responsivos.
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
 
-### Cards a Implementar
+---
 
-| Card | Fonte de Dados | Valor Principal | Descrição | Navegação |
-|------|----------------|-----------------|-----------|-----------|
-| **Leads Premium** | `leads` (assigned_to = user, status != new_lead) | Contagem | "Leads trabalhados este mês" | `leads` |
-| **Radar de Oportunidades** | `radar_credits` (credits_balance) | Créditos disponíveis | "Créditos para buscas" | `radar` |
-| **Leads Ativados** | `activate_leads` (assigned_to = user) | Contagem | "Leads ativos disponíveis" | `activate-leads` |
-| **Vendas Televendas** | `televendas` (user_id = user, status = pago) | Contagem | "Vendas cadastradas este mês" | `televendas-manage` |
-| **Documentos Salvos** | `client_documents` (uploaded_by = user) | Contagem | "Documentações armazenadas" | `documents` |
-| **API WhatsApp** | `whatsapp_instances` (hasToken) | "Conectado" / "Desconectado" | Botão "Verificar" | `whatsapp` |
-| **Crédito SMS** | `sms_credits` (credits_balance) | Saldo numérico | "Créditos disponíveis" | `sms` |
+### 2. Conectar Base OFF ao PostgreSQL externo
 
-### Layout Visual
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+
+**Arquitetura:**
 
 ```text
-┌────────────────────────────────────────────────────────────────┐
-│  Bom dia, João! 👋                    [Atualizar]              │
-│  Terça, 9 de março                                             │
-└────────────────────────────────────────────────────────────────┘
-
-┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-│ ⭐ Leads     │ │ 📡 Radar     │ │ ⚡ Leads     │
-│   Premium    │ │ Oportunid.   │ │   Ativados   │
-│              │ │              │ │              │
-│     127      │ │     45       │ │      89      │
-│ trabalhados  │ │ créditos     │ │ disponíveis  │
-└──────────────┘ └──────────────┘ └──────────────┘
-
-┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-│ 🛒 Vendas    │ │ 📄 Docs      │ │ 💬 WhatsApp  │
-│ Televendas   │ │ Salvos       │ │   API        │
-│              │ │              │ │              │
-│     23       │ │     156      │ │ ● Conectado  │
-│ este mês     │ │ documentos   │ │ [Verificar]  │
-└──────────────┘ └──────────────┘ └──────────────┘
-
-┌────────────────────────────────────────────────────────────────┐
-│ 📱 Crédito SMS                                                  │
-│                                                                 │
-│ Saldo: 1.250 créditos disponíveis para envio                   │
-│ [Ir para SMS]                                                  │
-└────────────────────────────────────────────────────────────────┘
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
 ```
 
-### Detalhes Técnicos
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
 
-**1. Hook de Dados do Dashboard**
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
 
-Criar queries paralelas em `useEffect` para buscar:
-- Contagem de leads premium (mês atual)
-- Contagem de activate leads (atribuídos ao usuário)
-- Vendas do televendas (status = pago, mês atual)
-- Documentos salvos (total)
-- Créditos Radar (`radar_credits.credits_balance`)
-- Créditos SMS (`sms_credits.credits_balance`)
-- Instâncias WhatsApp (`whatsapp_instances` com token)
+---
 
-**2. Verificação de Conexão WhatsApp**
+### 3. Simplificar modulo Base OFF - apenas Consulta
 
-O botão "Verificar" chamará a edge function `send-whatsapp` em modo teste (sem enviar mensagem) para validar se o token está funcional, atualizando o status visual.
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
 
-**3. Cards Clicáveis**
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
 
-Cada card terá `onClick={() => onNavigate('tab')}` com hover states e cursor pointer, seguindo o padrão já usado nos cards de recontatos.
+---
 
-**4. Grid Responsivo**
+### Arquivos a modificar
 
-```css
-grid-cols-1 sm:grid-cols-2 lg:grid-cols-3
-```
+| Arquivo | Mudanca |
+|---|---|
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
 
-### Arquivos Modificados
+---
 
-| Arquivo | Ação |
-|---------|------|
-| `src/components/ConsultorDashboard.tsx` | Redesenhar com 7 cards interativos |
+### Pergunta necessaria
 
-### Dependências Existentes
-
-- `useWhatsApp` hook (verificação de instâncias)
-- Tabelas: `leads`, `activate_leads`, `televendas`, `client_documents`, `sms_credits`, `radar_credits`, `whatsapp_instances`
-- Todas as queries usam RLS com `auth.uid()`
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 
