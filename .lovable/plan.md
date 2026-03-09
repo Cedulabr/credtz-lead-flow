@@ -1,80 +1,99 @@
 
+## Analysis
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+The system already records: photo URL, GPS (lat/lng, city/state), IP address, user agent, device info, and clock time — all in the `time_clock` table. There is NO existing audit/trust scoring system.
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+The `time_clock_settings` table exists with company-level configuration, but has no geofence fields (latitude, longitude, allowed radius).
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+The current tabs for managers are: Ponto, Histórico, Justificativas, Banco Horas, Painel, Descontos, Salários, Folgas, Jornadas (9 tabs, grid-cols-9).
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+## What we'll build
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+### Database (Migration)
+1. Add geofence columns to `time_clock_settings`:
+   - `company_latitude DOUBLE PRECISION`
+   - `company_longitude DOUBLE PRECISION`
+   - `geofence_radius_meters INTEGER DEFAULT 500`
+   - `block_on_invalid_photo BOOLEAN DEFAULT false`
+   - `block_on_geofence_violation BOOLEAN DEFAULT false`
 
----
+2. Add audit columns to `time_clock`:
+   - `trust_score INTEGER DEFAULT 100` (0–100)
+   - `audit_flags JSONB DEFAULT '[]'` (array of flag objects)
+   - `audit_status TEXT DEFAULT 'normal'` (`normal`, `suspicious`, `irregular`)
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+3. New table `time_clock_geofence_config` — OR simply reuse `time_clock_settings` (preferred, simpler)
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+### Audit Logic (client-side, runs at registration + on historical records)
+Function `calculateTrustScore(record)`:
+- Start at 100
+- If `latitude/longitude` provided AND company has geofence → calculate distance; if outside radius → -50 (flag: `fora_da_area`)
+- IP analysis: compare with last 5 records for that user; if different → -30 (flag: `ip_suspeito`)
+- Photo: face detection via `face-api.js` loaded client-side at capture time:
+  - No face detected → -80 (flag: `foto_invalida`)
+  - Multiple faces → -40 (flag: `multiplos_rostos`)
+  - Low quality (canvas blur detection) → -20 (flag: `foto_borrada`)
+- Determine `audit_status`: score ≥ 80 → `normal`, 40–79 → `suspicious`, < 40 → `irregular`
 
-**Arquitetura:**
+Face detection will be done client-side using `face-api.js` (no install needed, load from CDN or small models from public folder). This runs BEFORE the photo is uploaded/registered.
 
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
+### UI Changes
+
+**A) Score badge on every clock record** (ClockButton + AdminControl):
+- 🟢 ≥ 80 = Verde "Confiável"
+- 🟡 40–79 = Amarelo "Suspeito"  
+- 🔴 < 40 = Vermelho "Irregular"
+
+**B) New tab: "Auditoria"** (only for canManage) → `AuditDashboard.tsx`
+- Summary cards: Total batidas | Irregulares | Suspeitas | Fora da área
+- Filters: status, colaborador, período, tipo de alerta
+- Table columns: Colaborador | Data/Hora | Tipo | Score | Flags | Foto | Local | IP | Ações
+- Color-coded rows by audit_status
+
+**C) Settings tab** → add geofence config section:
+- Latitude da empresa, Longitude da empresa, Raio permitido (metros)
+- Toggle: Bloquear registro se foto inválida / Bloquear se fora do geofence
+
+**D) Behavior chart** (inside AuditDashboard, secondary tab):
+- Line/bar chart with recharts (already installed) showing per-collaborator score trends over time
+
+### File Plan
+
+1. **Migration SQL** — add columns to `time_clock` and `time_clock_settings`
+2. **`src/components/TimeClock/AuditDashboard.tsx`** — new full audit panel
+3. **`src/components/TimeClock/useFaceDetection.ts`** — hook using face-api.js for real-time face validation
+4. **`src/components/TimeClock/useAuditEngine.ts`** — scoring engine: geofence calc, IP comparison, photo result assembly
+5. **`src/components/TimeClock/ClockButton.tsx`** — integrate face detection before upload, store score + flags
+6. **`src/components/TimeClock/Settings.tsx`** — add geofence config fields
+7. **`src/components/TimeClock/index.tsx`** — add "Auditoria" tab (10th tab for managers, grid-cols-10 on lg)
+8. **`src/components/TimeClock/types.ts`** — add `trust_score`, `audit_flags`, `audit_status` to TimeClock type
+
+### Scoring Matrix
+```
+Situation                 Score delta   Final status
+All checks pass           0             normal (100)
+IP different from usual   -30           suspicious (70)
+Outside geofence          -50           suspicious/irregular (50)
+Photo invalid (no face)   -80           irregular (20)
+Multiple faces            -40           irregular (60)
+Multiple violations       cumulative    irregular (0-39)
 ```
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+### Face Detection Approach
+Use `face-api.js` loaded dynamically (no package install needed — use CDN via dynamic import or a lightweight wrapper). Models (tiny_face_detector) loaded from a public URL. This gives us:
+- Face count
+- Face confidence score
+- Landmark detection (partial face)
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+Validation happens in `CameraCapture.tsx` → before allowing photo submission → show warning to user if face not detected (configurable: warn only OR block).
 
----
+### Tabs layout for managers after change
+Current: 9 tabs (grid-cols-9)
+New: 10 tabs → `grid-cols-5 lg:grid-cols-10`
+New tab: "Auditoria" with ShieldAlert icon
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
-
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
-
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
-
----
-
-### Arquivos a modificar
-
-| Arquivo | Mudanca |
-|---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
-
----
-
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
-
+### Notes
+- `face-api.js` will be added as a dependency
+- Geofence distance calculated with Haversine formula client-side
+- Historical records without score will show "N/A" (null trust_score)
+- IP comparison uses last 10 records for that user_id fetched at registration time
