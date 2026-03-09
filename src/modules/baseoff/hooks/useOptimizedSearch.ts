@@ -82,10 +82,12 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
         const results = Array.isArray(data) ? data : (data?.data || data || []);
 
         // Spread all fields from API, only compute status
+        // Resilient: handle both transformed (snake_case) and raw (lowercase) field names
         const transformedClients: BaseOffClient[] = results.map((row: any) => {
+          const statusBeneficio = row.status_beneficio || row.statusbeneficio || '';
           let status: ClientStatus = 'simulado';
-          if (row.status_beneficio) {
-            const statusLower = row.status_beneficio.toLowerCase();
+          if (statusBeneficio) {
+            const statusLower = statusBeneficio.toLowerCase();
             if (statusLower.includes('ativo') || statusLower.includes('elegivel')) {
               status = 'ativo';
             } else if (statusLower.includes('finalizado') || statusLower.includes('cessado')) {
@@ -95,12 +97,36 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
             }
           }
 
+          // Map raw DB field names to expected names when transformed version is missing
+          const nb = row.nb || row.NB || row.numero_beneficio || row.num_beneficio || null;
+          const mr = parseFloat(row.mr) || 0;
+          const contratos = row.contratos || [];
+
           return {
             ...row,
             status,
-            total_contracts: row.contratos?.length || row.contracts?.length || row.total_contracts || 0,
+            status_beneficio: statusBeneficio,
+            nb,
+            mr,
+            data_nascimento: row.data_nascimento || row.dtnascimento || null,
+            banco_pagto: row.banco_pagto || row.bancopagto || null,
+            agencia_pagto: row.agencia_pagto || row.agenciapagto || null,
+            orgao_pagador: row.orgao_pagador || row.orgaopagador || null,
+            conta_corrente: row.conta_corrente || row.contacorrente || null,
+            meio_pagto: row.meio_pagto || row.meiopagto || null,
+            banco_rmc: row.banco_rmc || row.bancormc || null,
+            valor_rmc: parseFloat(row.valor_rmc || row.valorrmc) || 0,
+            banco_rcc: row.banco_rcc || row.bancorcc || null,
+            valor_rcc: parseFloat(row.valor_rcc || row.valorrcc) || 0,
+            tel_cel_1: row.tel_cel_1 || row.telcel_1 || null,
+            tel_cel_2: row.tel_cel_2 || row.telcel_2 || null,
+            tel_cel_3: row.tel_cel_3 || row.telcel_3 || null,
+            tel_fixo_1: row.tel_fixo_1 || row.telfixo_1 || null,
+            tel_fixo_2: row.tel_fixo_2 || row.telfixo_2 || null,
+            tel_fixo_3: row.tel_fixo_3 || row.telfixo_3 || null,
+            total_contracts: contratos.length || row.total_contracts || 0,
             contracts: row.contracts || [],
-            contratos: row.contratos || [],
+            contratos,
             telefones: row.telefones || [],
             credit_opportunities: row.credit_opportunities || null,
           };
