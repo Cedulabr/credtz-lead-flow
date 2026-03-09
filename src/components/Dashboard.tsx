@@ -152,8 +152,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         : (supabase.from('leads').select('id', { count: 'exact', head: true }).neq('status', 'new_lead').gte('created_at', startISO).lte('created_at', endISO) as any);
 
       const radarPromise = filterByCompany
-        ? (supabase.from('radar_credits').select('credits_balance').in('company_id', visibleCompanyIds) as any)
-        : (supabase.from('radar_credits').select('credits_balance') as any);
+        ? (supabase.from('radar_credits' as any).select('credits_balance').in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('radar_credits' as any).select('credits_balance') as any);
 
       const activatePromise = filterByCompany
         ? (supabase.from('activate_leads').select('id', { count: 'exact', head: true }).neq('status', 'novo').gte('created_at', startISO).lte('created_at', endISO).in('company_id', visibleCompanyIds) as any)
