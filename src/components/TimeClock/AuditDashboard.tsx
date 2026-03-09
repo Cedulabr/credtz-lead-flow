@@ -253,7 +253,7 @@ export function AuditDashboard() {
 
           // Merge new face flags with existing audit data
           const existingFlags: AuditFlag[] = Array.isArray(record.audit_flags) 
-            ? record.audit_flags as AuditFlag[] 
+            ? record.audit_flags as unknown as AuditFlag[] 
             : [];
           const newFlags = [...existingFlags, ...faceResult.flags];
           
