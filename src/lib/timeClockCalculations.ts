@@ -183,3 +183,16 @@ export function formatMinutesToHMCompact(minutes: number): string {
   const m = minutes % 60;
   return `${h}h${m.toString().padStart(2, '0')}`;
 }
+
+/**
+ * Calculate early exit minutes (exit before scheduled exit minus tolerance)
+ */
+export function calculateEarlyExitMinutes(
+  exitTimeStr: string,
+  scheduledExitStr: string,
+  toleranceMinutes: number
+): number {
+  const exitMin = parseTimeToMinutes(exitTimeStr);
+  const scheduledExitMin = parseTimeToMinutes(scheduledExitStr);
+  return Math.max(0, scheduledExitMin - exitMin - toleranceMinutes);
+}
