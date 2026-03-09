@@ -189,10 +189,15 @@ export function OpportunityList({
                         <span className="text-sm">{client.banco}</span>
                       </div>
 
-                      <div className="text-center">
+                      <div className="text-center space-x-1">
                         <Badge variant="outline" className="text-xs">
                           {client.tipo_operacao}
                         </Badge>
+                        {client.source && client.source !== 'televendas' && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {client.source === 'propostas' ? 'Proposta' : 'Lead'}
+                          </Badge>
+                        )}
                       </div>
 
                       <div className="text-right">
