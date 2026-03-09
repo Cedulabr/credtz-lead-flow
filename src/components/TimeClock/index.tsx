@@ -148,7 +148,7 @@ export function TimeClock() {
               <DayOffManager />
             </TabsContent>
             <TabsContent value="schedules">
-              <ScheduleManager />
+              <ScheduleManager companyId={companyId} />
             </TabsContent>
           </>
         )}
