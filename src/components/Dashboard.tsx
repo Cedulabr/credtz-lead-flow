@@ -73,6 +73,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const [companyActivities, setCompanyActivities] = useState<CompanyActivity[]>([]);
 
+  // Module metrics state for cards
+  const [moduleMetrics, setModuleMetrics] = useState({
+    leadsPremium: 0,
+    radarCredits: 0,
+    activateLeads: 0,
+    televendasPagas: 0,
+    documentos: 0,
+    smsCredits: 0,
+    whatsappConnected: false,
+  });
+  const [checkingWhatsApp, setCheckingWhatsApp] = useState(false);
+
   const userName = profile?.name || user?.email?.split('@')[0] || 'Usuário';
   const companyName = config?.company_name || 'Easyn';
 
