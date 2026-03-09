@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,8 +6,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Clock, MapPin, Wifi, Camera, CheckCircle2, Loader2, Coffee } from 'lucide-react';
 import { useTimeClock } from '@/hooks/useTimeClock';
+import { useAuditEngine } from './useAuditEngine';
+import { useFaceDetection } from './useFaceDetection';
 import { CameraCapture } from './CameraCapture';
 import { ConsentModal } from './ConsentModal';
+import { TrustScoreBadge } from './TrustScoreBadge';
 import { clockTypeLabels, type TimeClockType, type TimeClock, type TimeClockBreakType } from './types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
