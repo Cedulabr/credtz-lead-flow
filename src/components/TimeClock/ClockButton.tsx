@@ -151,8 +151,77 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
 
   const handlePhotoCapture = async (blob: Blob) => {
     setShowCamera(false);
+    
+    // Run face detection on captured photo
+    let faceResult = null;
+    try {
+      const img = new Image();
+      const url = URL.createObjectURL(blob);
+      await new Promise<void>((resolve) => {
+        img.onload = () => resolve();
+        img.src = url;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        faceResult = await validatePhoto(canvas);
+      }
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Face detection failed:', err);
+    }
+
+    // Calculate audit score
+    const [ip, location] = await Promise.all([
+      getPublicIP(),
+      new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
+        if (!navigator.geolocation) { resolve(null); return; }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+          () => resolve(null),
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      }),
+    ]);
+
+    const auditResult = await calculateAudit({
+      userId,
+      latitude: location?.latitude ?? null,
+      longitude: location?.longitude ?? null,
+      ipAddress: ip,
+      faceResult,
+    });
+
+    // Check if registration should be blocked
+    const blockCheck = await shouldBlockRegistration(auditResult);
+    if (blockCheck.block) {
+      toast({
+        title: 'Registro bloqueado',
+        description: blockCheck.reason || 'Não foi possível validar o registro.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const success = await registerClock(nextClockType, blob, companyId, selectedBreakType?.id);
     if (success) {
+      // Update the time_clock record with audit data
+      const records = await getTodayRecords();
+      const latestRecord = records[records.length - 1];
+      if (latestRecord) {
+        await supabase
+          .from('time_clock')
+          .update({
+            trust_score: auditResult.score,
+            audit_flags: auditResult.flags,
+            audit_status: auditResult.status,
+          })
+          .eq('id', latestRecord.id);
+      }
+
       setSelectedBreakType(null);
       await loadData();
       onClockRegistered?.();
