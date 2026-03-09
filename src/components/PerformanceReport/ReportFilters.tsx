@@ -226,6 +226,24 @@ export function ReportFilters({ filters, onFiltersChange, users, activityFilter,
               ))}
             </SelectContent>
           </Select>
+          {/* Activity Status Filter */}
+          {activityFilter !== undefined && onActivityFilterChange && (
+            <Select
+              value={activityFilter}
+              onValueChange={(value) => onActivityFilterChange(value as any)}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Atividade" />
+              </SelectTrigger>
+              <SelectContent>
+                {activityStatusOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </CardContent>
     </Card>
