@@ -278,6 +278,8 @@ export function PerformanceReport() {
             savedProposals: 0,
             lastActivity: null,
             averageResponseTime: null,
+            daysSinceLastActivity: 999,
+            activityStatus: 'critical' as ActivityStatus,
           });
         }
         return userMap.get(userId)!;
