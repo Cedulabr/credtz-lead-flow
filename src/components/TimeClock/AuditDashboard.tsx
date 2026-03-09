@@ -131,6 +131,34 @@ export function AuditDashboard() {
     setLoading(false);
   };
 
+  const handleReaudit = async () => {
+    setReauditing(true);
+    setReauditProgress({ current: 0, total: 0 });
+    
+    try {
+      const result = await bulkReaudit(dateFrom, dateTo, (current, total) => {
+        setReauditProgress({ current, total });
+      });
+      
+      toast({
+        title: 'Re-auditoria concluída',
+        description: `${result.processed} registros processados, ${result.flagged} com alertas detectados.`,
+      });
+      
+      // Reload records to show updated data
+      await loadRecords();
+    } catch (error) {
+      toast({
+        title: 'Erro na re-auditoria',
+        description: 'Ocorreu um erro ao processar os registros.',
+        variant: 'destructive',
+      });
+    } finally {
+      setReauditing(false);
+      setReauditProgress({ current: 0, total: 0 });
+    }
+  };
+
   const filteredRecords = records.filter(r => {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
