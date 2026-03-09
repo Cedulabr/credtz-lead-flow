@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, ChevronRight, TrendingUp, ChevronLeft } from "lucide-react";
+import { Users, ChevronRight, TrendingUp, ChevronLeft, Repeat, Target, BarChart3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Televenda, STATUS_CONFIG } from "../types";
