@@ -2652,6 +2652,103 @@ export type Database = {
           },
         ]
       }
+      hour_bank_entries: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          entry_date: string
+          entry_type: string
+          hourly_rate: number | null
+          id: string
+          minutes: number
+          performed_by: string
+          reason: string | null
+          reference_month: string
+          total_value: number | null
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          entry_date: string
+          entry_type: string
+          hourly_rate?: number | null
+          id?: string
+          minutes: number
+          performed_by: string
+          reason?: string | null
+          reference_month: string
+          total_value?: number | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          entry_date?: string
+          entry_type?: string
+          hourly_rate?: number | null
+          id?: string
+          minutes?: number
+          performed_by?: string
+          reason?: string | null
+          reference_month?: string
+          total_value?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hour_bank_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hour_bank_settings: {
+        Row: {
+          allow_negative_discount: boolean | null
+          company_id: string | null
+          created_at: string | null
+          id: string
+          max_bank_balance_minutes: number | null
+          max_overtime_monthly_minutes: number | null
+          overtime_multiplier: number | null
+          tolerance_delay_minutes: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          allow_negative_discount?: boolean | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          max_bank_balance_minutes?: number | null
+          max_overtime_monthly_minutes?: number | null
+          overtime_multiplier?: number | null
+          tolerance_delay_minutes?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          allow_negative_discount?: boolean | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          max_bank_balance_minutes?: number | null
+          max_overtime_monthly_minutes?: number | null
+          overtime_multiplier?: number | null
+          tolerance_delay_minutes?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hour_bank_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_jobs: {
         Row: {
           chunk_metadata: Json | null
@@ -5346,34 +5443,55 @@ export type Database = {
       }
       time_clock_hour_bank: {
         Row: {
+          absence_count: number | null
           balance_minutes: number
           company_id: string | null
+          compensations_minutes: number | null
           created_at: string | null
+          delay_minutes: number | null
+          early_exit_minutes: number | null
           expected_minutes: number
           id: string
+          manual_adjustments_minutes: number | null
+          overtime_minutes: number | null
           reference_month: string
+          status: string | null
           updated_at: string | null
           user_id: string
           worked_minutes: number
         }
         Insert: {
+          absence_count?: number | null
           balance_minutes?: number
           company_id?: string | null
+          compensations_minutes?: number | null
           created_at?: string | null
+          delay_minutes?: number | null
+          early_exit_minutes?: number | null
           expected_minutes?: number
           id?: string
+          manual_adjustments_minutes?: number | null
+          overtime_minutes?: number | null
           reference_month: string
+          status?: string | null
           updated_at?: string | null
           user_id: string
           worked_minutes?: number
         }
         Update: {
+          absence_count?: number | null
           balance_minutes?: number
           company_id?: string | null
+          compensations_minutes?: number | null
           created_at?: string | null
+          delay_minutes?: number | null
+          early_exit_minutes?: number | null
           expected_minutes?: number
           id?: string
+          manual_adjustments_minutes?: number | null
+          overtime_minutes?: number | null
           reference_month?: string
+          status?: string | null
           updated_at?: string | null
           user_id?: string
           worked_minutes?: number
