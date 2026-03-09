@@ -132,6 +132,14 @@ export const ClientesView = ({
           const hasPago = client.propostas.some(p => 
             p.status === "pago_aprovado" || p.status === "pago_aguardando" || p.status === "proposta_paga"
           );
+          const isRecurrent = client.propostas.length >= 3;
+          const paidPropostas = client.propostas.filter(p => p.status === "proposta_paga");
+          const conversionRate = client.propostas.length > 0
+            ? Math.round((paidPropostas.length / client.propostas.length) * 100)
+            : 0;
+          const ticketMedio = client.propostas.length > 0
+            ? client.valorTotal / client.propostas.length
+            : 0;
 
           return (
             <motion.div
@@ -158,6 +166,11 @@ export const ClientesView = ({
                     <Badge variant="secondary" className="text-xs font-mono">
                       {client.propostas.length} proposta{client.propostas.length !== 1 ? 's' : ''}
                     </Badge>
+                    {isRecurrent && (
+                      <Badge variant="outline" className="text-xs gap-1 border-primary/40 text-primary">
+                        <Repeat className="h-3 w-3" /> Recorrente
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground font-mono">
                     {formatCPF(client.cpf)}
@@ -176,6 +189,17 @@ export const ClientesView = ({
                         </Badge>
                       );
                     })}
+                  </div>
+                  {/* Smart insights row */}
+                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-0.5">
+                    <span className="flex items-center gap-1">
+                      <BarChart3 className="h-3 w-3" />
+                      Ticket médio: {formatCurrency(ticketMedio)}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Target className="h-3 w-3" />
+                      Conversão: {conversionRate}%
+                    </span>
                   </div>
                 </div>
 
