@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Clock, MapPin, Wifi, Camera, CheckCircle2, Loader2, Coffee } from 'lucide-react';
+import { Clock, MapPin, Wifi, Camera, CheckCircle2, Loader2, Coffee, AlertTriangle } from 'lucide-react';
 import { useTimeClock } from '@/hooks/useTimeClock';
 import { useAuditEngine } from './useAuditEngine';
 import { useFaceDetection } from './useFaceDetection';
