@@ -23,6 +23,8 @@ interface ReportFiltersProps {
   filters: ReportFiltersType;
   onFiltersChange: (filters: ReportFiltersType) => void;
   users: { id: string; name: string }[];
+  activityFilter?: 'all' | 'active' | 'warning' | 'critical';
+  onActivityFilterChange?: (value: 'all' | 'active' | 'warning' | 'critical') => void;
 }
 
 const dateOptions = [
@@ -52,7 +54,14 @@ const originOptions = [
   { value: "outros", label: "Outros" },
 ];
 
-export function ReportFilters({ filters, onFiltersChange, users }: ReportFiltersProps) {
+const activityStatusOptions = [
+  { value: "all", label: "Todos" },
+  { value: "active", label: "🟢 Ativos" },
+  { value: "warning", label: "🟡 Alertas" },
+  { value: "critical", label: "🔴 Críticos" },
+];
+
+export function ReportFilters({ filters, onFiltersChange, users, activityFilter, onActivityFilterChange }: ReportFiltersProps) {
   const [isCustomDateOpen, setIsCustomDateOpen] = useState(false);
 
   const handleDateTypeChange = (value: string) => {
@@ -217,6 +226,24 @@ export function ReportFilters({ filters, onFiltersChange, users }: ReportFilters
               ))}
             </SelectContent>
           </Select>
+          {/* Activity Status Filter */}
+          {activityFilter !== undefined && onActivityFilterChange && (
+            <Select
+              value={activityFilter}
+              onValueChange={(value) => onActivityFilterChange(value as any)}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Atividade" />
+              </SelectTrigger>
+              <SelectContent>
+                {activityStatusOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </CardContent>
     </Card>

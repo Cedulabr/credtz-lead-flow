@@ -1,13 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
-import { BarChart3, RefreshCw } from "lucide-react";
+import { BarChart3, RefreshCw, Building2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ReportFilters } from "./ReportFilters";
 import { SummaryCards } from "./SummaryCards";
 import { PerformanceTable } from "./PerformanceTable";
 import { ActivityDetailsModal } from "./ActivityDetailsModal";
 import { ExportButtons } from "./ExportButtons";
+import { TeamOverviewCards } from "./TeamOverviewCards";
+import { InactivityAlertBanner } from "./InactivityAlertBanner";
+import { TeamRanking } from "./TeamRanking";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGestorCompany } from "@/hooks/useGestorCompany";
 import { BlockedAccess } from "@/components/BlockedAccess";
 import { toast } from "sonner";
 import {
@@ -15,11 +20,14 @@ import {
   ReportFilters as ReportFiltersType,
   UserPerformance,
   ReportSummary,
+  ActivityStatus,
 } from "./types";
-import { startOfDay, endOfDay, subDays, startOfMonth } from "date-fns";
+import { startOfDay, endOfDay, subDays, startOfMonth, differenceInDays } from "date-fns";
 
 export function PerformanceReport() {
   const { profile, isAdmin } = useAuth();
+  const gestorCompany = useGestorCompany();
+  const [activityFilter, setActivityFilter] = useState<'all' | 'active' | 'warning' | 'critical'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
@@ -54,27 +62,8 @@ export function PerformanceReport() {
     userName: "",
   });
 
-  // Check access - only Admin and Gestor (via user_companies)
-  const [isGestor, setIsGestor] = useState(false);
-
-  useEffect(() => {
-    const checkGestorAccess = async () => {
-      if (!profile?.id) return;
-      
-      const { data } = await supabase
-        .from("user_companies")
-        .select("company_role")
-        .eq("user_id", profile.id)
-        .eq("company_role", "gestor")
-        .eq("is_active", true)
-        .limit(1);
-      
-      setIsGestor(data && data.length > 0);
-    };
-    
-    checkGestorAccess();
-  }, [profile?.id]);
-
+  // Use gestorCompany hook instead of manual check
+  const isGestor = gestorCompany.isGestor;
   const hasAccess = isAdmin || isGestor;
 
   // Calculate date range based on filter
@@ -289,6 +278,8 @@ export function PerformanceReport() {
             savedProposals: 0,
             lastActivity: null,
             averageResponseTime: null,
+            daysSinceLastActivity: 999,
+            activityStatus: 'critical' as ActivityStatus,
           });
         }
         return userMap.get(userId)!;
@@ -400,10 +391,21 @@ export function PerformanceReport() {
         user.savedProposals++;
       });
 
-      // Calculate conversion rates
+      // Calculate conversion rates and activity status
       userMap.forEach((user) => {
         if (user.proposalsCreated > 0) {
           user.conversionRate = (user.proposalsPaid / user.proposalsCreated) * 100;
+        }
+        // Calculate activity status
+        if (user.lastActivity) {
+          user.daysSinceLastActivity = differenceInDays(new Date(), new Date(user.lastActivity));
+        }
+        if (user.daysSinceLastActivity <= 2) {
+          user.activityStatus = 'active';
+        } else if (user.daysSinceLastActivity <= 6) {
+          user.activityStatus = 'warning';
+        } else {
+          user.activityStatus = 'critical';
         }
       });
 
@@ -447,6 +449,25 @@ export function PerformanceReport() {
     });
   };
 
+  // Filter data by activity status
+  const filteredPerformanceData = useMemo(() => {
+    if (activityFilter === 'all') return performanceData;
+    return performanceData.filter((u) => u.activityStatus === activityFilter);
+  }, [performanceData, activityFilter]);
+
+  const teamAvgConversion = useMemo(() => {
+    const withProposals = performanceData.filter((u) => u.proposalsCreated > 0);
+    if (withProposals.length === 0) return 0;
+    return withProposals.reduce((s, u) => s + u.conversionRate, 0) / withProposals.length;
+  }, [performanceData]);
+
+  const teamStats = useMemo(() => {
+    const active = performanceData.filter((u) => u.activityStatus === 'active').length;
+    const warning = performanceData.filter((u) => u.activityStatus === 'warning').length;
+    const critical = performanceData.filter((u) => u.activityStatus === 'critical').length;
+    return { active, warning, critical, total: performanceData.length };
+  }, [performanceData]);
+
   if (!hasAccess) {
     return (
       <BlockedAccess message="Acesso ao Relatório de Desempenho restrito a Administradores e Gestores" />
@@ -463,9 +484,23 @@ export function PerformanceReport() {
           </div>
           <div>
             <h1 className="text-2xl font-bold">Relatório de Desempenho</h1>
-            <p className="text-sm text-muted-foreground">
-              Acompanhe a produtividade e resultados da equipe
-            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-0.5">
+              {gestorCompany.companyName && (
+                <Badge variant="outline" className="gap-1 text-xs">
+                  <Building2 className="h-3 w-3" />
+                  {gestorCompany.companyName}
+                </Badge>
+              )}
+              {teamStats.total > 0 && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  {teamStats.total} colaboradores
+                  {teamStats.active > 0 && <span className="text-emerald-600">· {teamStats.active} ativos</span>}
+                  {teamStats.warning > 0 && <span className="text-amber-600">· {teamStats.warning} alertas</span>}
+                  {teamStats.critical > 0 && <span className="text-rose-600">· {teamStats.critical} críticos</span>}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -483,15 +518,38 @@ export function PerformanceReport() {
         </div>
       </div>
 
+      {/* Inactivity Alert */}
+      <InactivityAlertBanner data={performanceData} />
+
       {/* Filters */}
-      <ReportFilters filters={filters} onFiltersChange={setFilters} users={users} />
+      <ReportFilters
+        filters={filters}
+        onFiltersChange={setFilters}
+        users={users}
+        activityFilter={activityFilter}
+        onActivityFilterChange={setActivityFilter}
+      />
 
       {/* Summary Cards */}
-      <SummaryCards summary={summary} isLoading={isLoading} />
+      <SummaryCards summary={summary} isLoading={isLoading} teamStats={teamStats} />
+
+      {/* Team Overview + Ranking */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <TeamOverviewCards
+            data={filteredPerformanceData}
+            onViewDetails={handleViewDetails}
+            teamAvgConversion={teamAvgConversion}
+          />
+        </div>
+        <div>
+          <TeamRanking data={performanceData} />
+        </div>
+      </div>
 
       {/* Performance Table */}
       <PerformanceTable
-        data={performanceData}
+        data={filteredPerformanceData}
         isLoading={isLoading}
         onViewDetails={handleViewDetails}
       />

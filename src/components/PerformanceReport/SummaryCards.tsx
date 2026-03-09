@@ -16,9 +16,10 @@ import { ReportSummary } from "./types";
 interface SummaryCardsProps {
   summary: ReportSummary;
   isLoading?: boolean;
+  teamStats?: { active: number; warning: number; critical: number; total: number };
 }
 
-export function SummaryCards({ summary, isLoading }: SummaryCardsProps) {
+export function SummaryCards({ summary, isLoading, teamStats }: SummaryCardsProps) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",

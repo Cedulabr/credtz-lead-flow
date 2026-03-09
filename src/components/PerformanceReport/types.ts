@@ -11,6 +11,8 @@ export interface ReportFilters {
   origin: string | null;
 }
 
+export type ActivityStatus = 'active' | 'warning' | 'critical';
+
 export interface UserPerformance {
   userId: string;
   userName: string;
@@ -30,6 +32,9 @@ export interface UserPerformance {
   savedProposals: number;
   lastActivity: string | null;
   averageResponseTime: number | null;
+  // Gestão
+  daysSinceLastActivity: number;
+  activityStatus: ActivityStatus;
 }
 
 export interface ActivityLog {
