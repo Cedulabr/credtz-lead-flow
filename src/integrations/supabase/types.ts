@@ -5049,6 +5049,8 @@ export type Database = {
       }
       time_clock: {
         Row: {
+          audit_flags: Json | null
+          audit_status: string | null
           break_type_id: string | null
           city: string | null
           clock_date: string
@@ -5065,11 +5067,14 @@ export type Database = {
           photo_url: string | null
           state: string | null
           status: Database["public"]["Enums"]["time_clock_status"]
+          trust_score: number | null
           updated_at: string
           user_agent: string | null
           user_id: string
         }
         Insert: {
+          audit_flags?: Json | null
+          audit_status?: string | null
           break_type_id?: string | null
           city?: string | null
           clock_date?: string
@@ -5086,11 +5091,14 @@ export type Database = {
           photo_url?: string | null
           state?: string | null
           status?: Database["public"]["Enums"]["time_clock_status"]
+          trust_score?: number | null
           updated_at?: string
           user_agent?: string | null
           user_id: string
         }
         Update: {
+          audit_flags?: Json | null
+          audit_status?: string | null
           break_type_id?: string | null
           city?: string | null
           clock_date?: string
@@ -5107,6 +5115,7 @@ export type Database = {
           photo_url?: string | null
           state?: string | null
           status?: Database["public"]["Enums"]["time_clock_status"]
+          trust_score?: number | null
           updated_at?: string
           user_agent?: string | null
           user_id?: string
@@ -5641,10 +5650,16 @@ export type Database = {
         Row: {
           allow_manual_adjustment: boolean | null
           block_duplicate_clock: boolean | null
+          block_on_geofence_violation: boolean | null
+          block_on_invalid_photo: boolean | null
           company_id: string | null
+          company_latitude: number | null
+          company_longitude: number | null
           created_at: string
           default_entry_time: string | null
           default_exit_time: string | null
+          enable_face_detection: boolean | null
+          geofence_radius_meters: number | null
           id: string
           require_location: boolean | null
           require_photo: boolean | null
@@ -5655,10 +5670,16 @@ export type Database = {
         Insert: {
           allow_manual_adjustment?: boolean | null
           block_duplicate_clock?: boolean | null
+          block_on_geofence_violation?: boolean | null
+          block_on_invalid_photo?: boolean | null
           company_id?: string | null
+          company_latitude?: number | null
+          company_longitude?: number | null
           created_at?: string
           default_entry_time?: string | null
           default_exit_time?: string | null
+          enable_face_detection?: boolean | null
+          geofence_radius_meters?: number | null
           id?: string
           require_location?: boolean | null
           require_photo?: boolean | null
@@ -5669,10 +5690,16 @@ export type Database = {
         Update: {
           allow_manual_adjustment?: boolean | null
           block_duplicate_clock?: boolean | null
+          block_on_geofence_violation?: boolean | null
+          block_on_invalid_photo?: boolean | null
           company_id?: string | null
+          company_latitude?: number | null
+          company_longitude?: number | null
           created_at?: string
           default_entry_time?: string | null
           default_exit_time?: string | null
+          enable_face_detection?: boolean | null
+          geofence_radius_meters?: number | null
           id?: string
           require_location?: boolean | null
           require_photo?: boolean | null
