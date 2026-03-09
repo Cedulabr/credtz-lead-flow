@@ -310,11 +310,22 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
               <p className="text-sm font-medium text-center">Registros de hoje:</p>
               <div className="flex flex-wrap justify-center gap-2">
                 {todayRecords.map((record) => (
-                  <Badge key={record.id} variant="secondary" className="flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    {clockTypeLabels[record.clock_type as TimeClockType]}
-                    {getBreakTypeName(record.break_type_id)} - {format(new Date(record.clock_time), 'HH:mm')}
-                  </Badge>
+                  <div key={record.id} className="flex items-center gap-2">
+                    <Badge variant="secondary" className="flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      {clockTypeLabels[record.clock_type as TimeClockType]}
+                      {getBreakTypeName(record.break_type_id)} - {format(new Date(record.clock_time), 'HH:mm')}
+                    </Badge>
+                    {record.trust_score !== null && (
+                      <TrustScoreBadge
+                        score={record.trust_score}
+                        status={record.audit_status}
+                        flags={record.audit_flags}
+                        showScore={false}
+                        size="sm"
+                      />
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
