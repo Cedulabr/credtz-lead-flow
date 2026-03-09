@@ -1,47 +1,15 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { DollarSign, FileText, AlertTriangle, AlertCircle } from "lucide-react";
-import { Televenda } from "../types";
+import { TelevendasStats } from "../hooks/useTelevendasStats";
 import { formatCurrency } from "../utils";
-import { calcDiasParado, getPriorityFromDays } from "./PriorityBadge";
 
 interface DashboardCardsProps {
-  televendas: Televenda[];
-  onFilterByStatus: (status: string) => void;
-  selectedStatus?: string;
-  isGestorOrAdmin: boolean;
-  dateMode: string;
-  bankCalculationModel?: Record<string, string>;
-  bankCommissionRate?: Record<string, number>;
+  stats: TelevendasStats;
 }
 
-export const DashboardCards = ({
-  televendas,
-}: DashboardCardsProps) => {
-  const stats = useMemo(() => {
-    const paid = televendas.filter((tv) => tv.status === "proposta_paga");
-    const totalBrutoPago = paid.reduce((sum, tv) => sum + (tv.saldo_devedor || 0), 0);
-
-    const finalStatuses = ["proposta_paga", "proposta_cancelada", "exclusao_aprovada"];
-    const active = televendas.filter((tv) => !finalStatuses.includes(tv.status));
-    
-    let criticos = 0;
-    let alertas = 0;
-    active.forEach((tv) => {
-      const priority = tv.prioridade_operacional || getPriorityFromDays(calcDiasParado(tv.updated_at));
-      if (priority === "critico") criticos++;
-      else if (priority === "alerta") alertas++;
-    });
-
-    return {
-      totalPropostas: televendas.length,
-      totalBrutoPago,
-      criticos,
-      alertas,
-    };
-  }, [televendas]);
-
-  const cards = [
+export const DashboardCards = ({ stats }: DashboardCardsProps) => {
+  const cards = useMemo(() => [
     {
       label: "Total Propostas",
       value: String(stats.totalPropostas),
@@ -70,7 +38,7 @@ export const DashboardCards = ({
       gradient: "from-amber-500 to-amber-600",
       bg: "bg-amber-500/10",
     }] : []),
-  ];
+  ], [stats]);
 
   return (
     <div className={`grid gap-3 ${cards.length <= 2 ? 'grid-cols-2' : cards.length === 3 ? 'grid-cols-3' : 'grid-cols-2 md:grid-cols-4'}`}>

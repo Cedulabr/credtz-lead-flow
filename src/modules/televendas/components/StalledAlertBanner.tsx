@@ -1,35 +1,19 @@
-import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { AlertTriangle, AlertCircle, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Televenda } from "../types";
-import { calcDiasParado, getPriorityFromDays } from "./PriorityBadge";
 
 interface StalledAlertBannerProps {
-  televendas: Televenda[];
+  criticos: number;
+  alertas: number;
   onFilterByPriority: (priority: string) => void;
 }
 
-export const StalledAlertBanner = ({ televendas, onFilterByPriority }: StalledAlertBannerProps) => {
-  const counts = useMemo(() => {
-    const finalStatuses = ["proposta_paga", "proposta_cancelada", "exclusao_aprovada"];
-    let alertas = 0;
-    let criticos = 0;
-    televendas.forEach((tv) => {
-      if (finalStatuses.includes(tv.status)) return;
-      const dias = calcDiasParado(tv.updated_at);
-      const prio = tv.prioridade_operacional || getPriorityFromDays(dias);
-      if (prio === "critico") criticos++;
-      else if (prio === "alerta") alertas++;
-    });
-    return { alertas, criticos };
-  }, [televendas]);
-
-  if (counts.criticos === 0 && counts.alertas === 0) return null;
+export const StalledAlertBanner = ({ criticos, alertas, onFilterByPriority }: StalledAlertBannerProps) => {
+  if (criticos === 0 && alertas === 0) return null;
 
   return (
     <div className="space-y-2">
-      {counts.criticos > 0 && (
+      {criticos > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -45,7 +29,7 @@ export const StalledAlertBanner = ({ televendas, onFilterByPriority }: StalledAl
               </div>
               <div>
                 <p className="text-lg font-bold text-red-800 dark:text-red-300">
-                  🔴 {counts.criticos} proposta{counts.criticos !== 1 ? "s" : ""} em estado CRÍTICO!
+                  🔴 {criticos} proposta{criticos !== 1 ? "s" : ""} em estado CRÍTICO!
                 </p>
                 <p className="text-sm text-red-700 dark:text-red-400">
                   Paradas há mais de 10 dias sem atualização. Ação imediata necessária.
@@ -64,14 +48,14 @@ export const StalledAlertBanner = ({ televendas, onFilterByPriority }: StalledAl
         </motion.div>
       )}
 
-      {counts.alertas > 0 && (
+      {alertas > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="relative overflow-hidden rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3 shadow-md"
           style={{
-            boxShadow: counts.criticos === 0 ? "0 0 15px rgba(245, 158, 11, 0.3)" : undefined,
+            boxShadow: criticos === 0 ? "0 0 15px rgba(245, 158, 11, 0.3)" : undefined,
           }}
         >
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -81,7 +65,7 @@ export const StalledAlertBanner = ({ televendas, onFilterByPriority }: StalledAl
               </div>
               <div>
                 <p className="text-base font-bold text-amber-800 dark:text-amber-300">
-                  🟡 {counts.alertas} proposta{counts.alertas !== 1 ? "s" : ""} em alerta
+                  🟡 {alertas} proposta{alertas !== 1 ? "s" : ""} em alerta
                 </p>
                 <p className="text-xs text-amber-700 dark:text-amber-400">
                   Paradas há mais de 5 dias. Verifique o andamento.
