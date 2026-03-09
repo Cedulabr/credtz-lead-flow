@@ -54,15 +54,20 @@ const SCHEDULE_TYPES = [
   { value: 'shift', label: 'Por Turno' },
 ];
 
-export function ScheduleManager() {
+interface ScheduleManagerProps {
+  companyId: string | null;
+}
+
+export function ScheduleManager({ companyId }: ScheduleManagerProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<Partial<Schedule> | null>(null);
+  const [applyToAll, setApplyToAll] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   const defaultSchedule: Partial<Schedule> = {
     daily_hours: 8,
@@ -82,14 +87,29 @@ export function ScheduleManager() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [companyId]);
 
   const loadData = async () => {
     setLoading(true);
     
+    let usersQuery = supabase.from('profiles').select('id, name, email').eq('is_active', true).order('name');
+
+    // If gestor (non-admin), filter users by company
+    let companyUserIds: string[] | null = null;
+    if (!isAdmin && companyId) {
+      const { data: ucData } = await supabase
+        .from('user_companies')
+        .select('user_id')
+        .eq('company_id', companyId)
+        .eq('is_active', true);
+      companyUserIds = ucData?.map(u => u.user_id) || [];
+    }
+
     const [schedulesRes, usersRes] = await Promise.all([
       supabase.from('time_clock_schedules').select('*').order('created_at', { ascending: false }),
-      supabase.from('profiles').select('id, name, email').eq('is_active', true).order('name'),
+      companyUserIds
+        ? supabase.from('profiles').select('id, name, email').in('id', companyUserIds).eq('is_active', true).order('name')
+        : usersQuery,
     ]);
     
     if (schedulesRes.data) {
@@ -114,65 +134,77 @@ export function ScheduleManager() {
 
   const handleOpenCreate = () => {
     setEditingSchedule({ ...defaultSchedule });
+    setApplyToAll(false);
     setShowModal(true);
   };
 
   const handleOpenEdit = (schedule: Schedule) => {
     setEditingSchedule({ ...schedule });
+    setApplyToAll(false);
     setShowModal(true);
   };
 
+  const buildScheduleData = (targetUserId: string) => ({
+    user_id: targetUserId,
+    company_id: companyId,
+    daily_hours: editingSchedule?.daily_hours || 8,
+    monthly_hours: editingSchedule?.monthly_hours || 176,
+    entry_time: editingSchedule?.entry_time || '08:00',
+    exit_time: editingSchedule?.exit_time || '18:00',
+    lunch_start: editingSchedule?.lunch_start || '12:00',
+    lunch_end: editingSchedule?.lunch_end || '13:00',
+    lunch_duration_minutes: editingSchedule?.lunch_duration_minutes || 60,
+    tolerance_minutes: editingSchedule?.tolerance_minutes || 10,
+    schedule_type: editingSchedule?.schedule_type || 'fixed',
+    work_days: editingSchedule?.work_days || [1, 2, 3, 4, 5],
+    allow_overtime: editingSchedule?.allow_overtime || false,
+    max_overtime_daily_minutes: editingSchedule?.max_overtime_daily_minutes || 120,
+    is_active: editingSchedule?.is_active !== false,
+    created_by: user?.id,
+  });
+
   const handleSave = async () => {
-    if (!editingSchedule?.user_id) {
-      toast({ title: 'Selecione um colaborador', variant: 'destructive' });
+    if (!applyToAll && !editingSchedule?.user_id) {
+      toast({ title: 'Selecione um colaborador ou marque "Aplicar para todos"', variant: 'destructive' });
       return;
     }
 
     setSaving(true);
-    
-    const scheduleData = {
-      user_id: editingSchedule.user_id,
-      daily_hours: editingSchedule.daily_hours || 8,
-      monthly_hours: editingSchedule.monthly_hours || 176,
-      entry_time: editingSchedule.entry_time || '08:00',
-      exit_time: editingSchedule.exit_time || '18:00',
-      lunch_start: editingSchedule.lunch_start || '12:00',
-      lunch_end: editingSchedule.lunch_end || '13:00',
-      lunch_duration_minutes: editingSchedule.lunch_duration_minutes || 60,
-      tolerance_minutes: editingSchedule.tolerance_minutes || 10,
-      schedule_type: editingSchedule.schedule_type || 'fixed',
-      work_days: editingSchedule.work_days || [1, 2, 3, 4, 5],
-      allow_overtime: editingSchedule.allow_overtime || false,
-      max_overtime_daily_minutes: editingSchedule.max_overtime_daily_minutes || 120,
-      is_active: editingSchedule.is_active !== false,
-      created_by: user?.id,
-    };
 
-    let error;
-    if (editingSchedule.id) {
-      const result = await supabase
-        .from('time_clock_schedules')
-        .update(scheduleData)
-        .eq('id', editingSchedule.id);
-      error = result.error;
-    } else {
-      const result = await supabase
-        .from('time_clock_schedules')
-        .insert(scheduleData);
-      error = result.error;
-    }
+    try {
+      if (applyToAll) {
+        // Upsert a jornada para todos os colaboradores da empresa
+        const records = users.map(u => buildScheduleData(u.id));
+        const { error } = await supabase
+          .from('time_clock_schedules')
+          .upsert(records, { onConflict: 'user_id' });
+        if (error) throw error;
+        toast({ title: `Jornada aplicada para ${users.length} colaborador(es)!` });
+      } else if (editingSchedule?.id) {
+        const { error } = await supabase
+          .from('time_clock_schedules')
+          .update(buildScheduleData(editingSchedule.user_id!))
+          .eq('id', editingSchedule.id);
+        if (error) throw error;
+        toast({ title: 'Jornada atualizada com sucesso!' });
+      } else {
+        const { error } = await supabase
+          .from('time_clock_schedules')
+          .upsert([buildScheduleData(editingSchedule!.user_id!)], { onConflict: 'user_id' });
+        if (error) throw error;
+        toast({ title: 'Jornada salva com sucesso!' });
+      }
 
-    if (error) {
-      toast({ 
-        title: 'Erro ao salvar jornada', 
-        description: error.message, 
-        variant: 'destructive' 
-      });
-    } else {
-      toast({ title: 'Jornada salva com sucesso!' });
       setShowModal(false);
       setEditingSchedule(null);
+      setApplyToAll(false);
       loadData();
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao salvar jornada',
+        description: err.message,
+        variant: 'destructive',
+      });
     }
 
     setSaving(false);
@@ -311,23 +343,47 @@ export function ScheduleManager() {
             <div className="space-y-6 py-4">
               {/* Seleção de Colaborador */}
               {!editingSchedule.id && (
-                <div className="space-y-2">
-                  <Label>Colaborador *</Label>
-                  <Select
-                    value={editingSchedule.user_id || ''}
-                    onValueChange={(value) => setEditingSchedule({ ...editingSchedule, user_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um colaborador" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getUsersWithoutSchedule().map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.name || u.email}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-3">
+                  {/* Aplicar para todos */}
+                  <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/40">
+                    <Checkbox
+                      id="applyToAll"
+                      checked={applyToAll}
+                      onCheckedChange={(checked) => {
+                        setApplyToAll(!!checked);
+                        if (checked) setEditingSchedule(prev => ({ ...prev, user_id: undefined }));
+                      }}
+                    />
+                    <div>
+                      <Label htmlFor="applyToAll" className="cursor-pointer font-medium">
+                        Aplicar para todos os colaboradores da empresa
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        A jornada será criada/atualizada para todos os {users.length} colaboradores
+                      </p>
+                    </div>
+                  </div>
+
+                  {!applyToAll && (
+                    <div className="space-y-2">
+                      <Label>Colaborador *</Label>
+                      <Select
+                        value={editingSchedule.user_id || ''}
+                        onValueChange={(value) => setEditingSchedule({ ...editingSchedule, user_id: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um colaborador" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {users.map((u) => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.name || u.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               )}
 
