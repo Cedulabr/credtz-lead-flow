@@ -38,7 +38,7 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
   
   const { toast } = useToast();
   const { calculateAudit, shouldBlockRegistration } = useAuditEngine();
-  const { initialize: initFaceDetection, validatePhoto } = useFaceDetection();
+  const { initialize: initFaceDetection, validatePhoto, isReady: faceDetectionReady, error: faceDetectionError } = useFaceDetection();
   const {
     loading,
     checkConsent,
