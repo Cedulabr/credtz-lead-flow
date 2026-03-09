@@ -33,6 +33,10 @@ export function AuditDashboard() {
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   
+  // Re-audit state
+  const [reauditing, setReauditing] = useState(false);
+  const [reauditProgress, setReauditProgress] = useState({ current: 0, total: 0 });
+  
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [userFilter, setUserFilter] = useState<string>('all');
@@ -48,6 +52,9 @@ export function AuditDashboard() {
     irregular: 0,
     outsideGeofence: 0,
   });
+
+  const { bulkReaudit } = useAuditEngine();
+  const { toast } = useToast();
 
   useEffect(() => {
     loadUsers();
