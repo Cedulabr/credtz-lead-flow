@@ -10,6 +10,7 @@ import { useWhitelabel } from "@/hooks/useWhitelabel";
 import { AnimatedContainer } from "./ui/animated-container";
 import { SkeletonCard } from "./ui/skeleton-card";
 import { ConsultorDashboard } from "./ConsultorDashboard";
+import { motion } from "framer-motion";
 import {
   Calendar,
   RefreshCw,
@@ -21,6 +22,11 @@ import {
   MessageSquare,
   Users,
   ClipboardList,
+  Radar,
+  FileCheck,
+  Wifi,
+  WifiOff,
+  Loader2,
 } from "lucide-react";
 import { format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -66,6 +72,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [showSimpleDashboard, setShowSimpleDashboard] = useState<boolean | null>(null);
 
   const [companyActivities, setCompanyActivities] = useState<CompanyActivity[]>([]);
+
+  // Module metrics state for cards
+  const [moduleMetrics, setModuleMetrics] = useState({
+    leadsPremium: 0,
+    radarCredits: 0,
+    activateLeads: 0,
+    televendasPagas: 0,
+    documentos: 0,
+    smsCredits: 0,
+    whatsappConnected: false,
+  });
+  const [checkingWhatsApp, setCheckingWhatsApp] = useState(false);
 
   const userName = profile?.name || user?.email?.split('@')[0] || 'Usuário';
   const companyName = config?.company_name || 'Easyn';
@@ -113,8 +131,87 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   useEffect(() => {
     if (user && showSimpleDashboard === false) {
       fetchActivityData();
+      fetchModuleMetrics();
     }
   }, [user, isAdmin, isGestor, selectedMonth, selectedCompany, userCompanyIds, showSimpleDashboard]);
+
+  // Fetch module metrics for admin/gestor cards
+  const fetchModuleMetrics = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { startDate, endDate } = getDateRange();
+      const startISO = startDate.toISOString();
+      const endISO = endDate.toISOString();
+      const visibleCompanyIds = getVisibleCompanyIds();
+      const filterByCompany = !isAdmin && visibleCompanyIds.length > 0;
+
+      // Execute all queries in parallel - build them inline to avoid TS deep instantiation
+      const leadsPromise = filterByCompany
+        ? (supabase.from('leads').select('id', { count: 'exact', head: true }).neq('status', 'new_lead').gte('created_at', startISO).lte('created_at', endISO).in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('leads').select('id', { count: 'exact', head: true }).neq('status', 'new_lead').gte('created_at', startISO).lte('created_at', endISO) as any);
+
+      const radarPromise = filterByCompany
+        ? (supabase.from('radar_credits' as any).select('credits_balance').in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('radar_credits' as any).select('credits_balance') as any);
+
+      const activatePromise = filterByCompany
+        ? (supabase.from('activate_leads').select('id', { count: 'exact', head: true }).neq('status', 'novo').gte('created_at', startISO).lte('created_at', endISO).in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('activate_leads').select('id', { count: 'exact', head: true }).neq('status', 'novo').gte('created_at', startISO).lte('created_at', endISO) as any);
+
+      const tvPromise = filterByCompany
+        ? (supabase.from('televendas').select('id', { count: 'exact', head: true }).eq('status', 'pago').gte('created_at', startISO).lte('created_at', endISO).in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('televendas').select('id', { count: 'exact', head: true }).eq('status', 'pago').gte('created_at', startISO).lte('created_at', endISO) as any);
+
+      const docsPromise = filterByCompany
+        ? (supabase.from('client_documents').select('id', { count: 'exact', head: true }).in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('client_documents').select('id', { count: 'exact', head: true }) as any);
+
+      const smsPromise = filterByCompany
+        ? (supabase.from('sms_credits' as any).select('credits_balance').in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('sms_credits' as any).select('credits_balance') as any);
+
+      const waPromise = filterByCompany
+        ? (supabase.from('whatsapp_instances').select('id, token').not('token', 'is', null).in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('whatsapp_instances').select('id, token').not('token', 'is', null) as any);
+
+      const [leadsRes, radarRes, activateRes, tvRes, docsRes, smsRes, waRes] = await Promise.all([
+        leadsPromise, radarPromise, activatePromise, tvPromise, docsPromise, smsPromise, waPromise,
+      ]);
+
+      // Calculate totals
+      const radarTotal = (radarRes.data || []).reduce((sum: number, r: any) => sum + (r.credits_balance || 0), 0);
+      const smsTotal = (smsRes.data || []).reduce((sum: number, r: any) => sum + (r.credits_balance || 0), 0);
+      const waConnected = (waRes.data || []).length > 0;
+
+      setModuleMetrics({
+        leadsPremium: leadsRes.count || 0,
+        radarCredits: radarTotal,
+        activateLeads: activateRes.count || 0,
+        televendasPagas: tvRes.count || 0,
+        documentos: docsRes.count || 0,
+        smsCredits: smsTotal,
+        whatsappConnected: waConnected,
+      });
+    } catch (error) {
+      console.error('Error fetching module metrics:', error);
+    }
+  };
+
+  const checkWhatsAppConnection = async () => {
+    setCheckingWhatsApp(true);
+    try {
+      const visibleCompanyIds = getVisibleCompanyIds();
+      let query = supabase.from('whatsapp_instances').select('id, token').not('token', 'is', null);
+      if (!isAdmin && visibleCompanyIds.length > 0) {
+        query = query.in('company_id', visibleCompanyIds);
+      }
+      const { data } = await query;
+      setModuleMetrics(prev => ({ ...prev, whatsappConnected: (data || []).length > 0 }));
+    } finally {
+      setCheckingWhatsApp(false);
+    }
+  };
 
   const getDateRange = () => {
     const [year, month] = selectedMonth.split('-').map(Number);
@@ -389,7 +486,211 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </div>
 
       <div className="px-4 md:px-6 py-4 md:py-6 space-y-6">
-        {/* Summary Cards */}
+        {/* Module Cards - Quick Access */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Leads Premium */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <Card 
+              className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-amber-500 bg-gradient-to-br from-amber-50 to-background dark:from-amber-950/20"
+              onClick={() => onNavigate('leads')}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">Leads Premium</p>
+                    <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{moduleMetrics.leadsPremium}</p>
+                    <p className="text-xs text-muted-foreground">trabalhados no mês</p>
+                  </div>
+                  <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+                    <Zap className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Radar de Oportunidades */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            <Card 
+              className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-purple-500 bg-gradient-to-br from-purple-50 to-background dark:from-purple-950/20"
+              onClick={() => onNavigate('radar')}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">Radar de Oportunidades</p>
+                    <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{moduleMetrics.radarCredits}</p>
+                    <p className="text-xs text-muted-foreground">créditos disponíveis</p>
+                  </div>
+                  <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full">
+                    <Radar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Leads Ativados */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <Card 
+              className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-background dark:from-blue-950/20"
+              onClick={() => onNavigate('activate-leads')}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">Leads Ativados</p>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{moduleMetrics.activateLeads}</p>
+                    <p className="text-xs text-muted-foreground">trabalhados no mês</p>
+                  </div>
+                  <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                    <Phone className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Vendas Televendas */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+          >
+            <Card 
+              className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50 to-background dark:from-emerald-950/20"
+              onClick={() => onNavigate('televendas-manage')}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">Vendas Televendas</p>
+                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{moduleMetrics.televendasPagas}</p>
+                    <p className="text-xs text-muted-foreground">pagas no mês</p>
+                  </div>
+                  <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-full">
+                    <ShoppingCart className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Documentos Salvos */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Card 
+              className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-rose-500 bg-gradient-to-br from-rose-50 to-background dark:from-rose-950/20"
+              onClick={() => onNavigate('documents')}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">Documentos Salvos</p>
+                    <p className="text-2xl font-bold text-rose-600 dark:text-rose-400">{moduleMetrics.documentos}</p>
+                    <p className="text-xs text-muted-foreground">arquivos armazenados</p>
+                  </div>
+                  <div className="p-3 bg-rose-100 dark:bg-rose-900/30 rounded-full">
+                    <FileCheck className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* WhatsApp API */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+          >
+            <Card 
+              className={`cursor-pointer hover:shadow-lg transition-all border-l-4 ${moduleMetrics.whatsappConnected ? 'border-l-green-500 bg-gradient-to-br from-green-50 to-background dark:from-green-950/20' : 'border-l-red-500 bg-gradient-to-br from-red-50 to-background dark:from-red-950/20'}`}
+              onClick={() => onNavigate('whatsapp')}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">API WhatsApp</p>
+                    <div className="flex items-center gap-2">
+                      {moduleMetrics.whatsappConnected ? (
+                        <>
+                          <span className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
+                          <span className="text-sm font-semibold text-green-600 dark:text-green-400">Conectado</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="h-2 w-2 bg-red-500 rounded-full" />
+                          <span className="text-sm font-semibold text-red-600 dark:text-red-400">Desconectado</span>
+                        </>
+                      )}
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-2 h-7 text-xs"
+                      onClick={(e) => { e.stopPropagation(); checkWhatsAppConnection(); }}
+                      disabled={checkingWhatsApp}
+                    >
+                      {checkingWhatsApp ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                      Verificar
+                    </Button>
+                  </div>
+                  <div className={`p-3 rounded-full ${moduleMetrics.whatsappConnected ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+                    {moduleMetrics.whatsappConnected ? (
+                      <Wifi className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <WifiOff className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Crédito SMS */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="sm:col-span-2"
+          >
+            <Card 
+              className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-sky-500 bg-gradient-to-br from-sky-50 to-background dark:from-sky-950/20"
+              onClick={() => onNavigate('sms')}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">Crédito SMS</p>
+                    <p className="text-2xl font-bold text-sky-600 dark:text-sky-400">{moduleMetrics.smsCredits.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">créditos disponíveis para envio</p>
+                  </div>
+                  <div className="p-3 bg-sky-100 dark:bg-sky-900/30 rounded-full">
+                    <MessageSquare className="h-5 w-5 text-sky-600 dark:text-sky-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+
+        {/* Activity Summary Cards - Existing */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {summaryCards.map((card) => (
             <Card key={card.label} className={`${card.bg} border-none shadow-sm`}>
