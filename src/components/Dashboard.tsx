@@ -10,6 +10,7 @@ import { useWhitelabel } from "@/hooks/useWhitelabel";
 import { AnimatedContainer } from "./ui/animated-container";
 import { SkeletonCard } from "./ui/skeleton-card";
 import { ConsultorDashboard } from "./ConsultorDashboard";
+import { motion } from "framer-motion";
 import {
   Calendar,
   RefreshCw,
@@ -21,6 +22,11 @@ import {
   MessageSquare,
   Users,
   ClipboardList,
+  Radar,
+  FileCheck,
+  Wifi,
+  WifiOff,
+  Loader2,
 } from "lucide-react";
 import { format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
