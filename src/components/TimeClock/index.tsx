@@ -71,7 +71,7 @@ export function TimeClock() {
       </div>
 
       <Tabs defaultValue="clock" className="space-y-6">
-        <TabsList className={`grid w-full ${canManage ? 'grid-cols-3 lg:grid-cols-9' : 'grid-cols-4'}`}>
+        <TabsList className={`grid w-full ${canManage ? 'grid-cols-5 lg:grid-cols-10' : 'grid-cols-4'}`}>
           <TabsTrigger value="clock" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             <span className="hidden sm:inline">Ponto</span>
