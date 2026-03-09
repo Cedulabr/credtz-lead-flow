@@ -61,27 +61,8 @@ export function PerformanceReport() {
     userName: "",
   });
 
-  // Check access - only Admin and Gestor (via user_companies)
-  const [isGestor, setIsGestor] = useState(false);
-
-  useEffect(() => {
-    const checkGestorAccess = async () => {
-      if (!profile?.id) return;
-      
-      const { data } = await supabase
-        .from("user_companies")
-        .select("company_role")
-        .eq("user_id", profile.id)
-        .eq("company_role", "gestor")
-        .eq("is_active", true)
-        .limit(1);
-      
-      setIsGestor(data && data.length > 0);
-    };
-    
-    checkGestorAccess();
-  }, [profile?.id]);
-
+  // Use gestorCompany hook instead of manual check
+  const isGestor = gestorCompany.isGestor;
   const hasAccess = isAdmin || isGestor;
 
   // Calculate date range based on filter
