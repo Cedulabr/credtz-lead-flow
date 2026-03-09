@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, History, Settings as SettingsIcon, CalendarClock, FileText, LayoutDashboard, Timer, DollarSign, CalendarOff, Calculator } from 'lucide-react';
+import { Clock, History, Settings as SettingsIcon, CalendarClock, FileText, LayoutDashboard, Timer, DollarSign, CalendarOff, Calculator, ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ClockButton } from './ClockButton';
@@ -13,6 +13,7 @@ import { HourBank } from './HourBank';
 import { SalaryManager } from './SalaryManager';
 import { DayOffManager } from './DayOffManager';
 import { DiscountCalculator } from './DiscountCalculator';
+import { AuditDashboard } from './AuditDashboard';
 import { BlockedAccess } from '@/components/BlockedAccess';
 import { Loader2 } from 'lucide-react';
 
@@ -70,7 +71,7 @@ export function TimeClock() {
       </div>
 
       <Tabs defaultValue="clock" className="space-y-6">
-        <TabsList className={`grid w-full ${canManage ? 'grid-cols-3 lg:grid-cols-9' : 'grid-cols-4'}`}>
+        <TabsList className={`grid w-full ${canManage ? 'grid-cols-5 lg:grid-cols-10' : 'grid-cols-4'}`}>
           <TabsTrigger value="clock" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             <span className="hidden sm:inline">Ponto</span>
@@ -108,6 +109,10 @@ export function TimeClock() {
               <TabsTrigger value="schedules" className="flex items-center gap-2">
                 <CalendarClock className="h-4 w-4" />
                 <span className="hidden sm:inline">Jornadas</span>
+              </TabsTrigger>
+              <TabsTrigger value="audit" className="flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4" />
+                <span className="hidden sm:inline">Auditoria</span>
               </TabsTrigger>
             </>
           )}
@@ -149,6 +154,9 @@ export function TimeClock() {
             </TabsContent>
             <TabsContent value="schedules">
               <ScheduleManager companyId={companyId} />
+            </TabsContent>
+            <TabsContent value="audit">
+              <AuditDashboard />
             </TabsContent>
           </>
         )}

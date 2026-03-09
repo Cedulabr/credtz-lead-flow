@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,8 +6,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Clock, MapPin, Wifi, Camera, CheckCircle2, Loader2, Coffee } from 'lucide-react';
 import { useTimeClock } from '@/hooks/useTimeClock';
+import { useAuditEngine } from './useAuditEngine';
+import { useFaceDetection } from './useFaceDetection';
 import { CameraCapture } from './CameraCapture';
 import { ConsentModal } from './ConsentModal';
+import { TrustScoreBadge } from './TrustScoreBadge';
 import { clockTypeLabels, type TimeClockType, type TimeClock, type TimeClockBreakType } from './types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -34,6 +37,8 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
   const [activeBreak, setActiveBreak] = useState<TimeClock | null>(null);
   
   const { toast } = useToast();
+  const { calculateAudit, shouldBlockRegistration } = useAuditEngine();
+  const { initialize: initFaceDetection, validatePhoto } = useFaceDetection();
   const {
     loading,
     checkConsent,
@@ -53,6 +58,7 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
     loadData();
     loadBreakTypes();
     checkLocationPermission();
+    initFaceDetection(); // Preload face detection models
   }, [userId]);
 
   const loadData = async () => {
@@ -145,8 +151,77 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
 
   const handlePhotoCapture = async (blob: Blob) => {
     setShowCamera(false);
+    
+    // Run face detection on captured photo
+    let faceResult = null;
+    try {
+      const img = new Image();
+      const url = URL.createObjectURL(blob);
+      await new Promise<void>((resolve) => {
+        img.onload = () => resolve();
+        img.src = url;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        faceResult = await validatePhoto(canvas);
+      }
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Face detection failed:', err);
+    }
+
+    // Calculate audit score
+    const [ip, location] = await Promise.all([
+      getPublicIP(),
+      new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
+        if (!navigator.geolocation) { resolve(null); return; }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+          () => resolve(null),
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      }),
+    ]);
+
+    const auditResult = await calculateAudit({
+      userId,
+      latitude: location?.latitude ?? null,
+      longitude: location?.longitude ?? null,
+      ipAddress: ip,
+      faceResult,
+    });
+
+    // Check if registration should be blocked
+    const blockCheck = await shouldBlockRegistration(auditResult);
+    if (blockCheck.block) {
+      toast({
+        title: 'Registro bloqueado',
+        description: blockCheck.reason || 'Não foi possível validar o registro.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const success = await registerClock(nextClockType, blob, companyId, selectedBreakType?.id);
     if (success) {
+      // Update the time_clock record with audit data
+      const records = await getTodayRecords();
+      const latestRecord = records[records.length - 1];
+      if (latestRecord) {
+        await supabase
+          .from('time_clock')
+          .update({
+            trust_score: auditResult.score,
+            audit_flags: auditResult.flags as any,
+            audit_status: auditResult.status,
+          })
+          .eq('id', latestRecord.id);
+      }
+
       setSelectedBreakType(null);
       await loadData();
       onClockRegistered?.();
@@ -235,11 +310,22 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
               <p className="text-sm font-medium text-center">Registros de hoje:</p>
               <div className="flex flex-wrap justify-center gap-2">
                 {todayRecords.map((record) => (
-                  <Badge key={record.id} variant="secondary" className="flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    {clockTypeLabels[record.clock_type as TimeClockType]}
-                    {getBreakTypeName(record.break_type_id)} - {format(new Date(record.clock_time), 'HH:mm')}
-                  </Badge>
+                  <div key={record.id} className="flex items-center gap-2">
+                    <Badge variant="secondary" className="flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      {clockTypeLabels[record.clock_type as TimeClockType]}
+                      {getBreakTypeName(record.break_type_id)} - {format(new Date(record.clock_time), 'HH:mm')}
+                    </Badge>
+                    {record.trust_score !== null && (
+                      <TrustScoreBadge
+                        score={record.trust_score}
+                        status={record.audit_status}
+                        flags={record.audit_flags}
+                        showScore={false}
+                        size="sm"
+                      />
+                    )}
+                  </div>
                 ))}
               </div>
             </div>

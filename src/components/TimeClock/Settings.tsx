@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings as SettingsIcon, Save, Loader2, Coffee } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Loader2, Coffee, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { TimeClockSettings } from './types';
@@ -72,6 +72,11 @@ export function Settings() {
         allow_manual_adjustment: settings.allow_manual_adjustment,
         block_duplicate_clock: settings.block_duplicate_clock,
         retention_years: settings.retention_years,
+        company_latitude: settings.company_latitude,
+        company_longitude: settings.company_longitude,
+        geofence_radius_meters: settings.geofence_radius_meters,
+        block_on_invalid_photo: settings.block_on_invalid_photo,
+        block_on_geofence_violation: settings.block_on_geofence_violation,
       })
       .eq('id', settings.id);
 
@@ -238,6 +243,94 @@ export function Settings() {
                     checked={settings.block_duplicate_clock}
                     onCheckedChange={(checked) =>
                       setSettings({ ...settings, block_duplicate_clock: checked })
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Geofence Section */}
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-medium text-sm flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Configuração de Geofence
+                </h3>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="company_lat">Latitude da Empresa</Label>
+                    <Input
+                      id="company_lat"
+                      type="number"
+                      step="0.000001"
+                      placeholder="-23.550520"
+                      value={settings.company_latitude ?? ''}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          company_latitude: e.target.value ? parseFloat(e.target.value) : null,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="company_lng">Longitude da Empresa</Label>
+                    <Input
+                      id="company_lng"
+                      type="number"
+                      step="0.000001"
+                      placeholder="-46.633309"
+                      value={settings.company_longitude ?? ''}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          company_longitude: e.target.value ? parseFloat(e.target.value) : null,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="geofence_radius">Raio Permitido (metros)</Label>
+                    <Input
+                      id="geofence_radius"
+                      type="number"
+                      min="50"
+                      max="10000"
+                      value={settings.geofence_radius_meters ?? 500}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          geofence_radius_meters: parseInt(e.target.value) || 500,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Bloquear se Foto Inválida</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Impedir registro se nenhum rosto for detectado
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.block_on_invalid_photo ?? false}
+                    onCheckedChange={(checked) =>
+                      setSettings({ ...settings, block_on_invalid_photo: checked })
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Bloquear Fora do Geofence</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Impedir registro se fora da área permitida
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.block_on_geofence_violation ?? false}
+                    onCheckedChange={(checked) =>
+                      setSettings({ ...settings, block_on_geofence_violation: checked })
                     }
                   />
                 </div>
