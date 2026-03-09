@@ -1,80 +1,35 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Diagnostico: Modulo Consulta Base OFF
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### O que foi encontrado
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+A edge function `baseoff-external-query` esta respondendo com status 200 e retornando dados validos para o CPF `89498674434` (cliente **MARIA CELIA SOARES**, ATIVO, Marechal Deodoro/AL).
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+Porem, a resposta da edge function vem em formato `{ cache: false, data: [...] }` com as **colunas brutas do banco** (`statusbeneficio`, `bancoemprestimo`, `vlparcela`), ao inves do formato transformado que o codigo da edge function deveria produzir (`status_beneficio`, `banco_emprestimo`, `vl_parcela`, `contratos[]`, `credit_opportunities{}`).
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+Isso indica que a **versao deployada da edge function e diferente** do codigo no repositorio. A versao deployada retorna os dados crus, enquanto o codigo no repo tem toda a logica de agrupamento por CPF e calculo de oportunidades de credito.
 
----
+### O que o frontend espera vs o que recebe
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+| Campo | Frontend espera | API retorna |
+|-------|----------------|-------------|
+| Status | `status_beneficio` | `statusbeneficio` |
+| Contratos | `contratos[]` (array agrupado) | Campos flat por row |
+| Oportunidades | `credit_opportunities{}` | Nao existe |
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+O hook `useOptimizedSearch` ja trata o wrapper `{ data: [...] }` corretamente (linha 82), mas os nomes dos campos nao batem porque a edge function deployada nao faz a transformacao.
 
-**Arquitetura:**
+### Plano de correcao
 
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
-```
+1. **Redeployar a edge function** `baseoff-external-query` — o codigo no repositorio ja esta correto com toda a logica de agrupamento e transformacao. Basta fazer o redeploy para que a versao correta entre em producao.
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+2. **Adicionar fallback no `useOptimizedSearch`** — para resiliencia, o hook deve mapear tanto os nomes transformados (`status_beneficio`) quanto os nomes brutos (`statusbeneficio`), garantindo que funcione independente da versao da edge function.
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+### Arquivos modificados
 
----
-
-### 3. Simplificar modulo Base OFF - apenas Consulta
-
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
-
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
-
----
-
-### Arquivos a modificar
-
-| Arquivo | Mudanca |
-|---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
-
----
-
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+| Arquivo | Acao |
+|---------|------|
+| `supabase/functions/baseoff-external-query/index.ts` | Redeploy (sem alteracao no codigo) |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Adicionar fallback para nomes de campos brutos |
 
