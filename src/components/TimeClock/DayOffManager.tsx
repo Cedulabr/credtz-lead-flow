@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGestorCompany } from '@/hooks/useGestorCompany';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 type OffType = 'folga' | 'feriado' | 'licenca' | 'ferias' | 'abono';
