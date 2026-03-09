@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,8 +14,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGestorCompany } from '@/hooks/useGestorCompany';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { NationalHolidaysSection } from './NationalHolidaysSection';
 
 type OffType = 'folga' | 'feriado' | 'licenca' | 'ferias' | 'abono' | 'home_office';
 
@@ -56,7 +57,8 @@ export function DayOffManager() {
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
-  const [modalDate, setModalDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [modalDateStart, setModalDateStart] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [modalDateEnd, setModalDateEnd] = useState('');
   const [modalOffType, setModalOffType] = useState<OffType>('folga');
   const [modalReason, setModalReason] = useState('');
   const [modalUserId, setModalUserId] = useState<string>('');
@@ -66,7 +68,8 @@ export function DayOffManager() {
   const [modalEndTime, setModalEndTime] = useState('12:00');
   const [saving, setSaving] = useState(false);
 
-  // When off type changes, reset partial day if type doesn't support it
+  const selectedYear = Number(selectedMonth.split('-')[0]);
+
   useEffect(() => {
     if (!OFF_TYPE_CONFIG[modalOffType]?.allowsPartial) {
       setModalIsPartial(false);
@@ -110,6 +113,28 @@ export function DayOffManager() {
     }
   }, [selectedCompanyId, selectedMonth]);
 
+  // Load ALL day offs for the selected year (for holidays section comparison)
+  const [allYearDayOffs, setAllYearDayOffs] = useState<DayOff[]>([]);
+
+  useEffect(() => {
+    if (!selectedCompanyId) return;
+    (async () => {
+      const { data } = await supabase
+        .from('time_clock_day_offs')
+        .select('*')
+        .eq('company_id', selectedCompanyId)
+        .eq('off_type', 'feriado')
+        .gte('off_date', `${selectedYear}-01-01`)
+        .lte('off_date', `${selectedYear}-12-31`);
+      setAllYearDayOffs((data as DayOff[]) || []);
+    })();
+  }, [selectedCompanyId, selectedYear, dayOffs]);
+
+  const existingHolidayDates = useMemo(
+    () => [...new Set(allYearDayOffs.map((d) => d.off_date))],
+    [allYearDayOffs]
+  );
+
   const loadUsers = async () => {
     const { data: ucData } = await supabase
       .from('user_companies')
@@ -152,10 +177,19 @@ export function DayOffManager() {
     setLoading(false);
   };
 
-  const buildInsertPayload = (userId: string) => ({
+  const getDateRange = (): string[] => {
+    if (!modalDateEnd || modalDateEnd <= modalDateStart) {
+      return [modalDateStart];
+    }
+    const start = parseISO(modalDateStart);
+    const end = parseISO(modalDateEnd);
+    return eachDayOfInterval({ start, end }).map((d) => format(d, 'yyyy-MM-dd'));
+  };
+
+  const buildInsertPayload = (userId: string, date: string) => ({
     user_id: userId,
     company_id: selectedCompanyId,
-    off_date: modalDate,
+    off_date: date,
     off_type: modalOffType,
     reason: modalReason || null,
     is_partial_day: modalIsPartial,
@@ -178,39 +212,43 @@ export function DayOffManager() {
   };
 
   const handleSave = async () => {
-    if (!modalDate || !modalOffType || !selectedCompanyId) {
+    if (!modalDateStart || !modalOffType || !selectedCompanyId) {
       toast({ title: 'Dados incompletos', description: 'Selecione empresa, data e tipo.', variant: 'destructive' });
       return;
     }
     if (!validateTimes()) return;
 
+    const dates = getDateRange();
     setSaving(true);
     try {
       if (modalBulk) {
         const userIds = users.map(u => u.id);
-        await supabase
-          .from('time_clock_day_offs')
-          .delete()
-          .in('user_id', userIds)
-          .eq('off_date', modalDate)
-          .eq('company_id', selectedCompanyId);
-
-        const inserts = users.map(u => buildInsertPayload(u.id));
+        for (const date of dates) {
+          await supabase
+            .from('time_clock_day_offs')
+            .delete()
+            .in('user_id', userIds)
+            .eq('off_date', date)
+            .eq('company_id', selectedCompanyId);
+        }
+        const inserts = dates.flatMap((date) => users.map(u => buildInsertPayload(u.id, date)));
         const { error } = await supabase.from('time_clock_day_offs').insert(inserts);
         if (error) throw error;
-        toast({ title: `${OFF_TYPE_CONFIG[modalOffType].label} lançado para ${users.length} colaboradores!` });
+        toast({ title: `${OFF_TYPE_CONFIG[modalOffType].label} lançado para ${users.length} colaboradores em ${dates.length} dia(s)!` });
       } else {
         if (!modalUserId) return;
-        await supabase
-          .from('time_clock_day_offs')
-          .delete()
-          .eq('user_id', modalUserId)
-          .eq('off_date', modalDate)
-          .eq('company_id', selectedCompanyId);
-
-        const { error } = await supabase.from('time_clock_day_offs').insert(buildInsertPayload(modalUserId));
+        for (const date of dates) {
+          await supabase
+            .from('time_clock_day_offs')
+            .delete()
+            .eq('user_id', modalUserId)
+            .eq('off_date', date)
+            .eq('company_id', selectedCompanyId);
+        }
+        const inserts = dates.map((date) => buildInsertPayload(modalUserId, date));
+        const { error } = await supabase.from('time_clock_day_offs').insert(inserts);
         if (error) throw error;
-        toast({ title: `${OFF_TYPE_CONFIG[modalOffType].label} lançado com sucesso!` });
+        toast({ title: `${OFF_TYPE_CONFIG[modalOffType].label} lançado em ${dates.length} dia(s)!` });
       }
 
       setShowModal(false);
@@ -219,6 +257,7 @@ export function DayOffManager() {
       setModalIsPartial(false);
       setModalStartTime('08:00');
       setModalEndTime('12:00');
+      setModalDateEnd('');
       loadDayOffs();
     } catch (error: any) {
       console.error('Erro ao lançar folga:', error);
@@ -246,6 +285,7 @@ export function DayOffManager() {
   };
 
   const currentTypeConfig = OFF_TYPE_CONFIG[modalOffType];
+  const dateCount = getDateRange().length;
 
   return (
     <div className="space-y-6">
@@ -364,6 +404,17 @@ export function DayOffManager() {
         </CardContent>
       </Card>
 
+      {/* National Holidays Section */}
+      {selectedCompanyId && (
+        <NationalHolidaysSection
+          year={selectedYear}
+          companyId={selectedCompanyId}
+          users={users}
+          existingHolidayDates={existingHolidayDates}
+          onHolidaysApplied={loadDayOffs}
+        />
+      )}
+
       {/* Modal */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent>
@@ -393,10 +444,24 @@ export function DayOffManager() {
                 </Select>
               </div>
             )}
-            <div className="space-y-1">
-              <Label>Data</Label>
-              <Input type="date" value={modalDate} onChange={(e) => setModalDate(e.target.value)} />
+
+            {/* Date range */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Data Início</Label>
+                <Input type="date" value={modalDateStart} onChange={(e) => setModalDateStart(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Data Fim <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+                <Input type="date" value={modalDateEnd} onChange={(e) => setModalDateEnd(e.target.value)} min={modalDateStart} />
+              </div>
             </div>
+            {dateCount > 1 && (
+              <p className="text-sm text-muted-foreground">
+                📅 Será lançado para <strong>{dateCount} dias</strong> no intervalo selecionado.
+              </p>
+            )}
+
             <div className="space-y-1">
               <Label>Tipo</Label>
               <Select value={modalOffType} onValueChange={(v) => setModalOffType(v as OffType)}>
@@ -411,7 +476,6 @@ export function DayOffManager() {
               </Select>
             </div>
 
-            {/* Partial day toggle — only for types that allow it */}
             {currentTypeConfig?.allowsPartial && (
               <div className="flex items-center gap-2">
                 <Checkbox
@@ -425,28 +489,19 @@ export function DayOffManager() {
               </div>
             )}
 
-            {/* Time range — only shown when partial is checked */}
             {modalIsPartial && currentTypeConfig?.allowsPartial && (
               <div className="grid grid-cols-2 gap-3 pl-1">
                 <div className="space-y-1">
                   <Label className="text-xs flex items-center gap-1">
                     <Clock className="h-3 w-3" /> Início
                   </Label>
-                  <Input
-                    type="time"
-                    value={modalStartTime}
-                    onChange={(e) => setModalStartTime(e.target.value)}
-                  />
+                  <Input type="time" value={modalStartTime} onChange={(e) => setModalStartTime(e.target.value)} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs flex items-center gap-1">
                     <Clock className="h-3 w-3" /> Fim
                   </Label>
-                  <Input
-                    type="time"
-                    value={modalEndTime}
-                    onChange={(e) => setModalEndTime(e.target.value)}
-                  />
+                  <Input type="time" value={modalEndTime} onChange={(e) => setModalEndTime(e.target.value)} />
                 </div>
               </div>
             )}
@@ -458,9 +513,9 @@ export function DayOffManager() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving || !modalDate}>
+            <Button onClick={handleSave} disabled={saving || !modalDateStart}>
               {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Salvar
+              Salvar{dateCount > 1 ? ` (${dateCount} dias)` : ''}
             </Button>
           </DialogFooter>
         </DialogContent>
