@@ -1,80 +1,81 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Levantamento Completo: Módulo de Televendas — Diagnóstico e Otimizações
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Estado Atual
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+O módulo está bem estruturado com 17 componentes, 2 hooks, 3 views e utilitários. As features principais estão interligadas:
+- **Sales Wizard** → insere em `televendas` → aparece no **TelevendasModule**
+- **Status comercial** ↔ **Status bancário** sincronizados nos finais (pago/cancelado)
+- **Pipeline** ↔ **Filtros** ↔ **Cards** tudo conectado via `mapToPipelineStatus`
+- **Aprovações em lote** → atualiza status + histórico + SMS sync (trigger `sms_sync_televendas_status`)
+- **Prioridade operacional** → calculada client-side + DB (`update_televendas_prioridade`) + notificações (`notify_critical_televendas`)
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+### Problemas Encontrados
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+**1. Código morto — `TelevendasManagement.tsx` (1.407 linhas)**
+O arquivo antigo `src/components/TelevendasManagement.tsx` não é importado por nenhum componente. São 1.407 linhas de código legado que devem ser removidas.
 
----
+**2. Recálculo redundante de prioridade (3x no mesmo render)**
+`StalledAlertBanner`, `BankingPipeline` e `DashboardCards` — cada um recalcula independentemente a contagem de propostas críticas/alerta iterando todos os televendas. São 3 loops separados sobre os mesmos dados.
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+**3. `bankCalculationModel` e `bankCommissionRate` não são usados**
+O hook `useCommissionRules` é chamado no TelevendasModule, mas seus valores (`bankCalculationModel`, `bankCommissionRate`) nunca são passados efetivamente para DashboardCards nem ProductionBar. Os props existem nas interfaces mas não são repassados.
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+**4. `handleQuickStatusChange` duplica lógica de `confirmStatusChange`**
+A função de mudança rápida de status (linhas 404-441) replica a lógica de atualização sem sincronizar `status_bancario` nem registrar datas de pagamento/cancelamento. Propostas alteradas por esta via ficam dessincronizadas.
 
-**Arquitetura:**
+**5. Bulk operations sequenciais (N+1)**
+`handleBulkApproveCancellation` faz `for...of` com await individual para cada proposta. 10 cancelamentos = 20 requests sequenciais (update + history).
 
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
-```
+**6. `fetchTelevendas` enriquece com profiles em 2 queries separadas**
+Primeiro busca todos os televendas, depois faz uma segunda query para profiles. Poderia usar um único select com join ou view.
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+**7. `businessDays.ts` não usa feriados**
+O cálculo de dias úteis para previsão de saldo ignora feriados nacionais, mesmo existindo `brazilianHolidays.ts` no TimeClock.
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+### Plano de Otimizações
 
----
+#### 1. Remover código morto
+- Deletar `src/components/TelevendasManagement.tsx`
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
+#### 2. Centralizar cálculo de prioridades (`useTelevendasStats`)
+Criar um hook `useTelevendasStats` que calcula uma única vez:
+- Contagem por status pipeline
+- Contagem de prioridades (crítico/alerta/normal)
+- Stats de produção (total bruto pago, ranking)
+- Retorna tudo memoizado
 
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
+`DashboardCards`, `BankingPipeline`, `StalledAlertBanner` e `ProductionBar` passam a consumir do mesmo objeto de stats via props.
 
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+#### 3. Conectar commission rules ao cálculo financeiro
+Passar `bankCalculationModel` efetivamente para `DashboardCards` e `ProductionBar`. Na produção, quando o modelo for `'valor_bruto'`, usar `parcela` ao invés de `saldo_devedor` para o cálculo do Total Bruto Pago.
 
----
+#### 4. Unificar lógica de status change
+Eliminar `handleQuickStatusChange` e usar `confirmStatusChange` com reason opcional. Garantir que toda mudança de status sincronize `status_bancario` para finais e registre datas.
 
-### Arquivos a modificar
+#### 5. Batch operations com Promise.all
+Substituir o `for...of` sequencial por `Promise.all` com chunks de 5, reduzindo tempo de aprovação em lote em ~80%.
 
-| Arquivo | Mudanca |
-|---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
+#### 6. Integrar feriados no cálculo de previsão de saldo
+Importar `getBrazilianHolidays` de `brazilianHolidays.ts` (já existe) e usar no `addBusinessDays` para pular feriados nacionais.
 
----
+#### 7. Smart insights na visão de Clientes
+Adicionar indicadores inteligentes na `ClientesView`:
+- **Recorrência**: badge "Cliente recorrente" quando tem 3+ propostas
+- **Ticket médio**: mostrar valor médio por proposta
+- **Taxa de conversão**: % de propostas pagas vs total
 
-### Pergunta necessaria
+### Arquivos Modificados
 
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+| Arquivo | Ação |
+|---------|------|
+| `src/components/TelevendasManagement.tsx` | **Deletar** |
+| `src/modules/televendas/TelevendasModule.tsx` | Centralizar stats, unificar status change, batch otimizado |
+| `src/modules/televendas/components/DashboardCards.tsx` | Receber stats pré-calculados + usar commission model |
+| `src/modules/televendas/components/BankingPipeline.tsx` | Receber stats pré-calculados |
+| `src/modules/televendas/components/ProductionBar.tsx` | Receber stats + usar commission model |
+| `src/modules/televendas/components/StalledAlertBanner.tsx` | Receber counts pré-calculados |
+| `src/modules/televendas/views/ClientesView.tsx` | Adicionar insights (recorrência, ticket médio, conversão) |
+| `src/modules/televendas/utils/businessDays.ts` | Integrar feriados nacionais |
 
