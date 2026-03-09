@@ -545,26 +545,29 @@ export const TelevendasModule = () => {
   const handleApproveCancellation = (tv: Televenda) => handleStatusChange(tv, "proposta_cancelada");
   const handleRejectCancellation = (tv: Televenda) => handleStatusChange(tv, "devolvido");
 
-  // Bulk approve cancellations
+  // Bulk approve cancellations — chunked Promise.all
   const handleBulkApproveCancellation = async (items: Televenda[]) => {
     try {
-      for (const tv of items) {
-        const updateData: Record<string, unknown> = {
-          status: "proposta_cancelada",
-          status_bancario: "cancelado_banco",
-          status_updated_at: new Date().toISOString(),
-          status_updated_by: user?.id,
-          data_cancelamento: new Date().toISOString().split("T")[0],
-        };
-
-        await supabase.from("televendas").update(updateData).eq("id", tv.id);
-        await supabase.from("televendas_status_history").insert({
-          televendas_id: tv.id,
-          from_status: tv.status,
-          to_status: "proposta_cancelada",
-          changed_by: user?.id,
-          reason: "Aprovação em massa de cancelamento",
-        });
+      const CHUNK_SIZE = 5;
+      for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+        const chunk = items.slice(i, i + CHUNK_SIZE);
+        await Promise.all(chunk.map(async (tv) => {
+          const updateData: Record<string, unknown> = {
+            status: "proposta_cancelada",
+            status_bancario: "cancelado_banco",
+            status_updated_at: new Date().toISOString(),
+            status_updated_by: user?.id,
+            data_cancelamento: new Date().toISOString().split("T")[0],
+          };
+          await supabase.from("televendas").update(updateData).eq("id", tv.id);
+          await supabase.from("televendas_status_history").insert({
+            televendas_id: tv.id,
+            from_status: tv.status,
+            to_status: "proposta_cancelada",
+            changed_by: user?.id,
+            reason: "Aprovação em massa de cancelamento",
+          });
+        }));
       }
 
       toast({ title: "✅ Cancelamentos aprovados", description: `${items.length} propostas canceladas com sucesso` });
