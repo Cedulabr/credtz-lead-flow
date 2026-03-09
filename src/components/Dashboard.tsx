@@ -144,69 +144,40 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       const startISO = startDate.toISOString();
       const endISO = endDate.toISOString();
       const visibleCompanyIds = getVisibleCompanyIds();
+      const filterByCompany = !isAdmin && visibleCompanyIds.length > 0;
 
-      // Build queries based on scope (admin = global, gestor = company)
-      const queries: Promise<any>[] = [];
+      // Execute all queries in parallel - build them inline to avoid TS deep instantiation
+      const leadsPromise = filterByCompany
+        ? (supabase.from('leads').select('id', { count: 'exact', head: true }).neq('status', 'new_lead').gte('created_at', startISO).lte('created_at', endISO).in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('leads').select('id', { count: 'exact', head: true }).neq('status', 'new_lead').gte('created_at', startISO).lte('created_at', endISO) as any);
 
-      // Leads Premium count
-      let leadsQuery = supabase.from('leads').select('id', { count: 'exact', head: true })
-        .neq('status', 'new_lead')
-        .gte('created_at', startISO)
-        .lte('created_at', endISO);
-      if (!isAdmin && visibleCompanyIds.length > 0) {
-        leadsQuery = leadsQuery.in('company_id', visibleCompanyIds);
-      }
-      queries.push(leadsQuery);
+      const radarPromise = filterByCompany
+        ? (supabase.from('radar_credits').select('credits_balance').in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('radar_credits').select('credits_balance') as any);
 
-      // Radar Credits (sum)
-      let radarQuery = supabase.from('radar_credits').select('credits_balance');
-      if (!isAdmin && visibleCompanyIds.length > 0) {
-        radarQuery = radarQuery.in('company_id', visibleCompanyIds);
-      }
-      queries.push(radarQuery);
+      const activatePromise = filterByCompany
+        ? (supabase.from('activate_leads').select('id', { count: 'exact', head: true }).neq('status', 'novo').gte('created_at', startISO).lte('created_at', endISO).in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('activate_leads').select('id', { count: 'exact', head: true }).neq('status', 'novo').gte('created_at', startISO).lte('created_at', endISO) as any);
 
-      // Activate Leads count
-      let activateQuery = supabase.from('activate_leads').select('id', { count: 'exact', head: true })
-        .neq('status', 'novo')
-        .gte('created_at', startISO)
-        .lte('created_at', endISO);
-      if (!isAdmin && visibleCompanyIds.length > 0) {
-        activateQuery = activateQuery.in('company_id', visibleCompanyIds);
-      }
-      queries.push(activateQuery);
+      const tvPromise = filterByCompany
+        ? (supabase.from('televendas').select('id', { count: 'exact', head: true }).eq('status', 'pago').gte('created_at', startISO).lte('created_at', endISO).in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('televendas').select('id', { count: 'exact', head: true }).eq('status', 'pago').gte('created_at', startISO).lte('created_at', endISO) as any);
 
-      // Televendas Pagas count
-      let tvQuery = supabase.from('televendas').select('id', { count: 'exact', head: true })
-        .eq('status', 'pago')
-        .gte('created_at', startISO)
-        .lte('created_at', endISO);
-      if (!isAdmin && visibleCompanyIds.length > 0) {
-        tvQuery = tvQuery.in('company_id', visibleCompanyIds);
-      }
-      queries.push(tvQuery);
+      const docsPromise = filterByCompany
+        ? (supabase.from('client_documents').select('id', { count: 'exact', head: true }).in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('client_documents').select('id', { count: 'exact', head: true }) as any);
 
-      // Documents count
-      let docsQuery = supabase.from('client_documents').select('id', { count: 'exact', head: true });
-      if (!isAdmin && visibleCompanyIds.length > 0) {
-        docsQuery = docsQuery.in('company_id', visibleCompanyIds);
-      }
-      queries.push(docsQuery);
+      const smsPromise = filterByCompany
+        ? (supabase.from('sms_credits').select('credits_balance').in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('sms_credits').select('credits_balance') as any);
 
-      // SMS Credits (sum)
-      let smsQuery = supabase.from('sms_credits').select('credits_balance');
-      if (!isAdmin && visibleCompanyIds.length > 0) {
-        smsQuery = smsQuery.in('company_id', visibleCompanyIds);
-      }
-      queries.push(smsQuery);
+      const waPromise = filterByCompany
+        ? (supabase.from('whatsapp_instances').select('id, token').not('token', 'is', null).in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('whatsapp_instances').select('id, token').not('token', 'is', null) as any);
 
-      // WhatsApp instances
-      let waQuery = supabase.from('whatsapp_instances').select('id, token').not('token', 'is', null);
-      if (!isAdmin && visibleCompanyIds.length > 0) {
-        waQuery = waQuery.in('company_id', visibleCompanyIds);
-      }
-      queries.push(waQuery);
-
-      const [leadsRes, radarRes, activateRes, tvRes, docsRes, smsRes, waRes] = await Promise.all(queries);
+      const [leadsRes, radarRes, activateRes, tvRes, docsRes, smsRes, waRes] = await Promise.all([
+        leadsPromise, radarPromise, activatePromise, tvPromise, docsPromise, smsPromise, waPromise,
+      ]);
 
       // Calculate totals
       const radarTotal = (radarRes.data || []).reduce((sum: number, r: any) => sum + (r.credits_balance || 0), 0);
