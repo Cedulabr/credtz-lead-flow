@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGestorCompany } from '@/hooks/useGestorCompany';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 type OffType = 'folga' | 'feriado' | 'licenca' | 'ferias' | 'abono';
@@ -122,7 +122,7 @@ export function DayOffManager() {
   const loadDayOffs = async () => {
     setLoading(true);
     const startDate = `${selectedMonth}-01`;
-    const endDate = `${selectedMonth}-31`;
+    const endDate = format(endOfMonth(new Date(`${selectedMonth}-01`)), 'yyyy-MM-dd');
 
     const { data } = await supabase
       .from('time_clock_day_offs')
