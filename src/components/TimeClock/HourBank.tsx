@@ -176,7 +176,7 @@ export function HourBank() {
     for (const b of balances) {
       await supabase.from('time_clock_hour_bank').upsert({
         user_id: selectedUserId,
-        month: b.month,
+        reference_month: b.month,
         expected_minutes: b.expectedMinutes,
         worked_minutes: b.workedMinutes,
         balance_minutes: b.balanceMinutes,
@@ -186,7 +186,7 @@ export function HourBank() {
         absence_count: b.absenceCount,
         manual_adjustments_minutes: b.manualAdjustmentsMinutes,
         compensations_minutes: b.compensationsMinutes,
-      }, { onConflict: 'user_id,month' });
+      }, { onConflict: 'user_id,reference_month' });
     }
 
     toast({ title: 'Banco de horas recalculado e salvo!' });
