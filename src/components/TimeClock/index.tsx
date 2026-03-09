@@ -13,6 +13,7 @@ import { HourBank } from './HourBank';
 import { SalaryManager } from './SalaryManager';
 import { DayOffManager } from './DayOffManager';
 import { DiscountCalculator } from './DiscountCalculator';
+import { AuditDashboard } from './AuditDashboard';
 import { BlockedAccess } from '@/components/BlockedAccess';
 import { Loader2 } from 'lucide-react';
 
