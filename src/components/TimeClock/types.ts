@@ -138,3 +138,74 @@ export const auditStatusColors: Record<AuditStatus, string> = {
   suspicious: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   irregular: 'bg-red-100 text-red-800 border-red-200',
 };
+
+// Hour Bank types
+export type HourBankEntryType = 
+  | 'hora_extra' | 'atraso' | 'saida_antecipada' | 'falta' 
+  | 'ajuste_manual' | 'compensacao_folga' | 'compensacao_pagamento' | 'desconto_folha';
+
+export type HourBankStatus = 'open' | 'closed' | 'paid';
+
+export interface HourBankEntry {
+  id: string;
+  user_id: string;
+  company_id: string | null;
+  entry_date: string;
+  entry_type: HourBankEntryType;
+  minutes: number;
+  reason: string | null;
+  reference_month: string;
+  performed_by: string;
+  hourly_rate: number | null;
+  total_value: number | null;
+  created_at: string;
+}
+
+export interface HourBankSettings {
+  id: string;
+  company_id: string | null;
+  tolerance_delay_minutes: number;
+  max_overtime_monthly_minutes: number;
+  max_bank_balance_minutes: number;
+  allow_negative_discount: boolean;
+  overtime_multiplier: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MonthBalance {
+  month: string;
+  monthLabel: string;
+  expectedMinutes: number;
+  workedMinutes: number;
+  balanceMinutes: number;
+  overtimeMinutes: number;
+  delayMinutes: number;
+  earlyExitMinutes: number;
+  absenceCount: number;
+  manualAdjustmentsMinutes: number;
+  compensationsMinutes: number;
+  status: HourBankStatus;
+}
+
+export const hourBankEntryTypeLabels: Record<HourBankEntryType, string> = {
+  hora_extra: 'Hora Extra',
+  atraso: 'Atraso',
+  saida_antecipada: 'Saída Antecipada',
+  falta: 'Falta',
+  ajuste_manual: 'Ajuste Manual',
+  compensacao_folga: 'Compensação (Folga)',
+  compensacao_pagamento: 'Compensação (Pagamento)',
+  desconto_folha: 'Desconto em Folha',
+};
+
+export const hourBankEntryTypeColors: Record<HourBankEntryType, string> = {
+  hora_extra: 'bg-green-100 text-green-800',
+  atraso: 'bg-red-100 text-red-800',
+  saida_antecipada: 'bg-orange-100 text-orange-800',
+  falta: 'bg-red-100 text-red-800',
+  ajuste_manual: 'bg-blue-100 text-blue-800',
+  compensacao_folga: 'bg-purple-100 text-purple-800',
+  compensacao_pagamento: 'bg-indigo-100 text-indigo-800',
+  desconto_folha: 'bg-yellow-100 text-yellow-800',
+};
