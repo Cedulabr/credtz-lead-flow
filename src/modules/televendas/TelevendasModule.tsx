@@ -99,6 +99,9 @@ export const TelevendasModule = () => {
 
   const isGestorOrAdmin = isAdmin || isGestor;
 
+  // Centralized stats
+  const centralStats = useTelevendasStats(televendas, bankCalculationModel);
+
   // Check gestor role
   useEffect(() => {
     const checkRole = async () => {
