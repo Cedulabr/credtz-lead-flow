@@ -276,9 +276,10 @@ export function HourBank() {
       {/* Main Content with Sub-tabs */}
       <Tabs defaultValue="resumo">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <TabsList className={`grid w-full ${isGestor ? 'grid-cols-5' : 'grid-cols-2'}`}>
+          <TabsList className={`grid w-full ${isGestor ? 'grid-cols-6' : 'grid-cols-2'}`}>
             <TabsTrigger value="resumo" className="text-xs">Resumo</TabsTrigger>
             <TabsTrigger value="historico" className="text-xs">Histórico</TabsTrigger>
+            {isGestor && <TabsTrigger value="gestao" className="text-xs">Gestão</TabsTrigger>}
             {isGestor && <TabsTrigger value="lancamentos" className="text-xs">Lançamentos</TabsTrigger>}
             {isGestor && <TabsTrigger value="compensacoes" className="text-xs">Compensações</TabsTrigger>}
             {isGestor && <TabsTrigger value="config" className="text-xs">Regras</TabsTrigger>}
