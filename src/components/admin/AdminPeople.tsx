@@ -61,7 +61,7 @@ export function AdminPeople() {
   const renderContent = () => {
     switch (activeSection) {
       case 'users':
-        return <UsersList />;
+        return <UsersManagement />;
       case 'companies':
         return <AdminCompanies />;
       case 'indications':
