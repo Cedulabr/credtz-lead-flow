@@ -31,7 +31,8 @@ export function HourBank() {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
 
-  const isGestor = isAdmin || (profile as any)?.company_role === 'gestor';
+  const { isGestor: gestorFlag, isAdmin: adminFlag } = useGestorCompany();
+  const isGestor = isAdmin || gestorFlag || adminFlag;
 
   useEffect(() => {
     if (isGestor) {
