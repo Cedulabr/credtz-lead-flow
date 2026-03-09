@@ -17,6 +17,8 @@ import { HourBankEntries } from './HourBankEntries';
 import { HourBankCompensation } from './HourBankCompensation';
 import { HourBankSettingsPanel } from './HourBankSettings';
 import { HourBankReport } from './HourBankReport';
+import { HourBankCompanyOverview } from './HourBankCompanyOverview';
+import { HourBankEmployeeAlert } from './HourBankEmployeeAlert';
 
 export function HourBank() {
   const { user, isAdmin, profile } = useAuth();
