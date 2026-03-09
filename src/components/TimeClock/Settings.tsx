@@ -72,6 +72,11 @@ export function Settings() {
         allow_manual_adjustment: settings.allow_manual_adjustment,
         block_duplicate_clock: settings.block_duplicate_clock,
         retention_years: settings.retention_years,
+        company_latitude: settings.company_latitude,
+        company_longitude: settings.company_longitude,
+        geofence_radius_meters: settings.geofence_radius_meters,
+        block_on_invalid_photo: settings.block_on_invalid_photo,
+        block_on_geofence_violation: settings.block_on_geofence_violation,
       })
       .eq('id', settings.id);
 

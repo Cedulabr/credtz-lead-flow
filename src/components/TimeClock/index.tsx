@@ -155,6 +155,9 @@ export function TimeClock() {
             <TabsContent value="schedules">
               <ScheduleManager companyId={companyId} />
             </TabsContent>
+            <TabsContent value="audit">
+              <AuditDashboard />
+            </TabsContent>
           </>
         )}
       </Tabs>
