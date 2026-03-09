@@ -7,6 +7,8 @@ const MODELS_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
 let faceapi: any = null;
 let modelsLoaded = false;
 let loadingPromise: Promise<void> | null = null;
+let loadAttempts = 0;
+const MAX_LOAD_ATTEMPTS = 3;
 
 async function loadFaceApi(): Promise<void> {
   if (modelsLoaded) return;
@@ -14,6 +16,8 @@ async function loadFaceApi(): Promise<void> {
 
   loadingPromise = (async () => {
     try {
+      console.log('[FaceDetection] Loading face-api.js...');
+      
       // Dynamic import of face-api.js
       const module = await import('face-api.js');
       faceapi = module;
@@ -21,8 +25,12 @@ async function loadFaceApi(): Promise<void> {
       // Load the tiny face detector model (smallest and fastest)
       await faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL);
       modelsLoaded = true;
+      loadAttempts = 0;
+      console.log('[FaceDetection] ✓ Models loaded successfully');
     } catch (error) {
-      console.error('Failed to load face-api.js:', error);
+      console.error('[FaceDetection] ✗ Failed to load face-api.js:', error);
+      loadAttempts++;
+      loadingPromise = null; // Reset so it can retry
       throw error;
     }
   })();
@@ -79,23 +87,31 @@ function calculateSharpness(canvas: HTMLCanvasElement): number {
 
 export function useFaceDetection() {
   const [isLoading, setIsLoading] = useState(false);
-  const [isReady, setIsReady] = useState(false);
+  const [isReady, setIsReady] = useState(modelsLoaded);
   const [error, setError] = useState<string | null>(null);
   const initAttempted = useRef(false);
 
   const initialize = useCallback(async () => {
-    if (isReady || initAttempted.current) return;
-    initAttempted.current = true;
+    // Allow retry if previous attempts failed
+    if (isReady) return true;
+    if (initAttempted.current && loadAttempts >= MAX_LOAD_ATTEMPTS) {
+      console.warn('[FaceDetection] Max load attempts reached, skipping');
+      return false;
+    }
     
+    initAttempted.current = true;
     setIsLoading(true);
     setError(null);
     
     try {
       await loadFaceApi();
       setIsReady(true);
+      return true;
     } catch (err) {
-      setError('Falha ao carregar detecção facial');
-      console.error('Face detection init error:', err);
+      const errorMsg = `Falha ao carregar detecção facial (tentativa ${loadAttempts}/${MAX_LOAD_ATTEMPTS})`;
+      setError(errorMsg);
+      console.error('[FaceDetection]', errorMsg, err);
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -112,6 +128,7 @@ export function useFaceDetection() {
     // Check blur first (works without face-api)
     if (imageSource instanceof HTMLCanvasElement) {
       const sharpness = calculateSharpness(imageSource);
+      console.log('[FaceDetection] Sharpness score:', sharpness);
       if (sharpness < 30) {
         isBlurry = true;
         flags.push({
@@ -125,6 +142,7 @@ export function useFaceDetection() {
     // Try face detection if face-api is loaded
     if (modelsLoaded && faceapi) {
       try {
+        console.log('[FaceDetection] Running face detection...');
         const detections = await faceapi.detectAllFaces(
           imageSource,
           new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 })
@@ -132,6 +150,7 @@ export function useFaceDetection() {
 
         faceCount = detections.length;
         confidence = faceCount > 0 ? Math.max(...detections.map((d: any) => d.score)) * 100 : 0;
+        console.log('[FaceDetection] Detected', faceCount, 'faces, confidence:', confidence);
 
         if (faceCount === 0) {
           flags.push({
@@ -147,9 +166,22 @@ export function useFaceDetection() {
           });
         }
       } catch (err) {
-        console.error('Face detection error:', err);
-        // Don't penalize if detection fails - continue without face validation
+        console.error('[FaceDetection] Detection error:', err);
+        // Penalize when detection fails after models loaded
+        flags.push({
+          code: 'foto_erro_deteccao',
+          label: 'Erro na detecção facial',
+          scoreDelta: -10,
+        });
       }
+    } else {
+      // Models not loaded - add fallback flag
+      console.warn('[FaceDetection] Models not loaded, adding fallback flag');
+      flags.push({
+        code: 'foto_nao_validada',
+        label: 'Validação facial indisponível',
+        scoreDelta: -10,
+      });
     }
 
     return {
@@ -163,9 +195,12 @@ export function useFaceDetection() {
   const validatePhoto = useCallback(async (
     canvas: HTMLCanvasElement
   ): Promise<FaceDetectionResult> => {
-    // Initialize if not ready
+    // Try to initialize if not ready
     if (!isReady && !isLoading) {
-      await initialize();
+      const success = await initialize();
+      if (!success) {
+        console.warn('[FaceDetection] Could not initialize, proceeding with limited validation');
+      }
     }
     
     return detectFaces(canvas);
@@ -173,7 +208,7 @@ export function useFaceDetection() {
 
   return {
     isLoading,
-    isReady,
+    isReady: modelsLoaded, // Use module-level state for accuracy
     error,
     initialize,
     detectFaces,

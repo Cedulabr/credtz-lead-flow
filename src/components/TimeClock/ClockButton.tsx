@@ -168,10 +168,22 @@ export function ClockButton({ userId, companyId, onClockRegistered }: ClockButto
       if (ctx) {
         ctx.drawImage(img, 0, 0);
         faceResult = await validatePhoto(canvas);
+        console.log('[ClockButton] Face detection result:', faceResult);
       }
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Face detection failed:', err);
+      console.error('[ClockButton] Face detection failed:', err);
+      // Add fallback flag when detection completely fails
+      faceResult = {
+        faceCount: 0,
+        confidence: 0,
+        isBlurry: false,
+        flags: [{
+          code: 'foto_nao_validada',
+          label: 'Validação facial indisponível',
+          scoreDelta: -10,
+        }],
+      };
     }
 
     // Calculate audit score
