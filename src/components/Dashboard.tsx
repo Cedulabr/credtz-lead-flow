@@ -168,8 +168,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         : (supabase.from('client_documents').select('id', { count: 'exact', head: true }) as any);
 
       const smsPromise = filterByCompany
-        ? (supabase.from('sms_credits').select('credits_balance').in('company_id', visibleCompanyIds) as any)
-        : (supabase.from('sms_credits').select('credits_balance') as any);
+        ? (supabase.from('sms_credits' as any).select('credits_balance').in('company_id', visibleCompanyIds) as any)
+        : (supabase.from('sms_credits' as any).select('credits_balance') as any);
 
       const waPromise = filterByCompany
         ? (supabase.from('whatsapp_instances').select('id, token').not('token', 'is', null).in('company_id', visibleCompanyIds) as any)
