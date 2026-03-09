@@ -54,15 +54,20 @@ const SCHEDULE_TYPES = [
   { value: 'shift', label: 'Por Turno' },
 ];
 
-export function ScheduleManager() {
+interface ScheduleManagerProps {
+  companyId: string | null;
+}
+
+export function ScheduleManager({ companyId }: ScheduleManagerProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<Partial<Schedule> | null>(null);
+  const [applyToAll, setApplyToAll] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   const defaultSchedule: Partial<Schedule> = {
     daily_hours: 8,
@@ -82,14 +87,29 @@ export function ScheduleManager() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [companyId]);
 
   const loadData = async () => {
     setLoading(true);
     
+    let usersQuery = supabase.from('profiles').select('id, name, email').eq('is_active', true).order('name');
+
+    // If gestor (non-admin), filter users by company
+    let companyUserIds: string[] | null = null;
+    if (!isAdmin && companyId) {
+      const { data: ucData } = await supabase
+        .from('user_companies')
+        .select('user_id')
+        .eq('company_id', companyId)
+        .eq('is_active', true);
+      companyUserIds = ucData?.map(u => u.user_id) || [];
+    }
+
     const [schedulesRes, usersRes] = await Promise.all([
       supabase.from('time_clock_schedules').select('*').order('created_at', { ascending: false }),
-      supabase.from('profiles').select('id, name, email').eq('is_active', true).order('name'),
+      companyUserIds
+        ? supabase.from('profiles').select('id, name, email').in('id', companyUserIds).eq('is_active', true).order('name')
+        : usersQuery,
     ]);
     
     if (schedulesRes.data) {
