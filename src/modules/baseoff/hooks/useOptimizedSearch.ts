@@ -138,6 +138,47 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
             competencia_final: c.competencia_final || null,
           }));
 
+          // Create synthetic card contracts from rmc/rcc objects
+          // These represent existing cards the client already has
+          const rmcParcela = parseFloat(rmcObj?.valor) || 0;
+          const rccParcela = parseFloat(rccObj?.valor) || 0;
+
+          if (rmcObj && rmcParcela > 0) {
+            contratos.push({
+              banco_emprestimo: rmcObj.banco || '',
+              contrato: `RMC-${rmcObj.banco || 'N/I'}`,
+              vl_emprestimo: null,
+              vl_parcela: rmcParcela,
+              prazo: null,
+              taxa: null,
+              saldo: null,
+              situacao_emprestimo: 'Ativo',
+              tipo_emprestimo: 'RMC',
+              data_averbacao: null,
+              inicio_desconto: null,
+              competencia: null,
+              competencia_final: null,
+            });
+          }
+
+          if (rccObj && rccParcela > 0) {
+            contratos.push({
+              banco_emprestimo: rccObj.banco || '',
+              contrato: `RCC-${rccObj.banco || 'N/I'}`,
+              vl_emprestimo: null,
+              vl_parcela: rccParcela,
+              prazo: null,
+              taxa: null,
+              saldo: null,
+              situacao_emprestimo: 'Ativo',
+              tipo_emprestimo: 'RCC',
+              data_averbacao: null,
+              inicio_desconto: null,
+              competencia: null,
+              competencia_final: null,
+            });
+          }
+
           return {
             ...flat,
             status,
@@ -166,7 +207,7 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
             orgao_pagador: pagObj?.orgao_pagador || flat.orgao_pagador || flat.orgaopagador || null,
             conta_corrente: pagObj?.conta_corrente || flat.conta_corrente || flat.contacorrente || null,
             meio_pagto: pagObj?.meio_pagamento || flat.meio_pagto || flat.meiopagto || null,
-            // RMC/RCC flat
+            // RMC/RCC - total margin values (valor_rmc/rcc represent the committed amount)
             banco_rmc: rmcObj?.banco || flat.banco_rmc || flat.bancormc || null,
             valor_rmc: parseFloat(rmcObj?.valor || flat.valor_rmc || flat.valorrmc) || 0,
             banco_rcc: rccObj?.banco || flat.banco_rcc || flat.bancorcc || null,
