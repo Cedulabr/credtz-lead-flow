@@ -23,21 +23,12 @@ export function ConsultaView({ onClientSelect, filters, onFiltersChange }: Consu
     search,
   } = useOptimizedSearch({ debounceMs: 400, pageSize: 50 });
 
-  // Calculate stats from current results
-  const stats: DashboardStats = {
-    totalClientes: clients.length,
-    ativos: clients.filter(c => c.status === 'ativo').length,
-    simulados: clients.filter(c => c.status === 'simulado').length,
-    vencendo: clients.filter(c => c.status === 'vencendo').length,
-  };
-
   const handleSearch = useCallback((query: string, immediate: boolean = false) => {
     search(query, 0, immediate);
   }, [search]);
 
   return (
     <div className="space-y-6">
-      {/* Optimized Search Component */}
       <OptimizedSearch
         onSearch={handleSearch}
         isLoading={isLoading}
@@ -45,10 +36,6 @@ export function ConsultaView({ onClientSelect, filters, onFiltersChange }: Consu
         totalCount={totalCount}
       />
 
-      {/* Dashboard Cards */}
-      {hasSearched && <SummaryCards stats={stats} isLoading={isLoading} />}
-
-      {/* Results Count & Filters */}
       {hasSearched && clients.length > 0 && (
         <div className="flex items-center gap-3">
           <div className="flex-1">
@@ -68,7 +55,6 @@ export function ConsultaView({ onClientSelect, filters, onFiltersChange }: Consu
         </div>
       )}
 
-      {/* Results */}
       <div className="space-y-3">
         {isLoading ? (
           Array.from({ length: 5 }).map((_, i) => (
