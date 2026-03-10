@@ -1,9 +1,8 @@
 import React, { useCallback } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, AlertCircle, Users } from 'lucide-react';
-import { BaseOffClient, BaseOffFilters, DashboardStats } from '../types';
+import { BaseOffClient, BaseOffFilters } from '../types';
 import { ClienteCard } from '../components/ClienteCard';
-import { SummaryCards } from '../components/SummaryCards';
 import { FiltersDrawer } from '../components/FiltersDrawer';
 import { OptimizedSearch } from '../components/OptimizedSearch';
 import { useOptimizedSearch } from '../hooks/useOptimizedSearch';
