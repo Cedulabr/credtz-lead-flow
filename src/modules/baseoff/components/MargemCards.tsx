@@ -12,6 +12,15 @@ import { BaseOffContract } from '../types';
 import { isCardContract } from './CartoesSection';
 import { cn } from '@/lib/utils';
 
+interface MargemCardsProps {
+  mr?: number | null;
+  baseCalculo?: number | null;
+  margemCartao?: number | null;
+  cartaoBeneficio?: number | null;
+  contracts?: BaseOffContract[];
+  esp?: string | null;
+}
+
 export function MargemCards({ 
   mr, 
   baseCalculo, 
