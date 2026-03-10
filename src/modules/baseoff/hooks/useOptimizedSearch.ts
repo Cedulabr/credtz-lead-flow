@@ -88,6 +88,21 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
           const beneficio = row.beneficios?.[0] || {};
           const flat = { ...row, ...beneficio };
 
+          // 1. Endereco: extract fields if it's an object (prevents React Error #31)
+          const enderecoObj = typeof flat.endereco === 'object' && flat.endereco ? flat.endereco : null;
+
+          // 2. Contatos: extract from row.contatos (not from beneficio)
+          const contatos = row.contatos || {};
+          const tels = (contatos.telefones || flat.telefones || []).filter(Boolean);
+          const emails = contatos.emails || [];
+
+          // 3. RMC/RCC: extract from nested objects
+          const rmcObj = flat.rmc && typeof flat.rmc === 'object' ? flat.rmc : null;
+          const rccObj = flat.rcc && typeof flat.rcc === 'object' ? flat.rcc : null;
+
+          // 4. Pagamento: extract banking data
+          const pagObj = flat.pagamento && typeof flat.pagamento === 'object' ? flat.pagamento : null;
+
           const statusBeneficio = flat.status_beneficio || flat.statusbeneficio || '';
           let status: ClientStatus = 'simulado';
           if (statusBeneficio) {
@@ -104,7 +119,7 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
           const nb = flat.nb || flat.NB || flat.numero_beneficio || flat.num_beneficio || null;
           const mr = parseFloat(flat.mr) || 0;
 
-          // Normalize contract field names from API (banco→banco_emprestimo, valor→vl_emprestimo, etc.)
+          // Normalize contract field names from API
           const rawContratos = flat.contratos || [];
           const contratos = rawContratos.map((c: any) => ({
             ...c,
@@ -123,9 +138,6 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
             competencia_final: c.competencia_final || null,
           }));
 
-          // Map telefones array to individual fields
-          const tels = (flat.telefones || []).filter(Boolean);
-
           return {
             ...flat,
             status,
@@ -133,26 +145,55 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
             nb,
             mr,
             data_nascimento: flat.data_nascimento || flat.dtnascimento || null,
-            banco_pagto: flat.banco_pagto || flat.bancopagto || null,
-            agencia_pagto: flat.agencia_pagto || flat.agenciapagto || null,
-            orgao_pagador: flat.orgao_pagador || flat.orgaopagador || null,
-            conta_corrente: flat.conta_corrente || flat.contacorrente || null,
-            meio_pagto: flat.meio_pagto || flat.meiopagto || null,
-            banco_rmc: flat.banco_rmc || flat.bancormc || null,
-            valor_rmc: parseFloat(flat.valor_rmc || flat.valorrmc) || 0,
-            banco_rcc: flat.banco_rcc || flat.bancorcc || null,
-            valor_rcc: parseFloat(flat.valor_rcc || flat.valorrcc) || 0,
-            tel_cel_1: flat.tel_cel_1 || flat.telcel_1 || tels[0] || null,
-            tel_cel_2: flat.tel_cel_2 || flat.telcel_2 || tels[1] || null,
-            tel_cel_3: flat.tel_cel_3 || flat.telcel_3 || tels[2] || null,
-            tel_fixo_1: flat.tel_fixo_1 || flat.telfixo_1 || tels[3] || null,
-            tel_fixo_2: flat.tel_fixo_2 || flat.telfixo_2 || tels[4] || null,
-            tel_fixo_3: flat.tel_fixo_3 || flat.telfixo_3 || tels[5] || null,
+            // Endereço flat (prevent rendering objects)
+            endereco: enderecoObj?.endereco || (typeof flat.endereco === 'string' ? flat.endereco : null),
+            bairro: flat.bairro || enderecoObj?.bairro || null,
+            municipio: flat.municipio || enderecoObj?.municipio || null,
+            uf: flat.uf || enderecoObj?.uf || null,
+            cep: flat.cep || enderecoObj?.cep || null,
+            logr_tipo_1: enderecoObj?.logr_tipo || flat.logr_tipo_1 || null,
+            logr_titulo_1: enderecoObj?.logr_titulo || flat.logr_titulo_1 || null,
+            logr_nome_1: enderecoObj?.logr_nome || flat.logr_nome_1 || null,
+            logr_numero_1: enderecoObj?.logr_numero || flat.logr_numero_1 || null,
+            logr_complemento_1: enderecoObj?.logr_complemento || flat.logr_complemento_1 || null,
+            bairro_1: enderecoObj?.bairro_alt || flat.bairro_1 || null,
+            cidade_1: enderecoObj?.cidade_alt || flat.cidade_1 || null,
+            uf_1: enderecoObj?.uf_alt || flat.uf_1 || null,
+            cep_1: enderecoObj?.cep_alt || flat.cep_1 || null,
+            // Pagamento flat
+            banco_pagto: pagObj?.banco_pagamento || flat.banco_pagto || flat.bancopagto || null,
+            agencia_pagto: pagObj?.agencia_pagamento || flat.agencia_pagto || flat.agenciapagto || null,
+            orgao_pagador: pagObj?.orgao_pagador || flat.orgao_pagador || flat.orgaopagador || null,
+            conta_corrente: pagObj?.conta_corrente || flat.conta_corrente || flat.contacorrente || null,
+            meio_pagto: pagObj?.meio_pagamento || flat.meio_pagto || flat.meiopagto || null,
+            // RMC/RCC flat
+            banco_rmc: rmcObj?.banco || flat.banco_rmc || flat.bancormc || null,
+            valor_rmc: parseFloat(rmcObj?.valor || flat.valor_rmc || flat.valorrmc) || 0,
+            banco_rcc: rccObj?.banco || flat.banco_rcc || flat.bancorcc || null,
+            valor_rcc: parseFloat(rccObj?.valor || flat.valor_rcc || flat.valorrcc) || 0,
+            // Telefones
+            tel_cel_1: tels[0] || null,
+            tel_cel_2: tels[1] || null,
+            tel_cel_3: tels[2] || null,
+            tel_fixo_1: tels[3] || null,
+            tel_fixo_2: tels[4] || null,
+            tel_fixo_3: tels[5] || null,
+            telefones: tels,
+            // Emails
+            email_1: emails[0] || flat.email_1 || null,
+            email_2: emails[1] || flat.email_2 || null,
+            email_3: emails[2] || flat.email_3 || null,
+            // Contratos e extras
             total_contracts: contratos.length || flat.total_contracts || 0,
             contracts: flat.contracts || [],
             contratos,
-            telefones: tels,
             credit_opportunities: flat.credit_opportunities || null,
+            // Clean up nested objects to prevent React rendering errors
+            rmc: undefined,
+            rcc: undefined,
+            pagamento: undefined,
+            contatos: undefined,
+            beneficios: undefined,
           };
         });
 
