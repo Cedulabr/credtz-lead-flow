@@ -1,80 +1,103 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Correção: Consulta Base OFF - 4 problemas identificados
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Causa Raiz (confirmada via teste do edge function)
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+A resposta da API tem estrutura com **objetos aninhados** que o frontend tenta renderizar diretamente como texto:
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
-
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
-
----
-
-### 2. Conectar Base OFF ao PostgreSQL externo
-
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
-
-**Arquitetura:**
-
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
+```json
+{
+  "endereco": { "bairro": "...", "municipio": "...", "uf": "...", ... },  // ← OBJETO, não string
+  "contatos": { "telefones": [...], "emails": [...] },                    // ← telefones estão aqui, não em beneficios
+  "beneficios": [{
+    "rmc": { "banco": "276", "valor": "120.69" },                        // ← OBJETO
+    "rcc": { "banco": "276", "valor": "120.69" },                        // ← OBJETO
+    "pagamento": { "banco_pagamento": "69", "agencia_pagamento": "1" },  // ← OBJETO
+    ...
+  }]
+}
 ```
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+### 4 Correções
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+**1. Remover SummaryCards** da `ConsultaView.tsx` — os cards "Total Clientes / Ativos / Simulados / Vencendo" não são necessários.
 
----
+**2. Corrigir React Error #31** — o campo `endereco` é um objeto e o `InfoRow` tenta renderizá-lo como texto. No `useOptimizedSearch.ts`, achatar o objeto `endereco` em campos individuais (`bairro`, `municipio`, `uf`, `cep`, `logr_nome`, etc.).
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
+**3. Corrigir telefones e emails** — estão em `contatos.telefones` e `contatos.emails` (não diretamente em `beneficios`). Extrair de `row.contatos` antes do flatten.
 
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
+**4. Corrigir RMC/RCC e dados bancários** — `rmc`, `rcc` e `pagamento` são objetos aninhados dentro de `beneficios[0]`. Mapear para campos flat:
+- `rmc.banco` → `banco_rmc`, `rmc.valor` → `valor_rmc`
+- `rcc.banco` → `banco_rcc`, `rcc.valor` → `valor_rcc`
+- `pagamento.banco_pagamento` → `banco_pagto`, etc.
 
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+### Arquivos a Modificar
 
----
-
-### Arquivos a modificar
-
-| Arquivo | Mudanca |
+| Arquivo | Ação |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
+| `src/modules/baseoff/views/ConsultaView.tsx` | Remover SummaryCards |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Achatar `endereco`, `contatos`, `rmc`, `rcc`, `pagamento` em campos flat |
 
----
+### Lógica de achatamento (useOptimizedSearch.ts)
 
-### Pergunta necessaria
+```typescript
+// Após flatten de beneficios[0]:
+const flat = { ...row, ...beneficio };
 
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+// 1. Endereco: extrair campos se for objeto
+const enderecoObj = typeof flat.endereco === 'object' && flat.endereco ? flat.endereco : null;
+
+// 2. Contatos: extrair de row.contatos (não de beneficio)
+const contatos = row.contatos || {};
+const tels = (contatos.telefones || flat.telefones || []).filter(Boolean);
+const emails = contatos.emails || [];
+
+// 3. RMC/RCC: extrair de objetos aninhados
+const rmcObj = flat.rmc && typeof flat.rmc === 'object' ? flat.rmc : null;
+const rccObj = flat.rcc && typeof flat.rcc === 'object' ? flat.rcc : null;
+
+// 4. Pagamento: extrair dados bancários
+const pagObj = flat.pagamento && typeof flat.pagamento === 'object' ? flat.pagamento : null;
+
+return {
+  ...flat,
+  // Endereço flat
+  endereco: enderecoObj?.endereco || (typeof flat.endereco === 'string' ? flat.endereco : null),
+  bairro: flat.bairro || enderecoObj?.bairro || null,
+  municipio: flat.municipio || enderecoObj?.municipio || null,
+  uf: flat.uf || enderecoObj?.uf || null,
+  cep: flat.cep || enderecoObj?.cep || null,
+  logr_tipo_1: enderecoObj?.logr_tipo || null,
+  logr_nome_1: enderecoObj?.logr_nome || null,
+  logr_numero_1: enderecoObj?.logr_numero || null,
+  logr_complemento_1: enderecoObj?.logr_complemento || null,
+  bairro_1: enderecoObj?.bairro_alt || null,
+  cidade_1: enderecoObj?.cidade_alt || null,
+  uf_1: enderecoObj?.uf_alt || null,
+  cep_1: enderecoObj?.cep_alt || null,
+  // Telefones
+  tel_cel_1: tels[0] || null,
+  tel_cel_2: tels[1] || null,
+  tel_cel_3: tels[2] || null,
+  tel_fixo_1: tels[3] || null,
+  telefones: tels,
+  // Emails
+  email_1: emails[0] || flat.email_1 || null,
+  // RMC/RCC
+  banco_rmc: rmcObj?.banco || flat.banco_rmc || null,
+  valor_rmc: parseFloat(rmcObj?.valor || flat.valor_rmc) || 0,
+  banco_rcc: rccObj?.banco || flat.banco_rcc || null,
+  valor_rcc: parseFloat(rccObj?.valor || flat.valor_rcc) || 0,
+  // Pagamento
+  banco_pagto: pagObj?.banco_pagamento || flat.banco_pagto || null,
+  agencia_pagto: pagObj?.agencia_pagamento || flat.agencia_pagto || null,
+  conta_corrente: pagObj?.conta_corrente || flat.conta_corrente || null,
+  meio_pagto: pagObj?.meio_pagamento || flat.meio_pagto || null,
+  orgao_pagador: pagObj?.orgao_pagador || flat.orgao_pagador || null,
+  // ... contratos e demais campos existentes
+};
+```
+
+Nenhuma alteração no edge function do Supabase.
 
