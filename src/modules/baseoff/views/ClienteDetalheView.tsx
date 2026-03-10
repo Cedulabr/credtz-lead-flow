@@ -287,6 +287,9 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
         )}
       </div>
 
+      {/* 5️⃣ CARTÕES RMC/RCC */}
+      <CartoesSection contracts={contracts} />
+
       {/* Timeline (collapsible) */}
       {showTimeline && timelineEvents.length > 0 && (
         <div className="relative pl-6 border-l-2 border-muted space-y-4">

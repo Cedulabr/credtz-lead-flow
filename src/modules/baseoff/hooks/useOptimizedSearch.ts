@@ -131,7 +131,7 @@ export function useOptimizedSearch(options: UseOptimizedSearchOptions = {}) {
             taxa: c.taxa ? Number(c.taxa) : null,
             saldo: c.saldo ? Number(c.saldo) : null,
             situacao_emprestimo: c.situacao_emprestimo || c.situacao || null,
-            tipo_emprestimo: c.tipo_emprestimo || null,
+            tipo_emprestimo: c.tipo_emprestimo || c.tipo || null,
             data_averbacao: c.data_averbacao || null,
             inicio_desconto: c.inicio_desconto || null,
             competencia: c.competencia || null,

@@ -9,23 +9,8 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '../utils';
 import { BaseOffContract } from '../types';
+import { isCardContract } from './CartoesSection';
 import { cn } from '@/lib/utils';
-
-interface MargemCardsProps {
-  mr?: number | null;
-  baseCalculo?: number | null;
-  margemCartao?: number | null;
-  cartaoBeneficio?: number | null;
-  contracts?: BaseOffContract[];
-  esp?: string | null;
-}
-
-const CARD_TYPES = ['4', '5', '6', '7', '12', '13'];
-
-function isCardContract(tipoEmprestimo: string | null): boolean {
-  if (!tipoEmprestimo) return false;
-  return CARD_TYPES.includes(tipoEmprestimo.trim());
-}
 
 export function MargemCards({ 
   mr, 
