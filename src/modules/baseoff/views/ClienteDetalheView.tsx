@@ -221,10 +221,7 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
         esp={client.esp}
       />
 
-      {/* 4️⃣ CARTÕES */}
-      <CartoesSection contracts={contracts} />
-
-      {/* 5️⃣ CONTRATOS */}
+      {/* 4️⃣ CONTRATOS */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
