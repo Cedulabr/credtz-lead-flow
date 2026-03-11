@@ -526,6 +526,45 @@ export function LeadsPremiumModule() {
         onSubmit={handleTypingSubmit}
         isProcessing={isTypProcessing}
       />
+
+      {/* Future Contact Modal */}
+      <Dialog open={showFutureContactModal} onOpenChange={setShowFutureContactModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-orange-600" />
+              Agendar Contato Futuro
+            </DialogTitle>
+          </DialogHeader>
+          {futureContactLead && (
+            <div className="p-3 rounded-lg bg-muted/50 border mb-2">
+              <p className="font-semibold">{futureContactLead.name}</p>
+              <p className="text-sm text-muted-foreground">{futureContactLead.phone}</p>
+            </div>
+          )}
+          <div className="space-y-3">
+            <div>
+              <Label>Data do contato futuro *</Label>
+              <Input
+                type="date"
+                value={futureContactDate}
+                onChange={(e) => setFutureContactDate(e.target.value)}
+                min={format(new Date(), 'yyyy-MM-dd')}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFutureContactModal(false)}>Cancelar</Button>
+            <Button
+              onClick={handleFutureContactSubmit}
+              disabled={isFCProcessing || !futureContactDate}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {isFCProcessing ? "Salvando..." : "Agendar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
