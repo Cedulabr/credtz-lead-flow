@@ -21,7 +21,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { LayoutGrid, List, BarChart3, Calculator, Plus, CreditCard, Filter } from "lucide-react";
+import { LayoutGrid, List, BarChart3, Calculator, Plus, CreditCard, Filter, CalendarDays } from "lucide-react";
+import { addDays, format } from "date-fns";
 
 export function LeadsPremiumModule() {
   const isMobile = useIsMobile();
@@ -45,6 +46,12 @@ export function LeadsPremiumModule() {
   const [typingLead, setTypingLead] = useState<Lead | null>(null);
   const [typingForm, setTypingForm] = useState({ banco: "", valor: "", parcela: "", notes: "" });
   const [isTypProcessing, setIsTypProcessing] = useState(false);
+
+  // Future Contact Modal
+  const [showFutureContactModal, setShowFutureContactModal] = useState(false);
+  const [futureContactLead, setFutureContactLead] = useState<Lead | null>(null);
+  const [futureContactDate, setFutureContactDate] = useState("");
+  const [isFCProcessing, setIsFCProcessing] = useState(false);
 
   const {
     leads,
@@ -182,8 +189,34 @@ export function LeadsPremiumModule() {
     }
   };
 
+  // Future contact submit
+  const handleFutureContactSubmit = async () => {
+    if (!futureContactLead || !futureContactDate) {
+      toast({ title: "Selecione a data de contato futuro", variant: "destructive" });
+      return;
+    }
+    setIsFCProcessing(true);
+    try {
+      const success = await updateLeadStatus(futureContactLead.id, 'contato_futuro', {
+        future_contact_date: futureContactDate
+      });
+      if (success) {
+        toast({ title: "Contato futuro agendado!", description: `Data: ${format(new Date(futureContactDate + 'T12:00:00'), 'dd/MM/yyyy')}` });
+        setShowFutureContactModal(false);
+      }
+    } finally {
+      setIsFCProcessing(false);
+    }
+  };
+
   // Handle status change from list item
   const handleListStatusChange = (lead: Lead, newStatus: string) => {
+    if (newStatus === 'contato_futuro') {
+      setFutureContactLead(lead);
+      setFutureContactDate(format(addDays(new Date(), 7), 'yyyy-MM-dd'));
+      setShowFutureContactModal(true);
+      return;
+    }
     handleStatusChange(lead.id, newStatus);
   };
 
@@ -493,6 +526,45 @@ export function LeadsPremiumModule() {
         onSubmit={handleTypingSubmit}
         isProcessing={isTypProcessing}
       />
+
+      {/* Future Contact Modal */}
+      <Dialog open={showFutureContactModal} onOpenChange={setShowFutureContactModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-orange-600" />
+              Agendar Contato Futuro
+            </DialogTitle>
+          </DialogHeader>
+          {futureContactLead && (
+            <div className="p-3 rounded-lg bg-muted/50 border mb-2">
+              <p className="font-semibold">{futureContactLead.name}</p>
+              <p className="text-sm text-muted-foreground">{futureContactLead.phone}</p>
+            </div>
+          )}
+          <div className="space-y-3">
+            <div>
+              <Label>Data do contato futuro *</Label>
+              <Input
+                type="date"
+                value={futureContactDate}
+                onChange={(e) => setFutureContactDate(e.target.value)}
+                min={format(new Date(), 'yyyy-MM-dd')}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFutureContactModal(false)}>Cancelar</Button>
+            <Button
+              onClick={handleFutureContactSubmit}
+              disabled={isFCProcessing || !futureContactDate}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {isFCProcessing ? "Salvando..." : "Agendar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

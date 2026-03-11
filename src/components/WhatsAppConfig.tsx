@@ -196,24 +196,85 @@ export function WhatsAppConfig() {
 
   const fetchMessages = useCallback(async () => {
     if (!user?.id) return;
-    const { data } = await (supabase as any)
+
+    // Build role-aware user IDs list
+    let targetUserIds: string[] | null = null;
+    if (role === "colaborador") {
+      targetUserIds = [user.id];
+    } else if (role === "gestor" && myCompanyId) {
+      const { data: ucData } = await supabase
+        .from("user_companies")
+        .select("user_id")
+        .eq("company_id", myCompanyId)
+        .eq("is_active", true);
+      targetUserIds = (ucData || []).map(u => u.user_id);
+    }
+    // admin: targetUserIds stays null → no filter
+
+    let query = (supabase as any)
       .from("whatsapp_messages")
       .select("*")
-      .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(50);
-    setMessages(data || []);
-  }, [user?.id]);
+      .limit(100);
+
+    if (targetUserIds) {
+      query = query.in("user_id", targetUserIds);
+    }
+
+    const { data } = await query;
+    const rawMessages = data || [];
+
+    // Enrich with user names for admin/gestor
+    if (role !== "colaborador" && rawMessages.length > 0) {
+      const uids = [...new Set(rawMessages.map((m: any) => m.user_id).filter(Boolean))] as string[];
+      if (uids.length > 0) {
+        const { data: profiles } = await supabase.from("profiles").select("id, name").in("id", uids);
+        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.name]));
+        rawMessages.forEach((m: any) => { m._user_name = profileMap.get(m.user_id) || ""; });
+      }
+    }
+
+    setMessages(rawMessages);
+  }, [user?.id, role, myCompanyId]);
 
   const fetchScheduled = useCallback(async () => {
     if (!user?.id) return;
-    const { data } = await (supabase as any)
+
+    let targetUserIds: string[] | null = null;
+    if (role === "colaborador") {
+      targetUserIds = [user.id];
+    } else if (role === "gestor" && myCompanyId) {
+      const { data: ucData } = await supabase
+        .from("user_companies")
+        .select("user_id")
+        .eq("company_id", myCompanyId)
+        .eq("is_active", true);
+      targetUserIds = (ucData || []).map(u => u.user_id);
+    }
+
+    let query = (supabase as any)
       .from("whatsapp_scheduled_messages")
       .select("*, whatsapp_instances(instance_name, phone_number)")
-      .eq("user_id", user.id)
       .order("scheduled_at", { ascending: true });
-    setScheduled(data || []);
-  }, [user?.id]);
+
+    if (targetUserIds) {
+      query = query.in("user_id", targetUserIds);
+    }
+
+    const { data } = await query;
+    const rawScheduled = data || [];
+
+    if (role !== "colaborador" && rawScheduled.length > 0) {
+      const uids = [...new Set(rawScheduled.map((m: any) => m.user_id).filter(Boolean))] as string[];
+      if (uids.length > 0) {
+        const { data: profiles } = await supabase.from("profiles").select("id, name").in("id", uids);
+        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.name]));
+        rawScheduled.forEach((m: any) => { m._user_name = profileMap.get(m.user_id) || ""; });
+      }
+    }
+
+    setScheduled(rawScheduled);
+  }, [user?.id, role, myCompanyId]);
 
   useEffect(() => {
     const load = async () => {
@@ -529,6 +590,7 @@ export function WhatsAppConfig() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Data</TableHead>
+                        {role !== "colaborador" && <TableHead>Usuário</TableHead>}
                         <TableHead>Telefone</TableHead>
                         <TableHead>Cliente</TableHead>
                         <TableHead>Tipo</TableHead>
@@ -541,6 +603,9 @@ export function WhatsAppConfig() {
                           <TableCell className="text-xs">
                             {msg.created_at ? format(new Date(msg.created_at), "dd/MM/yy HH:mm", { locale: ptBR }) : "-"}
                           </TableCell>
+                          {role !== "colaborador" && (
+                            <TableCell className="text-xs">{msg._user_name || "-"}</TableCell>
+                          )}
                           <TableCell className="font-mono text-xs">{msg.phone}</TableCell>
                           <TableCell className="text-xs">{msg.client_name || "-"}</TableCell>
                           <TableCell>
@@ -583,6 +648,7 @@ export function WhatsAppConfig() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Agendado para</TableHead>
+                        {role !== "colaborador" && <TableHead>Usuário</TableHead>}
                         <TableHead>Telefone</TableHead>
                         <TableHead>Cliente</TableHead>
                         <TableHead>Instância</TableHead>
@@ -596,6 +662,9 @@ export function WhatsAppConfig() {
                           <TableCell className="text-xs">
                             {format(new Date(msg.scheduled_at), "dd/MM/yy HH:mm", { locale: ptBR })}
                           </TableCell>
+                          {role !== "colaborador" && (
+                            <TableCell className="text-xs">{msg._user_name || "-"}</TableCell>
+                          )}
                           <TableCell className="font-mono text-xs">{msg.phone}</TableCell>
                           <TableCell className="text-xs">{msg.client_name || "-"}</TableCell>
                           <TableCell className="text-xs">
