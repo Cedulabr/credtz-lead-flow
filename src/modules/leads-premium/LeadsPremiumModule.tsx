@@ -21,7 +21,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { LayoutGrid, List, BarChart3, Calculator, Plus, CreditCard, Filter } from "lucide-react";
+import { LayoutGrid, List, BarChart3, Calculator, Plus, CreditCard, Filter, CalendarDays } from "lucide-react";
+import { addDays, format } from "date-fns";
 
 export function LeadsPremiumModule() {
   const isMobile = useIsMobile();
@@ -45,6 +46,12 @@ export function LeadsPremiumModule() {
   const [typingLead, setTypingLead] = useState<Lead | null>(null);
   const [typingForm, setTypingForm] = useState({ banco: "", valor: "", parcela: "", notes: "" });
   const [isTypProcessing, setIsTypProcessing] = useState(false);
+
+  // Future Contact Modal
+  const [showFutureContactModal, setShowFutureContactModal] = useState(false);
+  const [futureContactLead, setFutureContactLead] = useState<Lead | null>(null);
+  const [futureContactDate, setFutureContactDate] = useState("");
+  const [isFCProcessing, setIsFCProcessing] = useState(false);
 
   const {
     leads,
