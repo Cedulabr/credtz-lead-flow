@@ -590,6 +590,7 @@ export function WhatsAppConfig() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Data</TableHead>
+                        {role !== "colaborador" && <TableHead>Usuário</TableHead>}
                         <TableHead>Telefone</TableHead>
                         <TableHead>Cliente</TableHead>
                         <TableHead>Tipo</TableHead>
@@ -602,6 +603,9 @@ export function WhatsAppConfig() {
                           <TableCell className="text-xs">
                             {msg.created_at ? format(new Date(msg.created_at), "dd/MM/yy HH:mm", { locale: ptBR }) : "-"}
                           </TableCell>
+                          {role !== "colaborador" && (
+                            <TableCell className="text-xs">{msg._user_name || "-"}</TableCell>
+                          )}
                           <TableCell className="font-mono text-xs">{msg.phone}</TableCell>
                           <TableCell className="text-xs">{msg.client_name || "-"}</TableCell>
                           <TableCell>
