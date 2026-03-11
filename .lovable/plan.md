@@ -1,80 +1,55 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Correções: WhatsApp Histórico + Leads Premium Contato Futuro
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Problema 1: WhatsApp — Admin/Gestor não vê histórico de mensagens e agendamentos
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+**Causa**: `fetchMessages` e `fetchScheduled` em `WhatsAppConfig.tsx` (linhas 197-216) filtram sempre por `.eq("user_id", user.id)`, ignorando o role do usuário.
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+**Correção em `src/components/WhatsAppConfig.tsx`**:
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+- `fetchMessages` (linha 197): Para admin, remover filtro `user_id`. Para gestor, buscar IDs de usuários da empresa via `user_companies` e usar `.in("user_id", companyUserIds)`.
+- `fetchScheduled` (linha 208): Mesma lógica — admin vê todos, gestor vê da empresa, colaborador vê apenas os próprios.
+- Adicionar colunas de identificação (nome do usuário) na tabela de histórico e agendamentos para admin/gestor saberem de quem é cada mensagem.
 
----
+### Problema 2: Leads Premium — Contato Futuro não muda status
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+**Causa**: Quando o usuário seleciona `contato_futuro` pelo **dropdown da lista** (`LeadListItem.tsx`), o fluxo é:
+1. `handleStatusSelect` → `onStatusChange(lead, value)` → `handleListStatusChange(lead, newStatus)` → `handleStatusChange(leadId, newStatus)` — **sem `additionalData`**.
+2. Isso muda o status diretamente sem mostrar o modal de data.
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+No entanto, quando feito pelo **drawer** (`LeadDetailDrawer`), o modal aparece e a data é passada corretamente.
 
-**Arquitetura:**
+O problema real é que ao usar o dropdown da lista, o status `contato_futuro` é aplicado sem `future_contact_date`, o que pode funcionar tecnicamente mas não faz sentido no negócio. Se houver constraint ou trigger que exige a data, o update falha silenciosamente.
 
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
+**Correção em `src/modules/leads-premium/LeadsPremiumModule.tsx`**:
+
+- Interceptar `handleListStatusChange`: quando `newStatus === 'contato_futuro'`, abrir o lead no drawer com o modal de data em vez de mudar direto. Alternativa: abrir um modal inline de data futura (similar ao que já existe para simulação/digitação).
+
+**Abordagem**: Adicionar um modal de contato futuro no `LeadsPremiumModule.tsx` (como já existe para simulação e digitação), que é disparado tanto pelo drawer quanto pelo dropdown da lista.
+
+```typescript
+// LeadsPremiumModule.tsx - novo state
+const [showFutureContactModal, setShowFutureContactModal] = useState(false);
+const [futureContactLead, setFutureContactLead] = useState<Lead | null>(null);
+const [futureContactDate, setFutureContactDate] = useState("");
+
+// handleListStatusChange atualizado
+const handleListStatusChange = (lead: Lead, newStatus: string) => {
+  if (newStatus === 'contato_futuro') {
+    setFutureContactLead(lead);
+    setFutureContactDate(format(addDays(new Date(), 7), 'yyyy-MM-dd'));
+    setShowFutureContactModal(true);
+    return;
+  }
+  handleStatusChange(lead.id, newStatus);
+};
 ```
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+### Arquivos a Modificar
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
-
----
-
-### 3. Simplificar modulo Base OFF - apenas Consulta
-
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
-
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
-
----
-
-### Arquivos a modificar
-
-| Arquivo | Mudanca |
+| Arquivo | Ação |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
-
----
-
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+| `src/components/WhatsAppConfig.tsx` | Ajustar `fetchMessages` e `fetchScheduled` para respeitar role (admin/gestor/colaborador) |
+| `src/modules/leads-premium/LeadsPremiumModule.tsx` | Interceptar `contato_futuro` no dropdown da lista para abrir modal de data |
 
