@@ -189,8 +189,34 @@ export function LeadsPremiumModule() {
     }
   };
 
+  // Future contact submit
+  const handleFutureContactSubmit = async () => {
+    if (!futureContactLead || !futureContactDate) {
+      toast({ title: "Selecione a data de contato futuro", variant: "destructive" });
+      return;
+    }
+    setIsFCProcessing(true);
+    try {
+      const success = await updateLeadStatus(futureContactLead.id, 'contato_futuro', {
+        future_contact_date: futureContactDate
+      });
+      if (success) {
+        toast({ title: "Contato futuro agendado!", description: `Data: ${format(new Date(futureContactDate + 'T12:00:00'), 'dd/MM/yyyy')}` });
+        setShowFutureContactModal(false);
+      }
+    } finally {
+      setIsFCProcessing(false);
+    }
+  };
+
   // Handle status change from list item
   const handleListStatusChange = (lead: Lead, newStatus: string) => {
+    if (newStatus === 'contato_futuro') {
+      setFutureContactLead(lead);
+      setFutureContactDate(format(addDays(new Date(), 7), 'yyyy-MM-dd'));
+      setShowFutureContactModal(true);
+      return;
+    }
     handleStatusChange(lead.id, newStatus);
   };
 
