@@ -80,12 +80,7 @@ export function DocumentsManager({
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('user-documents')
-        .getPublicUrl(fileName);
-
-      // Save to database
+      // Save to database with file path (not public URL, bucket is private)
       const { error: dbError } = await supabase
         .from('user_documents')
         .insert({
@@ -93,7 +88,7 @@ export function DocumentsManager({
           document_type: selectedType,
           document_name: selectedDocName || availableDocTypes.find(t => t.value === selectedType)?.label || 'Documento',
           file_name: file.name,
-          file_url: publicUrl,
+          file_url: fileName,
           file_size: file.size,
           mime_type: file.type,
           version: newVersion,
