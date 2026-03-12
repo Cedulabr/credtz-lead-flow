@@ -80,12 +80,7 @@ export function DocumentsManager({
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('user-documents')
-        .getPublicUrl(fileName);
-
-      // Save to database
+      // Save to database with file path (not public URL, bucket is private)
       const { error: dbError } = await supabase
         .from('user_documents')
         .insert({
@@ -93,7 +88,7 @@ export function DocumentsManager({
           document_type: selectedType,
           document_name: selectedDocName || availableDocTypes.find(t => t.value === selectedType)?.label || 'Documento',
           file_name: file.name,
-          file_url: publicUrl,
+          file_url: fileName,
           file_size: file.size,
           mime_type: file.type,
           version: newVersion,
@@ -118,20 +113,54 @@ export function DocumentsManager({
     }
   };
 
+  const getFilePath = (fileUrl: string): string => {
+    if (fileUrl.includes('/user-documents/')) {
+      return decodeURIComponent(fileUrl.split('/user-documents/')[1]);
+    }
+    return fileUrl;
+  };
+
+  const getSignedUrl = async (fileUrl: string): Promise<string | null> => {
+    const filePath = getFilePath(fileUrl);
+    if (!filePath) return null;
+    
+    const { data, error } = await supabase.storage
+      .from('user-documents')
+      .createSignedUrl(filePath, 3600);
+    
+    if (error) {
+      console.error('Error creating signed URL:', error);
+      toast.error('Erro ao acessar documento');
+      return null;
+    }
+    return data.signedUrl;
+  };
+
+  const handleView = async (doc: UserDocument) => {
+    const url = await getSignedUrl(doc.file_url);
+    if (url) window.open(url, '_blank');
+  };
+
+  const handleDownload = async (doc: UserDocument) => {
+    const url = await getSignedUrl(doc.file_url);
+    if (url) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = doc.file_name;
+      link.click();
+    }
+  };
+
   const handleDelete = async (doc: UserDocument) => {
     if (!confirm('Deseja realmente excluir este documento?')) return;
 
     try {
-      // Extract file path from URL
-      const urlParts = doc.file_url.split('/');
-      const filePath = urlParts.slice(-2).join('/');
+      const filePath = getFilePath(doc.file_url);
 
-      // Delete from storage
       await supabase.storage
         .from('user-documents')
         .remove([filePath]);
 
-      // Delete from database
       const { error } = await supabase
         .from('user_documents')
         .delete()
@@ -284,7 +313,7 @@ export function DocumentsManager({
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => window.open(doc.file_url, '_blank')}
+                        onClick={() => handleView(doc)}
                         title="Visualizar"
                       >
                         <Eye className="h-4 w-4" />
@@ -292,12 +321,7 @@ export function DocumentsManager({
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = doc.file_url;
-                          link.download = doc.file_name;
-                          link.click();
-                        }}
+                        onClick={() => handleDownload(doc)}
                         title="Baixar"
                       >
                         <Download className="h-4 w-4" />

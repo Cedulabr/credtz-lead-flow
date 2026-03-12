@@ -1,84 +1,80 @@
 
 
-## Correção: Documentos "Meus Dados" — Bucket not found (404)
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Causa Raiz
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-O bucket `user-documents` existe mas é **privado** (`public: false`). O código usa `getPublicUrl()` que gera URLs com `/object/public/...` — essas URLs retornam 404 em buckets privados.
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-Além disso, falta a **policy de INSERT** no storage, impedindo uploads.
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
 
-### Correções
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
 
-**1. Migration SQL — Adicionar policy de INSERT no storage**
+---
 
-```sql
-CREATE POLICY "Users can upload to their own folder"
-ON storage.objects FOR INSERT
-TO authenticated
-WITH CHECK (
-  bucket_id = 'user-documents'
-  AND (auth.uid())::text = (storage.foldername(name))[1]
-);
+### 2. Conectar Base OFF ao PostgreSQL externo
+
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+
+**Arquitetura:**
+
+```text
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
 ```
 
-**2. `src/components/MyData/DocumentsManager.tsx` — Usar signed URLs**
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
 
-No upload (linha 83-86): remover `getPublicUrl()` e salvar apenas o **file path** (ex: `userId/rg_v1_123.pdf`) no campo `file_url` do banco.
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
 
-Na visualização/download (linhas 287 e 296-299): criar uma função helper que gera signed URL sob demanda:
+---
 
-```typescript
-const getSignedUrl = async (fileUrl: string): Promise<string | null> => {
-  // Extract path from legacy full URLs or use path directly
-  const filePath = fileUrl.includes('/storage/v1/')
-    ? fileUrl.split('/user-documents/')[1]
-    : fileUrl;
-  
-  if (!filePath) return null;
-  
-  const { data, error } = await supabase.storage
-    .from('user-documents')
-    .createSignedUrl(filePath, 3600); // 1 hour
-  
-  if (error) {
-    console.error('Error creating signed URL:', error);
-    toast.error('Erro ao acessar documento');
-    return null;
-  }
-  return data.signedUrl;
-};
+### 3. Simplificar modulo Base OFF - apenas Consulta
 
-// Visualizar
-const handleView = async (doc: UserDocument) => {
-  const url = await getSignedUrl(doc.file_url);
-  if (url) window.open(url, '_blank');
-};
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
 
-// Baixar
-const handleDownload = async (doc: UserDocument) => {
-  const url = await getSignedUrl(doc.file_url);
-  if (url) {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = doc.file_name;
-    link.click();
-  }
-};
-```
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
 
-Substituir os `onClick` dos botões Eye e Download para usar essas funções.
+---
 
-Na exclusão (linha 111-113): extrair o path da mesma forma para funcionar com URLs legadas e paths novos.
+### Arquivos a modificar
 
-### Arquivos a Modificar
-
-| Arquivo | Ação |
+| Arquivo | Mudanca |
 |---|---|
-| Migration SQL | Adicionar INSERT policy no storage `user-documents` |
-| `src/components/MyData/DocumentsManager.tsx` | Salvar path em vez de public URL; usar `createSignedUrl` para view/download |
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
 
-### Compatibilidade com dados existentes
+---
 
-Os 5 registros atuais têm URLs completas (`https://...supabase.co/storage/v1/object/public/user-documents/...`). A função `getSignedUrl` extrai o path após `/user-documents/` para manter compatibilidade. Novos uploads salvarão apenas o path relativo.
+### Pergunta necessaria
+
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 
