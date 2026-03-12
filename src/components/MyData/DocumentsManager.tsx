@@ -113,20 +113,54 @@ export function DocumentsManager({
     }
   };
 
+  const getFilePath = (fileUrl: string): string => {
+    if (fileUrl.includes('/user-documents/')) {
+      return decodeURIComponent(fileUrl.split('/user-documents/')[1]);
+    }
+    return fileUrl;
+  };
+
+  const getSignedUrl = async (fileUrl: string): Promise<string | null> => {
+    const filePath = getFilePath(fileUrl);
+    if (!filePath) return null;
+    
+    const { data, error } = await supabase.storage
+      .from('user-documents')
+      .createSignedUrl(filePath, 3600);
+    
+    if (error) {
+      console.error('Error creating signed URL:', error);
+      toast.error('Erro ao acessar documento');
+      return null;
+    }
+    return data.signedUrl;
+  };
+
+  const handleView = async (doc: UserDocument) => {
+    const url = await getSignedUrl(doc.file_url);
+    if (url) window.open(url, '_blank');
+  };
+
+  const handleDownload = async (doc: UserDocument) => {
+    const url = await getSignedUrl(doc.file_url);
+    if (url) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = doc.file_name;
+      link.click();
+    }
+  };
+
   const handleDelete = async (doc: UserDocument) => {
     if (!confirm('Deseja realmente excluir este documento?')) return;
 
     try {
-      // Extract file path from URL
-      const urlParts = doc.file_url.split('/');
-      const filePath = urlParts.slice(-2).join('/');
+      const filePath = getFilePath(doc.file_url);
 
-      // Delete from storage
       await supabase.storage
         .from('user-documents')
         .remove([filePath]);
 
-      // Delete from database
       const { error } = await supabase
         .from('user_documents')
         .delete()
