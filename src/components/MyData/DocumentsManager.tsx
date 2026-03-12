@@ -313,7 +313,7 @@ export function DocumentsManager({
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => window.open(doc.file_url, '_blank')}
+                        onClick={() => handleView(doc)}
                         title="Visualizar"
                       >
                         <Eye className="h-4 w-4" />
@@ -321,12 +321,7 @@ export function DocumentsManager({
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = doc.file_url;
-                          link.download = doc.file_name;
-                          link.click();
-                        }}
+                        onClick={() => handleDownload(doc)}
                         title="Baixar"
                       >
                         <Download className="h-4 w-4" />
