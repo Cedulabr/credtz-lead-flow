@@ -985,24 +985,27 @@ export function ProposalGenerator() {
         </div>
 
         {/* Contracts List */}
-        <div className="max-w-2xl mx-auto space-y-2">
-          {completedContracts.map((contract, i) => {
-            const productInfo = getProductInfo(contract.product);
+        <div className="max-w-2xl mx-auto space-y-4">
+          {groupContractsByProduct(completedContracts).map(([productId, contracts], groupIndex) => {
+            const productInfo = getProductInfo(productId);
+            const borderColor = productInfo?.color.replace("bg-", "#").replace("emerald-500", "10b981").replace("blue-500", "3b82f6").replace("amber-500", "f59e0b").replace("purple-500", "a855f7");
             return (
-              <Card key={contract.id} className="border-l-4" style={{ borderLeftColor: productInfo?.color.replace("bg-", "#").replace("emerald-500", "10b981").replace("blue-500", "3b82f6").replace("amber-500", "f59e0b").replace("purple-500", "a855f7") }}>
-                <CardContent className="p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+              <Card key={productId} className="border-l-4" style={{ borderLeftColor: borderColor }}>
+                <CardContent className="p-3 space-y-2">
+                  <div className="flex items-center gap-2 mb-1">
                     <span className="text-lg">{productInfo?.emoji}</span>
-                    <div>
-                      <p className="font-medium text-sm">{productInfo?.label} - {contract.bank}</p>
-                      <p className="text-xs text-muted-foreground">Parcela: {contract.parcela}</p>
-                    </div>
+                    <p className="font-semibold text-sm">{groupIndex + 1}. {productInfo?.label}</p>
                   </div>
-                  {contract.troco && parseCurrency(contract.troco) > 0 && (
-                    <Badge variant="secondary" className="text-xs">
-                      Troco: {contract.troco}
-                    </Badge>
-                  )}
+                  {contracts.map((contract) => (
+                    <div key={contract.id} className="flex items-center justify-between pl-8">
+                      <p className="text-xs text-muted-foreground">Parcela: {contract.parcela}</p>
+                      {contract.troco && parseCurrency(contract.troco) > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          Troco: {contract.troco}
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
             );
