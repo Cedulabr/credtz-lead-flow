@@ -9,6 +9,7 @@ export interface TelevendasStats {
   paidCount: number;
   criticos: number;
   alertas: number;
+  aguardandoAprovacao: number;
   pipelineCounts: Record<string, number>;
   topSellers: { name: string; count: number }[];
   totalPropostasAtivas: number;
