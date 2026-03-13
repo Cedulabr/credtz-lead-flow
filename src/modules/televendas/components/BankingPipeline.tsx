@@ -134,11 +134,13 @@ export const mapToPipelineStatus = (tv: Televenda): string => {
     case "proposta_pendente":
     case "devolvido":
       return "pendente";
-    case "proposta_paga":
     case "pago_aguardando":
+      return "aguardando_pagamento";
+    case "proposta_paga":
       return "pago_cliente";
-    case "proposta_cancelada":
     case "cancelado_aguardando":
+      return "aguardando_cancelamento";
+    case "proposta_cancelada":
     case "exclusao_aprovada":
       return "cancelado_banco";
     default:
