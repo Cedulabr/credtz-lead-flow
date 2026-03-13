@@ -6670,6 +6670,14 @@ export type Database = {
         }
         Returns: Json
       }
+      autolead_increment_failed: {
+        Args: { p_job_id: string }
+        Returns: undefined
+      }
+      autolead_increment_sent: {
+        Args: { p_job_id: string }
+        Returns: undefined
+      }
       calculate_lead_priority: {
         Args: {
           lead_created_at: string
