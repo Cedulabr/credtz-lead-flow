@@ -161,7 +161,7 @@ export const PropostasView = ({
                     ? 'border-red-500 bg-red-100/60 dark:border-red-500 dark:bg-red-900/30 shadow-[0_0_12px_rgba(239,68,68,0.25)] ring-1 ring-red-400/40' 
                     : priority === "alerta" 
                       ? 'border-amber-400 bg-amber-50/50 dark:border-amber-500 dark:bg-amber-900/20' 
-                      : isAwaiting && isGestorOrAdmin ? 'border-amber-300 bg-amber-500/5' : 'border-border/50'}
+                      : isAwaitingApproval ? 'border-emerald-300 bg-emerald-500/5 dark:border-emerald-600 dark:bg-emerald-900/10' : 'border-border/50'}
                 `}
               >
                 <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
