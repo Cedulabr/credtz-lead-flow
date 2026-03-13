@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.radar-opportunities]
 verify_jwt = false
+
+[functions.autolead-worker]
+verify_jwt = false

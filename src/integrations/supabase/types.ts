@@ -639,6 +639,142 @@ export type Database = {
         }
         Relationships: []
       }
+      autolead_jobs: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          finished_at: string | null
+          id: string
+          leads_failed: number
+          leads_sent: number
+          max_per_number_day: number
+          message_template: string | null
+          pause_every: number
+          pause_minutes: number
+          paused_at: string | null
+          selected_ddds: string[] | null
+          selected_tags: string[] | null
+          send_window_end: string
+          send_window_start: string
+          started_at: string | null
+          status: string
+          tipo_lead: string | null
+          total_leads: number
+          use_default_message: boolean
+          user_id: string
+          whatsapp_instance_ids: string[] | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          leads_failed?: number
+          leads_sent?: number
+          max_per_number_day?: number
+          message_template?: string | null
+          pause_every?: number
+          pause_minutes?: number
+          paused_at?: string | null
+          selected_ddds?: string[] | null
+          selected_tags?: string[] | null
+          send_window_end?: string
+          send_window_start?: string
+          started_at?: string | null
+          status?: string
+          tipo_lead?: string | null
+          total_leads?: number
+          use_default_message?: boolean
+          user_id: string
+          whatsapp_instance_ids?: string[] | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          leads_failed?: number
+          leads_sent?: number
+          max_per_number_day?: number
+          message_template?: string | null
+          pause_every?: number
+          pause_minutes?: number
+          paused_at?: string | null
+          selected_ddds?: string[] | null
+          selected_tags?: string[] | null
+          send_window_end?: string
+          send_window_start?: string
+          started_at?: string | null
+          status?: string
+          tipo_lead?: string | null
+          total_leads?: number
+          use_default_message?: boolean
+          user_id?: string
+          whatsapp_instance_ids?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autolead_jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      autolead_messages: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          job_id: string
+          lead_id: string | null
+          lead_name: string | null
+          message: string
+          phone: string
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+          whatsapp_instance_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          job_id: string
+          lead_id?: string | null
+          lead_name?: string | null
+          message: string
+          phone: string
+          scheduled_at: string
+          sent_at?: string | null
+          status?: string
+          whatsapp_instance_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          job_id?: string
+          lead_id?: string | null
+          lead_name?: string | null
+          message?: string
+          phone?: string
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          whatsapp_instance_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autolead_messages_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "autolead_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bank_reuse_settings: {
         Row: {
           bank_name: string
@@ -6533,6 +6669,14 @@ export type Database = {
           target_user_id: string
         }
         Returns: Json
+      }
+      autolead_increment_failed: {
+        Args: { p_job_id: string }
+        Returns: undefined
+      }
+      autolead_increment_sent: {
+        Args: { p_job_id: string }
+        Returns: undefined
       }
       calculate_lead_priority: {
         Args: {
