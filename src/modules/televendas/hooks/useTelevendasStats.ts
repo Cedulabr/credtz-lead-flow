@@ -33,6 +33,7 @@ export function useTelevendasStats(
     let paidCount = 0;
     let criticos = 0;
     let alertas = 0;
+    let aguardandoAprovacao = 0;
     let totalPropostasAtivas = 0;
 
     for (const tv of televendas) {
