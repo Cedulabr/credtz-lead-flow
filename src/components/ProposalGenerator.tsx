@@ -548,11 +548,22 @@ export function ProposalGenerator() {
     return Array.from(uniqueProducts).map(productId => getProductInfo(productId)?.footer).filter(Boolean);
   };
 
+  const groupContractsByProduct = (contracts: Contract[]) => {
+    const groups: Record<string, Contract[]> = {};
+    contracts.forEach(c => {
+      const key = c.product;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(c);
+    });
+    return Object.entries(groups);
+  };
+
   const generateProposalText = () => {
     const completedContracts = getCompletedContracts();
     const totalTroco = calculateTotalTroco();
     const footers = getUniqueProductFooters();
     const userName = profile?.name || 'Consultor';
+    const grouped = groupContractsByProduct(completedContracts);
     
     let text = `✨ *PROPOSTA COMERCIAL* ✨\n\n`;
     text += `👤 *Cliente:* ${proposalData.clientName}\n`;
@@ -561,15 +572,17 @@ export function ProposalGenerator() {
     text += `📝 *CONTRATOS (${completedContracts.length})*\n`;
     text += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-    completedContracts.forEach((c, i) => {
-      const productInfo = getProductInfo(c.product);
-      text += `${productInfo?.emoji || "📄"} *${i + 1}. ${productInfo?.label || c.product}*\n`;
-      text += `   🏦 Banco: ${c.bank}\n`;
-      text += `   💵 Parcela: ${c.parcela}\n`;
-      if (c.troco && parseCurrency(c.troco) > 0) {
-        text += `   💰 Troco: ${c.troco}\n`;
-      }
-      text += `\n`;
+    grouped.forEach(([productId, contracts], groupIndex) => {
+      const productInfo = getProductInfo(productId);
+      text += `${productInfo?.emoji || "📄"} *${groupIndex + 1}. ${productInfo?.label || productId}*\n\n`;
+      
+      contracts.forEach((c) => {
+        text += `   💵 Parcela: ${c.parcela}\n`;
+        if (c.troco && parseCurrency(c.troco) > 0) {
+          text += `   💰 Troco: ${c.troco}\n`;
+        }
+        text += `\n`;
+      });
     });
 
     if (totalTroco > 0) {
@@ -579,7 +592,6 @@ export function ProposalGenerator() {
     text += `📅 Data: ${new Date().toLocaleDateString("pt-BR")}\n`;
     text += `👨‍💼 Consultor: ${userName}\n`;
     
-    // Add product-specific footers
     if (footers.length > 0) {
       text += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
       text += `ℹ️ *INFORMAÇÕES*\n`;
