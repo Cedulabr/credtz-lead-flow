@@ -137,7 +137,7 @@ export const PropostasView = ({
       <div className="space-y-2">
         <AnimatePresence mode="popLayout">
           {sortedTelevendas.map((tv, index) => {
-            const isAwaiting = tv.status === "pago_aguardando" || tv.status === "cancelado_aguardando";
+            const isAwaitingApproval = tv.status === "pago_aguardando" || tv.status === "cancelado_aguardando";
             const opBadge = OPERATION_BADGE[tv.tipo_operacao];
             const syncByName = tv.last_sync_by ? usersMap.get(tv.last_sync_by) : null;
             const isFinal = ["proposta_paga", "proposta_cancelada", "exclusao_aprovada"].includes(tv.status);
