@@ -36,6 +36,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGestorCompany } from "@/hooks/useGestorCompany";
 import { SmsNotifyDialog } from "@/modules/sales-wizard/components/SmsNotifyDialog";
 import { WhatsAppSendDialog } from "@/components/WhatsAppSendDialog";
 import { MessageCircle } from "lucide-react";
@@ -89,11 +90,12 @@ const parseCurrency = (value: string): number => {
 
 export function ProposalGenerator() {
   const { user, profile } = useAuth();
+  const { isGestor: isGestorCompany, isAdmin: isAdminCompany } = useGestorCompany();
   const [activeTab, setActiveTab] = useState<"generator" | "saved">("generator");
   
   // Role checks for viewing all proposals
   const isAdmin = profile?.role === 'admin';
-  const isGestor = profile?.role === 'partner';
+  const isGestor = isGestorCompany;
   const canViewAllProposals = isAdmin || isGestor;
   const [step, setStep] = useState<"client-name" | "client-phone" | "contracts" | "summary">("client-name");
   const [proposalData, setProposalData] = useState<ProposalData>({
