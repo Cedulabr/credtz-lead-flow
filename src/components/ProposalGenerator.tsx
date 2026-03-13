@@ -548,11 +548,22 @@ export function ProposalGenerator() {
     return Array.from(uniqueProducts).map(productId => getProductInfo(productId)?.footer).filter(Boolean);
   };
 
+  const groupContractsByProduct = (contracts: Contract[]) => {
+    const groups: Record<string, Contract[]> = {};
+    contracts.forEach(c => {
+      const key = c.product;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(c);
+    });
+    return Object.entries(groups);
+  };
+
   const generateProposalText = () => {
     const completedContracts = getCompletedContracts();
     const totalTroco = calculateTotalTroco();
     const footers = getUniqueProductFooters();
     const userName = profile?.name || 'Consultor';
+    const grouped = groupContractsByProduct(completedContracts);
     
     let text = `✨ *PROPOSTA COMERCIAL* ✨\n\n`;
     text += `👤 *Cliente:* ${proposalData.clientName}\n`;
@@ -561,15 +572,17 @@ export function ProposalGenerator() {
     text += `📝 *CONTRATOS (${completedContracts.length})*\n`;
     text += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-    completedContracts.forEach((c, i) => {
-      const productInfo = getProductInfo(c.product);
-      text += `${productInfo?.emoji || "📄"} *${i + 1}. ${productInfo?.label || c.product}*\n`;
-      text += `   🏦 Banco: ${c.bank}\n`;
-      text += `   💵 Parcela: ${c.parcela}\n`;
-      if (c.troco && parseCurrency(c.troco) > 0) {
-        text += `   💰 Troco: ${c.troco}\n`;
-      }
-      text += `\n`;
+    grouped.forEach(([productId, contracts], groupIndex) => {
+      const productInfo = getProductInfo(productId);
+      text += `${productInfo?.emoji || "📄"} *${groupIndex + 1}. ${productInfo?.label || productId}*\n\n`;
+      
+      contracts.forEach((c) => {
+        text += `   💵 Parcela: ${c.parcela}\n`;
+        if (c.troco && parseCurrency(c.troco) > 0) {
+          text += `   💰 Troco: ${c.troco}\n`;
+        }
+        text += `\n`;
+      });
     });
 
     if (totalTroco > 0) {
@@ -579,7 +592,6 @@ export function ProposalGenerator() {
     text += `📅 Data: ${new Date().toLocaleDateString("pt-BR")}\n`;
     text += `👨‍💼 Consultor: ${userName}\n`;
     
-    // Add product-specific footers
     if (footers.length > 0) {
       text += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
       text += `ℹ️ *INFORMAÇÕES*\n`;
@@ -707,33 +719,39 @@ export function ProposalGenerator() {
     doc.text(`CONTRATOS (${completedContracts.length})`, 20, y);
     y += 10;
 
-    completedContracts.forEach((c, i) => {
-      const productInfo = getProductInfo(c.product);
+    const grouped = groupContractsByProduct(completedContracts);
+    
+    grouped.forEach(([productId, contracts], groupIndex) => {
+      const productInfo = getProductInfo(productId);
       
-      // Contract card background - cinza claro neutro
-      doc.setFillColor(245, 245, 245);
-      doc.roundedRect(15, y - 5, pageWidth - 30, 35, 3, 3, "F");
-
+      // Product group header
+      if (y > 250) { doc.addPage(); y = 20; }
+      
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(51, 51, 51);
-      doc.text(`${i + 1}. ${productInfo?.label || c.product}`, 20, y + 5);
-
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Banco: ${c.bank}`, 25, y + 13);
-      doc.text(`Parcela: ${c.parcela}`, 25, y + 20);
-      if (c.troco && parseCurrency(c.troco) > 0) {
-        doc.text(`Troco Estimado: ${c.troco}`, 25, y + 27);
-      }
-
-      y += 40;
-
-      if (y > 250) {
-        doc.addPage();
-        y = 20;
-      }
+      doc.text(`${groupIndex + 1}. ${productInfo?.label || productId}`, 20, y);
+      y += 8;
+      
+      contracts.forEach((c) => {
+        if (y > 260) { doc.addPage(); y = 20; }
+        
+        const cardHeight = (c.troco && parseCurrency(c.troco) > 0) ? 22 : 15;
+        doc.setFillColor(245, 245, 245);
+        doc.roundedRect(20, y - 4, pageWidth - 40, cardHeight, 2, 2, "F");
+        
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Parcela: ${c.parcela}`, 25, y + 4);
+        if (c.troco && parseCurrency(c.troco) > 0) {
+          doc.text(`Troco Estimado: ${c.troco}`, 25, y + 11);
+        }
+        
+        y += cardHeight + 5;
+      });
+      
+      y += 5;
     });
 
     y += 10;
@@ -967,24 +985,27 @@ export function ProposalGenerator() {
         </div>
 
         {/* Contracts List */}
-        <div className="max-w-2xl mx-auto space-y-2">
-          {completedContracts.map((contract, i) => {
-            const productInfo = getProductInfo(contract.product);
+        <div className="max-w-2xl mx-auto space-y-4">
+          {groupContractsByProduct(completedContracts).map(([productId, contracts], groupIndex) => {
+            const productInfo = getProductInfo(productId);
+            const borderColor = productInfo?.color.replace("bg-", "#").replace("emerald-500", "10b981").replace("blue-500", "3b82f6").replace("amber-500", "f59e0b").replace("purple-500", "a855f7");
             return (
-              <Card key={contract.id} className="border-l-4" style={{ borderLeftColor: productInfo?.color.replace("bg-", "#").replace("emerald-500", "10b981").replace("blue-500", "3b82f6").replace("amber-500", "f59e0b").replace("purple-500", "a855f7") }}>
-                <CardContent className="p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+              <Card key={productId} className="border-l-4" style={{ borderLeftColor: borderColor }}>
+                <CardContent className="p-3 space-y-2">
+                  <div className="flex items-center gap-2 mb-1">
                     <span className="text-lg">{productInfo?.emoji}</span>
-                    <div>
-                      <p className="font-medium text-sm">{productInfo?.label} - {contract.bank}</p>
-                      <p className="text-xs text-muted-foreground">Parcela: {contract.parcela}</p>
-                    </div>
+                    <p className="font-semibold text-sm">{groupIndex + 1}. {productInfo?.label}</p>
                   </div>
-                  {contract.troco && parseCurrency(contract.troco) > 0 && (
-                    <Badge variant="secondary" className="text-xs">
-                      Troco: {contract.troco}
-                    </Badge>
-                  )}
+                  {contracts.map((contract) => (
+                    <div key={contract.id} className="flex items-center justify-between pl-8">
+                      <p className="text-xs text-muted-foreground">Parcela: {contract.parcela}</p>
+                      {contract.troco && parseCurrency(contract.troco) > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          Troco: {contract.troco}
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
             );
