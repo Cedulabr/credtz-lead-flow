@@ -286,28 +286,28 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
 
   return (
     <Sheet open={open} onOpenChange={() => !submitting && onClose()}>
-      <SheetContent side="bottom" className="h-[90vh] rounded-t-2xl flex flex-col">
-        <SheetHeader className="pb-2">
+      <SheetContent side="bottom" className="h-auto max-h-[calc(100dvh-2rem)] rounded-t-2xl flex flex-col">
+        <SheetHeader className="pb-1 shrink-0">
           <SheetTitle className="text-base">{stepTitles[step]}</SheetTitle>
           <CompactStepIndicator currentStep={step} totalSteps={totalSteps} />
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto py-4">
+        <div className="flex-1 overflow-y-auto py-3 min-h-0">
           {renderStep()}
         </div>
 
-        <div className="flex gap-3 pt-4 border-t">
+        <div className="flex gap-2 pt-3 pb-[env(safe-area-inset-bottom,0.5rem)] border-t shrink-0">
           {step > 0 && (
-            <Button variant="outline" onClick={() => setStep(s => s - 1)} disabled={submitting} className="flex-1">
+            <Button variant="outline" onClick={() => setStep(s => s - 1)} disabled={submitting} className="flex-1 h-11">
               <ChevronLeft className="h-4 w-4 mr-1" /> Voltar
             </Button>
           )}
           {step < totalSteps - 1 ? (
-            <Button onClick={() => setStep(s => s + 1)} disabled={!canProceed()} className="flex-1">
+            <Button onClick={() => setStep(s => s + 1)} disabled={!canProceed()} className="flex-1 h-11">
               Continuar <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (
-            <Button onClick={handleConfirm} disabled={submitting || !canProceed()} className="flex-1 gap-2">
+            <Button onClick={handleConfirm} disabled={submitting || !canProceed()} className="flex-1 h-11 gap-2">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
               {submitting ? "Processando..." : "Iniciar Prospecção"}
             </Button>

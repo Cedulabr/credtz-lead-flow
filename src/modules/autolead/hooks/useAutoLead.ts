@@ -86,6 +86,8 @@ export function useAutoLead() {
         leads_requested: wizardData.quantidade,
         ddd_filter: wizardData.ddds.length > 0 ? wizardData.ddds : null,
         convenio_filter: wizardData.tipoLead === "todos" ? null : wizardData.tipoLead,
+        banco_filter: null,
+        produto_filter: null,
       }
     );
 
