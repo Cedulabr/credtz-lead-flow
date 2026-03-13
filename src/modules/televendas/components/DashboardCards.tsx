@@ -38,6 +38,13 @@ export const DashboardCards = ({ stats }: DashboardCardsProps) => {
       gradient: "from-amber-500 to-amber-600",
       bg: "bg-amber-500/10",
     }] : []),
+    ...(stats.aguardandoAprovacao > 0 ? [{
+      label: "Aguardando Aprovação",
+      value: String(stats.aguardandoAprovacao),
+      icon: Bell,
+      gradient: "from-emerald-500 to-teal-600",
+      bg: "bg-emerald-500/10",
+    }] : []),
   ], [stats]);
 
   return (

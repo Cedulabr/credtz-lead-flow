@@ -84,6 +84,7 @@ export function useTelevendasStats(
       paidCount,
       criticos,
       alertas,
+      aguardandoAprovacao,
       pipelineCounts,
       topSellers,
       totalPropostasAtivas,

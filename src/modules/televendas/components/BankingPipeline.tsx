@@ -232,7 +232,7 @@ export const BankingPipeline = ({ pipelineCounts, criticos, alertas, onFilterByB
               className={cn(
                 "flex-shrink-0 rounded-xl px-4 py-2.5 text-left transition-all border",
                 "cursor-pointer hover:shadow-sm active:scale-[0.98]",
-                "min-w-[130px]",
+                "min-w-[120px] snap-start",
                 isSelected ? `${item.activeBg} ${item.borderColor} ring-1 ring-primary/30 shadow-sm` : `${item.bgColor} ${item.borderColor}`,
                 !hasItems && "opacity-60"
               )}

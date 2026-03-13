@@ -213,9 +213,14 @@ export const PropostasView = ({
                       )}
                     </div>
 
-                    {/* Row 2: Current status only */}
+                    {/* Row 2: Current status + approval badge */}
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <StatusBadge status={tv.status} size="sm" />
+                      {isAwaitingApproval && (
+                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-700 border border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700 animate-pulse">
+                          🔔 Aguardando Aprovação
+                        </span>
+                      )}
                     </div>
 
                     {/* Row 3: Details */}
