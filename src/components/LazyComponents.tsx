@@ -175,3 +175,4 @@ export const LazyWhatsAppConfig = withLazyLoading(WhatsAppConfig, FormSkeleton);
 export const LazyMeuNumeroModule = withLazyLoading(MeuNumeroModule, FormSkeleton);
 export const LazySystemStatus = withLazyLoading(SystemStatus, FormSkeleton);
 export const LazyRadarModule = withLazyLoading(RadarModule, TableSkeleton);
+export const LazyAutoLeadModule = withLazyLoading(AutoLeadModule, FormSkeleton);

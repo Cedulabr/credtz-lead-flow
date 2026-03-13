@@ -170,6 +170,7 @@ const Index = () => {
     'test-functionalities': <LazyTestFunctionalities />,
     'system-status': <LazySystemStatus />,
     radar: <LazyRadarModule />,
+    autolead: <LazyAutoLeadModule />,
   }), [setActiveTab]);
 
   // ── Render active tab ──────────────────────────────────────────────
