@@ -52,6 +52,11 @@ export function useTelevendasStats(
         }
       }
 
+      // Awaiting approval counts
+      if (tv.status === "pago_aguardando" || tv.status === "cancelado_aguardando") {
+        aguardandoAprovacao++;
+      }
+
       // Priority counts (non-final only)
       if (!finalStatuses.includes(tv.status)) {
         totalPropostasAtivas++;
