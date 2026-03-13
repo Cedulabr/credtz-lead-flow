@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { DollarSign, FileText, AlertTriangle, AlertCircle } from "lucide-react";
+import { DollarSign, FileText, AlertTriangle, AlertCircle, Bell } from "lucide-react";
 import { TelevendasStats } from "../hooks/useTelevendasStats";
 import { formatCurrency } from "../utils";
 
@@ -37,6 +37,13 @@ export const DashboardCards = ({ stats }: DashboardCardsProps) => {
       icon: AlertTriangle,
       gradient: "from-amber-500 to-amber-600",
       bg: "bg-amber-500/10",
+    }] : []),
+    ...(stats.aguardandoAprovacao > 0 ? [{
+      label: "Aguardando Aprovação",
+      value: String(stats.aguardandoAprovacao),
+      icon: Bell,
+      gradient: "from-emerald-500 to-teal-600",
+      bg: "bg-emerald-500/10",
     }] : []),
   ], [stats]);
 

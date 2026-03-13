@@ -49,9 +49,27 @@ export const BANKING_STATUS_CONFIG: Record<string, {
     borderColor: "border-orange-200 dark:border-orange-700",
     activeBg: "bg-orange-100 dark:bg-orange-800/40",
   },
+  aguardando_pagamento: {
+    label: "Aguard. Pagamento",
+    shortLabel: "Aguard. Pgto",
+    emoji: "🔔",
+    color: "text-emerald-700",
+    bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
+    borderColor: "border-emerald-200 dark:border-emerald-700",
+    activeBg: "bg-emerald-100 dark:bg-emerald-800/40",
+  },
+  aguardando_cancelamento: {
+    label: "Aguard. Cancelamento",
+    shortLabel: "Aguard. Cancel",
+    emoji: "🔔",
+    color: "text-rose-700",
+    bgColor: "bg-rose-50 dark:bg-rose-900/20",
+    borderColor: "border-rose-200 dark:border-rose-700",
+    activeBg: "bg-rose-100 dark:bg-rose-800/40",
+  },
   pago_cliente: {
     label: "Pago ao Cliente",
-    shortLabel: "Pago",
+    shortLabel: "Pago ✅",
     emoji: "✅",
     color: "text-green-700",
     bgColor: "bg-green-50 dark:bg-green-900/20",
@@ -60,7 +78,7 @@ export const BANKING_STATUS_CONFIG: Record<string, {
   },
   cancelado_banco: {
     label: "Cancelados",
-    shortLabel: "Cancelado",
+    shortLabel: "Cancelado ❌",
     emoji: "❌",
     color: "text-red-800",
     bgColor: "bg-red-50 dark:bg-red-900/20",
@@ -116,11 +134,13 @@ export const mapToPipelineStatus = (tv: Televenda): string => {
     case "proposta_pendente":
     case "devolvido":
       return "pendente";
-    case "proposta_paga":
     case "pago_aguardando":
+      return "aguardando_pagamento";
+    case "proposta_paga":
       return "pago_cliente";
-    case "proposta_cancelada":
     case "cancelado_aguardando":
+      return "aguardando_cancelamento";
+    case "proposta_cancelada":
     case "exclusao_aprovada":
       return "cancelado_banco";
     default:
@@ -198,7 +218,7 @@ export const BankingPipeline = ({ pipelineCounts, criticos, alertas, onFilterByB
         </div>
       )}
 
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin snap-x snap-mandatory md:snap-none">
         {stats.map((item, index) => {
           const isSelected = selectedBankStatus === item.key;
           const hasItems = item.count > 0;
@@ -212,7 +232,7 @@ export const BankingPipeline = ({ pipelineCounts, criticos, alertas, onFilterByB
               className={cn(
                 "flex-shrink-0 rounded-xl px-4 py-2.5 text-left transition-all border",
                 "cursor-pointer hover:shadow-sm active:scale-[0.98]",
-                "min-w-[130px]",
+                "min-w-[120px] snap-start",
                 isSelected ? `${item.activeBg} ${item.borderColor} ring-1 ring-primary/30 shadow-sm` : `${item.bgColor} ${item.borderColor}`,
                 !hasItems && "opacity-60"
               )}

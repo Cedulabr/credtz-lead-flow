@@ -9,6 +9,7 @@ export interface TelevendasStats {
   paidCount: number;
   criticos: number;
   alertas: number;
+  aguardandoAprovacao: number;
   pipelineCounts: Record<string, number>;
   topSellers: { name: string; count: number }[];
   totalPropostasAtivas: number;
@@ -32,6 +33,7 @@ export function useTelevendasStats(
     let paidCount = 0;
     let criticos = 0;
     let alertas = 0;
+    let aguardandoAprovacao = 0;
     let totalPropostasAtivas = 0;
 
     for (const tv of televendas) {
@@ -48,6 +50,11 @@ export function useTelevendasStats(
         } else {
           totalBrutoPago += tv.saldo_devedor || 0;
         }
+      }
+
+      // Awaiting approval counts
+      if (tv.status === "pago_aguardando" || tv.status === "cancelado_aguardando") {
+        aguardandoAprovacao++;
       }
 
       // Priority counts (non-final only)
@@ -77,6 +84,7 @@ export function useTelevendasStats(
       paidCount,
       criticos,
       alertas,
+      aguardandoAprovacao,
       pipelineCounts,
       topSellers,
       totalPropostasAtivas,

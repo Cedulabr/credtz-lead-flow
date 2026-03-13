@@ -137,7 +137,7 @@ export const PropostasView = ({
       <div className="space-y-2">
         <AnimatePresence mode="popLayout">
           {sortedTelevendas.map((tv, index) => {
-            const isAwaiting = tv.status === "pago_aguardando" || tv.status === "cancelado_aguardando";
+            const isAwaitingApproval = tv.status === "pago_aguardando" || tv.status === "cancelado_aguardando";
             const opBadge = OPERATION_BADGE[tv.tipo_operacao];
             const syncByName = tv.last_sync_by ? usersMap.get(tv.last_sync_by) : null;
             const isFinal = ["proposta_paga", "proposta_cancelada", "exclusao_aprovada"].includes(tv.status);
@@ -161,7 +161,7 @@ export const PropostasView = ({
                     ? 'border-red-500 bg-red-100/60 dark:border-red-500 dark:bg-red-900/30 shadow-[0_0_12px_rgba(239,68,68,0.25)] ring-1 ring-red-400/40' 
                     : priority === "alerta" 
                       ? 'border-amber-400 bg-amber-50/50 dark:border-amber-500 dark:bg-amber-900/20' 
-                      : isAwaiting && isGestorOrAdmin ? 'border-amber-300 bg-amber-500/5' : 'border-border/50'}
+                      : isAwaitingApproval ? 'border-emerald-300 bg-emerald-500/5 dark:border-emerald-600 dark:bg-emerald-900/10' : 'border-border/50'}
                 `}
               >
                 <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
@@ -213,9 +213,14 @@ export const PropostasView = ({
                       )}
                     </div>
 
-                    {/* Row 2: Current status only */}
+                    {/* Row 2: Current status + approval badge */}
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <StatusBadge status={tv.status} size="sm" />
+                      {isAwaitingApproval && (
+                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-700 border border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700 animate-pulse">
+                          🔔 Aguardando Aprovação
+                        </span>
+                      )}
                     </div>
 
                     {/* Row 3: Details */}
