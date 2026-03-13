@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { DollarSign, FileText, AlertTriangle, AlertCircle } from "lucide-react";
+import { DollarSign, FileText, AlertTriangle, AlertCircle, Bell } from "lucide-react";
 import { TelevendasStats } from "../hooks/useTelevendasStats";
 import { formatCurrency } from "../utils";
 
