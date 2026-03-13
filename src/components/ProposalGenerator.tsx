@@ -719,33 +719,39 @@ export function ProposalGenerator() {
     doc.text(`CONTRATOS (${completedContracts.length})`, 20, y);
     y += 10;
 
-    completedContracts.forEach((c, i) => {
-      const productInfo = getProductInfo(c.product);
+    const grouped = groupContractsByProduct(completedContracts);
+    
+    grouped.forEach(([productId, contracts], groupIndex) => {
+      const productInfo = getProductInfo(productId);
       
-      // Contract card background - cinza claro neutro
-      doc.setFillColor(245, 245, 245);
-      doc.roundedRect(15, y - 5, pageWidth - 30, 35, 3, 3, "F");
-
+      // Product group header
+      if (y > 250) { doc.addPage(); y = 20; }
+      
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(51, 51, 51);
-      doc.text(`${i + 1}. ${productInfo?.label || c.product}`, 20, y + 5);
-
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Banco: ${c.bank}`, 25, y + 13);
-      doc.text(`Parcela: ${c.parcela}`, 25, y + 20);
-      if (c.troco && parseCurrency(c.troco) > 0) {
-        doc.text(`Troco Estimado: ${c.troco}`, 25, y + 27);
-      }
-
-      y += 40;
-
-      if (y > 250) {
-        doc.addPage();
-        y = 20;
-      }
+      doc.text(`${groupIndex + 1}. ${productInfo?.label || productId}`, 20, y);
+      y += 8;
+      
+      contracts.forEach((c) => {
+        if (y > 260) { doc.addPage(); y = 20; }
+        
+        const cardHeight = (c.troco && parseCurrency(c.troco) > 0) ? 22 : 15;
+        doc.setFillColor(245, 245, 245);
+        doc.roundedRect(20, y - 4, pageWidth - 40, cardHeight, 2, 2, "F");
+        
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Parcela: ${c.parcela}`, 25, y + 4);
+        if (c.troco && parseCurrency(c.troco) > 0) {
+          doc.text(`Troco Estimado: ${c.troco}`, 25, y + 11);
+        }
+        
+        y += cardHeight + 5;
+      });
+      
+      y += 5;
     });
 
     y += 10;
