@@ -1,80 +1,56 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Correção: Visibilidade de Propostas por Perfil
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Problema
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+Dois bugs combinados fazem colaboradores verem propostas de toda a empresa:
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+**1. RLS Policy (causa principal)**: A policy SELECT em `saved_proposals` usa `company_id IN (SELECT get_user_company_ids(auth.uid()))` — isso permite que **qualquer membro** da empresa veja todas as propostas, incluindo colaboradores.
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+**2. Frontend `isGestor` errado (linha 96)**: O código verifica `profile?.role === 'partner'`, mas gestores são identificados via `user_companies.company_role = 'gestor'`, não pelo role do profile. Então a lógica de filtro do frontend nunca identifica gestores corretamente.
 
----
+### Correções
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+**Migration SQL — Restringir RLS SELECT**:
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+Substituir a policy `saved_proposals_select_scope` para:
+- **Colaborador**: `auth.uid() = user_id` (apenas as próprias)
+- **Gestor**: propostas da mesma empresa via `is_company_gestor()`
+- **Admin**: `is_global_admin()` (todas)
 
-**Arquitetura:**
+```sql
+DROP POLICY "saved_proposals_select_scope" ON public.saved_proposals;
 
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
+CREATE POLICY "saved_proposals_select_scope"
+ON public.saved_proposals FOR SELECT TO authenticated
+USING (
+  public.is_global_admin(auth.uid())
+  OR auth.uid() = user_id
+  OR (
+    company_id IS NOT NULL
+    AND public.is_company_gestor(auth.uid(), company_id)
+  )
+);
 ```
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+Mesma lógica para UPDATE e DELETE (gestor pode ver mas só dono pode editar/deletar — manter como está).
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+**Frontend `ProposalGenerator.tsx`**:
 
----
+Corrigir detecção de gestor usando `useGestorCompany` hook (já existente no projeto) em vez de `profile?.role === 'partner'`.
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
+```typescript
+const { isGestor: isGestorCompany } = useGestorCompany();
+const isAdmin = profile?.role === 'admin';
+const isGestor = isGestorCompany;
+const canViewAllProposals = isAdmin || isGestor;
+```
 
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
+### Arquivos a Modificar
 
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
-
----
-
-### Arquivos a modificar
-
-| Arquivo | Mudanca |
+| Arquivo | Ação |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
-
----
-
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+| Migration SQL | Substituir policy SELECT para restringir por role |
+| `src/components/ProposalGenerator.tsx` | Usar `useGestorCompany` para detectar gestor corretamente |
 
