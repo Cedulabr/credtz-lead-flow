@@ -38,6 +38,7 @@ import {
   LazySystemStatus,
   LazyMyData,
   LazyRadarModule,
+  LazyAutoLeadModule,
 } from "@/components/LazyComponents";
 
 // ── Types ─────────────────────────────────────────────────────────────
