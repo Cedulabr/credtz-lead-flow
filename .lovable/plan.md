@@ -1,80 +1,62 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Unificar Propostas por Produto — WhatsApp e PDF
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Problema
+Cada contrato é listado individualmente com produto + banco, gerando texto repetitivo. O usuário quer agrupar contratos do mesmo produto sob um único cabeçalho.
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+### Formato Desejado
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+**Antes:**
+```
+🔄 1. Portabilidade
+   🏦 Banco: Safra
+   💵 Parcela: R$ 200,00
+   💰 Troco: R$ 1.500,00
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
-
----
-
-### 2. Conectar Base OFF ao PostgreSQL externo
-
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
-
-**Arquitetura:**
-
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
+🔄 2. Portabilidade
+   🏦 Banco: Facta
+   💵 Parcela: R$ 100,00
+   💰 Troco: R$ 1.300,00
 ```
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+**Depois:**
+```
+🔄 1. Portabilidade
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+   💵 Parcela: R$ 200,00
+   💰 Troco: R$ 1.500,00
 
----
+   💵 Parcela: R$ 100,00
+   💰 Troco: R$ 1.300,00
+```
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
+### Alterações em `src/components/ProposalGenerator.tsx`
 
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
+**1. Helper para agrupar contratos por produto:**
+```typescript
+const groupContractsByProduct = (contracts: Contract[]) => {
+  const groups: Record<string, Contract[]> = {};
+  contracts.forEach(c => {
+    if (!groups[c.product]) groups[c.product] = [];
+    groups[c.product].push(c);
+  });
+  return Object.entries(groups);
+};
+```
 
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+**2. `generateProposalText()` (linhas 551-595):**
+Em vez de iterar contrato a contrato, iterar por grupo de produto. Cada grupo tem um cabeçalho numerado com emoji+label, seguido dos contratos daquele grupo listando apenas parcela e troco (sem banco).
 
----
+**3. `generatePDF()` (linhas 669-786):**
+Mesma lógica de agrupamento. Um card/header por produto, com sub-itens para cada contrato mostrando parcela e troco.
 
-### Arquivos a modificar
+**4. Summary step — lista de contratos (linhas 970-991):**
+Agrupar visualmente os cards por produto no resumo da proposta gerada.
 
-| Arquivo | Mudanca |
+### Arquivo
+
+| Arquivo | Ação |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
-
----
-
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+| `src/components/ProposalGenerator.tsx` | Agrupar contratos por produto no texto WhatsApp, PDF e resumo |
 
