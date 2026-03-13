@@ -218,7 +218,7 @@ export const BankingPipeline = ({ pipelineCounts, criticos, alertas, onFilterByB
         </div>
       )}
 
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin snap-x snap-mandatory md:snap-none">
         {stats.map((item, index) => {
           const isSelected = selectedBankStatus === item.key;
           const hasItems = item.count > 0;
