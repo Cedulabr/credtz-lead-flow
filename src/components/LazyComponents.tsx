@@ -55,6 +55,9 @@ export const ClientReuseAlerts = lazy(() => import('./ClientReuseAlerts').then(m
 // Radar
 export const RadarModule = lazy(() => import('@/modules/radar/RadarModule').then(m => ({ default: m.RadarModule })));
 
+// AutoLead
+export const AutoLeadModule = lazy(() => import('@/modules/autolead/AutoLeadModule').then(m => ({ default: m.AutoLeadModule })));
+
 // Base OFF legacy
 export const BaseOff = lazy(() => import('./BaseOff').then(m => ({ default: m.BaseOff })));
 export const BaseOffModern = lazy(() => import('./BaseOffModern').then(m => ({ default: m.BaseOffModern })));
