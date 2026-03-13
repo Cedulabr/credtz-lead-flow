@@ -36,6 +36,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGestorCompany } from "@/hooks/useGestorCompany";
 import { SmsNotifyDialog } from "@/modules/sales-wizard/components/SmsNotifyDialog";
 import { WhatsAppSendDialog } from "@/components/WhatsAppSendDialog";
 import { MessageCircle } from "lucide-react";
