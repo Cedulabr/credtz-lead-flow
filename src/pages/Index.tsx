@@ -116,6 +116,10 @@ const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMes
     permission: 'can_access_radar',
     blockedMessage: 'Acesso ao Radar de Oportunidades bloqueado pelo administrador',
   },
+  autolead: {
+    permission: 'can_access_autolead',
+    blockedMessage: 'Acesso ao AutoLead bloqueado pelo administrador',
+  },
 };
 
 // ── Main Component ────────────────────────────────────────────────────
