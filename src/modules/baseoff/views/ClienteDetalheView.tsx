@@ -7,7 +7,8 @@ import {
   FileText, 
   Clock, 
   RefreshCw,
-  Download
+  Download,
+  Send
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { BaseOffClient, BaseOffContract, BaseOffInlineContract, TimelineEvent } from '../types';
@@ -19,6 +20,7 @@ import { ContratoCard } from '../components/ContratoCard';
 import { SimulationModal } from '../components/SimulationModal';
 import { ProfessionalProposalPDF } from '../components/ProfessionalProposalPDF';
 import { TrocoCalculator, TrocoSimulation } from '../components/TrocoCalculator';
+import { DigitacaoWizard } from '../components/DigitacaoWizard';
 import { formatDate, formatCurrency } from '../utils';
 import { validatePhone } from '../utils/phoneValidation';
 import { toast } from 'sonner';
@@ -79,7 +81,7 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
   const [selectedContractIds, setSelectedContractIds] = useState<string[]>([]);
   const [currentSimulation, setCurrentSimulation] = useState<TrocoSimulation | null>(null);
   const [showTimeline, setShowTimeline] = useState(false);
-
+  const [showDigitacao, setShowDigitacao] = useState(false);
   const margemData = useMargemData(client, contracts);
   const inlineContracts = client.contratos || client.contracts;
   const hasInlineContracts = inlineContracts && inlineContracts.length > 0;
@@ -193,6 +195,13 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
         selectedContractIds={selectedContractIds}
       />
 
+      <DigitacaoWizard
+        isOpen={showDigitacao}
+        onClose={() => setShowDigitacao(false)}
+        client={client}
+        contracts={contracts}
+      />
+
       {/* Back button */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={onBack} className="gap-2">
@@ -220,6 +229,20 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
         contracts={contracts}
         esp={client.esp}
       />
+
+      {/* DIGITAÇÃO DE CONTRATO */}
+      <Card className="p-4 border-primary/20 bg-primary/5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold text-sm">Digitação de Contrato</p>
+            <p className="text-xs text-muted-foreground">Enviar proposta diretamente via API bancária</p>
+          </div>
+          <Button onClick={() => setShowDigitacao(true)} className="gap-2">
+            <Send className="w-4 h-4" />
+            Digitar Contrato
+          </Button>
+        </div>
+      </Card>
 
       {/* 4️⃣ CONTRATOS */}
       <div className="space-y-3">

@@ -25,6 +25,7 @@ import { AdminBankReuseSettings } from '@/components/AdminBankReuseSettings';
 import { AdminDuplicatesManager } from '@/components/AdminDuplicatesManager';
 import { AdminInactivitySettings } from '@/components/AdminInactivitySettings';
 import { AdminSmsCreditsManagement } from '@/components/AdminSmsCreditsManagement';
+import { AdminBankingAPI } from '@/components/admin/AdminBankingAPI';
 
 type OperationSection = 
   | 'menu' 
@@ -34,7 +35,8 @@ type OperationSection =
   | 'televendas-banks' 
   | 'bank-reuse' 
   | 'duplicates'
-  | 'inactivity';
+  | 'inactivity'
+  | 'banking-api';
 
 interface SectionItem {
   id: OperationSection;
@@ -110,6 +112,16 @@ export function AdminOperations() {
       color: 'text-orange-600',
       bgColor: 'bg-orange-100 dark:bg-orange-900/30',
     },
+    {
+      id: 'banking-api' as OperationSection,
+      label: 'API Bancária',
+      description: 'Digitação de contratos via JoinBank API',
+      icon: Landmark,
+      color: 'text-indigo-600',
+      bgColor: 'bg-indigo-100 dark:bg-indigo-900/30',
+      badge: 'Novo',
+      badgeVariant: 'default' as const,
+    },
   ];
 
   const renderContent = () => {
@@ -128,6 +140,8 @@ export function AdminOperations() {
         return <AdminDuplicatesManager />;
       case 'inactivity':
         return <AdminInactivitySettings />;
+      case 'banking-api':
+        return <AdminBankingAPI />;
       default:
         return null;
     }

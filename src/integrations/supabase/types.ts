@@ -3103,6 +3103,97 @@ export type Database = {
         }
         Relationships: []
       }
+      joinbank_config: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          default_products: Json | null
+          enabled: boolean
+          id: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          default_products?: Json | null
+          enabled?: boolean
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          default_products?: Json | null
+          enabled?: boolean
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "joinbank_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      joinbank_proposals: {
+        Row: {
+          api_response: Json | null
+          client_cpf: string
+          client_name: string
+          company_id: string | null
+          created_at: string
+          id: string
+          operation_type: string
+          request_payload: Json | null
+          simulation_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_response?: Json | null
+          client_cpf: string
+          client_name: string
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          operation_type?: string
+          request_payload?: Json | null
+          simulation_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_response?: Json | null
+          client_cpf?: string
+          client_name?: string
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          operation_type?: string
+          request_payload?: Json | null
+          simulation_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "joinbank_proposals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_alerts: {
         Row: {
           alert_type: string
