@@ -1,80 +1,49 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Redesign Módulo Digitação — Layout Qualibank (5 Steps)
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Análise dos Prints vs. Código Atual
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
-
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
-
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
-
----
-
-### 2. Conectar Base OFF ao PostgreSQL externo
-
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
-
-**Arquitetura:**
+O código atual tem 4 steps (Cliente → Simulação → Docs → Enviar) com os dados pessoais e endereço escondidos em um collapsible. Os prints do Qualibank mostram um fluxo diferente com 5 etapas claras e um sistema de múltiplas simulações:
 
 ```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
+FLUXO ATUAL (4 steps):
+1. Cliente (tudo junto, dados adicionais colapsados)
+2. Simulação
+3. Documentos
+4. Confirmação + Bancários
+
+FLUXO QUALIBANK (5 steps):
+1. Consulta IN100 (CPF, Nome, NB, Celular + link copiável)
+2. Simulações (criar/listar múltiplas simulações com modal)
+3. Dados Pessoais + Benefício + Endereço + Bancários
+4. Documentos (upload frente/verso)
+5. Formalização (status, link formalização, CCB)
 ```
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+### Mudanças Principais
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+**Step 1 — Consulta IN100** (print 37): Layout limpo com apenas CPF, Nome, NB, Celular. Abaixo: "Autorize o IN100" com link copiável e botão "Copiar". Sem dados adicionais neste step.
 
----
+**Step 2 — Simulações** (prints 38-39): Suporte a múltiplas simulações. Botão "Adicionar Simulação" abre um modal/card com: Produto (select), Tabela (select), seção Portabilidade (Banco Origem, Nº Contrato, Taxa, Prazo Original, Parcelas Restantes, Valor Parcela, Saldo Devedor), seção Refinanciamento (Taxa, Prazo, Valor Parcela, Valor do Contrato). Resultado: Valor do Troco + IOF. Lista de simulações criadas com detalhes expandidos.
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
+**Step 3 — Dados Pessoais + Endereço + Bancários** (prints 40-41): Campos organizados em seções claras: Dados Pessoais (Tipo Doc, Número, UF, Órgão, Data Emissão, Nascimento, Sexo, Estado Civil, Email, Nome Mãe), Dados do Benefício (Tipo, DDB, UF, Forma Pagamento), Dados do Endereço (CEP, Rua, Número, Complemento, Bairro, Cidade, UF), Dados Bancários (Tipo Conta, Banco, Agência, Conta, Dígito).
 
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
+**Step 4 — Documentos** (print 42): Upload frente e verso com cards visuais mostrando formatos aceitos (PNG, JPEG, PDF, HEIC) e tamanho mínimo. Checkbox "Documentos enviados pelo próprio cliente". Navegação "Voltar | 3/4 | Próximo".
 
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+**Step 5 — Formalização** (print 43): Após envio bem-sucedido, mostrar status, tipo (Biometria com documento), link de formalização copiável e botão "Visualizar CCB".
 
----
+### Dados do PDF para Teste
 
-### Arquivos a modificar
+O PDF contém os dados completos de uma proposta Port+Refin da cliente ALAIDE FERREIRA DOS SANTOS (CPF 146.046.475-34, NB 1347306800). Após implementar o redesign, o sistema estará pronto para digitação desses dados via interface.
 
-| Arquivo | Mudanca |
+### Arquivos a Modificar/Criar
+
+| Arquivo | Ação |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
-
----
-
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+| `src/modules/digitacao/components/DigitacaoForm.tsx` | Redesign completo — 5 steps no layout Qualibank |
+| `src/modules/digitacao/components/SimulationModal.tsx` | Novo — Modal de criação de simulação (print 38) |
+| `src/modules/digitacao/components/SimulationCard.tsx` | Novo — Card de simulação criada na lista (print 39) |
+| `src/modules/digitacao/components/ProposalDetail.tsx` | Atualizar — Adicionar seção formalização (print 43) |
+| `src/modules/digitacao/types.ts` | Adicionar types para múltiplas simulações e formalização |
 
