@@ -67,6 +67,106 @@ export function useAutoLead() {
     return () => { supabase.removeChannel(channel); };
   }, [activeJob?.id, fetchMessages, fetchJobs]);
 
+  // Helper: get gestor's SMS credits and gestor ID
+  const getGestorSmsInfo = useCallback(async (): Promise<{ gestorId: string; credits: number } | null> => {
+    if (!user?.id) return null;
+
+    const { data: ucData } = await supabase
+      .from("user_companies")
+      .select("company_id, company_role")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!ucData?.company_id) return null;
+
+    let gestorId = user.id;
+    if (ucData.company_role !== 'gestor') {
+      const { data: gestorData } = await supabase
+        .from("user_companies")
+        .select("user_id")
+        .eq("company_id", ucData.company_id)
+        .eq("company_role", "gestor")
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      if (gestorData?.user_id) gestorId = gestorData.user_id;
+    }
+
+    const { data: creditData } = await supabase
+      .from("sms_credits")
+      .select("credits_balance")
+      .eq("user_id", gestorId)
+      .maybeSingle();
+
+    return { gestorId, credits: creditData?.credits_balance ?? 0 };
+  }, [user?.id]);
+
+  // Helper: get WhatsApp phone number for SMS template
+  const getWhatsAppPhone = useCallback(async (instanceIds: string[]): Promise<string> => {
+    if (instanceIds.length === 0) return "";
+    const { data } = await (supabase as any)
+      .from("whatsapp_instances")
+      .select("phone_number")
+      .in("id", instanceIds)
+      .not("phone_number", "is", null)
+      .limit(1)
+      .maybeSingle();
+    return data?.phone_number || "";
+  }, []);
+
+  // Send SMS in batch (immediate, no delay)
+  const sendSmsBatch = useCallback(async (
+    leads: any[],
+    smsTemplate: string,
+    whatsAppPhone: string,
+    jobId: string,
+    companyId: string | null,
+  ) => {
+    let smsSent = 0;
+    let smsFailed = 0;
+
+    for (const lead of leads) {
+      const personalizedMsg = smsTemplate
+        .replace(/\{\{nome\}\}/g, lead.name || "")
+        .replace(/\{\{whatsapp\}\}/g, whatsAppPhone);
+
+      const phone = lead.phone;
+      if (!phone) {
+        smsFailed++;
+        continue;
+      }
+
+      try {
+        const { data: result, error } = await supabase.functions.invoke("send-sms", {
+          body: {
+            phone,
+            message: personalizedMsg,
+            contact_name: lead.name || null,
+            send_type: "autolead",
+          },
+        });
+
+        if (error || (result && result.error)) {
+          smsFailed++;
+        } else {
+          smsSent++;
+        }
+      } catch {
+        smsFailed++;
+      }
+    }
+
+    // Update job SMS counters
+    await (supabase as any)
+      .from("autolead_jobs")
+      .update({ sms_sent: smsSent, sms_failed: smsFailed })
+      .eq("id", jobId);
+
+    return { smsSent, smsFailed };
+  }, []);
+
   const createJob = useCallback(async (wizardData: WizardData): Promise<string | null> => {
     if (!user?.id) return null;
 
@@ -116,6 +216,8 @@ export function useAutoLead() {
         tipo_lead: wizardData.tipoLead,
         whatsapp_instance_ids: wizardData.whatsappInstanceIds,
         started_at: new Date().toISOString(),
+        sms_enabled: wizardData.smsEnabled,
+        sms_template: wizardData.smsEnabled ? wizardData.smsTemplate : null,
       })
       .select("id")
       .single();
@@ -125,7 +227,7 @@ export function useAutoLead() {
       return null;
     }
 
-    // 3. Generate scheduled messages with anti-ban logic
+    // 3. Generate scheduled WhatsApp messages with anti-ban logic
     const template = wizardData.useDefaultMessage ? DEFAULT_MESSAGE : wizardData.messageTemplate;
     const instances = wizardData.whatsappInstanceIds;
     const shuffledLeads = [...leadsArray].sort(() => Math.random() - 0.5);
@@ -133,7 +235,6 @@ export function useAutoLead() {
     const now = new Date();
     let currentTime = new Date(now);
     
-    // If outside send window, push to next day 08:30
     const hour = currentTime.getHours();
     const minute = currentTime.getMinutes();
     if (hour < 8 || (hour === 8 && minute < 30)) {
@@ -144,16 +245,13 @@ export function useAutoLead() {
     }
 
     const messagesToInsert = shuffledLeads.map((lead: any, index: number) => {
-      // Random delay 2-7 min
       const delay = Math.floor(Math.random() * (7 - 2 + 1) + 2);
       currentTime = new Date(currentTime.getTime() + delay * 60000);
 
-      // Pause every N messages
       if (index > 0 && index % 10 === 0) {
         currentTime = new Date(currentTime.getTime() + 10 * 60000);
       }
 
-      // Check send window
       const h = currentTime.getHours();
       const m = currentTime.getMinutes();
       if (h >= 18 && m > 30) {
@@ -161,10 +259,8 @@ export function useAutoLead() {
         currentTime.setHours(8, 30, 0, 0);
       }
 
-      // Round-robin instance
       const instanceId = instances[index % instances.length];
 
-      // Personalize message
       const personalizedMsg = template
         .replace(/\{\{nome\}\}/g, lead.name || "")
         .replace(/\{\{cidade\}\}/g, "")
@@ -189,11 +285,29 @@ export function useAutoLead() {
       await (supabase as any).from("autolead_messages").insert(batch);
     }
 
+    // 4. Send SMS immediately if enabled
+    if (wizardData.smsEnabled) {
+      const smsInfo = await getGestorSmsInfo();
+      if (smsInfo && smsInfo.credits > 0) {
+        const smsLeads = leadsArray.slice(0, smsInfo.credits); // limit to available credits
+        const whatsAppPhone = await getWhatsAppPhone(wizardData.whatsappInstanceIds);
+
+        // Fire and forget SMS — don't block the job creation
+        sendSmsBatch(smsLeads, wizardData.smsTemplate, whatsAppPhone, job.id, ucData?.company_id || null)
+          .then(({ smsSent, smsFailed }) => {
+            if (smsSent > 0) toast.success(`${smsSent} SMS enviados com sucesso!`);
+            if (smsFailed > 0) toast.error(`${smsFailed} SMS falharam`);
+          });
+      } else {
+        toast.info("SMS não enviado: sem créditos disponíveis");
+      }
+    }
+
     toast.success(`Prospecção iniciada com ${leadsArray.length} leads!`);
     await fetchJobs();
     await fetchCredits();
     return job.id;
-  }, [user?.id, fetchJobs, fetchCredits]);
+  }, [user?.id, fetchJobs, fetchCredits, getGestorSmsInfo, getWhatsAppPhone, sendSmsBatch]);
 
   const pauseJob = useCallback(async (jobId: string) => {
     await (supabase as any)
