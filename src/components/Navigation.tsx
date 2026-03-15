@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2, UserCircle, Clock, ChevronRight, Target, MessageSquare, MessageCircle, Radar } from "lucide-react";
+import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2, UserCircle, Clock, ChevronRight, Target, MessageSquare, MessageCircle, Radar, CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -41,6 +41,7 @@ const navItems = [
   { id: "meu-numero", label: "Meu Número", icon: Phone, permissionKey: "can_access_meu_numero" },
   { id: "radar", label: "Radar de Oportunidades", icon: Radar, permissionKey: "can_access_radar" },
   { id: "autolead", label: "AutoLead", icon: Zap, permissionKey: "can_access_autolead" },
+  { id: "digitacao", label: "Digitação", icon: CreditCard, permissionKey: "can_access_digitacao" },
 ];
 
 // Mobile priority items - only icons

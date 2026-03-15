@@ -58,6 +58,9 @@ export const RadarModule = lazy(() => import('@/modules/radar/RadarModule').then
 // AutoLead
 export const AutoLeadModule = lazy(() => import('@/modules/autolead/AutoLeadModule').then(m => ({ default: m.AutoLeadModule })));
 
+// Digitação
+export const DigitacaoModule = lazy(() => import('@/modules/digitacao/DigitacaoModule').then(m => ({ default: m.DigitacaoModule })));
+
 // Base OFF legacy
 export const BaseOff = lazy(() => import('./BaseOff').then(m => ({ default: m.BaseOff })));
 export const BaseOffModern = lazy(() => import('./BaseOffModern').then(m => ({ default: m.BaseOffModern })));
@@ -176,3 +179,4 @@ export const LazyMeuNumeroModule = withLazyLoading(MeuNumeroModule, FormSkeleton
 export const LazySystemStatus = withLazyLoading(SystemStatus, FormSkeleton);
 export const LazyRadarModule = withLazyLoading(RadarModule, TableSkeleton);
 export const LazyAutoLeadModule = withLazyLoading(AutoLeadModule, FormSkeleton);
+export const LazyDigitacaoModule = withLazyLoading(DigitacaoModule, FormSkeleton);

@@ -39,6 +39,7 @@ import {
   LazyMyData,
   LazyRadarModule,
   LazyAutoLeadModule,
+  LazyDigitacaoModule,
 } from "@/components/LazyComponents";
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -120,6 +121,10 @@ const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMes
     permission: 'can_access_autolead',
     blockedMessage: 'Acesso ao AutoLead bloqueado pelo administrador',
   },
+  digitacao: {
+    permission: 'can_access_digitacao',
+    blockedMessage: 'Acesso à Digitação bloqueado pelo administrador',
+  },
 };
 
 // ── Main Component ────────────────────────────────────────────────────
@@ -171,6 +176,7 @@ const Index = () => {
     'system-status': <LazySystemStatus />,
     radar: <LazyRadarModule />,
     autolead: <LazyAutoLeadModule />,
+    digitacao: <LazyDigitacaoModule />,
   }), [setActiveTab]);
 
   // ── Render active tab ──────────────────────────────────────────────

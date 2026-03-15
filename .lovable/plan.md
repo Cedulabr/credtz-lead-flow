@@ -1,71 +1,80 @@
 
 
-## Módulo Digitação — Standalone Mobile-First
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Objetivo
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-Criar um módulo independente chamado "Digitação" no menu de navegação, permitindo que usuários digitem contratos diretamente pelo celular usando a API bancária JoinBank. Diferente do wizard atual (que abre como Sheet lateral dentro do Base OFF e requer um cliente pré-selecionado), este módulo será uma página completa, standalone, onde o usuário preenche tudo do zero.
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-### Arquitetura
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
+
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+
+---
+
+### 2. Conectar Base OFF ao PostgreSQL externo
+
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+
+**Arquitetura:**
 
 ```text
-src/modules/digitacao/
-├── DigitacaoModule.tsx          # Módulo principal com lista de propostas + botão "Nova Digitação"
-├── index.ts                     # Exports
-├── types.ts                     # Types
-├── components/
-│   ├── DigitacaoForm.tsx         # Wizard mobile-first 4 steps (fullscreen)
-│   ├── ProposalCard.tsx          # Card de proposta na listagem
-│   └── ProposalDetail.tsx        # Detalhe/status de uma proposta
-└── hooks/
-    └── useDigitacao.ts           # CRUD de propostas (joinbank_proposals) + lógica de listagem
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
 ```
 
-### Fluxo do Wizard (4 Steps — Mobile-First)
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
 
-**Step 1 — Dados do Cliente**: CPF (com busca automática se existir na base), Nome, NB, Celular, Data Nascimento, DDB, Espécie, Renda, UF. Seção colapsável "Dados Adicionais" (endereço, RG, mãe). Link copiável IN100 + botão consultar.
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
 
-**Step 2 — Simulação**: Tipo operação, Tabela (rules), Prazo, Taxa, Valor Parcela/Empréstimo, Seguro. Se Port/Refin: campos do contrato de origem. Botão "Calcular" com resultado visual (parcela, valor liberado, IOF, troco).
+---
 
-**Step 3 — Documentos**: Upload frente/verso do documento (aceita imagem e PDF).
+### 3. Simplificar modulo Base OFF - apenas Consulta
 
-**Step 4 — Confirmação**: Dados bancários para crédito + resumo completo + botão "Enviar Proposta".
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
 
-### Layout Mobile-First
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
 
-- Formulário ocupa tela inteira (não Sheet lateral)
-- Inputs com `h-12` para facilitar toque
-- Step indicator compacto (dots) no mobile
-- Botões de navegação fixos no bottom (`sticky bottom-0`)
-- Cards de resultado da simulação com destaque visual (verde/vermelho para troco)
-- Listagem de propostas em cards com status badge e swipe actions
+---
 
-### Tela Principal (DigitacaoModule)
+### Arquivos a modificar
 
-- Header com título + botão FAB "Nova Digitação"
-- Lista de propostas do usuário (joinbank_proposals) com filtros por status
-- Cards mostrando: CPF, Nome, Tipo Operação, Status, Data
-- Tap no card abre detalhe com dados completos + ações (consultar status, copiar simulação)
-
-### Integração
-
-- Reutiliza `useJoinBankAPI` existente (hook do Base OFF)
-- Reutiliza tabela `joinbank_proposals` existente
-- Permissão: `can_access_digitacao`
-
-### Arquivos a Criar/Modificar
-
-| Arquivo | Ação |
+| Arquivo | Mudanca |
 |---|---|
-| `src/modules/digitacao/DigitacaoModule.tsx` | Módulo principal com listagem + FAB |
-| `src/modules/digitacao/components/DigitacaoForm.tsx` | Wizard 4 steps mobile-first (fullscreen) |
-| `src/modules/digitacao/components/ProposalCard.tsx` | Card de proposta |
-| `src/modules/digitacao/hooks/useDigitacao.ts` | CRUD propostas + busca CPF na base |
-| `src/modules/digitacao/types.ts` | Types |
-| `src/modules/digitacao/index.ts` | Exports |
-| `src/components/Navigation.tsx` | Adicionar item "Digitação" com icon CreditCard |
-| `src/components/LazyComponents.tsx` | Lazy import do módulo |
-| `src/pages/Index.tsx` | Registrar tab + permissão |
-| `src/components/UsersList.tsx` | Adicionar `can_access_digitacao` nas permissões |
-| Migração SQL | Adicionar coluna `can_access_digitacao` na tabela profiles |
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
+
+---
+
+### Pergunta necessaria
+
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 

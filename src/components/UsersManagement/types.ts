@@ -63,6 +63,7 @@ export const PERMISSION_MODULES = [
   { key: "can_access_meu_numero", label: "Meu Número", description: "Gerenciar linha telefônica virtual", category: "comunicacao", defaultValue: true },
   { key: "can_access_sms", label: "Comunicação SMS", description: "Envio de SMS em massa e automações", category: "comunicacao", defaultValue: false },
   { key: "can_access_whatsapp", label: "WhatsApp", description: "Integração e envio via WhatsApp", category: "comunicacao", defaultValue: false },
+  { key: "can_access_digitacao", label: "Digitação", description: "Digitar contratos via API bancária", category: "comercial", defaultValue: true },
 ] as const;
 
 export const PERMISSION_CATEGORIES = [

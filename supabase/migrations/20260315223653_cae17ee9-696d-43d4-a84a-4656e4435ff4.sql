@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS can_access_digitacao BOOLEAN DEFAULT true;
