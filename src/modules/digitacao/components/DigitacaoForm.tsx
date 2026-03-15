@@ -596,7 +596,7 @@ export function DigitacaoForm({ onClose, onSuccess, searchClientByCPF }: Digitac
                     {calcResult.changeValue != null && (
                       <div>
                         <span className="text-muted-foreground text-xs">Troco</span>
-                        <p className={cn("font-bold text-lg", Number(calcResult.changeValue) > 0 ? 'text-green-600' : 'text-red-500')}>
+                        <p className={cn("font-bold text-lg", Number(calcResult.changeValue) > 0 ? 'text-primary' : 'text-destructive')}>
                           R$ {Number(calcResult.changeValue).toFixed(2)}
                         </p>
                       </div>

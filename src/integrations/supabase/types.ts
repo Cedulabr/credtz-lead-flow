@@ -3851,6 +3851,7 @@ export type Database = {
           can_access_baseoff_consulta: boolean | null
           can_access_colaborativo: boolean | null
           can_access_controle_ponto: boolean | null
+          can_access_digitacao: boolean | null
           can_access_documentos: boolean | null
           can_access_financas: boolean | null
           can_access_gerador_propostas: boolean | null
@@ -3889,6 +3890,7 @@ export type Database = {
           can_access_baseoff_consulta?: boolean | null
           can_access_colaborativo?: boolean | null
           can_access_controle_ponto?: boolean | null
+          can_access_digitacao?: boolean | null
           can_access_documentos?: boolean | null
           can_access_financas?: boolean | null
           can_access_gerador_propostas?: boolean | null
@@ -3927,6 +3929,7 @@ export type Database = {
           can_access_baseoff_consulta?: boolean | null
           can_access_colaborativo?: boolean | null
           can_access_controle_ponto?: boolean | null
+          can_access_digitacao?: boolean | null
           can_access_documentos?: boolean | null
           can_access_financas?: boolean | null
           can_access_gerador_propostas?: boolean | null
