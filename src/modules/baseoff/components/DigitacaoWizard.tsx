@@ -765,7 +765,7 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
                   <Card className="bg-accent/50 border-primary/20">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        <CheckCircle2 className="w-4 h-4 text-primary" />
                         Resultado da Simulação
                       </CardTitle>
                     </CardHeader>
