@@ -8,7 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Send, Calculator, CheckCircle2, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { 
+  Loader2, Send, Calculator, CheckCircle2, AlertCircle, 
+  ChevronDown, Copy, FileUp, Search, User, FileText, CreditCard
+} from 'lucide-react';
 import { FormWizard, StepContent } from '@/components/ui/form-wizard';
 import { BaseOffClient, BaseOffContract } from '../types';
 import { useJoinBankAPI } from '../hooks/useJoinBankAPI';
@@ -31,15 +35,24 @@ const OPERATION_TYPES = [
 
 const UF_OPTIONS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
+// Convert date from DD/MM/YYYY or ISO to YYYY-MM-DD for input[type=date]
+const formatDateForInput = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.substring(0, 10);
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+    const [d, m, y] = dateStr.split('/');
+    return `${y}-${m}-${d}`;
+  }
+  return dateStr;
+};
+
 export function DigitacaoWizard({ isOpen, onClose, client, contracts }: DigitacaoWizardProps) {
   const api = useJoinBankAPI();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showAdditionalData, setShowAdditionalData] = useState(false);
 
-  // Step 1: Operation type
-  const [operationType, setOperationType] = useState(1);
-
-  // Step 2: Client data (pre-filled, all editable)
+  // Step 1: IN100 + Client basic data
   const [clientData, setClientData] = useState({
     name: '',
     identity: '',
@@ -68,7 +81,12 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
     docIssuingState: '',
   });
 
-  // Step 3: Operation data
+  // IN100
+  const [in100Loading, setIn100Loading] = useState(false);
+  const [in100Result, setIn100Result] = useState<any>(null);
+
+  // Step 2: Simulation
+  const [operationType, setOperationType] = useState(1);
   const [rules, setRules] = useState<any[]>([]);
   const [selectedRuleId, setSelectedRuleId] = useState('');
   const [term, setTerm] = useState(84);
@@ -76,7 +94,7 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
   const [installmentValue, setInstallmentValue] = useState(0);
   const [loanValue, setLoanValue] = useState(0);
   const [hasInsurance, setHasInsurance] = useState(false);
-  // Portability/Refin fields
+  // Port/Refin
   const [selectedContractId, setSelectedContractId] = useState('');
   const [originLenderCode, setOriginLenderCode] = useState('');
   const [originContractNumber, setOriginContractNumber] = useState('');
@@ -84,27 +102,22 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
   const [originInstallmentsRemaining, setOriginInstallmentsRemaining] = useState(0);
   const [originInstallmentValue, setOriginInstallmentValue] = useState(0);
   const [originDueBalance, setOriginDueBalance] = useState(0);
-  // Bank account
+  // Refin extra
+  const [refinTerm, setRefinTerm] = useState(84);
+  const [refinRate, setRefinRate] = useState(1.66);
+  const [refinInstallmentValue, setRefinInstallmentValue] = useState(0);
+  // Calc result
+  const [calcResult, setCalcResult] = useState<any>(null);
+
+  // Step 3: Documents
+  const [docFrontFile, setDocFrontFile] = useState<File | null>(null);
+  const [docBackFile, setDocBackFile] = useState<File | null>(null);
+
+  // Step 4: Bank account
   const [bankCode, setBankCode] = useState('');
   const [bankBranch, setBankBranch] = useState('');
   const [bankNumber, setBankNumber] = useState('');
   const [bankDigit, setBankDigit] = useState('');
-
-  // Step 4: Calculation result
-  const [calcResult, setCalcResult] = useState<any>(null);
-
-  // Convert date from DD/MM/YYYY or ISO to YYYY-MM-DD for input[type=date]
-  const formatDateForInput = (dateStr: string | null | undefined): string => {
-    if (!dateStr) return '';
-    // Already YYYY-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.substring(0, 10);
-    // DD/MM/YYYY
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
-      const [d, m, y] = dateStr.split('/');
-      return `${y}-${m}-${d}`;
-    }
-    return dateStr;
-  };
 
   // Pre-fill client data
   useEffect(() => {
@@ -139,12 +152,17 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
       setBankCode(client.banco_pagto || '');
       setBankBranch(client.agencia_pagto || '');
       setBankNumber(client.conta_corrente || '');
+      setCurrentStep(0);
+      setCalcResult(null);
+      setIn100Result(null);
     }
   }, [client, isOpen]);
 
   // Load rules when operation type changes
   useEffect(() => {
     if (isOpen && operationType) {
+      setSelectedRuleId('');
+      setRules([]);
       api.listRules(operationType).then(data => {
         if (data?.items || Array.isArray(data)) {
           setRules(data?.items || data);
@@ -169,6 +187,24 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
   }, [selectedContractId, contracts]);
 
   const needsOriginContract = operationType >= 2;
+  const isPortRefin = operationType === 4;
+
+  const handleIN100 = async () => {
+    if (!clientData.identity || !clientData.benefit) {
+      toast.error('CPF e Nº Benefício são obrigatórios para consulta IN100');
+      return;
+    }
+    setIn100Loading(true);
+    try {
+      const result = await api.queryIN100(clientData.identity, clientData.benefit);
+      if (result) {
+        setIn100Result(result);
+        toast.success('Consulta IN100 realizada com sucesso!');
+      }
+    } finally {
+      setIn100Loading(false);
+    }
+  };
 
   const handleCalculate = async () => {
     const payload: any = {
@@ -189,6 +225,14 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
         installmentsRemaining: originInstallmentsRemaining,
         installmentValue: originInstallmentValue,
         dueBalanceValue: originDueBalance,
+      };
+    }
+
+    if (isPortRefin) {
+      payload.refinancing = {
+        term: refinTerm,
+        rate: refinRate,
+        installmentValue: refinInstallmentValue,
       };
     }
 
@@ -256,6 +300,14 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
         };
       }
 
+      if (isPortRefin) {
+        item.refinancing = {
+          term: refinTerm,
+          rate: refinRate,
+          installmentValue: refinInstallmentValue,
+        };
+      }
+
       const requestPayload = {
         borrower,
         items: [item],
@@ -297,24 +349,28 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
     setClientData(prev => ({ ...prev, [field]: value }));
   };
 
+  const copyIN100Link = () => {
+    const link = `https://app.ajin.io/auth/inss/${clientData.identity}/${clientData.benefit}`;
+    navigator.clipboard.writeText(link);
+    toast.success('Link IN100 copiado!');
+  };
+
   const steps = [
-    { id: 'operation', title: 'Operação' },
-    { id: 'client', title: 'Cliente' },
-    { id: 'operation-data', title: 'Dados' },
-    { id: 'calculator', title: 'Cálculo' },
-    { id: 'confirm', title: 'Enviar' },
+    { id: 'in100', title: 'IN100', icon: Search },
+    { id: 'simulation', title: 'Simulação', icon: Calculator },
+    { id: 'documents', title: 'Documentos', icon: FileText },
+    { id: 'confirm', title: 'Enviar', icon: Send },
   ];
 
   const canProceed = useMemo(() => {
     switch (currentStep) {
-      case 0: return !!operationType;
-      case 1: return !!clientData.name && !!clientData.identity && !!clientData.benefit;
-      case 2: return !!selectedRuleId && term > 0;
+      case 0: return !!clientData.name && !!clientData.identity && !!clientData.benefit;
+      case 1: return !!selectedRuleId && term > 0;
+      case 2: return true; // documents optional
       case 3: return true;
-      case 4: return true;
       default: return true;
     }
-  }, [currentStep, operationType, clientData, selectedRuleId, term]);
+  }, [currentStep, clientData, selectedRuleId, term]);
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
@@ -336,196 +392,249 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
             isSubmitting={isSubmitting}
             canProceed={canProceed}
             completeText="Enviar Proposta"
-            showNavigation={currentStep < 4}
           >
-            {/* Step 1: Operation Type */}
-            <StepContent>
-              <p className="text-sm text-muted-foreground mb-4">Selecione o tipo de operação INSS:</p>
-              <div className="grid gap-3">
-                {OPERATION_TYPES.map(op => (
-                  <Card
-                    key={op.code}
-                    className={cn(
-                      'cursor-pointer transition-all',
-                      operationType === op.code ? 'ring-2 ring-primary bg-primary/5' : 'hover:bg-muted/50'
-                    )}
-                    onClick={() => setOperationType(op.code)}
-                  >
-                    <CardContent className="p-4 flex items-center gap-3">
-                      <div className={cn(
-                        'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold',
-                        operationType === op.code ? 'bg-primary text-primary-foreground' : 'bg-muted'
-                      )}>
-                        {op.code}
-                      </div>
-                      <div>
-                        <p className="font-semibold">{op.label}</p>
-                        <p className="text-xs text-muted-foreground">{op.description}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </StepContent>
-
-            {/* Step 2: Client Data */}
-            <StepContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="sm:col-span-2">
-                  <Label>Nome</Label>
-                  <Input value={clientData.name} onChange={e => updateField('name', e.target.value)} />
-                </div>
-                <div>
-                  <Label>CPF</Label>
-                  <Input value={clientData.identity} onChange={e => updateField('identity', e.target.value)} />
-                </div>
-                <div>
-                  <Label>Nº Benefício (NB)</Label>
-                  <Input value={clientData.benefit} onChange={e => updateField('benefit', e.target.value)} />
-                </div>
-                <div>
-                  <Label>Data Nascimento</Label>
-                  <Input type="date" value={clientData.birthDate} onChange={e => updateField('birthDate', e.target.value)} />
-                </div>
-                <div>
-                  <Label>Nome da Mãe</Label>
-                  <Input value={clientData.motherName} onChange={e => updateField('motherName', e.target.value)} />
-                </div>
-                <div>
-                  <Label>Sexo</Label>
-                  <Select value={clientData.sex} onValueChange={v => updateField('sex', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Masculino">Masculino</SelectItem>
-                      <SelectItem value="Feminino">Feminino</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Estado Civil</Label>
-                  <Select value={clientData.maritalStatus} onValueChange={v => updateField('maritalStatus', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Solteiro">Solteiro</SelectItem>
-                      <SelectItem value="Casado">Casado</SelectItem>
-                      <SelectItem value="Divorciado">Divorciado</SelectItem>
-                      <SelectItem value="Viúvo">Viúvo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Renda (R$)</Label>
-                  <Input type="number" step="0.01" value={clientData.income} onChange={e => updateField('income', parseFloat(e.target.value) || 0)} />
-                </div>
-                <div>
-                  <Label>Telefone</Label>
-                  <Input value={clientData.phone} onChange={e => updateField('phone', e.target.value)} />
-                </div>
-                <div>
-                  <Label>Email</Label>
-                  <Input value={clientData.email} onChange={e => updateField('email', e.target.value)} />
-                </div>
-                <div>
-                  <Label>Espécie Benefício</Label>
-                  <Input type="number" value={clientData.benefitType} onChange={e => updateField('benefitType', parseInt(e.target.value) || 42)} />
-                </div>
-                <div>
-                  <Label>UF Benefício</Label>
-                  <Select value={clientData.benefitState} onValueChange={v => updateField('benefitState', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {UF_OPTIONS.map(uf => (
-                        <SelectItem key={uf} value={uf}>{uf}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Início Benefício</Label>
-                  <Input type="date" value={clientData.benefitStartDate} onChange={e => updateField('benefitStartDate', e.target.value)} />
-                </div>
-                <div>
-                  <Label>Meio Pagamento</Label>
-                  <Select value={String(clientData.benefitPaymentMethod)} onValueChange={v => updateField('benefitPaymentMethod', parseInt(v))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">Cartão Magnético</SelectItem>
-                      <SelectItem value="2">Conta Corrente</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Separator className="sm:col-span-2 my-2" />
-                <p className="sm:col-span-2 text-sm font-semibold text-muted-foreground">Endereço</p>
-                
-                <div className="sm:col-span-2">
-                  <Label>Rua</Label>
-                  <Input value={clientData.street} onChange={e => updateField('street', e.target.value)} />
-                </div>
-                <div>
-                  <Label>Número</Label>
-                  <Input value={clientData.number} onChange={e => updateField('number', e.target.value)} />
-                </div>
-                <div>
-                  <Label>Complemento</Label>
-                  <Input value={clientData.complement} onChange={e => updateField('complement', e.target.value)} />
-                </div>
-                <div>
-                  <Label>Bairro</Label>
-                  <Input value={clientData.district} onChange={e => updateField('district', e.target.value)} />
-                </div>
-                <div>
-                  <Label>Cidade</Label>
-                  <Input value={clientData.city} onChange={e => updateField('city', e.target.value)} />
-                </div>
-                <div>
-                  <Label>UF</Label>
-                  <Select value={clientData.state} onValueChange={v => updateField('state', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {UF_OPTIONS.map(uf => (
-                        <SelectItem key={uf} value={uf}>{uf}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>CEP</Label>
-                  <Input value={clientData.zipCode} onChange={e => updateField('zipCode', e.target.value)} />
-                </div>
-
-                <Separator className="sm:col-span-2 my-2" />
-                <p className="sm:col-span-2 text-sm font-semibold text-muted-foreground">Documento (RG)</p>
-
-                <div>
-                  <Label>Número RG</Label>
-                  <Input value={clientData.docNumber} onChange={e => updateField('docNumber', e.target.value)} />
-                </div>
-                <div>
-                  <Label>Data Emissão</Label>
-                  <Input type="date" value={clientData.docIssuingDate} onChange={e => updateField('docIssuingDate', e.target.value)} />
-                </div>
-                <div>
-                  <Label>Órgão Emissor</Label>
-                  <Input value={clientData.docIssuingEntity} onChange={e => updateField('docIssuingEntity', e.target.value)} />
-                </div>
-                <div>
-                  <Label>UF Emissão</Label>
-                  <Select value={clientData.docIssuingState} onValueChange={v => updateField('docIssuingState', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {UF_OPTIONS.map(uf => (
-                        <SelectItem key={uf} value={uf}>{uf}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </StepContent>
-
-            {/* Step 3: Operation Data */}
+            {/* ===== STEP 1: IN100 + Dados do Cliente ===== */}
             <StepContent>
               <div className="space-y-4">
+                {/* IN100 Link */}
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-semibold flex items-center gap-2">
+                        <Search className="w-4 h-4 text-primary" />
+                        Autorize o IN100
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={copyIN100Link}
+                        disabled={!clientData.identity || !clientData.benefit}
+                        className="gap-1"
+                      >
+                        <Copy className="w-3 h-3" /> Copiar Link
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Envie o link ao cliente para autorizar a consulta IN100 antes de simular.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* Main fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2">
+                    <Label>Nome Completo</Label>
+                    <Input value={clientData.name} onChange={e => updateField('name', e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>CPF</Label>
+                    <Input value={clientData.identity} onChange={e => updateField('identity', e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>Nº Benefício (NB)</Label>
+                    <Input value={clientData.benefit} onChange={e => updateField('benefit', e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>Celular</Label>
+                    <Input value={clientData.phone} onChange={e => updateField('phone', e.target.value)} placeholder="(00) 00000-0000" />
+                  </div>
+                  <div>
+                    <Label>Data Nascimento</Label>
+                    <Input type="date" value={clientData.birthDate} onChange={e => updateField('birthDate', e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>Início Benefício (DDB)</Label>
+                    <Input type="date" value={clientData.benefitStartDate} onChange={e => updateField('benefitStartDate', e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>Espécie</Label>
+                    <Input type="number" value={clientData.benefitType} onChange={e => updateField('benefitType', parseInt(e.target.value) || 42)} />
+                  </div>
+                  <div>
+                    <Label>Renda (R$)</Label>
+                    <Input type="number" step="0.01" value={clientData.income} onChange={e => updateField('income', parseFloat(e.target.value) || 0)} />
+                  </div>
+                  <div>
+                    <Label>UF Benefício</Label>
+                    <Select value={clientData.benefitState} onValueChange={v => updateField('benefitState', v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {UF_OPTIONS.map(uf => (
+                          <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* IN100 Query Button */}
+                <Button
+                  onClick={handleIN100}
+                  disabled={in100Loading || !clientData.identity || !clientData.benefit}
+                  variant="outline"
+                  className="w-full gap-2"
+                >
+                  {in100Loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  Consultar IN100
+                </Button>
+
+                {in100Result && (
+                  <Card className="bg-accent/50 border-primary/20">
+                    <CardContent className="p-3">
+                      <p className="text-sm font-semibold text-primary flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4" /> IN100 Consultado
+                      </p>
+                      <pre className="text-xs mt-2 bg-background p-2 rounded overflow-auto max-h-32">
+                        {JSON.stringify(in100Result, null, 2)}
+                      </pre>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Collapsible: Additional Data */}
+                <Collapsible open={showAdditionalData} onOpenChange={setShowAdditionalData}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full justify-between text-muted-foreground" type="button">
+                      <span className="flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        Dados Adicionais (endereço, RG, etc.)
+                      </span>
+                      <ChevronDown className={cn("w-4 h-4 transition-transform", showAdditionalData && "rotate-180")} />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-3 pt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label>Nome da Mãe</Label>
+                        <Input value={clientData.motherName} onChange={e => updateField('motherName', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Sexo</Label>
+                        <Select value={clientData.sex} onValueChange={v => updateField('sex', v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Masculino">Masculino</SelectItem>
+                            <SelectItem value="Feminino">Feminino</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Estado Civil</Label>
+                        <Select value={clientData.maritalStatus} onValueChange={v => updateField('maritalStatus', v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Solteiro">Solteiro</SelectItem>
+                            <SelectItem value="Casado">Casado</SelectItem>
+                            <SelectItem value="Divorciado">Divorciado</SelectItem>
+                            <SelectItem value="Viúvo">Viúvo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Email</Label>
+                        <Input value={clientData.email} onChange={e => updateField('email', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Meio Pagamento</Label>
+                        <Select value={String(clientData.benefitPaymentMethod)} onValueChange={v => updateField('benefitPaymentMethod', parseInt(v))}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">Cartão Magnético</SelectItem>
+                            <SelectItem value="2">Conta Corrente</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <Separator className="sm:col-span-2 my-1" />
+                      <p className="sm:col-span-2 text-xs font-semibold text-muted-foreground">Endereço</p>
+                      
+                      <div className="sm:col-span-2">
+                        <Label>Rua</Label>
+                        <Input value={clientData.street} onChange={e => updateField('street', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Número</Label>
+                        <Input value={clientData.number} onChange={e => updateField('number', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Complemento</Label>
+                        <Input value={clientData.complement} onChange={e => updateField('complement', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Bairro</Label>
+                        <Input value={clientData.district} onChange={e => updateField('district', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Cidade</Label>
+                        <Input value={clientData.city} onChange={e => updateField('city', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>UF</Label>
+                        <Select value={clientData.state} onValueChange={v => updateField('state', v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {UF_OPTIONS.map(uf => (
+                              <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>CEP</Label>
+                        <Input value={clientData.zipCode} onChange={e => updateField('zipCode', e.target.value)} />
+                      </div>
+
+                      <Separator className="sm:col-span-2 my-1" />
+                      <p className="sm:col-span-2 text-xs font-semibold text-muted-foreground">Documento (RG)</p>
+
+                      <div>
+                        <Label>Número RG</Label>
+                        <Input value={clientData.docNumber} onChange={e => updateField('docNumber', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Data Emissão</Label>
+                        <Input type="date" value={clientData.docIssuingDate} onChange={e => updateField('docIssuingDate', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Órgão Emissor</Label>
+                        <Input value={clientData.docIssuingEntity} onChange={e => updateField('docIssuingEntity', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>UF Emissão</Label>
+                        <Select value={clientData.docIssuingState} onValueChange={v => updateField('docIssuingState', v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {UF_OPTIONS.map(uf => (
+                              <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
+            </StepContent>
+
+            {/* ===== STEP 2: Simulação ===== */}
+            <StepContent>
+              <div className="space-y-4">
+                {/* Operation Type */}
+                <div>
+                  <Label>Tipo de Operação</Label>
+                  <Select value={String(operationType)} onValueChange={v => setOperationType(parseInt(v))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {OPERATION_TYPES.map(op => (
+                        <SelectItem key={op.code} value={String(op.code)}>
+                          {op.label} — {op.description}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Rule / Table */}
                 <div>
                   <Label>Tabela (Rule ID)</Label>
                   {rules.length > 0 ? (
@@ -547,6 +656,7 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
                   )}
                 </div>
 
+                {/* Loan params */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Prazo (meses)</Label>
@@ -571,6 +681,7 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
                   <Label>Incluir Seguro</Label>
                 </div>
 
+                {/* Origin Contract (Port/Refin) */}
                 {needsOriginContract && (
                   <>
                     <Separator />
@@ -621,125 +732,224 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
                   </>
                 )}
 
-                <Separator />
-                <p className="text-sm font-semibold text-muted-foreground">Conta Bancária para Crédito</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Banco</Label>
-                    <Input value={bankCode} onChange={e => setBankCode(e.target.value)} placeholder="001" />
-                  </div>
-                  <div>
-                    <Label>Agência</Label>
-                    <Input value={bankBranch} onChange={e => setBankBranch(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label>Conta</Label>
-                    <Input value={bankNumber} onChange={e => setBankNumber(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label>Dígito</Label>
-                    <Input value={bankDigit} onChange={e => setBankDigit(e.target.value)} maxLength={1} />
-                  </div>
-                </div>
-              </div>
-            </StepContent>
+                {/* Refinancing extra fields (Port+Refin) */}
+                {isPortRefin && (
+                  <>
+                    <Separator />
+                    <p className="text-sm font-semibold text-muted-foreground">Dados do Refinanciamento</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>Prazo Refin (meses)</Label>
+                        <Input type="number" value={refinTerm} onChange={e => setRefinTerm(parseInt(e.target.value) || 0)} />
+                      </div>
+                      <div>
+                        <Label>Taxa Refin (%)</Label>
+                        <Input type="number" step="0.01" value={refinRate} onChange={e => setRefinRate(parseFloat(e.target.value) || 0)} />
+                      </div>
+                      <div>
+                        <Label>Parcela Refin (R$)</Label>
+                        <Input type="number" step="0.01" value={refinInstallmentValue} onChange={e => setRefinInstallmentValue(parseFloat(e.target.value) || 0)} />
+                      </div>
+                    </div>
+                  </>
+                )}
 
-            {/* Step 4: Calculator */}
-            <StepContent>
-              <div className="space-y-4">
+                {/* Calculate */}
+                <Separator />
                 <Button onClick={handleCalculate} disabled={api.loading || !selectedRuleId} className="w-full gap-2">
                   {api.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />}
-                  Calcular Simulação
+                  Simular
                 </Button>
 
                 {calcResult && (
-                  <Card className="bg-muted/30">
+                  <Card className="bg-accent/50 border-primary/20">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        <CheckCircle2 className="w-4 h-4 text-primary" />
                         Resultado da Simulação
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <pre className="text-xs bg-background p-3 rounded-lg overflow-auto max-h-60">
-                        {JSON.stringify(calcResult, null, 2)}
-                      </pre>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        {calcResult.installmentValue && (
+                          <div>
+                            <span className="text-muted-foreground">Parcela:</span>
+                            <p className="font-bold text-primary">R$ {Number(calcResult.installmentValue).toFixed(2)}</p>
+                          </div>
+                        )}
+                        {calcResult.loanValue && (
+                          <div>
+                            <span className="text-muted-foreground">Valor Liberado:</span>
+                            <p className="font-bold text-primary">R$ {Number(calcResult.loanValue).toFixed(2)}</p>
+                          </div>
+                        )}
+                        {calcResult.iofValue != null && (
+                          <div>
+                            <span className="text-muted-foreground">IOF:</span>
+                            <p className="font-medium">R$ {Number(calcResult.iofValue).toFixed(2)}</p>
+                          </div>
+                        )}
+                        {calcResult.changeValue != null && (
+                          <div>
+                            <span className="text-muted-foreground">Troco:</span>
+                            <p className="font-bold text-primary">R$ {Number(calcResult.changeValue).toFixed(2)}</p>
+                          </div>
+                        )}
+                      </div>
+                      <details className="mt-2">
+                        <summary className="text-xs text-muted-foreground cursor-pointer">Ver detalhes completos</summary>
+                        <pre className="text-xs bg-background p-2 rounded mt-1 overflow-auto max-h-40">
+                          {JSON.stringify(calcResult, null, 2)}
+                        </pre>
+                      </details>
                     </CardContent>
                   </Card>
-                )}
-
-                {!calcResult && !api.loading && (
-                  <div className="text-center text-sm text-muted-foreground py-8">
-                    <Calculator className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                    <p>Clique em "Calcular" para ver a simulação</p>
-                    <p className="text-xs mt-1">Este passo é opcional — você pode enviar direto</p>
-                  </div>
                 )}
               </div>
             </StepContent>
 
-            {/* Step 5: Confirmation */}
+            {/* ===== STEP 3: Documentos ===== */}
             <StepContent>
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Resumo da Proposta</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <span className="text-muted-foreground">Cliente:</span>
-                      <p className="font-medium">{clientData.name}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">CPF:</span>
-                      <p className="font-medium">{clientData.identity}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Operação:</span>
-                      <p className="font-medium">{OPERATION_TYPES.find(o => o.code === operationType)?.label}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Prazo:</span>
-                      <p className="font-medium">{term} meses</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Taxa:</span>
-                      <p className="font-medium">{rate}%</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Seguro:</span>
-                      <p className="font-medium">{hasInsurance ? 'Sim' : 'Não'}</p>
-                    </div>
-                    {installmentValue > 0 && (
-                      <div>
-                        <span className="text-muted-foreground">Parcela:</span>
-                        <p className="font-medium">R$ {installmentValue.toFixed(2)}</p>
-                      </div>
-                    )}
-                    {loanValue > 0 && (
-                      <div>
-                        <span className="text-muted-foreground">Valor:</span>
-                        <p className="font-medium">R$ {loanValue.toFixed(2)}</p>
-                      </div>
-                    )}
-                  </div>
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Envie a frente e o verso do documento de identidade. Formatos aceitos: PNG, JPEG, PDF, HEIC.
+                </p>
 
-                  <Separator />
+                <Card>
+                  <CardContent className="p-4 space-y-4">
+                    <div>
+                      <Label className="flex items-center gap-2 mb-2">
+                        <FileUp className="w-4 h-4" /> Frente do Documento
+                      </Label>
+                      <Input
+                        type="file"
+                        accept="image/*,.pdf,.heic"
+                        onChange={e => setDocFrontFile(e.target.files?.[0] || null)}
+                      />
+                      {docFrontFile && (
+                        <p className="text-xs text-primary mt-1">✓ {docFrontFile.name}</p>
+                      )}
+                    </div>
 
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={isSubmitting}
-                    className="w-full gap-2"
-                    size="lg"
-                  >
-                    {isSubmitting ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</>
-                    ) : (
-                      <><Send className="w-4 h-4" /> Enviar Proposta para o Banco</>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
+                    <Separator />
+
+                    <div>
+                      <Label className="flex items-center gap-2 mb-2">
+                        <FileUp className="w-4 h-4" /> Verso do Documento
+                      </Label>
+                      <Input
+                        type="file"
+                        accept="image/*,.pdf,.heic"
+                        onChange={e => setDocBackFile(e.target.files?.[0] || null)}
+                      />
+                      {docBackFile && (
+                        <p className="text-xs text-primary mt-1">✓ {docBackFile.name}</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <p className="text-xs text-muted-foreground text-center">
+                  Os documentos são opcionais neste momento e podem ser enviados depois.
+                </p>
+              </div>
+            </StepContent>
+
+            {/* ===== STEP 4: Confirmação + Conta Bancária ===== */}
+            <StepContent>
+              <div className="space-y-4">
+                {/* Summary */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <User className="w-4 h-4" /> Resumo da Proposta
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-muted-foreground">Cliente:</span>
+                        <p className="font-medium">{clientData.name}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">CPF:</span>
+                        <p className="font-medium">{clientData.identity}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Operação:</span>
+                        <p className="font-medium">{OPERATION_TYPES.find(o => o.code === operationType)?.label}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Prazo:</span>
+                        <p className="font-medium">{term} meses</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Taxa:</span>
+                        <p className="font-medium">{rate}%</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Seguro:</span>
+                        <p className="font-medium">{hasInsurance ? 'Sim' : 'Não'}</p>
+                      </div>
+                      {calcResult?.loanValue && (
+                        <div>
+                          <span className="text-muted-foreground">Valor Liberado:</span>
+                          <p className="font-bold text-primary">R$ {Number(calcResult.loanValue).toFixed(2)}</p>
+                        </div>
+                      )}
+                      {calcResult?.changeValue != null && Number(calcResult.changeValue) > 0 && (
+                        <div>
+                          <span className="text-muted-foreground">Troco:</span>
+                          <p className="font-bold text-primary">R$ {Number(calcResult.changeValue).toFixed(2)}</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Bank Account */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <CreditCard className="w-4 h-4" /> Conta Bancária para Crédito
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>Banco</Label>
+                        <Input value={bankCode} onChange={e => setBankCode(e.target.value)} placeholder="001" />
+                      </div>
+                      <div>
+                        <Label>Agência</Label>
+                        <Input value={bankBranch} onChange={e => setBankBranch(e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Conta</Label>
+                        <Input value={bankNumber} onChange={e => setBankNumber(e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Dígito</Label>
+                        <Input value={bankDigit} onChange={e => setBankDigit(e.target.value)} maxLength={1} />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Submit */}
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className="w-full gap-2"
+                  size="lg"
+                >
+                  {isSubmitting ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</>
+                  ) : (
+                    <><Send className="w-4 h-4" /> Enviar Proposta para o Banco</>
+                  )}
+                </Button>
+              </div>
             </StepContent>
           </FormWizard>
         </div>
