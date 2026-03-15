@@ -827,7 +827,7 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
                         onChange={e => setDocFrontFile(e.target.files?.[0] || null)}
                       />
                       {docFrontFile && (
-                        <p className="text-xs text-green-600 mt-1">✓ {docFrontFile.name}</p>
+                        <p className="text-xs text-primary mt-1">✓ {docFrontFile.name}</p>
                       )}
                     </div>
 
