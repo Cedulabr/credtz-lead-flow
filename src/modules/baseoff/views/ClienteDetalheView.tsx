@@ -7,7 +7,8 @@ import {
   FileText, 
   Clock, 
   RefreshCw,
-  Download
+  Download,
+  Send
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { BaseOffClient, BaseOffContract, BaseOffInlineContract, TimelineEvent } from '../types';
