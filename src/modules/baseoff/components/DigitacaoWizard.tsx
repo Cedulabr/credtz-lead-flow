@@ -780,7 +780,7 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
                         {calcResult.loanValue && (
                           <div>
                             <span className="text-muted-foreground">Valor Liberado:</span>
-                            <p className="font-bold text-green-700">R$ {Number(calcResult.loanValue).toFixed(2)}</p>
+                            <p className="font-bold text-primary">R$ {Number(calcResult.loanValue).toFixed(2)}</p>
                           </div>
                         )}
                         {calcResult.iofValue != null && (
