@@ -330,7 +330,7 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
               <p className="text-xs text-muted-foreground">
                 Créditos SMS disponíveis: <span className="font-semibold text-primary">{smsCredits}</span>
                 {data.smsEnabled && data.quantidade > (smsCredits || 0) && (
-                  <span className="text-amber-600 ml-1">
+                  <span className="text-destructive/80 ml-1">
                     (apenas {smsCredits} de {data.quantidade} leads receberão SMS)
                   </span>
                 )}
