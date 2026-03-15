@@ -121,6 +121,10 @@ const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMes
     permission: 'can_access_autolead',
     blockedMessage: 'Acesso ao AutoLead bloqueado pelo administrador',
   },
+  digitacao: {
+    permission: 'can_access_digitacao',
+    blockedMessage: 'Acesso à Digitação bloqueado pelo administrador',
+  },
 };
 
 // ── Main Component ────────────────────────────────────────────────────
