@@ -112,6 +112,16 @@ export function AdminOperations() {
       color: 'text-orange-600',
       bgColor: 'bg-orange-100 dark:bg-orange-900/30',
     },
+    {
+      id: 'banking-api' as OperationSection,
+      label: 'API Bancária',
+      description: 'Digitação de contratos via JoinBank API',
+      icon: Landmark,
+      color: 'text-indigo-600',
+      bgColor: 'bg-indigo-100 dark:bg-indigo-900/30',
+      badge: 'Novo',
+      badgeVariant: 'default' as const,
+    },
   ];
 
   const renderContent = () => {
