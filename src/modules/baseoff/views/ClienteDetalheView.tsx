@@ -195,6 +195,13 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
         selectedContractIds={selectedContractIds}
       />
 
+      <DigitacaoWizard
+        isOpen={showDigitacao}
+        onClose={() => setShowDigitacao(false)}
+        client={client}
+        contracts={contracts}
+      />
+
       {/* Back button */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={onBack} className="gap-2">
