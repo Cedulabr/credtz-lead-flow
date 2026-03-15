@@ -21,6 +21,10 @@ export interface AutoLeadJob {
   started_at: string | null;
   paused_at: string | null;
   finished_at: string | null;
+  sms_enabled: boolean;
+  sms_template: string | null;
+  sms_sent: number;
+  sms_failed: number;
 }
 
 export interface AutoLeadMessage {
@@ -45,6 +49,8 @@ export interface WizardData {
   useDefaultMessage: boolean;
   messageTemplate: string;
   whatsappInstanceIds: string[];
+  smsEnabled: boolean;
+  smsTemplate: string;
 }
 
 export const DEFAULT_MESSAGE = `Olá {{nome}}, tudo bem?
@@ -52,6 +58,27 @@ export const DEFAULT_MESSAGE = `Olá {{nome}}, tudo bem?
 Estamos entrando em contato pois identificamos que você pode ter oportunidades disponíveis em seus contratos.
 
 Se quiser mais informações, posso verificar aqui para você!`;
+
+export const SMS_TEMPLATES = [
+  {
+    id: 'portabilidade',
+    label: 'Portabilidade de Crédito',
+    icon: '🔄',
+    template: 'Olá {{nome}}! Identificamos que você pode reduzir sua parcela com a portabilidade de crédito. Quer saber quanto pode economizar? Fale comigo: {{whatsapp}}',
+  },
+  {
+    id: 'ofertas',
+    label: 'Novas Ofertas INSS',
+    icon: '🎯',
+    template: '{{nome}}, temos ofertas exclusivas para beneficiários do INSS com as melhores taxas do mercado. Entre em contato: {{whatsapp}}',
+  },
+  {
+    id: 'oportunidade',
+    label: 'Nova Oportunidade',
+    icon: '💰',
+    template: 'Olá {{nome}}! Surgiu uma nova oportunidade de crédito para você com condições especiais. Saiba mais: {{whatsapp}}',
+  },
+];
 
 export const TIPOS_LEAD = [
   { id: 'inss', label: 'INSS', icon: '👴' },

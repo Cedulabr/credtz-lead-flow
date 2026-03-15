@@ -656,6 +656,10 @@ export type Database = {
           selected_tags: string[] | null
           send_window_end: string
           send_window_start: string
+          sms_enabled: boolean
+          sms_failed: number
+          sms_sent: number
+          sms_template: string | null
           started_at: string | null
           status: string
           tipo_lead: string | null
@@ -680,6 +684,10 @@ export type Database = {
           selected_tags?: string[] | null
           send_window_end?: string
           send_window_start?: string
+          sms_enabled?: boolean
+          sms_failed?: number
+          sms_sent?: number
+          sms_template?: string | null
           started_at?: string | null
           status?: string
           tipo_lead?: string | null
@@ -704,6 +712,10 @@ export type Database = {
           selected_tags?: string[] | null
           send_window_end?: string
           send_window_start?: string
+          sms_enabled?: boolean
+          sms_failed?: number
+          sms_sent?: number
+          sms_template?: string | null
           started_at?: string | null
           status?: string
           tipo_lead?: string | null
