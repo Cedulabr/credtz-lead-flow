@@ -25,6 +25,7 @@ import { AdminBankReuseSettings } from '@/components/AdminBankReuseSettings';
 import { AdminDuplicatesManager } from '@/components/AdminDuplicatesManager';
 import { AdminInactivitySettings } from '@/components/AdminInactivitySettings';
 import { AdminSmsCreditsManagement } from '@/components/AdminSmsCreditsManagement';
+import { AdminBankingAPI } from '@/components/admin/AdminBankingAPI';
 
 type OperationSection = 
   | 'menu' 
@@ -34,7 +35,8 @@ type OperationSection =
   | 'televendas-banks' 
   | 'bank-reuse' 
   | 'duplicates'
-  | 'inactivity';
+  | 'inactivity'
+  | 'banking-api';
 
 interface SectionItem {
   id: OperationSection;
