@@ -3,23 +3,24 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Switch } from '@/components/ui/switch';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Loader2, Send, Calculator, CheckCircle2, AlertCircle,
-  ChevronDown, Copy, FileUp, Search, User, FileText, CreditCard, ArrowLeft, ChevronRight
+  Loader2, Send, CheckCircle2, Copy, FileUp, Search, ArrowLeft, ChevronRight, ChevronLeft,
+  Plus, Image as ImageIcon, ExternalLink
 } from 'lucide-react';
-import { CompactStepIndicator } from '@/components/ui/form-wizard';
 import { useJoinBankAPI } from '@/modules/baseoff/hooks/useJoinBankAPI';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
-  ClientFormData, BankAccountData, INITIAL_CLIENT_DATA,
-  OPERATION_TYPES, UF_OPTIONS
+  ClientFormData, BankAccountData, SimulationItem,
+  INITIAL_CLIENT_DATA, INITIAL_BANK_DATA,
+  OPERATION_TYPES, UF_OPTIONS, BENEFIT_TYPES
 } from '../types';
+import { SimulationModal } from './SimulationModal';
+import { SimulationCard } from './SimulationCard';
 
 interface DigitacaoFormProps {
   onClose: () => void;
@@ -38,68 +39,38 @@ const formatDateForInput = (dateStr: string | null | undefined): string => {
 };
 
 const STEPS = [
-  { id: 'client', title: 'Cliente', icon: User },
-  { id: 'simulation', title: 'Simulação', icon: Calculator },
-  { id: 'documents', title: 'Docs', icon: FileText },
-  { id: 'confirm', title: 'Enviar', icon: Send },
+  { id: 'in100', title: 'Consulta IN100' },
+  { id: 'simulations', title: 'Simulações' },
+  { id: 'data', title: 'Dados' },
+  { id: 'documents', title: 'Documentos' },
+  { id: 'formalization', title: 'Formalização' },
 ];
 
 export function DigitacaoForm({ onClose, onSuccess, searchClientByCPF }: DigitacaoFormProps) {
   const api = useJoinBankAPI();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showAdditionalData, setShowAdditionalData] = useState(false);
   const [cpfSearching, setCpfSearching] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [submissionResult, setSubmissionResult] = useState<any>(null);
 
-  // Step 1
+  // Step 1 — IN100
   const [clientData, setClientData] = useState<ClientFormData>({ ...INITIAL_CLIENT_DATA });
+  const [in100Link, setIn100Link] = useState('');
 
-  // IN100
-  const [in100Loading, setIn100Loading] = useState(false);
-  const [in100Result, setIn100Result] = useState<any>(null);
+  // Step 2 — Simulações
+  const [simulations, setSimulations] = useState<SimulationItem[]>([]);
+  const [showSimModal, setShowSimModal] = useState(false);
 
-  // Step 2
-  const [operationType, setOperationType] = useState(1);
-  const [rules, setRules] = useState<any[]>([]);
-  const [selectedRuleId, setSelectedRuleId] = useState('');
-  const [term, setTerm] = useState(84);
-  const [rate, setRate] = useState(1.66);
-  const [installmentValue, setInstallmentValue] = useState(0);
-  const [loanValue, setLoanValue] = useState(0);
-  const [hasInsurance, setHasInsurance] = useState(false);
-  // Origin contract
-  const [originLenderCode, setOriginLenderCode] = useState('');
-  const [originContractNumber, setOriginContractNumber] = useState('');
-  const [originTerm, setOriginTerm] = useState(84);
-  const [originInstallmentsRemaining, setOriginInstallmentsRemaining] = useState(0);
-  const [originInstallmentValue, setOriginInstallmentValue] = useState(0);
-  const [originDueBalance, setOriginDueBalance] = useState(0);
-  // Refin extra
-  const [refinTerm, setRefinTerm] = useState(84);
-  const [refinRate, setRefinRate] = useState(1.66);
-  const [refinInstallmentValue, setRefinInstallmentValue] = useState(0);
-  const [calcResult, setCalcResult] = useState<any>(null);
+  // Step 3 — Dados
+  const [bankData, setBankData] = useState<BankAccountData>({ ...INITIAL_BANK_DATA });
 
-  // Step 3
+  // Step 4 — Docs
   const [docFrontFile, setDocFrontFile] = useState<File | null>(null);
   const [docBackFile, setDocBackFile] = useState<File | null>(null);
+  const [clientSentDocs, setClientSentDocs] = useState(false);
 
-  // Step 4
-  const [bank, setBankData] = useState<BankAccountData>({ bankCode: '', bankBranch: '', bankNumber: '', bankDigit: '' });
-
-  const needsOriginContract = operationType >= 2;
-  const isPortRefin = operationType === 4;
-
-  // Load rules when operation type changes
-  useEffect(() => {
-    setSelectedRuleId('');
-    setRules([]);
-    api.listRules(operationType).then(data => {
-      if (data?.items || Array.isArray(data)) {
-        setRules(data?.items || data);
-      }
-    });
-  }, [operationType]);
+  const inputCls = 'h-11 text-sm';
 
   const updateField = (field: keyof ClientFormData, value: any) => {
     setClientData(prev => ({ ...prev, [field]: value }));
@@ -149,59 +120,38 @@ export function DigitacaoForm({ onClose, onSuccess, searchClientByCPF }: Digitac
     }
   };
 
-  const handleIN100 = async () => {
-    if (!clientData.identity || !clientData.benefit) {
-      toast.error('CPF e Nº Benefício são obrigatórios');
-      return;
+  // Generate IN100 link
+  useEffect(() => {
+    if (clientData.identity && clientData.benefit) {
+      const cpf = clientData.identity.replace(/\D/g, '');
+      setIn100Link(`https://app.ajin.io/auth/inss/${cpf}/${clientData.benefit}`);
+    } else {
+      setIn100Link('');
     }
-    setIn100Loading(true);
-    try {
-      const result = await api.queryIN100(clientData.identity, clientData.benefit);
-      if (result) {
-        setIn100Result(result);
-        toast.success('IN100 consultado!');
-      }
-    } finally {
-      setIn100Loading(false);
-    }
-  };
+  }, [clientData.identity, clientData.benefit]);
 
   const copyIN100Link = () => {
-    const link = `https://app.ajin.io/auth/inss/${clientData.identity}/${clientData.benefit}`;
-    navigator.clipboard.writeText(link);
+    if (!in100Link) return;
+    navigator.clipboard.writeText(in100Link);
     toast.success('Link IN100 copiado!');
   };
 
-  const handleCalculate = async () => {
-    const payload: any = { ruleId: selectedRuleId, hasInsurance, term, rate, referenceCode: null };
-    if (installmentValue > 0) payload.installmentValue = installmentValue;
-    if (loanValue > 0) payload.loanValue = loanValue;
-    if (needsOriginContract) {
-      payload.originContract = {
-        lenderCode: parseInt(originLenderCode) || 0,
-        contractNumber: originContractNumber,
-        term: originTerm,
-        installmentsRemaining: originInstallmentsRemaining,
-        installmentValue: originInstallmentValue,
-        dueBalanceValue: originDueBalance,
-      };
-    }
-    if (isPortRefin) {
-      payload.refinancing = { term: refinTerm, rate: refinRate, installmentValue: refinInstallmentValue };
-    }
-    const result = await api.calculate(payload);
-    if (result) {
-      setCalcResult(result);
-      toast.success('Cálculo realizado!');
-    }
+  const addSimulation = (sim: SimulationItem) => {
+    setSimulations(prev => [...prev, sim]);
+  };
+
+  const removeSimulation = (id: string) => {
+    setSimulations(prev => prev.filter(s => s.id !== id));
   };
 
   const handleSubmit = async () => {
+    if (simulations.length === 0) { toast.error('Adicione pelo menos uma simulação'); return; }
     setIsSubmitting(true);
     try {
+      const sim = simulations[0];
       const borrower: any = {
         name: clientData.name,
-        identity: clientData.identity,
+        identity: clientData.identity.replace(/\D/g, ''),
         benefit: clientData.benefit,
         benefitState: clientData.benefitState,
         benefitStartDate: clientData.benefitStartDate || '1999-01-15',
@@ -229,24 +179,45 @@ export function DigitacaoForm({ onClose, onSuccess, searchClientByCPF }: Digitac
         },
       };
 
-      const item: any = { ruleId: selectedRuleId, term, rate, hasInsurance, referenceCode: null };
-      if (installmentValue > 0) item.installmentValue = installmentValue;
-      if (loanValue > 0) item.loanValue = loanValue;
-      if (needsOriginContract) {
+      const item: any = {
+        ruleId: sim.ruleId,
+        term: sim.refinTerm || sim.originTerm,
+        rate: sim.refinRate || sim.originRate,
+        hasInsurance: sim.hasInsurance,
+        referenceCode: null,
+      };
+      if (sim.refinInstallmentValue > 0) item.installmentValue = sim.refinInstallmentValue;
+      if (sim.operationType >= 3) {
         item.originContract = {
-          lenderCode: parseInt(originLenderCode) || 0, contractNumber: originContractNumber,
-          term: originTerm, installmentsRemaining: originInstallmentsRemaining,
-          installmentValue: originInstallmentValue, dueBalanceValue: originDueBalance,
+          lenderCode: parseInt(sim.originLenderCode) || 0,
+          contractNumber: sim.originContractNumber,
+          term: sim.originTerm,
+          installmentsRemaining: sim.originInstallmentsRemaining,
+          installmentValue: sim.originInstallmentValue,
+          dueBalanceValue: sim.originDueBalance,
         };
       }
-      if (isPortRefin) {
-        item.refinancing = { term: refinTerm, rate: refinRate, installmentValue: refinInstallmentValue };
+      if (sim.operationType === 4 || sim.operationType === 2) {
+        item.refinancing = {
+          term: sim.refinTerm,
+          rate: sim.refinRate,
+          installmentValue: sim.refinInstallmentValue,
+        };
       }
 
       const requestPayload = {
-        borrower, items: [item],
-        creditBankAccount: { bank: bank.bankCode, branch: bank.bankBranch, number: bank.bankNumber, digit: bank.bankDigit },
-        step: { code: 0, name: null }, note: null, brokerId: null, accessId: null,
+        borrower,
+        items: [item],
+        creditBankAccount: {
+          bank: bankData.bankCode,
+          branch: bankData.bankBranch,
+          number: bankData.bankNumber,
+          digit: bankData.bankDigit,
+        },
+        step: { code: 0, name: null },
+        note: null,
+        brokerId: null,
+        accessId: null,
       };
 
       const result = await api.createSimulation(requestPayload);
@@ -255,14 +226,16 @@ export function DigitacaoForm({ onClose, onSuccess, searchClientByCPF }: Digitac
           client_cpf: clientData.identity,
           client_name: clientData.name,
           simulation_id: result.id || result.simulationId,
-          operation_type: OPERATION_TYPES.find(o => o.code === operationType)?.label || 'Novo',
+          operation_type: OPERATION_TYPES.find(o => o.code === sim.operationType)?.label || 'Novo',
           status: 'enviada',
           api_response: result,
           request_payload: requestPayload,
         });
+        setSubmissionResult(result);
+        setSubmitted(true);
+        setCurrentStep(4); // Go to formalization
         toast.success('Proposta enviada com sucesso!');
         onSuccess();
-        onClose();
       }
     } catch (err: any) {
       toast.error('Erro: ' + err.message);
@@ -274,18 +247,25 @@ export function DigitacaoForm({ onClose, onSuccess, searchClientByCPF }: Digitac
   const canProceed = useMemo(() => {
     switch (currentStep) {
       case 0: return !!clientData.name && !!clientData.identity && !!clientData.benefit;
-      case 1: return !!selectedRuleId && term > 0;
+      case 1: return simulations.length > 0;
       case 2: return true;
       case 3: return true;
       default: return true;
     }
-  }, [currentStep, clientData.name, clientData.identity, clientData.benefit, selectedRuleId, term]);
+  }, [currentStep, clientData.name, clientData.identity, clientData.benefit, simulations.length]);
 
-  const goNext = () => { if (currentStep < STEPS.length - 1) setCurrentStep(s => s + 1); else handleSubmit(); };
-  const goBack = () => { if (currentStep === 0) onClose(); else setCurrentStep(s => s - 1); };
-
-  // Input class for touch-friendly
-  const inputCls = 'h-12 text-base';
+  const goNext = () => {
+    if (currentStep === 3) {
+      handleSubmit();
+    } else if (currentStep < 4) {
+      setCurrentStep(s => s + 1);
+    }
+  };
+  const goBack = () => {
+    if (currentStep === 0) onClose();
+    else if (currentStep === 4 && submitted) onClose();
+    else setCurrentStep(s => s - 1);
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col">
@@ -298,386 +278,463 @@ export function DigitacaoForm({ onClose, onSuccess, searchClientByCPF }: Digitac
           <h1 className="font-bold text-base truncate">Nova Digitação</h1>
           <p className="text-xs text-muted-foreground">{STEPS[currentStep].title}</p>
         </div>
-        <Badge variant="secondary" className="text-[10px] shrink-0">API Bancária</Badge>
+        <Badge variant="secondary" className="text-[10px] shrink-0">{currentStep + 1}/{STEPS.length}</Badge>
       </div>
 
-      {/* Step Indicator */}
-      <div className="py-3 px-4">
-        <CompactStepIndicator currentStep={currentStep} totalSteps={STEPS.length} />
-      </div>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 pb-28">
 
-      {/* Content — scrollable */}
-      <div className="flex-1 overflow-y-auto px-4 pb-28">
-        {/* ===== STEP 0: Dados do Cliente ===== */}
+        {/* ===== STEP 0: Consulta IN100 ===== */}
         {currentStep === 0 && (
-          <div className="space-y-4">
-            {/* IN100 Link */}
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-sm font-semibold flex items-center gap-2">
-                    <Search className="w-4 h-4 text-primary" /> Autorize o IN100
-                  </p>
-                  <Button variant="outline" size="sm" onClick={copyIN100Link}
-                    disabled={!clientData.identity || !clientData.benefit} className="gap-1 h-9">
-                    <Copy className="w-3 h-3" /> Copiar
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">Envie o link ao cliente para autorizar.</p>
-              </CardContent>
-            </Card>
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-base font-bold mb-1">Consulta <span className="text-primary">IN100</span></h2>
+              <p className="text-xs text-muted-foreground">Dados do Beneficiário</p>
+            </div>
 
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <Label>CPF *</Label>
+                <Label className="text-xs text-muted-foreground">CPF</Label>
                 <div className="relative">
                   <Input className={inputCls} value={clientData.identity}
                     onChange={e => updateField('identity', e.target.value)}
                     onBlur={handleCPFBlur} placeholder="000.000.000-00" inputMode="numeric" />
-                  {cpfSearching && <Loader2 className="absolute right-3 top-3.5 h-4 w-4 animate-spin text-muted-foreground" />}
+                  {cpfSearching && <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />}
                 </div>
               </div>
               <div>
-                <Label>Nome Completo *</Label>
+                <Label className="text-xs text-muted-foreground">Nome</Label>
                 <Input className={inputCls} value={clientData.name} onChange={e => updateField('name', e.target.value)} />
               </div>
               <div>
-                <Label>Nº Benefício (NB) *</Label>
+                <Label className="text-xs text-muted-foreground">Número do Benefício</Label>
                 <Input className={inputCls} value={clientData.benefit} onChange={e => updateField('benefit', e.target.value)} inputMode="numeric" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+            </div>
+
+            <div className="max-w-xs">
+              <Label className="text-xs text-muted-foreground">Celular</Label>
+              <Input className={inputCls} value={clientData.phone} onChange={e => updateField('phone', e.target.value)} placeholder="(00) 00000-0000" inputMode="tel" />
+            </div>
+
+            <Separator />
+
+            <div>
+              <h3 className="text-sm font-bold mb-1">Autorize o <span className="text-primary">IN100</span></h3>
+              <p className="text-xs text-muted-foreground mb-3">Copie o link abaixo e envie ao seu cliente para que ele possa autorizar a consulta do IN100</p>
+              <div className="flex gap-2">
+                <Input
+                  className="flex-1 text-xs h-11 bg-muted"
+                  value={in100Link || 'Preencha CPF e NB para gerar o link'}
+                  readOnly
+                />
+                <Button onClick={copyIN100Link} disabled={!in100Link} className="h-11 px-5 shrink-0">
+                  Copiar
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===== STEP 1: Simulações ===== */}
+        {currentStep === 1 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold">Simulações</h2>
+              <Button onClick={() => setShowSimModal(true)} className="gap-1.5 h-10">
+                <Plus className="w-4 h-4" /> Adicionar Simulação
+              </Button>
+            </div>
+
+            {/* Info banner */}
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+              <p className="text-xs text-muted-foreground">
+                ⓘ Já incluiu sua proposta de aumento salarial? Saiba que é possível incluir este produto nesta mesma digitação! Basta adicionar uma nova simulação!
+              </p>
+            </div>
+
+            {/* Simulation list */}
+            {simulations.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                <p className="text-sm">Nenhuma simulação adicionada</p>
+                <p className="text-xs mt-1">Toque em "Adicionar Simulação" para começar</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {simulations.map(sim => (
+                  <SimulationCard
+                    key={sim.id}
+                    simulation={sim}
+                    onRemove={() => removeSimulation(sim.id)}
+                  />
+                ))}
+              </div>
+            )}
+
+            <SimulationModal
+              open={showSimModal}
+              onClose={() => setShowSimModal(false)}
+              onAdd={addSimulation}
+            />
+          </div>
+        )}
+
+        {/* ===== STEP 2: Dados Pessoais + Benefício + Endereço + Bancários ===== */}
+        {currentStep === 2 && (
+          <div className="space-y-5">
+            {/* Dados Pessoais */}
+            <div>
+              <h3 className="text-sm font-bold mb-3">Dados <span className="font-bold">Pessoais</span></h3>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 <div>
-                  <Label>Celular</Label>
-                  <Input className={inputCls} value={clientData.phone} onChange={e => updateField('phone', e.target.value)} placeholder="(00) 00000-0000" inputMode="tel" />
+                  <Label className="text-xs text-muted-foreground">Tipo de Documento</Label>
+                  <Select defaultValue="RG">
+                    <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="RG">RG</SelectItem>
+                      <SelectItem value="CNH">CNH</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
-                  <Label>Nascimento</Label>
+                  <Label className="text-xs text-muted-foreground">Número do Documento</Label>
+                  <Input className={inputCls} value={clientData.docNumber} onChange={e => updateField('docNumber', e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">UF do Documento</Label>
+                  <Select value={clientData.docIssuingState} onValueChange={v => updateField('docIssuingState', v)}>
+                    <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                    <SelectContent>{UF_OPTIONS.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Órgão Expedidor</Label>
+                  <Input className={inputCls} value={clientData.docIssuingEntity} onChange={e => updateField('docIssuingEntity', e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Data de Emissão</Label>
+                  <Input type="date" className={inputCls} value={clientData.docIssuingDate} onChange={e => updateField('docIssuingDate', e.target.value)} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Data de Nascimento</Label>
                   <Input type="date" className={inputCls} value={clientData.birthDate} onChange={e => updateField('birthDate', e.target.value)} />
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>DDB (Início Benef.)</Label>
-                  <Input type="date" className={inputCls} value={clientData.benefitStartDate} onChange={e => updateField('benefitStartDate', e.target.value)} />
+                  <Label className="text-xs text-muted-foreground">Sexo</Label>
+                  <Select value={clientData.sex} onValueChange={v => updateField('sex', v)}>
+                    <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Masculino">Masculino</SelectItem>
+                      <SelectItem value="Feminino">Feminino</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
-                  <Label>Espécie</Label>
-                  <Input type="number" className={inputCls} value={clientData.benefitType} onChange={e => updateField('benefitType', parseInt(e.target.value) || 42)} inputMode="numeric" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Renda (R$)</Label>
-                  <Input type="number" step="0.01" className={inputCls} value={clientData.income || ''} onChange={e => updateField('income', parseFloat(e.target.value) || 0)} inputMode="decimal" />
-                </div>
-                <div>
-                  <Label>UF Benefício</Label>
-                  <Select value={clientData.benefitState} onValueChange={v => updateField('benefitState', v)}>
-                    <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
-                    <SelectContent>{UF_OPTIONS.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}</SelectContent>
+                  <Label className="text-xs text-muted-foreground">Estado Civil</Label>
+                  <Select value={clientData.maritalStatus} onValueChange={v => updateField('maritalStatus', v)}>
+                    <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Solteiro">Solteiro</SelectItem>
+                      <SelectItem value="Casado">Casado</SelectItem>
+                      <SelectItem value="Divorciado">Divorciado</SelectItem>
+                      <SelectItem value="Viúvo">Viúvo</SelectItem>
+                    </SelectContent>
                   </Select>
                 </div>
               </div>
 
-              {/* IN100 */}
-              <Button onClick={handleIN100} disabled={in100Loading || !clientData.identity || !clientData.benefit}
-                variant="outline" className="w-full gap-2 h-12">
-                {in100Loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                Consultar IN100
-              </Button>
-
-              {in100Result && (
-                <Card className="bg-accent/50 border-primary/20">
-                  <CardContent className="p-3">
-                    <p className="text-sm font-semibold text-primary flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4" /> IN100 Consultado
-                    </p>
-                    <pre className="text-xs mt-2 bg-background p-2 rounded overflow-auto max-h-32">
-                      {JSON.stringify(in100Result, null, 2)}
-                    </pre>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Collapsible Additional Data */}
-              <Collapsible open={showAdditionalData} onOpenChange={setShowAdditionalData}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" className="w-full justify-between text-muted-foreground h-12" type="button">
-                    <span className="flex items-center gap-2"><User className="w-4 h-4" /> Dados Adicionais</span>
-                    <ChevronDown className={cn("w-4 h-4 transition-transform", showAdditionalData && "rotate-180")} />
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-3 pt-2">
-                  <div className="space-y-3">
-                    <div>
-                      <Label>Nome da Mãe</Label>
-                      <Input className={inputCls} value={clientData.motherName} onChange={e => updateField('motherName', e.target.value)} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label>Sexo</Label>
-                        <Select value={clientData.sex} onValueChange={v => updateField('sex', v)}>
-                          <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Masculino">Masculino</SelectItem>
-                            <SelectItem value="Feminino">Feminino</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>Estado Civil</Label>
-                        <Select value={clientData.maritalStatus} onValueChange={v => updateField('maritalStatus', v)}>
-                          <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Solteiro">Solteiro</SelectItem>
-                            <SelectItem value="Casado">Casado</SelectItem>
-                            <SelectItem value="Divorciado">Divorciado</SelectItem>
-                            <SelectItem value="Viúvo">Viúvo</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div>
-                      <Label>Email</Label>
-                      <Input className={inputCls} value={clientData.email} onChange={e => updateField('email', e.target.value)} type="email" />
-                    </div>
-                    <div>
-                      <Label>Meio Pagamento</Label>
-                      <Select value={String(clientData.benefitPaymentMethod)} onValueChange={v => updateField('benefitPaymentMethod', parseInt(v))}>
-                        <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">Cartão Magnético</SelectItem>
-                          <SelectItem value="2">Conta Corrente</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Separator />
-                    <p className="text-xs font-semibold text-muted-foreground">Endereço</p>
-                    <div>
-                      <Label>Rua</Label>
-                      <Input className={inputCls} value={clientData.street} onChange={e => updateField('street', e.target.value)} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div><Label>Número</Label><Input className={inputCls} value={clientData.number} onChange={e => updateField('number', e.target.value)} /></div>
-                      <div><Label>Complemento</Label><Input className={inputCls} value={clientData.complement} onChange={e => updateField('complement', e.target.value)} /></div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div><Label>Bairro</Label><Input className={inputCls} value={clientData.district} onChange={e => updateField('district', e.target.value)} /></div>
-                      <div><Label>Cidade</Label><Input className={inputCls} value={clientData.city} onChange={e => updateField('city', e.target.value)} /></div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label>UF</Label>
-                        <Select value={clientData.state} onValueChange={v => updateField('state', v)}>
-                          <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
-                          <SelectContent>{UF_OPTIONS.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                      <div><Label>CEP</Label><Input className={inputCls} value={clientData.zipCode} onChange={e => updateField('zipCode', e.target.value)} inputMode="numeric" /></div>
-                    </div>
-                    <Separator />
-                    <p className="text-xs font-semibold text-muted-foreground">Documento (RG)</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div><Label>Número RG</Label><Input className={inputCls} value={clientData.docNumber} onChange={e => updateField('docNumber', e.target.value)} /></div>
-                      <div><Label>Data Emissão</Label><Input type="date" className={inputCls} value={clientData.docIssuingDate} onChange={e => updateField('docIssuingDate', e.target.value)} /></div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div><Label>Órgão</Label><Input className={inputCls} value={clientData.docIssuingEntity} onChange={e => updateField('docIssuingEntity', e.target.value)} /></div>
-                      <div>
-                        <Label>UF Emissão</Label>
-                        <Select value={clientData.docIssuingState} onValueChange={v => updateField('docIssuingState', v)}>
-                          <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
-                          <SelectContent>{UF_OPTIONS.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            </div>
-          </div>
-        )}
-
-        {/* ===== STEP 1: Simulação ===== */}
-        {currentStep === 1 && (
-          <div className="space-y-4">
-            <div>
-              <Label>Tipo de Operação</Label>
-              <Select value={String(operationType)} onValueChange={v => setOperationType(parseInt(v))}>
-                <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {OPERATION_TYPES.map(op => (
-                    <SelectItem key={op.code} value={String(op.code)}>{op.label} — {op.description}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>Tabela (Rule)</Label>
-              {rules.length > 0 ? (
-                <Select value={selectedRuleId} onValueChange={setSelectedRuleId}>
-                  <SelectTrigger className="h-12"><SelectValue placeholder="Selecione a tabela" /></SelectTrigger>
-                  <SelectContent>
-                    {rules.map((rule: any, idx: number) => (
-                      <SelectItem key={rule.id || idx} value={rule.id || ''}>
-                        {rule.name || rule.product?.name || `Tabela ${idx + 1}`} — {rule.lender?.name || ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 bg-muted rounded-lg mt-1">
-                  {api.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertCircle className="w-4 h-4" />}
-                  {api.loading ? 'Carregando tabelas...' : 'Nenhuma tabela disponível'}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">E-mail</Label>
+                  <Input className={inputCls} type="email" value={clientData.email} onChange={e => updateField('email', e.target.value)} />
                 </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Prazo (meses)</Label><Input type="number" className={inputCls} value={term} onChange={e => setTerm(parseInt(e.target.value) || 0)} inputMode="numeric" /></div>
-              <div><Label>Taxa (%)</Label><Input type="number" step="0.01" className={inputCls} value={rate} onChange={e => setRate(parseFloat(e.target.value) || 0)} inputMode="decimal" /></div>
-              <div><Label>Vl. Parcela (R$)</Label><Input type="number" step="0.01" className={inputCls} value={installmentValue || ''} onChange={e => setInstallmentValue(parseFloat(e.target.value) || 0)} placeholder="Opcional" inputMode="decimal" /></div>
-              <div><Label>Vl. Empréstimo (R$)</Label><Input type="number" step="0.01" className={inputCls} value={loanValue || ''} onChange={e => setLoanValue(parseFloat(e.target.value) || 0)} placeholder="Opcional" inputMode="decimal" /></div>
-            </div>
-
-            <div className="flex items-center gap-2 py-1">
-              <Switch checked={hasInsurance} onCheckedChange={setHasInsurance} />
-              <Label>Incluir Seguro</Label>
-            </div>
-
-            {needsOriginContract && (
-              <>
-                <Separator />
-                <p className="text-sm font-semibold text-muted-foreground">Contrato de Origem</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Cód. Banco</Label><Input className={inputCls} value={originLenderCode} onChange={e => setOriginLenderCode(e.target.value)} inputMode="numeric" /></div>
-                  <div><Label>Nº Contrato</Label><Input className={inputCls} value={originContractNumber} onChange={e => setOriginContractNumber(e.target.value)} /></div>
-                  <div><Label>Prazo Orig.</Label><Input type="number" className={inputCls} value={originTerm} onChange={e => setOriginTerm(parseInt(e.target.value) || 0)} inputMode="numeric" /></div>
-                  <div><Label>Parc. Rest.</Label><Input type="number" className={inputCls} value={originInstallmentsRemaining} onChange={e => setOriginInstallmentsRemaining(parseInt(e.target.value) || 0)} inputMode="numeric" /></div>
-                  <div><Label>Vl. Parcela</Label><Input type="number" step="0.01" className={inputCls} value={originInstallmentValue} onChange={e => setOriginInstallmentValue(parseFloat(e.target.value) || 0)} inputMode="decimal" /></div>
-                  <div><Label>Saldo Dev.</Label><Input type="number" step="0.01" className={inputCls} value={originDueBalance} onChange={e => setOriginDueBalance(parseFloat(e.target.value) || 0)} inputMode="decimal" /></div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Nome da Mãe</Label>
+                  <Input className={inputCls} value={clientData.motherName} onChange={e => updateField('motherName', e.target.value)} />
                 </div>
-              </>
-            )}
-
-            {isPortRefin && (
-              <>
-                <Separator />
-                <p className="text-sm font-semibold text-muted-foreground">Refinanciamento</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Prazo Refin</Label><Input type="number" className={inputCls} value={refinTerm} onChange={e => setRefinTerm(parseInt(e.target.value) || 0)} inputMode="numeric" /></div>
-                  <div><Label>Taxa Refin</Label><Input type="number" step="0.01" className={inputCls} value={refinRate} onChange={e => setRefinRate(parseFloat(e.target.value) || 0)} inputMode="decimal" /></div>
-                  <div><Label>Parcela Refin</Label><Input type="number" step="0.01" className={inputCls} value={refinInstallmentValue} onChange={e => setRefinInstallmentValue(parseFloat(e.target.value) || 0)} inputMode="decimal" /></div>
-                </div>
-              </>
-            )}
+              </div>
+            </div>
 
             <Separator />
-            <Button onClick={handleCalculate} disabled={api.loading || !selectedRuleId} className="w-full gap-2 h-12">
-              {api.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />}
-              Simular
-            </Button>
 
-            {calcResult && (
-              <Card className="bg-accent/50 border-primary/20">
-                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary" /> Resultado</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    {calcResult.installmentValue != null && (
-                      <div><span className="text-muted-foreground text-xs">Parcela</span><p className="font-bold text-primary text-lg">R$ {Number(calcResult.installmentValue).toFixed(2)}</p></div>
-                    )}
-                    {calcResult.loanValue != null && (
-                      <div><span className="text-muted-foreground text-xs">Liberado</span><p className="font-bold text-primary text-lg">R$ {Number(calcResult.loanValue).toFixed(2)}</p></div>
-                    )}
-                    {calcResult.iofValue != null && (
-                      <div><span className="text-muted-foreground text-xs">IOF</span><p className="font-medium">R$ {Number(calcResult.iofValue).toFixed(2)}</p></div>
-                    )}
-                    {calcResult.changeValue != null && (
-                      <div>
-                        <span className="text-muted-foreground text-xs">Troco</span>
-                        <p className={cn("font-bold text-lg", Number(calcResult.changeValue) > 0 ? 'text-primary' : 'text-destructive')}>
-                          R$ {Number(calcResult.changeValue).toFixed(2)}
-                        </p>
-                      </div>
-                    )}
+            {/* Dados do Benefício */}
+            <div>
+              <h3 className="text-sm font-bold mb-3">Dados do <span className="font-bold">Benefício</span></h3>
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Tipo de Benefício</Label>
+                  <Select value={String(clientData.benefitType)} onValueChange={v => updateField('benefitType', parseInt(v))}>
+                    <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {BENEFIT_TYPES.map(b => (
+                        <SelectItem key={b.code} value={String(b.code)}>{b.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Data Despacho (DDB)</Label>
+                    <Input type="date" className={inputCls} value={clientData.benefitStartDate} onChange={e => updateField('benefitStartDate', e.target.value)} />
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                  <div>
+                    <Label className="text-xs text-muted-foreground">UF do Benefício</Label>
+                    <Select value={clientData.benefitState} onValueChange={v => updateField('benefitState', v)}>
+                      <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                      <SelectContent>{UF_OPTIONS.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Forma de Pagamento</Label>
+                    <Select value={String(clientData.benefitPaymentMethod)} onValueChange={v => updateField('benefitPaymentMethod', parseInt(v))}>
+                      <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">Cartão Magnético</SelectItem>
+                        <SelectItem value="2">Conta Corrente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Dados do Endereço */}
+            <div>
+              <h3 className="text-sm font-bold mb-3">Dados do <span className="font-bold">Endereço</span></h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">CEP</Label>
+                  <Input className={inputCls} value={clientData.zipCode} onChange={e => updateField('zipCode', e.target.value)} inputMode="numeric" />
+                </div>
+                <div className="col-span-1 sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">Endereço</Label>
+                  <Input className={inputCls} value={clientData.street} onChange={e => updateField('street', e.target.value)} placeholder="(rua, avenida, praça, etc.)" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Número</Label>
+                    <Input className={inputCls} value={clientData.number} onChange={e => updateField('number', e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Compl.</Label>
+                    <Input className={inputCls} value={clientData.complement} onChange={e => updateField('complement', e.target.value)} />
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3 mt-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Bairro</Label>
+                  <Input className={inputCls} value={clientData.district} onChange={e => updateField('district', e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Cidade</Label>
+                  <Input className={inputCls} value={clientData.city} onChange={e => updateField('city', e.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">UF</Label>
+                  <Select value={clientData.state} onValueChange={v => updateField('state', v)}>
+                    <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                    <SelectContent>{UF_OPTIONS.map(uf => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Dados Bancários */}
+            <div>
+              <h3 className="text-sm font-bold mb-3">Dados <span className="font-bold">Bancários</span></h3>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Tipo de Conta</Label>
+                  <Select value={bankData.accountType} onValueChange={v => setBankData(p => ({ ...p, accountType: v }))}>
+                    <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CC">Conta Corrente</SelectItem>
+                      <SelectItem value="CP">Conta Poupança</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Código do Banco</Label>
+                  <Input className={inputCls} value={bankData.bankCode} onChange={e => setBankData(p => ({ ...p, bankCode: e.target.value }))} inputMode="numeric" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Agência</Label>
+                  <Input className={inputCls} value={bankData.bankBranch} onChange={e => setBankData(p => ({ ...p, bankBranch: e.target.value }))} />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Número da Conta</Label>
+                  <Input className={inputCls} value={bankData.bankNumber} onChange={e => setBankData(p => ({ ...p, bankNumber: e.target.value }))} />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Dígito</Label>
+                  <Input className={inputCls} value={bankData.bankDigit} onChange={e => setBankData(p => ({ ...p, bankDigit: e.target.value }))} />
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* ===== STEP 2: Documentos ===== */}
-        {currentStep === 2 && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Envie frente e verso do documento. Formatos: PNG, JPEG, PDF.</p>
-            <Card>
-              <CardContent className="p-4 space-y-4">
-                <div>
-                  <Label className="flex items-center gap-2 mb-2"><FileUp className="w-4 h-4" /> Frente do Documento</Label>
-                  <Input type="file" accept="image/*,.pdf" className="h-12" onChange={e => setDocFrontFile(e.target.files?.[0] || null)} />
-                  {docFrontFile && <p className="text-xs text-primary mt-1">✓ {docFrontFile.name}</p>}
-                </div>
-                <Separator />
-                <div>
-                  <Label className="flex items-center gap-2 mb-2"><FileUp className="w-4 h-4" /> Verso do Documento</Label>
-                  <Input type="file" accept="image/*,.pdf" className="h-12" onChange={e => setDocBackFile(e.target.files?.[0] || null)} />
-                  {docBackFile && <p className="text-xs text-primary mt-1">✓ {docBackFile.name}</p>}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* ===== STEP 3: Confirmação ===== */}
+        {/* ===== STEP 3: Documentos ===== */}
         {currentStep === 3 && (
-          <div className="space-y-4">
-            <p className="text-sm font-semibold">Dados Bancários para Crédito</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Cód. Banco</Label><Input className={inputCls} value={bank.bankCode} onChange={e => setBankData(p => ({...p, bankCode: e.target.value}))} inputMode="numeric" /></div>
-              <div><Label>Agência</Label><Input className={inputCls} value={bank.bankBranch} onChange={e => setBankData(p => ({...p, bankBranch: e.target.value}))} /></div>
-              <div><Label>Conta</Label><Input className={inputCls} value={bank.bankNumber} onChange={e => setBankData(p => ({...p, bankNumber: e.target.value}))} /></div>
-              <div><Label>Dígito</Label><Input className={inputCls} value={bank.bankDigit} onChange={e => setBankData(p => ({...p, bankDigit: e.target.value}))} /></div>
+          <div className="space-y-5">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={clientSentDocs}
+                onCheckedChange={(v) => setClientSentDocs(v === true)}
+              />
+              <span className="text-sm">Documentos enviados pelo próprio cliente durante a formalização</span>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-bold mb-3">Anexo de <span className="font-bold">Documentos</span></h3>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Frente */}
+                <label className="cursor-pointer">
+                  <Card className={cn(
+                    "border-2 border-dashed hover:border-primary/50 transition-colors",
+                    docFrontFile && "border-primary/40 bg-primary/5"
+                  )}>
+                    <CardContent className="p-6 flex flex-col items-center text-center gap-2">
+                      <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                      <p className="text-sm font-semibold">Frente do Documento</p>
+                      <p className="text-[10px] text-muted-foreground">Tamanho mínimo: 250×250px</p>
+                      <p className="text-[10px] text-muted-foreground">Formatos aceitos: PNG, JPEG, PDF, HEIC</p>
+                      {docFrontFile ? (
+                        <p className="text-xs text-primary font-medium mt-1">✓ {docFrontFile.name}</p>
+                      ) : (
+                        <Button variant="default" size="sm" className="mt-2" type="button">
+                          Selecionar
+                        </Button>
+                      )}
+                      <input type="file" accept="image/*,.pdf,.heic" className="hidden"
+                        onChange={e => setDocFrontFile(e.target.files?.[0] || null)} />
+                    </CardContent>
+                  </Card>
+                </label>
+
+                {/* Verso */}
+                <label className="cursor-pointer">
+                  <Card className={cn(
+                    "border-2 border-dashed hover:border-primary/50 transition-colors",
+                    docBackFile && "border-primary/40 bg-primary/5"
+                  )}>
+                    <CardContent className="p-6 flex flex-col items-center text-center gap-2">
+                      <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                      <p className="text-sm font-semibold">Verso do Documento</p>
+                      <p className="text-[10px] text-muted-foreground">Tamanho mínimo: 250×250px</p>
+                      <p className="text-[10px] text-muted-foreground">Formatos aceitos: PNG, JPEG, PDF, HEIC</p>
+                      {docBackFile ? (
+                        <p className="text-xs text-primary font-medium mt-1">✓ {docBackFile.name}</p>
+                      ) : (
+                        <Button variant="default" size="sm" className="mt-2" type="button">
+                          Selecionar
+                        </Button>
+                      )}
+                      <input type="file" accept="image/*,.pdf,.heic" className="hidden"
+                        onChange={e => setDocBackFile(e.target.files?.[0] || null)} />
+                    </CardContent>
+                  </Card>
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===== STEP 4: Formalização ===== */}
+        {currentStep === 4 && (
+          <div className="space-y-5 text-center">
+            <div className="py-4">
+              <h2 className="text-lg font-bold">Falta muito pouco, faça a formalização!</h2>
+              <p className="text-sm text-muted-foreground mt-2">
+                Sua proposta foi cadastrada com sucesso, agora basta fazer a formalização digital com o cliente e acompanhar o andamento do seu contrato!
+              </p>
+            </div>
+
+            <div className="text-left space-y-2">
+              <div className="flex gap-8">
+                <div>
+                  <span className="text-xs text-muted-foreground">Status</span>
+                  <p className="text-sm font-medium flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                    Assinado
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">{new Date().toLocaleDateString('pt-BR')} {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Tipo</span>
+                  <p className="text-sm font-medium">Biometria com documento</p>
+                </div>
+              </div>
             </div>
 
             <Separator />
-            <p className="text-sm font-semibold">Resumo da Proposta</p>
-            <Card>
-              <CardContent className="p-4 space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Cliente</span><span className="font-medium">{clientData.name}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">CPF</span><span className="font-medium">{clientData.identity}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">NB</span><span className="font-medium">{clientData.benefit}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Operação</span><span className="font-medium">{OPERATION_TYPES.find(o => o.code === operationType)?.label}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Prazo</span><span className="font-medium">{term} meses</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Taxa</span><span className="font-medium">{rate}%</span></div>
-                {calcResult?.loanValue && (
-                  <div className="flex justify-between"><span className="text-muted-foreground">Valor Liberado</span><span className="font-bold text-primary">R$ {Number(calcResult.loanValue).toFixed(2)}</span></div>
-                )}
-                {calcResult?.installmentValue && (
-                  <div className="flex justify-between"><span className="text-muted-foreground">Parcela</span><span className="font-bold text-primary">R$ {Number(calcResult.installmentValue).toFixed(2)}</span></div>
-                )}
-              </CardContent>
-            </Card>
+
+            <div className="text-left">
+              <Label className="text-xs text-muted-foreground">Link da Formalização</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  className="flex-1 text-xs h-11 bg-muted"
+                  value={submissionResult?.authTermUrl || submissionResult?.formalizationLink || `https://signer.ajin.io/${submissionResult?.id || ''}`}
+                  readOnly
+                />
+                <Button
+                  className="h-11 px-5 shrink-0"
+                  onClick={() => {
+                    const link = submissionResult?.authTermUrl || submissionResult?.formalizationLink || `https://signer.ajin.io/${submissionResult?.id || ''}`;
+                    navigator.clipboard.writeText(link);
+                    toast.success('Link copiado!');
+                  }}
+                >
+                  Copiar
+                </Button>
+              </div>
+            </div>
+
+            <Button variant="default" className="gap-2 h-11" onClick={() => {
+              window.open(`https://signer.ajin.io/${submissionResult?.id || ''}`, '_blank');
+            }}>
+              <ExternalLink className="w-4 h-4" /> Visualizar CCB
+            </Button>
           </div>
         )}
       </div>
 
       {/* Fixed bottom navigation */}
-      <div className="sticky bottom-0 border-t bg-background/95 backdrop-blur px-4 py-3 pb-safe flex gap-3">
-        <Button variant="outline" className="flex-1 h-12" onClick={goBack} disabled={isSubmitting}>
-          {currentStep === 0 ? 'Cancelar' : 'Voltar'}
-        </Button>
-        <Button className="flex-1 h-12" onClick={goNext} disabled={!canProceed || isSubmitting}>
-          {isSubmitting ? (
-            <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Enviando...</>
-          ) : currentStep === STEPS.length - 1 ? (
-            <><Send className="h-4 w-4 mr-2" /> Enviar Proposta</>
-          ) : (
-            <>Próximo <ChevronRight className="h-4 w-4 ml-1" /></>
-          )}
-        </Button>
-      </div>
+      {currentStep < 4 && (
+        <div className="sticky bottom-0 border-t bg-background/95 backdrop-blur px-4 py-3 pb-safe flex items-center justify-between gap-3">
+          <Button variant="outline" className="h-11 gap-1.5" onClick={goBack} disabled={isSubmitting}>
+            <ChevronLeft className="h-4 w-4" />
+            {currentStep === 0 ? 'Cancelar' : 'Voltar'}
+          </Button>
+          <span className="text-xs text-muted-foreground font-medium">{currentStep + 1} / {STEPS.length - 1}</span>
+          <Button className="h-11 gap-1.5" onClick={goNext} disabled={!canProceed || isSubmitting}>
+            {isSubmitting ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Enviando...</>
+            ) : currentStep === 3 ? (
+              <><Send className="h-4 w-4" /> Enviar</>
+            ) : (
+              <>Próximo <ChevronRight className="h-4 w-4" /></>
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* Formalization bottom */}
+      {currentStep === 4 && (
+        <div className="sticky bottom-0 border-t bg-background/95 backdrop-blur px-4 py-3 pb-safe">
+          <Button className="w-full h-11" onClick={onClose}>
+            <CheckCircle2 className="h-4 w-4 mr-2" /> Concluir
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
