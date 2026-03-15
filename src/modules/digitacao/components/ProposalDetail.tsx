@@ -2,6 +2,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { Copy, ExternalLink } from 'lucide-react';
 import { Proposal, STATUS_MAP } from '../types';
 import { toast } from 'sonner';
@@ -16,10 +19,17 @@ export function ProposalDetail({ proposal, onClose }: ProposalDetailProps) {
 
   const statusInfo = STATUS_MAP[proposal.status] || STATUS_MAP.pendente;
   const apiRes = proposal.api_response;
+  const simId = proposal.simulation_id || proposal.id;
+  const formLink = apiRes?.authTermUrl || apiRes?.formalizationLink || `https://signer.ajin.io/${simId}`;
 
   const copyId = () => {
-    navigator.clipboard.writeText(proposal.simulation_id || proposal.id);
+    navigator.clipboard.writeText(simId);
     toast.success('ID copiado!');
+  };
+
+  const copyFormLink = () => {
+    navigator.clipboard.writeText(formLink);
+    toast.success('Link copiado!');
   };
 
   return (
@@ -92,6 +102,38 @@ export function ProposalDetail({ proposal, onClose }: ProposalDetailProps) {
               </CardContent>
             </Card>
           )}
+
+          <Separator />
+
+          {/* Formalização */}
+          <div>
+            <h3 className="text-sm font-bold mb-3">Formalização</h3>
+            <div className="flex gap-6 mb-3">
+              <div>
+                <span className="text-xs text-muted-foreground">Status</span>
+                <p className="text-sm font-medium flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                  {statusInfo.label}
+                </p>
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground">Tipo</span>
+                <p className="text-sm font-medium">Biometria com documento</p>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs text-muted-foreground">Link da Formalização</Label>
+              <div className="flex gap-2 mt-1">
+                <Input className="flex-1 text-xs h-10 bg-muted" value={formLink} readOnly />
+                <Button className="h-10 px-4 shrink-0" onClick={copyFormLink}>Copiar</Button>
+              </div>
+            </div>
+
+            <Button variant="default" className="mt-3 gap-2 h-10" onClick={() => window.open(formLink, '_blank')}>
+              <ExternalLink className="w-4 h-4" /> Visualizar CCB
+            </Button>
+          </div>
         </div>
       </SheetContent>
     </Sheet>
