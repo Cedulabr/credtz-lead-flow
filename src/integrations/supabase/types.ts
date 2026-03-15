@@ -3848,6 +3848,7 @@ export type Database = {
         Row: {
           can_access_activate_leads: boolean | null
           can_access_alertas: boolean | null
+          can_access_autolead: boolean | null
           can_access_baseoff_consulta: boolean | null
           can_access_colaborativo: boolean | null
           can_access_controle_ponto: boolean | null
@@ -3857,6 +3858,7 @@ export type Database = {
           can_access_gerador_propostas: boolean | null
           can_access_gestao_televendas: boolean | null
           can_access_indicar: boolean | null
+          can_access_meu_numero: boolean | null
           can_access_meus_clientes: boolean | null
           can_access_minhas_comissoes: boolean | null
           can_access_premium_leads: boolean | null
@@ -3887,6 +3889,7 @@ export type Database = {
         Insert: {
           can_access_activate_leads?: boolean | null
           can_access_alertas?: boolean | null
+          can_access_autolead?: boolean | null
           can_access_baseoff_consulta?: boolean | null
           can_access_colaborativo?: boolean | null
           can_access_controle_ponto?: boolean | null
@@ -3896,6 +3899,7 @@ export type Database = {
           can_access_gerador_propostas?: boolean | null
           can_access_gestao_televendas?: boolean | null
           can_access_indicar?: boolean | null
+          can_access_meu_numero?: boolean | null
           can_access_meus_clientes?: boolean | null
           can_access_minhas_comissoes?: boolean | null
           can_access_premium_leads?: boolean | null
@@ -3926,6 +3930,7 @@ export type Database = {
         Update: {
           can_access_activate_leads?: boolean | null
           can_access_alertas?: boolean | null
+          can_access_autolead?: boolean | null
           can_access_baseoff_consulta?: boolean | null
           can_access_colaborativo?: boolean | null
           can_access_controle_ponto?: boolean | null
@@ -3935,6 +3940,7 @@ export type Database = {
           can_access_gerador_propostas?: boolean | null
           can_access_gestao_televendas?: boolean | null
           can_access_indicar?: boolean | null
+          can_access_meu_numero?: boolean | null
           can_access_meus_clientes?: boolean | null
           can_access_minhas_comissoes?: boolean | null
           can_access_premium_leads?: boolean | null
