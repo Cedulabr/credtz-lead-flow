@@ -230,6 +230,20 @@ export function ClienteDetalheView({ client, onBack }: ClienteDetalheViewProps) 
         esp={client.esp}
       />
 
+      {/* DIGITAÇÃO DE CONTRATO */}
+      <Card className="p-4 border-primary/20 bg-primary/5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold text-sm">Digitação de Contrato</p>
+            <p className="text-xs text-muted-foreground">Enviar proposta diretamente via API bancária</p>
+          </div>
+          <Button onClick={() => setShowDigitacao(true)} className="gap-2">
+            <Send className="w-4 h-4" />
+            Digitar Contrato
+          </Button>
+        </div>
+      </Card>
+
       {/* 4️⃣ CONTRATOS */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
