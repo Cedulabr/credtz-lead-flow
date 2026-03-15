@@ -1,80 +1,60 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Upgrade AutoLead — SMS Paralelo ao WhatsApp
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Visão Geral
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+Adicionar envio de SMS em paralelo ao WhatsApp no AutoLead. Ao criar um job, o sistema também dispara SMS imediatamente (sem delay) para os mesmos leads, verificando créditos SMS do gestor da empresa antes de autorizar. O wizard ganha um novo step para configurar o texto SMS com 3 copys de exemplo.
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
-
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
-
----
-
-### 2. Conectar Base OFF ao PostgreSQL externo
-
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
-
-**Arquitetura:**
+### Fluxo
 
 ```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
+Wizard Step 3 (Mensagem WhatsApp) → Step 4 (NOVO: Mensagem SMS) → Step 5 (WhatsApp instances) → Step 6 (Resumo)
+
+Step 4 - SMS:
+├── Toggle: "Enviar também via SMS?" (ativo por padrão)
+├── Verificação automática de créditos SMS do gestor
+├── Se sem créditos → mensagem de aviso, toggle bloqueado
+├── 3 copys de exemplo (cards clicáveis):
+│   1. Portabilidade de Crédito
+│   2. Novas Ofertas INSS
+│   3. Nova Oportunidade de Crédito
+├── Textarea editável com variáveis {{nome}}, {{whatsapp}}
+└── Preview do SMS final
 ```
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+### Copys de Exemplo
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+Cada copy terá no final o número WhatsApp do usuário (obtido da instância selecionada):
 
----
+1. **Portabilidade**: "Olá {{nome}}! Identificamos que você pode reduzir sua parcela com a portabilidade de crédito. Quer saber quanto pode economizar? Fale comigo: {{whatsapp}}"
+2. **Novas Ofertas**: "{{nome}}, temos ofertas exclusivas para beneficiários do INSS com as melhores taxas do mercado. Entre em contato: {{whatsapp}}"
+3. **Oportunidade**: "Olá {{nome}}! Surgiu uma nova oportunidade de crédito para você com condições especiais. Saiba mais: {{whatsapp}}"
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
+### Verificação de Créditos SMS
 
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
+O sistema busca o gestor da empresa do usuário e verifica os créditos SMS dele via `get_user_sms_credits`. Se o gestor não tiver créditos, o SMS é desabilitado com aviso. Os créditos são debitados do gestor (não do colaborador).
 
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+### Envio SMS
 
----
+Na `createJob` do `useAutoLead.ts`, após criar as mensagens WhatsApp agendadas:
+- Verificar créditos SMS do gestor
+- Invocar a edge function `send-sms` para cada lead imediatamente (sem delay)
+- Registrar no `sms_history` e debitar créditos SMS
+- Registrar no job se SMS foi habilitado (`sms_enabled`, `sms_template`, `sms_sent`, `sms_failed`)
 
-### Arquivos a modificar
+### Arquivos a Modificar/Criar
 
-| Arquivo | Mudanca |
+| Arquivo | Ação |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
+| `src/modules/autolead/types.ts` | Adicionar campos SMS ao `WizardData` e `AutoLeadJob`, adicionar copys de exemplo |
+| `src/modules/autolead/components/AutoLeadWizard.tsx` | Novo step SMS com 3 copys, toggle, preview com {{whatsapp}} |
+| `src/modules/autolead/hooks/useAutoLead.ts` | Lógica de verificação de créditos do gestor + envio SMS em lote imediato |
+| Migração SQL | Adicionar colunas `sms_enabled`, `sms_template`, `sms_sent`, `sms_failed` na tabela `autolead_jobs` |
 
----
+### Segurança
 
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+- Créditos SMS verificados do gestor da empresa (não do colaborador)
+- Debitar créditos antes do envio para evitar envios sem saldo
+- Se créditos insuficientes para todos os leads, enviar apenas para a quantidade disponível
 
