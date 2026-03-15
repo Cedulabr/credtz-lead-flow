@@ -93,6 +93,19 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
   // Step 4: Calculation result
   const [calcResult, setCalcResult] = useState<any>(null);
 
+  // Convert date from DD/MM/YYYY or ISO to YYYY-MM-DD for input[type=date]
+  const formatDateForInput = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return '';
+    // Already YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.substring(0, 10);
+    // DD/MM/YYYY
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+      const [d, m, y] = dateStr.split('/');
+      return `${y}-${m}-${d}`;
+    }
+    return dateStr;
+  };
+
   // Pre-fill client data
   useEffect(() => {
     if (client && isOpen) {
@@ -101,10 +114,10 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
         identity: client.cpf || '',
         benefit: client.nb || '',
         benefitState: client.uf || 'SP',
-        benefitStartDate: client.dib || '',
+        benefitStartDate: formatDateForInput(client.ddb || client.dib),
         benefitPaymentMethod: client.meio_pagto === 'CC' || client.meio_pagto === '2' ? 2 : 1,
         benefitType: client.esp ? parseInt(client.esp) || 42 : 42,
-        birthDate: client.data_nascimento || '',
+        birthDate: formatDateForInput(client.data_nascimento),
         motherName: client.nome_mae || '',
         maritalStatus: 'Solteiro',
         sex: client.sexo === 'F' ? 'Feminino' : 'Masculino',

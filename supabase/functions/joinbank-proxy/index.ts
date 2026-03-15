@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 const JOINBANK_BASE_URL = 'https://api.ajin.io/v3';
@@ -30,6 +30,7 @@ Deno.serve(async (req) => {
 
   try {
     const JOINBANK_API_KEY = Deno.env.get('JOINBANK_API_KEY');
+    const JOINBANK_LOGIN_ID = Deno.env.get('JOINBANK_LOGIN_ID');
     if (!JOINBANK_API_KEY) {
       throw new Error('JOINBANK_API_KEY not configured');
     }
@@ -43,16 +44,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    const token = authHeader.replace('Bearer ', '');
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(
-      authHeader.replace('Bearer ', '')
-    );
-    if (claimsError || !claimsData?.claims) {
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -73,17 +73,11 @@ Deno.serve(async (req) => {
     // Check if route matches allowed patterns (support dynamic IDs)
     const upperMethod = method.toUpperCase();
     const isAllowed =
-      // Static routes
       ALLOWED_ROUTES[upperMethod]?.includes(route) ||
-      // Dynamic GET routes: /loan-inss-simulations/:id, /loans/:id, /query-inss-balances/:id
       (upperMethod === 'GET' && /^\/(loan-inss-simulations|loans|query-inss-balances)\/[a-f0-9-]+$/.test(route)) ||
-      // Dynamic PUT routes: /loan-inss-simulations/:id
       (upperMethod === 'PUT' && /^\/loan-inss-simulations\/[a-f0-9-]+$/.test(route)) ||
-      // Dynamic POST routes: /loan-inss-simulations/:id/actions, /loan-inss-simulations/:id/copy
       (upperMethod === 'POST' && /^\/loan-inss-simulations\/[a-f0-9-]+\/(actions|copy|auth-term)$/.test(route)) ||
-      // Signer routes
       (upperMethod === 'POST' && /^\/signer\/[a-zA-Z0-9-]+\/accept$/.test(route)) ||
-      // Loans by contract number
       (upperMethod === 'GET' && /^\/loans\/contract-number\/.+$/.test(route));
 
     if (!isAllowed) {
@@ -93,21 +87,31 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Determine auth headers based on route
+    // Rules endpoint uses Bearer token, others use apikey header
+    const isRulesEndpoint = route.includes('/loan-product-rules/');
+    const apiHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (isRulesEndpoint && JOINBANK_LOGIN_ID) {
+      apiHeaders['Authorization'] = `Bearer ${JOINBANK_LOGIN_ID}`;
+    } else {
+      apiHeaders['apikey'] = JOINBANK_API_KEY;
+    }
+
     // Build the request to JoinBank API
     const targetUrl = `${JOINBANK_BASE_URL}${route}`;
     const fetchOptions: RequestInit = {
       method: upperMethod,
-      headers: {
-        'apikey': JOINBANK_API_KEY,
-        'Content-Type': 'application/json',
-      },
+      headers: apiHeaders,
     };
 
     if (upperMethod !== 'GET' && payload) {
       fetchOptions.body = JSON.stringify(payload);
     }
 
-    console.log(`JoinBank proxy: ${upperMethod} ${route}`);
+    console.log(`JoinBank proxy: ${upperMethod} ${route} [auth: ${isRulesEndpoint ? 'Bearer' : 'apikey'}]`);
 
     const apiResponse = await fetch(targetUrl, fetchOptions);
     const responseData = await apiResponse.text();
@@ -120,7 +124,7 @@ Deno.serve(async (req) => {
     }
 
     if (!apiResponse.ok) {
-      console.error(`JoinBank API error [${apiResponse.status}]: ${responseData}`);
+      console.error(`JoinBank API error [${apiResponse.status}]: ${responseData.substring(0, 500)}`);
       return new Response(JSON.stringify({
         error: 'JoinBank API error',
         status: apiResponse.status,
