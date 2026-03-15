@@ -39,6 +39,7 @@ import {
   LazyMyData,
   LazyRadarModule,
   LazyAutoLeadModule,
+  LazyDigitacaoModule,
 } from "@/components/LazyComponents";
 
 // ── Types ─────────────────────────────────────────────────────────────
