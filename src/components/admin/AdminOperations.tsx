@@ -140,6 +140,8 @@ export function AdminOperations() {
         return <AdminDuplicatesManager />;
       case 'inactivity':
         return <AdminInactivitySettings />;
+      case 'banking-api':
+        return <AdminBankingAPI />;
       default:
         return null;
     }
