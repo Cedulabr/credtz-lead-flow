@@ -1,80 +1,61 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## Correção de Busca + Redesign da Digitação (Layout Qualibank)
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Problema 1: Busca CPF não carrega
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+A edge function `baseoff-external-query` não foi modificada, mas os logs mostram apenas "shutdown" (sem erros). Possíveis causas:
+- Conexão externa com o PostgreSQL da base caindo (pool timeout)
+- A última edição no `useOptimizedSearch.ts` pode ter introduzido um erro silencioso no mapeamento
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+**Ação**: Testar a edge function diretamente via `supabase--test_edge_functions` para verificar se a conexão com o banco externo está funcional. Se o problema for o hook, reverificar o mapeamento.
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+### Problema 2: Autenticação da API de Tabelas
 
----
+A documentação mostra inconsistência: em algumas seções o endpoint `/loan-product-rules/search/basic` usa `apikey`, em outras usa `Bearer Token`. O proxy atual envia **apenas** Bearer para esse endpoint — mas provavelmente precisa enviar **ambos** os headers (`apikey` + `Authorization: Bearer`), ou apenas `apikey`.
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+**Ação**: Alterar o proxy para enviar `apikey` para **todos** os endpoints (padrão da API), mantendo `Authorization: Bearer` apenas quando explicitamente necessário (seção de Aprovação 2.1.2).
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+### Problema 3: Redesign do Wizard — Layout Qualibank
 
-**Arquitetura:**
+Baseado nas 4 telas enviadas, o novo fluxo será:
 
 ```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
+Step 1/4: Consulta IN100
+├── CPF, Nome, Nº Benefício, Celular (pré-preenchidos, editáveis)
+└── "Autorize o IN100" — link para o cliente autorizar (copiável)
+
+Step 2/4: Simulação
+├── Produto (select) + Tabela (select)
+├── Se Port/Refin:
+│   ├── Portabilidade: Banco Origem, Nº Contrato, Taxa, Prazo, Parcelas Restantes, Valor Parcela, Saldo Devedor
+│   └── Refinanciamento: Taxa, Prazo, Valor Parcela, Valor do Contrato
+├── Resultado: Valor do Troco, Valor do IOF
+└── Botões: "Simular" + "Confirmar"
+
+Step 3/4: Documentos
+├── Upload Frente do Documento (PNG, JPEG, PDF, HEIC)
+└── Upload Verso do Documento (mesmos formatos)
+
+Step 4/4: Confirmação + Envio
+├── Resumo completo (dados pessoais + operação + resultado)
+├── Dados bancários para crédito
+└── Botão "Enviar Proposta"
 ```
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+Os dados pessoais completos (endereço, RG, mãe, etc.) continuam sendo enviados na API, mas ficam em uma seção colapsável "Dados Adicionais" dentro do Step 1, em vez de um step inteiro separado. O foco visual é a consulta IN100 e a simulação.
 
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+### Problema 4: Salvar Documentação API
 
----
+Criar arquivo `docs/JOINBANK_API_REFERENCE.md` com o resumo completo dos endpoints, payloads e autenticação para referência futura.
 
-### 3. Simplificar modulo Base OFF - apenas Consulta
+### Arquivos a Modificar/Criar
 
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
-
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
-
----
-
-### Arquivos a modificar
-
-| Arquivo | Mudanca |
+| Arquivo | Ação |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
-
----
-
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+| `supabase/functions/joinbank-proxy/index.ts` | Corrigir autenticação — usar `apikey` como padrão para todos os endpoints |
+| `src/modules/baseoff/components/DigitacaoWizard.tsx` | Redesign completo — layout Qualibank (4 steps: IN100, Simulação, Documentos, Confirmação) |
+| `src/modules/baseoff/hooks/useJoinBankAPI.ts` | Adicionar métodos `queryIN100`, `getAuthTerm`, `uploadDocument` |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Verificar e corrigir possível erro no mapeamento que impede retorno |
+| `docs/JOINBANK_API_REFERENCE.md` | Criar referência completa da API |
 
