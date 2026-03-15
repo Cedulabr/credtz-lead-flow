@@ -78,7 +78,8 @@ Deno.serve(async (req) => {
       (upperMethod === 'PUT' && /^\/loan-inss-simulations\/[a-f0-9-]+$/.test(route)) ||
       (upperMethod === 'POST' && /^\/loan-inss-simulations\/[a-f0-9-]+\/(actions|copy|auth-term)$/.test(route)) ||
       (upperMethod === 'POST' && /^\/signer\/[a-zA-Z0-9-]+\/accept$/.test(route)) ||
-      (upperMethod === 'GET' && /^\/loans\/contract-number\/.+$/.test(route));
+      (upperMethod === 'GET' && /^\/loans\/contract-number\/.+$/.test(route)) ||
+      (upperMethod === 'GET' && /^\/loan-inss-simulations\/[a-f0-9-]+\/auth-term$/.test(route));
 
     if (!isAllowed) {
       return new Response(JSON.stringify({ error: 'Route not allowed: ' + route }), {
@@ -87,17 +88,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Determine auth headers based on route
-    // Rules endpoint uses Bearer token, others use apikey header
+    // Build auth headers for JoinBank API
+    // Rules endpoint needs BOTH apikey and Bearer token per API docs inconsistency
     const isRulesEndpoint = route.includes('/loan-product-rules/');
     const apiHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
+      'apikey': JOINBANK_API_KEY,
     };
 
+    // Rules endpoint: also send Bearer token if available
     if (isRulesEndpoint && JOINBANK_LOGIN_ID) {
       apiHeaders['Authorization'] = `Bearer ${JOINBANK_LOGIN_ID}`;
-    } else {
-      apiHeaders['apikey'] = JOINBANK_API_KEY;
     }
 
     // Build the request to JoinBank API
@@ -111,7 +112,7 @@ Deno.serve(async (req) => {
       fetchOptions.body = JSON.stringify(payload);
     }
 
-    console.log(`JoinBank proxy: ${upperMethod} ${route} [auth: ${isRulesEndpoint ? 'Bearer' : 'apikey'}]`);
+    console.log(`JoinBank proxy: ${upperMethod} ${route} [auth: apikey${isRulesEndpoint ? '+Bearer' : ''}]`);
 
     const apiResponse = await fetch(targetUrl, fetchOptions);
     const responseData = await apiResponse.text();
