@@ -479,9 +479,9 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
                 </Button>
 
                 {in100Result && (
-                  <Card className="bg-green-50 dark:bg-green-950/20 border-green-200">
+                  <Card className="bg-accent/50 border-primary/20">
                     <CardContent className="p-3">
-                      <p className="text-sm font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
+                      <p className="text-sm font-semibold text-primary flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4" /> IN100 Consultado
                       </p>
                       <pre className="text-xs mt-2 bg-background p-2 rounded overflow-auto max-h-32">
