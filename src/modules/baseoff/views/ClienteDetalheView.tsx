@@ -20,6 +20,7 @@ import { ContratoCard } from '../components/ContratoCard';
 import { SimulationModal } from '../components/SimulationModal';
 import { ProfessionalProposalPDF } from '../components/ProfessionalProposalPDF';
 import { TrocoCalculator, TrocoSimulation } from '../components/TrocoCalculator';
+import { DigitacaoWizard } from '../components/DigitacaoWizard';
 import { formatDate, formatCurrency } from '../utils';
 import { validatePhone } from '../utils/phoneValidation';
 import { toast } from 'sonner';
