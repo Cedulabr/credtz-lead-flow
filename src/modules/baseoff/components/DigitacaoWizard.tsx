@@ -774,7 +774,7 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
                         {calcResult.installmentValue && (
                           <div>
                             <span className="text-muted-foreground">Parcela:</span>
-                            <p className="font-bold text-green-700">R$ {Number(calcResult.installmentValue).toFixed(2)}</p>
+                            <p className="font-bold text-primary">R$ {Number(calcResult.installmentValue).toFixed(2)}</p>
                           </div>
                         )}
                         {calcResult.loanValue && (
