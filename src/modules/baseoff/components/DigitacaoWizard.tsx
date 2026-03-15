@@ -843,7 +843,7 @@ export function DigitacaoWizard({ isOpen, onClose, client, contracts }: Digitaca
                         onChange={e => setDocBackFile(e.target.files?.[0] || null)}
                       />
                       {docBackFile && (
-                        <p className="text-xs text-green-600 mt-1">✓ {docBackFile.name}</p>
+                        <p className="text-xs text-primary mt-1">✓ {docBackFile.name}</p>
                       )}
                     </div>
                   </CardContent>
