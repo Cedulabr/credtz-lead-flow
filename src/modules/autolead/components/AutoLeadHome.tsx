@@ -1,8 +1,11 @@
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Zap, Play, History, Pause, RotateCcw } from "lucide-react";
+import { Zap, Play, History, Pause, RotateCcw, MessageSquare, AlertTriangle, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import type { AutoLeadJob } from "../types";
 
 interface AutoLeadHomeProps {
