@@ -74,7 +74,6 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
   }, [open]);
 
   // Fetch SMS credits (admin bypasses user_companies)
-  const { profile } = useAuth();
   const fetchSmsCredits = useCallback(async () => {
     if (!user?.id) return;
     setLoadingSmsCredits(true);
