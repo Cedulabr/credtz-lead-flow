@@ -104,6 +104,15 @@ export const PIPELINE_STAGES: Record<string, {
     dotColor: "bg-blue-500",
     order: 1
   },
+  autolead: { 
+    label: "Auto Lead", 
+    color: "from-teal-500 to-cyan-500", 
+    textColor: "text-teal-700", 
+    bgColor: "bg-teal-50",
+    borderColor: "border-teal-200",
+    dotColor: "bg-teal-500",
+    order: 2
+  },
   em_andamento: { 
     label: "Em Andamento", 
     color: "from-indigo-500 to-violet-500", 
@@ -198,7 +207,7 @@ export const PIPELINE_STAGES: Record<string, {
 
 // Status categories for quick filtering
 export const STATUS_CATEGORIES = {
-  active: ['new_lead', 'em_andamento', 'aguardando_retorno', 'agendamento'],
+  active: ['new_lead', 'autolead', 'em_andamento', 'aguardando_retorno', 'agendamento'],
   converted: ['cliente_fechado'],
   lost: ['recusou_oferta', 'sem_interesse', 'nao_e_cliente', 'sem_retorno', 'nao_e_whatsapp'],
   scheduled: ['contato_futuro', 'agendamento']

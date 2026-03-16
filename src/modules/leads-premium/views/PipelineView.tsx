@@ -2,6 +2,7 @@ import { useMemo, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Lead, LeadStats, PIPELINE_STAGES, UserProfile } from "../types";
 import { LeadMiniCard } from "../components/LeadMiniCard";
+import { ScheduleModal } from "../components/ScheduleModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,7 +21,8 @@ import {
   Users,
   Target,
   User,
-  Filter
+  Filter,
+  Bot
 } from "lucide-react";
 
 interface PipelineViewProps {
@@ -34,10 +36,11 @@ interface PipelineViewProps {
 
 const PIPELINE_COLUMNS = [
   { key: 'new_lead', icon: Sparkles, label: 'Novos' },
+  { key: 'autolead', icon: Bot, label: 'Auto Leads' },
   { key: 'em_andamento', icon: TrendingUp, label: 'Em Andamento' },
-  { key: 'aguardando_retorno', icon: Clock, label: 'Aguardando' },
-  { key: 'agendamento', icon: Calendar, label: 'Agendados' },
+  { key: 'agendamento', icon: Calendar, label: 'Agendamento' },
   { key: 'cliente_fechado', icon: CheckCircle, label: 'Fechados' },
+  { key: 'recusou_oferta', icon: XCircle, label: 'Recusados' },
 ];
 
 export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusChange, stats }: PipelineViewProps) {
@@ -47,6 +50,8 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
   
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [draggingLeadId, setDraggingLeadId] = useState<string | null>(null);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [scheduleTargetLead, setScheduleTargetLead] = useState<Lead | null>(null);
   
   // Pipeline filters
   const [filterUser, setFilterUser] = useState("all");
@@ -108,6 +113,13 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
     
     const lead = leads.find(l => l.id === leadId);
     if (!lead || lead.status === targetStatus) return;
+    
+    // Intercept drop on "agendamento" to open schedule modal
+    if (targetStatus === 'agendamento') {
+      setScheduleTargetLead(lead);
+      setScheduleModalOpen(true);
+      return;
+    }
     
     await onStatusChange(leadId, targetStatus);
   }, [leads, onStatusChange]);
@@ -278,7 +290,7 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
       {filtersBar}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -356,7 +368,7 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
       </div>
 
       {/* Pipeline Columns with Drag & Drop */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-6 gap-3">
         {PIPELINE_COLUMNS.map((column, colIndex) => {
           const config = PIPELINE_STAGES[column.key];
           const columnLeads = groupedLeads[column.key] || [];
@@ -437,6 +449,18 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
           );
         })}
       </div>
+
+      <ScheduleModal
+        open={scheduleModalOpen}
+        onOpenChange={setScheduleModalOpen}
+        lead={scheduleTargetLead}
+        onConfirm={() => {
+          // Trigger a refresh by calling onStatusChange with the same status
+          if (scheduleTargetLead && onStatusChange) {
+            onStatusChange(scheduleTargetLead.id, 'agendamento');
+          }
+        }}
+      />
     </div>
   );
 }

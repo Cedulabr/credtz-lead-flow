@@ -203,6 +203,34 @@ export function useAutoLead() {
       return null;
     }
 
+    // Insert leads into leads table with status 'autolead' for Leads Premium
+    try {
+      const leadsToInsert = leadsArray.map((lead: any) => ({
+        name: lead.name,
+        cpf: lead.cpf ?? '',
+        phone: lead.phone,
+        phone2: lead.phone2 || null,
+        convenio: lead.convenio,
+        status: 'autolead',
+        created_by: user.id,
+        assigned_to: user.id,
+        origem_lead: 'AutoLead',
+        banco_operacao: lead.banco,
+        requested_at: new Date().toISOString(),
+        requested_by: user.id,
+        history: JSON.stringify([{
+          action: 'created',
+          timestamp: new Date().toISOString(),
+          user_id: user.id,
+          note: 'Lead gerado via AutoLead'
+        }])
+      }));
+
+      await supabase.from('leads').insert(leadsToInsert);
+    } catch (e) {
+      console.error('Erro ao inserir leads no Premium:', e);
+    }
+
     // 2. Create job
     const { data: job, error: jobError } = await (supabase as any)
       .from("autolead_jobs")
