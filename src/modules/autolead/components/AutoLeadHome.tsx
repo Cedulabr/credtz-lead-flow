@@ -108,11 +108,46 @@ export function AutoLeadHome({ credits, activeJob, jobs, onStartWizard, onViewJo
               {activeJob ? "Prospecção em andamento" : "Iniciar Prospecção"}
             </Button>
             {credits <= 0 && (
-              <p className="text-xs text-destructive">Solicite créditos ao administrador</p>
+              <p className="text-xs text-destructive">
+                {isGestor
+                  ? "Adquira créditos para iniciar a prospecção"
+                  : "Solicite créditos ao seu gestor"}
+              </p>
             )}
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* SMS Upsell Banner */}
+      {smsCredits !== null && smsCredits <= 0 && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-full bg-amber-500/10 shrink-0">
+                  <TrendingUp className="h-5 w-5 text-amber-600" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                    ⚠️ Você está utilizando apenas WhatsApp
+                  </p>
+                  <p className="text-xs text-amber-700/80 dark:text-amber-400/80">
+                    Adicionar créditos de SMS pode aumentar sua taxa de resposta em até <span className="font-bold">40%</span>.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-amber-600 shrink-0" />
+                <p className="text-xs text-muted-foreground">
+                  {isGestor
+                    ? "Adquira créditos SMS para potencializar seus resultados."
+                    : "Solicite créditos SMS ao seu gestor para melhores resultados."}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Active Job */}
       {activeJob && (
