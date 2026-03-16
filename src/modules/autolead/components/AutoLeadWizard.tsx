@@ -28,7 +28,7 @@ interface AutoLeadWizardProps {
 }
 
 export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWizardProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const { instances, loadingInstances } = useWhatsApp();
