@@ -72,6 +72,12 @@ export const WHATSAPP_TEMPLATES = [
     template: 'Olá {{nome}}, tudo bem?\n\nConseguimos identificar uma condição especial para reduzir o valor da sua parcela atual, mantendo as mesmas condições. Quer saber mais? Estou à disposição!',
   },
   {
+    id: 'portabilidade_troco',
+    label: 'Portabilidade com Troco',
+    icon: '🔄',
+    template: 'Olá {{nome}}, tudo bem?\n\nIdentificamos que você pode fazer a portabilidade do seu empréstimo e ainda receber um troco! Quer saber o valor? Fale comigo!',
+  },
+  {
     id: 'oportunidade_exclusiva',
     label: 'Oportunidade Exclusiva',
     icon: '⭐',
@@ -84,19 +90,19 @@ export const SMS_TEMPLATES = [
     id: 'valor_sem_aumento',
     label: 'Novo Valor sem Aumento',
     icon: '💰',
-    template: 'Identificamos possibilidade de liberar um novo valor sem aumentar a sua parcela. Quer saber quanto? Fale comigo: {{whatsapp}}',
+    template: 'Identificamos possibilidade de liberar um novo valor sem aumentar a sua parcela. Quer saber quanto? Fale comigo: https://wa.me/55{{whatsapp}}',
   },
   {
     id: 'reducao_parcela',
     label: 'Redução de Parcela',
     icon: '📉',
-    template: 'Identificamos uma condição especial para reduzir o valor da sua parcela atual. Quer saber mais? Fale comigo: {{whatsapp}}',
+    template: 'Identificamos uma condição especial para reduzir o valor da sua parcela atual. Quer saber mais? Fale comigo: https://wa.me/55{{whatsapp}}',
   },
   {
     id: 'oportunidade',
     label: 'Nova Oportunidade',
     icon: '⭐',
-    template: 'Surgiu uma nova oportunidade de crédito para você com condições especiais. Saiba mais: {{whatsapp}}',
+    template: 'Surgiu uma nova oportunidade de crédito para você com condições especiais. Saiba mais: https://wa.me/55{{whatsapp}}',
   },
 ];
 
