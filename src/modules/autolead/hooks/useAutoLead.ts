@@ -195,20 +195,20 @@ export function useAutoLead() {
       .limit(1)
       .maybeSingle();
 
-    // 1. Request leads via existing RPC
-    const { data: leads, error: leadsError } = await supabase.rpc(
-      "request_leads_with_credits" as any,
+    // 1. Request leads via existing RPC (5-param overload with ddd_filter)
+    const { data: leads, error: leadsError } = await (supabase as any).rpc(
+      "request_leads_with_credits",
       {
         leads_requested: wizardData.quantidade,
         ddd_filter: wizardData.ddds.length > 0 ? wizardData.ddds : null,
         convenio_filter: wizardData.tipoLead === "todos" ? null : wizardData.tipoLead,
         banco_filter: null,
         produto_filter: null,
-        tag_filter: wizardData.tags && wizardData.tags.length > 0 ? wizardData.tags : null,
       }
     );
 
     if (leadsError) {
+      console.error("RPC request_leads_with_credits error:", leadsError);
       toast.error(leadsError.message || "Erro ao solicitar leads");
       return null;
     }

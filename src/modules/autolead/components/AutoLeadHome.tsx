@@ -31,9 +31,22 @@ export function AutoLeadHome({ credits, activeJob, jobs, onStartWizard, onViewJo
   const [smsCredits, setSmsCredits] = useState<number | null>(null);
   const [isGestor, setIsGestor] = useState(false);
 
+  const { profile } = useAuth();
   const fetchSmsAndRole = useCallback(async () => {
     if (!user?.id) return;
     try {
+      // Admin: busca direto na sms_credits com próprio user_id
+      if (profile?.role === 'admin') {
+        const { data: creditData } = await supabase
+          .from("sms_credits")
+          .select("credits_balance")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        setSmsCredits(creditData?.credits_balance ?? 0);
+        setIsGestor(true);
+        return;
+      }
+
       const { data: ucData } = await supabase
         .from("user_companies")
         .select("company_id, company_role")
@@ -70,7 +83,7 @@ export function AutoLeadHome({ credits, activeJob, jobs, onStartWizard, onViewJo
     } catch {
       setSmsCredits(0);
     }
-  }, [user?.id]);
+  }, [user?.id, profile?.role]);
 
   useEffect(() => { fetchSmsAndRole(); }, [fetchSmsAndRole]);
 

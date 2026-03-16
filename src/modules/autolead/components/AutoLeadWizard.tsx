@@ -73,11 +73,25 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
     fetchTags();
   }, [open]);
 
-  // Fetch SMS credits
+  // Fetch SMS credits (admin bypasses user_companies)
+  const { profile } = useAuth();
   const fetchSmsCredits = useCallback(async () => {
     if (!user?.id) return;
     setLoadingSmsCredits(true);
     try {
+      // Admin: busca direto na sms_credits com próprio user_id
+      if (profile?.role === 'admin') {
+        const { data: creditData } = await supabase
+          .from("sms_credits")
+          .select("credits_balance")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        setSmsCredits(creditData?.credits_balance ?? 0);
+        setIsGestor(true);
+        setLoadingSmsCredits(false);
+        return;
+      }
+
       const { data: ucData } = await supabase
         .from("user_companies")
         .select("company_id, company_role")
@@ -118,7 +132,7 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
       setSmsCredits(0);
     }
     setLoadingSmsCredits(false);
-  }, [user?.id]);
+  }, [user?.id, profile?.role]);
 
   useEffect(() => {
     if (open) fetchSmsCredits();
