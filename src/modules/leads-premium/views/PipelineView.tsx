@@ -21,7 +21,8 @@ import {
   Users,
   Target,
   User,
-  Filter
+  Filter,
+  Bot
 } from "lucide-react";
 
 interface PipelineViewProps {
