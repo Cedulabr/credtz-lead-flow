@@ -114,6 +114,13 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
     const lead = leads.find(l => l.id === leadId);
     if (!lead || lead.status === targetStatus) return;
     
+    // Intercept drop on "agendamento" to open schedule modal
+    if (targetStatus === 'agendamento') {
+      setScheduleTargetLead(lead);
+      setScheduleModalOpen(true);
+      return;
+    }
+    
     await onStatusChange(leadId, targetStatus);
   }, [leads, onStatusChange]);
 
