@@ -27,6 +27,53 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 export function AutoLeadHome({ credits, activeJob, jobs, onStartWizard, onViewJob, onPause, onResume }: AutoLeadHomeProps) {
+  const { user } = useAuth();
+  const [smsCredits, setSmsCredits] = useState<number | null>(null);
+  const [isGestor, setIsGestor] = useState(false);
+
+  const fetchSmsAndRole = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const { data: ucData } = await supabase
+        .from("user_companies")
+        .select("company_id, company_role")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+
+      if (!ucData?.company_id) { setSmsCredits(0); return; }
+
+      const userIsGestor = ucData.company_role === 'gestor';
+      setIsGestor(userIsGestor);
+
+      let gestorId = user.id;
+      if (!userIsGestor) {
+        const { data: gestorData } = await supabase
+          .from("user_companies")
+          .select("user_id")
+          .eq("company_id", ucData.company_id)
+          .eq("company_role", "gestor")
+          .eq("is_active", true)
+          .limit(1)
+          .maybeSingle();
+        if (gestorData?.user_id) gestorId = gestorData.user_id;
+      }
+
+      const { data: creditData } = await supabase
+        .from("sms_credits")
+        .select("credits_balance")
+        .eq("user_id", gestorId)
+        .maybeSingle();
+
+      setSmsCredits(creditData?.credits_balance ?? 0);
+    } catch {
+      setSmsCredits(0);
+    }
+  }, [user?.id]);
+
+  useEffect(() => { fetchSmsAndRole(); }, [fetchSmsAndRole]);
+
   return (
     <div className="p-4 space-y-6 max-w-lg mx-auto">
       {/* Header */}
