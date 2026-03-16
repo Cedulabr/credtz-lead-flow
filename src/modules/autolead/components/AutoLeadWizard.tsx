@@ -90,6 +90,8 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
         return;
       }
 
+      setIsGestor(ucData.company_role === 'gestor');
+
       let gestorId = user.id;
       if (ucData.company_role !== 'gestor') {
         const { data: gestorData } = await supabase
