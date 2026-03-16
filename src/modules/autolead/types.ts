@@ -99,6 +99,12 @@ export const SMS_TEMPLATES = [
     template: 'Identificamos uma condição especial para reduzir o valor da sua parcela atual. Quer saber mais? Fale comigo: https://wa.me/55{{whatsapp}}',
   },
   {
+    id: 'portabilidade_troco',
+    label: 'Portabilidade com Troco',
+    icon: '🔄',
+    template: 'Você pode fazer a portabilidade do seu empréstimo e ainda receber um troco! Saiba o valor: https://wa.me/55{{whatsapp}}',
+  },
+  {
     id: 'oportunidade',
     label: 'Nova Oportunidade',
     icon: '⭐',
