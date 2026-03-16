@@ -104,6 +104,15 @@ export const PIPELINE_STAGES: Record<string, {
     dotColor: "bg-blue-500",
     order: 1
   },
+  autolead: { 
+    label: "Auto Lead", 
+    color: "from-teal-500 to-cyan-500", 
+    textColor: "text-teal-700", 
+    bgColor: "bg-teal-50",
+    borderColor: "border-teal-200",
+    dotColor: "bg-teal-500",
+    order: 2
+  },
   em_andamento: { 
     label: "Em Andamento", 
     color: "from-indigo-500 to-violet-500", 
