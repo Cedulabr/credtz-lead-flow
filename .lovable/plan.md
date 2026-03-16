@@ -1,80 +1,43 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## AutoLead — Novas Copies, DDD com Tags e Preview de Mensagens
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Resumo
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+Três mudanças no módulo AutoLead:
+1. Atualizar as copies de SMS e WhatsApp com o novo texto solicitado + 2 variações
+2. Redesenhar o step de DDD para mostrar os principais primeiro com "Ver mais" expansível, e incluir seleção de Tags no mesmo step (como no módulo Pedir Leads)
+3. Adicionar preview visual no resumo mostrando como as mensagens chegam via WhatsApp (balão verde) e SMS (balão cinza)
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+### Mudanças em Detalhe
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+**Step DDD + TAG (Step 1) — Merge dos steps 1 e 2 atuais:**
+- DDDs em destaque (grid 5 colunas) com os 10 principais
+- Botão "Ver mais DDDs" expandindo uma ScrollArea com todos os outros DDDs do Brasil
+- Seção de Tags logo abaixo (carregadas do banco via `get_available_tags` RPC, como no Pedir Leads)
+- Reduz o wizard de 7 para 6 steps
 
----
+**Novas Copies WhatsApp (Step 2 — Mensagem WA):**
+- Templates de WhatsApp selecionáveis em cards (como os SMS):
+  1. **Mensagem Padrão** (a atual)
+  2. **Novo Valor sem Aumento**: "Identificamos possibilidade de liberar um novo valor sem aumentar a sua parcela. Quer saber quanto? Fale comigo!"
+  3. **Redução de Parcela**: "Conseguimos identificar uma condição especial para reduzir o valor da sua parcela atual..."
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+**Novas Copies SMS (Step 3):**
+  1. **Novo Valor sem Aumento**: "Identificamos possibilidade de liberar um novo valor sem aumentar a sua parcela. Quer saber quanto? Fale comigo: {{whatsapp}}"
+  2. **Redução de Parcela**: "Identificamos uma condição especial para reduzir o valor da sua parcela atual..."
+  3. **Nova Oportunidade**: "Surgiu uma nova oportunidade de crédito para você..."
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+**Preview no Resumo (Step 5):**
+- Seção "Como o lead vai receber" com dois cards visuais:
+  - Balão verde estilo WhatsApp com a mensagem renderizada (substituindo variáveis por dados de exemplo)
+  - Balão cinza estilo SMS com a mensagem renderizada
+  - Mostra apenas SMS se `smsEnabled` estiver ativo
 
-**Arquitetura:**
+### Arquivos a Modificar
 
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
-```
-
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
-
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
-
----
-
-### 3. Simplificar modulo Base OFF - apenas Consulta
-
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
-
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
-
----
-
-### Arquivos a modificar
-
-| Arquivo | Mudanca |
+| Arquivo | Ação |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
-
----
-
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+| `src/modules/autolead/types.ts` | Adicionar `WHATSAPP_TEMPLATES`, `ALL_DDDS`, `FEATURED_DDDS` como array de strings, atualizar `SMS_TEMPLATES`, adicionar `tags` ao `WizardData` |
+| `src/modules/autolead/components/AutoLeadWizard.tsx` | Merge DDD+TAG em 1 step com pattern featured/expandable, WhatsApp templates selecionáveis, preview dual no resumo, reduzir de 7 para 6 steps |
 
