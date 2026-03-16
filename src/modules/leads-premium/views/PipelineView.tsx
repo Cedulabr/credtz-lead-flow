@@ -50,6 +50,8 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
   
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [draggingLeadId, setDraggingLeadId] = useState<string | null>(null);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [scheduleTargetLead, setScheduleTargetLead] = useState<Lead | null>(null);
   
   // Pipeline filters
   const [filterUser, setFilterUser] = useState("all");
