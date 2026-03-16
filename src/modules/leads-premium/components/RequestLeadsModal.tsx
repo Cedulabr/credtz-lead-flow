@@ -363,8 +363,11 @@ export function RequestLeadsModal({
             </SheetTitle>
           </SheetHeader>
           <ScrollArea className="flex-1 -mx-6 px-6">
-            {content}
+            {scrollContent}
           </ScrollArea>
+          <div className="-mx-6 px-6">
+            {footerButton}
+          </div>
         </SheetContent>
       </Sheet>
     );
@@ -380,8 +383,9 @@ export function RequestLeadsModal({
           </DialogTitle>
         </DialogHeader>
         <ScrollArea className="flex-1 pr-4 -mr-4">
-          {content}
+          {scrollContent}
         </ScrollArea>
+        {footerButton}
       </DialogContent>
     </Dialog>
   );
