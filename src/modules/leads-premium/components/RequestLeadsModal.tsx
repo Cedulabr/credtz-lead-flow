@@ -137,12 +137,12 @@ export function RequestLeadsModal({
   
   const otherDDDs = availableDDDs.filter(d => !FEATURED_DDDS.includes(d.ddd));
 
-  const content = (
+  const scrollContent = (
     <div className="space-y-5 py-2">
       {/* Credits Display - Compact */}
-      <div className="flex items-center justify-between p-3 rounded-xl bg-primary/10 border border-primary/20">
+      <div className="flex items-center justify-between p-3 rounded-xl bg-primary/10 border border-primary/20 animate-fade-in transition-all hover:shadow-md" style={{ animationDelay: '0ms' }}>
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
+          <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center animate-pulse-soft">
             <CreditCard className="h-5 w-5 text-primary" />
           </div>
           <div>
@@ -153,7 +153,7 @@ export function RequestLeadsModal({
       </div>
 
       {/* Quantidade - Quick Select */}
-      <div className="space-y-2">
+      <div className="space-y-2 animate-fade-in" style={{ animationDelay: '80ms' }}>
         <Label className="text-sm font-semibold flex items-center gap-2">
           <Users className="h-4 w-4 text-muted-foreground" />
           Quantidade de Leads
@@ -166,7 +166,7 @@ export function RequestLeadsModal({
               size="sm"
               onClick={() => setRequestCount(num)}
               disabled={num > userCredits}
-              className="h-10"
+              className="h-10 transition-all hover:scale-105"
             >
               {num}
             </Button>
@@ -187,7 +187,7 @@ export function RequestLeadsModal({
       </div>
 
       {/* Convênio - Always visible */}
-      <div className="space-y-2">
+      <div className="space-y-2 animate-fade-in" style={{ animationDelay: '160ms' }}>
         <Label className="text-sm font-semibold flex items-center gap-2">
           <Building2 className="h-4 w-4 text-muted-foreground" />
           Convênio
@@ -214,25 +214,25 @@ export function RequestLeadsModal({
 
       {/* DDDs - Featured Section */}
       {availableDDDs.length > 0 && (
-        <div className="space-y-3">
+        <div className="space-y-3 animate-fade-in" style={{ animationDelay: '240ms' }}>
           <Label className="text-sm font-semibold flex items-center gap-2">
             <MapPin className="h-4 w-4 text-muted-foreground" />
             Região (DDD)
             {selectedDDDs.length > 0 && (
-              <Badge variant="default" className="ml-2 text-xs">
+              <Badge variant="default" className="ml-2 text-xs animate-scale-in">
                 {selectedDDDs.length} selecionado{selectedDDDs.length > 1 ? 's' : ''}
               </Badge>
             )}
           </Label>
           
-          {/* Featured DDDs - Grid maior */}
-          <div className="grid grid-cols-5 gap-2">
+          {/* Featured DDDs - Responsive Grid */}
+          <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
             {featuredDDDsWithCount.map((d) => (
               <button
                 key={d.ddd}
                 onClick={() => toggleDDD(d.ddd)}
                 className={cn(
-                  "flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all",
+                  "flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all hover:scale-105",
                   "hover:border-primary/50 hover:bg-primary/5",
                   selectedDDDs.includes(d.ddd)
                     ? "border-primary bg-primary/10 text-primary"
@@ -264,7 +264,7 @@ export function RequestLeadsModal({
                         key={d.ddd}
                         variant={selectedDDDs.includes(d.ddd) ? "default" : "outline"}
                         className={cn(
-                          "cursor-pointer transition-all text-xs py-1 px-2",
+                          "cursor-pointer transition-all text-xs py-1 px-2 hover:scale-105",
                           selectedDDDs.includes(d.ddd) && "ring-2 ring-primary/30"
                         )}
                         onClick={() => toggleDDD(d.ddd)}
@@ -295,7 +295,7 @@ export function RequestLeadsModal({
 
       {/* Tags - Optional */}
       {availableTags.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-2 animate-fade-in" style={{ animationDelay: '320ms' }}>
           <Label className="text-sm font-semibold flex items-center gap-2">
             <Tag className="h-4 w-4 text-muted-foreground" />
             Tags
@@ -308,7 +308,7 @@ export function RequestLeadsModal({
                   key={t.tag}
                   variant={selectedTags.includes(t.tag) ? "default" : "outline"}
                   className={cn(
-                    "cursor-pointer transition-all text-xs",
+                    "cursor-pointer transition-all text-xs hover:scale-105",
                     selectedTags.includes(t.tag) && "ring-2 ring-primary/30"
                   )}
                   onClick={() => toggleTag(t.tag)}
@@ -321,10 +321,14 @@ export function RequestLeadsModal({
           </ScrollArea>
         </div>
       )}
+    </div>
+  );
 
-      {/* Submit Button */}
+  const footerButton = (
+    <div className="flex-shrink-0 pt-3 pb-1 border-t border-border bg-background">
       <Button 
-        className="w-full h-12 text-base font-semibold mt-4" 
+        className="w-full h-12 text-base font-semibold animate-fade-in" 
+        style={{ animationDelay: '400ms' }}
         onClick={handleRequest}
         disabled={isRequesting || requestCount > userCredits || requestCount < 1 || userCredits <= 0}
       >
@@ -340,9 +344,8 @@ export function RequestLeadsModal({
           </>
         )}
       </Button>
-
       {userCredits <= 0 && (
-        <p className="text-sm text-center text-destructive">
+        <p className="text-sm text-center text-destructive mt-2">
           Você não possui créditos. Solicite ao administrador.
         </p>
       )}
@@ -360,8 +363,11 @@ export function RequestLeadsModal({
             </SheetTitle>
           </SheetHeader>
           <ScrollArea className="flex-1 -mx-6 px-6">
-            {content}
+            {scrollContent}
           </ScrollArea>
+          <div className="-mx-6 px-6">
+            {footerButton}
+          </div>
         </SheetContent>
       </Sheet>
     );
@@ -377,8 +383,9 @@ export function RequestLeadsModal({
           </DialogTitle>
         </DialogHeader>
         <ScrollArea className="flex-1 pr-4 -mr-4">
-          {content}
+          {scrollContent}
         </ScrollArea>
+        {footerButton}
       </DialogContent>
     </Dialog>
   );
