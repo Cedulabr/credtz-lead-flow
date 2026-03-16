@@ -449,6 +449,18 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
           );
         })}
       </div>
+
+      <ScheduleModal
+        open={scheduleModalOpen}
+        onOpenChange={setScheduleModalOpen}
+        lead={scheduleTargetLead}
+        onConfirm={() => {
+          // Trigger a refresh by calling onStatusChange with the same status
+          if (scheduleTargetLead && onStatusChange) {
+            onStatusChange(scheduleTargetLead.id, 'agendamento');
+          }
+        }}
+      />
     </div>
   );
 }
