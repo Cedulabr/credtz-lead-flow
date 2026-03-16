@@ -368,7 +368,7 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
       </div>
 
       {/* Pipeline Columns with Drag & Drop */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-6 gap-3">
         {PIPELINE_COLUMNS.map((column, colIndex) => {
           const config = PIPELINE_STAGES[column.key];
           const columnLeads = groupedLeads[column.key] || [];
