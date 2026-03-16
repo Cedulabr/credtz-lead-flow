@@ -2,6 +2,7 @@ import { useMemo, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Lead, LeadStats, PIPELINE_STAGES, UserProfile } from "../types";
 import { LeadMiniCard } from "../components/LeadMiniCard";
+import { ScheduleModal } from "../components/ScheduleModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
