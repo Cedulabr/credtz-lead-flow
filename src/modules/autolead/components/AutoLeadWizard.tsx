@@ -55,16 +55,18 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
   const connectedInstances = instances.filter(i => i.hasToken);
   const extraDdds = ALL_DDDS.filter(d => !FEATURED_DDDS.includes(d));
 
-  // Fetch available tags
+  // Fetch available tags from leads_database
   useEffect(() => {
     if (!open) return;
     const fetchTags = async () => {
-      const { data: leads } = await supabase
-        .from("activate_leads")
-        .select("origem")
-        .not("origem", "is", null);
-      if (leads) {
-        const unique = [...new Set(leads.map(l => l.origem).filter(Boolean))];
+      const { data: tagData } = await supabase
+        .from("leads_database")
+        .select("tag")
+        .not("tag", "is", null)
+        .eq("is_available", true)
+        .limit(500);
+      if (tagData) {
+        const unique = [...new Set(tagData.map((l: any) => l.tag).filter(Boolean))] as string[];
         setAvailableTags(unique);
       }
     };
