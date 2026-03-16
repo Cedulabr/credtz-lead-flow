@@ -1,80 +1,45 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## AutoLead — SMS Portabilidade, Leads no Premium, Pipeline Kanban e Agendamento
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### 4 Mudanças
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+**1. Adicionar template SMS "Portabilidade com Troco"**
+Em `types.ts`, adicionar ao array `SMS_TEMPLATES` o modelo com link wa.me, igual aos demais.
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+**2. Leads do AutoLead aparecem no Leads Premium com status "autolead"**
+No `useAutoLead.ts`, após o RPC `request_leads_with_credits` retornar os leads, inserir cada um na tabela `leads` com `status: 'autolead'` e `origem_lead: 'AutoLead'` — mesma lógica que `useLeadsPremium.ts` faz (linhas 303-324) mas com status diferente.
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
+Adicionar o status `autolead` ao `PIPELINE_STAGES` em `types.ts` do módulo leads-premium.
 
----
+**3. Atualizar colunas do Kanban Pipeline**
+Em `PipelineView.tsx`, atualizar `PIPELINE_COLUMNS` para as 6 colunas solicitadas:
+- Novos (`new_lead`)
+- Auto Leads (`autolead`) — novo
+- Em Andamento (`em_andamento`)
+- Agendamento (`agendamento`)
+- Fechado (`cliente_fechado`)
+- Recusado (`recusou_oferta`)
 
-### 2. Conectar Base OFF ao PostgreSQL externo
+Grid muda de `grid-cols-5` para `grid-cols-6`.
 
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+**4. Modal de agendamento ao arrastar para "Agendamento"**
+No `PipelineView.tsx`, ao fazer drop na coluna `agendamento`, interceptar e abrir um modal/dialog com:
+- Data do agendamento (input date)
+- Horário (input time)
+- Observação (textarea)
+- Toggle "Agendar mensagem SMS" + campo de texto SMS
+- Toggle "Agendar mensagem WhatsApp" + campo de texto WhatsApp
 
-**Arquitetura:**
+Ao confirmar, salvar `future_contact_date` e `future_contact_time` no lead, e agendar as mensagens na tabela `autolead_messages` (ou via SMS automation) se ativado.
 
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
-```
+### Arquivos a Modificar
 
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
-
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
-
----
-
-### 3. Simplificar modulo Base OFF - apenas Consulta
-
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
-
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
-
----
-
-### Arquivos a modificar
-
-| Arquivo | Mudanca |
+| Arquivo | Ação |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
-
----
-
-### Pergunta necessaria
-
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+| `src/modules/autolead/types.ts` | Adicionar SMS template "Portabilidade com Troco" |
+| `src/modules/autolead/hooks/useAutoLead.ts` | Inserir leads na tabela `leads` com status `autolead` após RPC |
+| `src/modules/leads-premium/types.ts` | Adicionar stage `autolead` ao `PIPELINE_STAGES` |
+| `src/modules/leads-premium/views/PipelineView.tsx` | Atualizar colunas (6), adicionar modal de agendamento no drop |
+| `src/modules/leads-premium/components/ScheduleModal.tsx` | Novo — Modal de agendamento com campos de data/hora e mensagens SMS/WA |
 
