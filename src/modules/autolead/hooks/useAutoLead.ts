@@ -213,6 +213,7 @@ export function useAutoLead() {
         message_template: wizardData.useDefaultMessage ? DEFAULT_MESSAGE : wizardData.messageTemplate,
         use_default_message: wizardData.useDefaultMessage,
         selected_ddds: wizardData.ddds,
+        selected_tags: wizardData.tags || [],
         tipo_lead: wizardData.tipoLead,
         whatsapp_instance_ids: wizardData.whatsappInstanceIds,
         started_at: new Date().toISOString(),

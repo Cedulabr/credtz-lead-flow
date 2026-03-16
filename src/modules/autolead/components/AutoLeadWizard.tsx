@@ -6,16 +6,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { CompactStepIndicator } from "@/components/ui/form-wizard";
-import { ChevronLeft, ChevronRight, Check, Loader2, Zap, MessageSquare, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Loader2, Zap, MessageSquare, AlertTriangle, ChevronDown, Smartphone, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useWhatsApp, type WhatsAppInstance } from "@/hooks/useWhatsApp";
+import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { DEFAULT_MESSAGE, TIPOS_LEAD, FEATURED_DDDS, QUANTITY_PRESETS, SMS_TEMPLATES, type WizardData } from "../types";
+import {
+  DEFAULT_MESSAGE, TIPOS_LEAD, FEATURED_DDDS, ALL_DDDS, DDD_CITIES,
+  QUANTITY_PRESETS, SMS_TEMPLATES, WHATSAPP_TEMPLATES, type WizardData
+} from "../types";
 
 interface AutoLeadWizardProps {
   open: boolean;
@@ -29,6 +32,8 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const { instances, loadingInstances } = useWhatsApp();
+  const [showAllDdds, setShowAllDdds] = useState(false);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   const [smsCredits, setSmsCredits] = useState<number | null>(null);
   const [loadingSmsCredits, setLoadingSmsCredits] = useState(true);
@@ -36,6 +41,7 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
   const [data, setData] = useState<WizardData>({
     quantidade: Math.min(10, credits),
     ddds: [],
+    tags: [],
     tipoLead: null,
     useDefaultMessage: true,
     messageTemplate: DEFAULT_MESSAGE,
@@ -44,15 +50,31 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
     smsTemplate: SMS_TEMPLATES[0].template,
   });
 
-  const totalSteps = 7;
+  const totalSteps = 6;
   const connectedInstances = instances.filter(i => i.hasToken);
+  const extraDdds = ALL_DDDS.filter(d => !FEATURED_DDDS.includes(d));
 
-  // Fetch SMS credits from the gestor of the user's company
+  // Fetch available tags
+  useEffect(() => {
+    if (!open) return;
+    const fetchTags = async () => {
+      const { data: leads } = await supabase
+        .from("activate_leads")
+        .select("origem")
+        .not("origem", "is", null);
+      if (leads) {
+        const unique = [...new Set(leads.map(l => l.origem).filter(Boolean))];
+        setAvailableTags(unique);
+      }
+    };
+    fetchTags();
+  }, [open]);
+
+  // Fetch SMS credits
   const fetchSmsCredits = useCallback(async () => {
     if (!user?.id) return;
     setLoadingSmsCredits(true);
     try {
-      // Get user's company and gestor
       const { data: ucData } = await supabase
         .from("user_companies")
         .select("company_id, company_role")
@@ -67,7 +89,6 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
         return;
       }
 
-      // Find gestor of the company
       let gestorId = user.id;
       if (ucData.company_role !== 'gestor') {
         const { data: gestorData } = await supabase
@@ -78,12 +99,9 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
           .eq("is_active", true)
           .limit(1)
           .maybeSingle();
-        if (gestorData?.user_id) {
-          gestorId = gestorData.user_id;
-        }
+        if (gestorData?.user_id) gestorId = gestorData.user_id;
       }
 
-      // Get SMS credits of the gestor
       const { data: creditData } = await supabase
         .from("sms_credits")
         .select("credits_balance")
@@ -101,7 +119,6 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
     if (open) fetchSmsCredits();
   }, [open, fetchSmsCredits]);
 
-  // Auto-disable SMS if no credits
   useEffect(() => {
     if (smsCredits !== null && smsCredits <= 0) {
       setData(prev => ({ ...prev, smsEnabled: false }));
@@ -111,12 +128,11 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
   const canProceed = (): boolean => {
     switch (step) {
       case 0: return data.quantidade > 0 && data.quantidade <= credits;
-      case 1: return true;
-      case 2: return !!data.tipoLead;
-      case 3: return data.useDefaultMessage || data.messageTemplate.trim().length > 10;
-      case 4: return true; // SMS step — optional
-      case 5: return data.whatsappInstanceIds.length > 0;
-      case 6: return true;
+      case 1: return true; // DDD + Tags optional
+      case 2: return data.useDefaultMessage || data.messageTemplate.trim().length > 10;
+      case 3: return true; // SMS optional
+      case 4: return data.whatsappInstanceIds.length > 0;
+      case 5: return true;
       default: return false;
     }
   };
@@ -138,6 +154,13 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
     }));
   };
 
+  const toggleTag = (tag: string) => {
+    setData(prev => ({
+      ...prev,
+      tags: prev.tags.includes(tag) ? prev.tags.filter(t => t !== tag) : [...prev.tags, tag],
+    }));
+  };
+
   const toggleInstance = (id: string) => {
     setData(prev => ({
       ...prev,
@@ -147,15 +170,23 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
     }));
   };
 
-  // Get WhatsApp phone for preview
   const getWhatsAppPhone = () => {
-    if (data.whatsappInstanceIds.length === 0) return "(seu WhatsApp)";
+    if (data.whatsappInstanceIds.length === 0) return "(11) 99999-9999";
     const inst = connectedInstances.find(i => data.whatsappInstanceIds.includes(i.id));
-    return inst?.phone_number || "(seu WhatsApp)";
+    return inst?.phone_number || "(11) 99999-9999";
+  };
+
+  const renderPreviewMessage = (template: string) => {
+    return template
+      .replace(/\{\{nome\}\}/g, "João Silva")
+      .replace(/\{\{whatsapp\}\}/g, getWhatsAppPhone())
+      .replace(/\{\{cidade\}\}/g, "São Paulo")
+      .replace(/\{\{beneficio\}\}/g, "INSS");
   };
 
   const renderStep = () => {
     switch (step) {
+      // Step 0: Quantidade
       case 0:
         return (
           <div className="space-y-4">
@@ -190,113 +221,190 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
           </div>
         );
 
+      // Step 1: DDD + TAG (merged)
       case 1:
         return (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Selecione o DDD dos clientes (opcional)</p>
-            <div className="grid grid-cols-2 gap-2">
-              {FEATURED_DDDS.map(({ ddd, city }) => (
-                <Card
-                  key={ddd}
-                  className={cn(
-                    "cursor-pointer transition-all",
-                    data.ddds.includes(ddd) ? "border-primary bg-primary/5" : "hover:bg-muted/50"
-                  )}
-                  onClick={() => toggleDdd(ddd)}
-                >
-                  <CardContent className="p-3 flex items-center gap-2">
-                    <Checkbox checked={data.ddds.includes(ddd)} />
-                    <div>
-                      <p className="font-semibold text-sm">{ddd}</p>
-                      <p className="text-xs text-muted-foreground">{city}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+          <div className="space-y-5">
+            {/* DDD Section */}
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Selecione o DDD dos clientes <span className="text-muted-foreground font-normal">(opcional)</span></p>
+              <div className="grid grid-cols-5 gap-1.5">
+                {FEATURED_DDDS.map(ddd => (
+                  <button
+                    key={ddd}
+                    onClick={() => toggleDdd(ddd)}
+                    className={cn(
+                      "rounded-lg border p-2 text-center transition-all text-sm",
+                      data.ddds.includes(ddd)
+                        ? "border-primary bg-primary/10 text-primary font-semibold"
+                        : "border-border hover:bg-muted/50"
+                    )}
+                  >
+                    <span className="font-semibold">{ddd}</span>
+                    <span className="block text-[10px] text-muted-foreground truncate">{DDD_CITIES[ddd]}</span>
+                  </button>
+                ))}
+              </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs text-muted-foreground"
+                onClick={() => setShowAllDdds(!showAllDdds)}
+              >
+                {showAllDdds ? "Ocultar" : "Ver mais DDDs"}
+                <ChevronDown className={cn("h-3 w-3 ml-1 transition-transform", showAllDdds && "rotate-180")} />
+              </Button>
+
+              {showAllDdds && (
+                <ScrollArea className="h-40">
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {extraDdds.map(ddd => (
+                      <button
+                        key={ddd}
+                        onClick={() => toggleDdd(ddd)}
+                        className={cn(
+                          "rounded-lg border p-1.5 text-center transition-all text-xs",
+                          data.ddds.includes(ddd)
+                            ? "border-primary bg-primary/10 text-primary font-semibold"
+                            : "border-border hover:bg-muted/50"
+                        )}
+                      >
+                        {ddd}
+                      </button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+
+              {data.ddds.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {data.ddds.map(ddd => (
+                    <Badge key={ddd} variant="secondary" className="text-xs cursor-pointer" onClick={() => toggleDdd(ddd)}>
+                      {ddd} ✕
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* TAG Section */}
+            <div className="space-y-3 border-t pt-4">
+              <p className="text-sm font-medium">Selecione a TAG do lead <span className="text-muted-foreground font-normal">(opcional)</span></p>
+              <div className="grid grid-cols-2 gap-2">
+                {TIPOS_LEAD.map(tipo => (
+                  <Card
+                    key={tipo.id}
+                    className={cn(
+                      "cursor-pointer transition-all",
+                      data.tipoLead === tipo.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                    )}
+                    onClick={() => setData(prev => ({ ...prev, tipoLead: tipo.id }))}
+                  >
+                    <CardContent className="p-2.5 text-center space-y-0.5">
+                      <span className="text-xl">{tipo.icon}</span>
+                      <p className="font-medium text-xs">{tipo.label}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {availableTags.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">Tags disponíveis:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableTags.map(tag => (
+                      <Badge
+                        key={tag}
+                        variant={data.tags.includes(tag) ? "default" : "outline"}
+                        className="cursor-pointer text-xs"
+                        onClick={() => toggleTag(tag)}
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );
 
+      // Step 2: Mensagem WhatsApp (templates selecionáveis)
       case 2:
         return (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Selecione a TAG do lead</p>
-            <div className="grid grid-cols-2 gap-2">
-              {TIPOS_LEAD.map(tipo => (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">Escolha o modelo da mensagem WhatsApp:</p>
+
+            <div className="space-y-2">
+              {WHATSAPP_TEMPLATES.map(tmpl => (
                 <Card
-                  key={tipo.id}
+                  key={tmpl.id}
                   className={cn(
                     "cursor-pointer transition-all",
-                    data.tipoLead === tipo.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                    data.useDefaultMessage && data.messageTemplate === tmpl.template
+                      ? "border-primary bg-primary/5"
+                      : "hover:bg-muted/50"
                   )}
-                  onClick={() => setData(prev => ({ ...prev, tipoLead: tipo.id }))}
+                  onClick={() => setData(prev => ({
+                    ...prev,
+                    useDefaultMessage: true,
+                    messageTemplate: tmpl.template,
+                  }))}
                 >
-                  <CardContent className="p-3 text-center space-y-1">
-                    <span className="text-2xl">{tipo.icon}</span>
-                    <p className="font-medium text-sm">{tipo.label}</p>
+                  <CardContent className="p-3 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span>{tmpl.icon}</span>
+                      <p className="font-medium text-sm">{tmpl.label}</p>
+                      {data.useDefaultMessage && data.messageTemplate === tmpl.template && (
+                        <Check className="h-4 w-4 text-primary ml-auto" />
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{tmpl.template}</p>
                   </CardContent>
                 </Card>
               ))}
             </div>
-          </div>
-        );
 
-      case 3:
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Mensagem de saudação (WhatsApp)</p>
-            <RadioGroup
-              value={data.useDefaultMessage ? "default" : "custom"}
-              onValueChange={v => setData(prev => ({ ...prev, useDefaultMessage: v === "default" }))}
-              className="space-y-2"
+            <Card
+              className={cn(
+                "cursor-pointer transition-all",
+                !data.useDefaultMessage ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+              )}
+              onClick={() => setData(prev => ({ ...prev, useDefaultMessage: false }))}
             >
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="default" id="default" />
-                <Label htmlFor="default" className="text-sm">Usar mensagem padrão</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="custom" id="custom" />
-                <Label htmlFor="custom" className="text-sm">Personalizar mensagem</Label>
-              </div>
-            </RadioGroup>
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2">
+                  <span>✏️</span>
+                  <p className="font-medium text-sm">Personalizar mensagem</p>
+                  {!data.useDefaultMessage && <Check className="h-4 w-4 text-primary ml-auto" />}
+                </div>
+              </CardContent>
+            </Card>
 
             {!data.useDefaultMessage && (
               <div className="space-y-2">
                 <Textarea
                   value={data.messageTemplate}
                   onChange={e => setData(prev => ({ ...prev, messageTemplate: e.target.value }))}
-                  rows={6}
+                  rows={5}
                   placeholder="Digite sua mensagem..."
                 />
                 <div className="flex flex-wrap gap-1">
-                  <Badge variant="secondary" className="text-xs cursor-pointer"
-                    onClick={() => setData(prev => ({ ...prev, messageTemplate: prev.messageTemplate + " {{nome}}" }))}>
-                    {"{{nome}}"}
-                  </Badge>
-                  <Badge variant="secondary" className="text-xs cursor-pointer"
-                    onClick={() => setData(prev => ({ ...prev, messageTemplate: prev.messageTemplate + " {{cidade}}" }))}>
-                    {"{{cidade}}"}
-                  </Badge>
-                  <Badge variant="secondary" className="text-xs cursor-pointer"
-                    onClick={() => setData(prev => ({ ...prev, messageTemplate: prev.messageTemplate + " {{beneficio}}" }))}>
-                    {"{{beneficio}}"}
-                  </Badge>
+                  {["{{nome}}", "{{cidade}}", "{{beneficio}}"].map(v => (
+                    <Badge key={v} variant="secondary" className="text-xs cursor-pointer"
+                      onClick={() => setData(prev => ({ ...prev, messageTemplate: prev.messageTemplate + " " + v }))}>
+                      {v}
+                    </Badge>
+                  ))}
                 </div>
               </div>
-            )}
-
-            {data.useDefaultMessage && (
-              <Card className="bg-muted/50">
-                <CardContent className="p-3">
-                  <p className="text-xs text-muted-foreground whitespace-pre-line">{DEFAULT_MESSAGE}</p>
-                </CardContent>
-              </Card>
             )}
           </div>
         );
 
-      // NEW: SMS Step
-      case 4:
+      // Step 3: SMS
+      case 3:
         return (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -311,7 +419,6 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
               />
             </div>
 
-            {/* Credits info */}
             {loadingSmsCredits ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" /> Verificando créditos SMS...
@@ -322,17 +429,15 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
                   <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-destructive">Sem créditos SMS</p>
-                    <p className="text-xs text-muted-foreground">O gestor da sua empresa não possui créditos SMS. Solicite ao administrador.</p>
+                    <p className="text-xs text-muted-foreground">Solicite ao administrador.</p>
                   </div>
                 </CardContent>
               </Card>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Créditos SMS disponíveis: <span className="font-semibold text-primary">{smsCredits}</span>
+                Créditos SMS: <span className="font-semibold text-primary">{smsCredits}</span>
                 {data.smsEnabled && data.quantidade > (smsCredits || 0) && (
-                  <span className="text-destructive/80 ml-1">
-                    (apenas {smsCredits} de {data.quantidade} leads receberão SMS)
-                  </span>
+                  <span className="text-destructive/80 ml-1">(apenas {smsCredits} receberão SMS)</span>
                 )}
               </p>
             )}
@@ -340,27 +445,26 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
             {data.smsEnabled && (
               <>
                 <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">Escolha um modelo de SMS:</p>
-                  <div className="space-y-2">
-                    {SMS_TEMPLATES.map(tmpl => (
-                      <Card
-                        key={tmpl.id}
-                        className={cn(
-                          "cursor-pointer transition-all",
-                          data.smsTemplate === tmpl.template ? "border-primary bg-primary/5" : "hover:bg-muted/50"
-                        )}
-                        onClick={() => setData(prev => ({ ...prev, smsTemplate: tmpl.template }))}
-                      >
-                        <CardContent className="p-3 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span>{tmpl.icon}</span>
-                            <p className="font-medium text-sm">{tmpl.label}</p>
-                          </div>
-                          <p className="text-xs text-muted-foreground line-clamp-2">{tmpl.template}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                  <p className="text-sm text-muted-foreground">Escolha um modelo:</p>
+                  {SMS_TEMPLATES.map(tmpl => (
+                    <Card
+                      key={tmpl.id}
+                      className={cn(
+                        "cursor-pointer transition-all",
+                        data.smsTemplate === tmpl.template ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                      )}
+                      onClick={() => setData(prev => ({ ...prev, smsTemplate: tmpl.template }))}
+                    >
+                      <CardContent className="p-3 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span>{tmpl.icon}</span>
+                          <p className="font-medium text-sm">{tmpl.label}</p>
+                          {data.smsTemplate === tmpl.template && <Check className="h-4 w-4 text-primary ml-auto" />}
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-2">{tmpl.template}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
 
                 <div className="space-y-2">
@@ -368,38 +472,24 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
                   <Textarea
                     value={data.smsTemplate}
                     onChange={e => setData(prev => ({ ...prev, smsTemplate: e.target.value }))}
-                    rows={4}
-                    placeholder="Digite o texto do SMS..."
+                    rows={3}
                   />
                   <div className="flex flex-wrap gap-1">
-                    <Badge variant="secondary" className="text-xs cursor-pointer"
-                      onClick={() => setData(prev => ({ ...prev, smsTemplate: prev.smsTemplate + " {{nome}}" }))}>
-                      {"{{nome}}"}
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs cursor-pointer"
-                      onClick={() => setData(prev => ({ ...prev, smsTemplate: prev.smsTemplate + " {{whatsapp}}" }))}>
-                      {"{{whatsapp}}"}
-                    </Badge>
+                    {["{{nome}}", "{{whatsapp}}"].map(v => (
+                      <Badge key={v} variant="secondary" className="text-xs cursor-pointer"
+                        onClick={() => setData(prev => ({ ...prev, smsTemplate: prev.smsTemplate + " " + v }))}>
+                        {v}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
-
-                {/* Preview */}
-                <Card className="bg-muted/50">
-                  <CardContent className="p-3">
-                    <p className="text-xs font-medium mb-1 text-muted-foreground">Preview:</p>
-                    <p className="text-xs whitespace-pre-line">
-                      {data.smsTemplate
-                        .replace(/\{\{nome\}\}/g, "João Silva")
-                        .replace(/\{\{whatsapp\}\}/g, getWhatsAppPhone())}
-                    </p>
-                  </CardContent>
-                </Card>
               </>
             )}
           </div>
         );
 
-      case 5:
+      // Step 4: WhatsApp instances
+      case 4:
         return (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">Selecione os WhatsApps para envio (mínimo 1)</p>
@@ -437,7 +527,8 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
           </div>
         );
 
-      case 6:
+      // Step 5: Resumo + Preview
+      case 5:
         return (
           <div className="space-y-4">
             <p className="text-sm font-medium text-center">Resumo da prospecção</p>
@@ -445,8 +536,7 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
               <CardContent className="p-4 space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Leads:</span><span className="font-semibold">{data.quantidade}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">DDDs:</span><span className="font-semibold">{data.ddds.length > 0 ? data.ddds.join(", ") : "Todos"}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">TAG:</span><span className="font-semibold">{TIPOS_LEAD.find(t => t.id === data.tipoLead)?.label || "-"}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Mensagem WA:</span><span className="font-semibold">{data.useDefaultMessage ? "Padrão" : "Personalizada"}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">TAG:</span><span className="font-semibold">{TIPOS_LEAD.find(t => t.id === data.tipoLead)?.label || "Todos"}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">WhatsApps:</span><span className="font-semibold">{data.whatsappInstanceIds.length}</span></div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">SMS:</span>
@@ -456,6 +546,48 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
                 </div>
               </CardContent>
             </Card>
+
+            {/* Message Preview */}
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-center">📱 Como o lead vai receber</p>
+
+              {/* WhatsApp Preview */}
+              <div className="rounded-lg overflow-hidden border">
+                <div className="bg-[#075e54] px-3 py-2 flex items-center gap-2">
+                  <Smartphone className="h-4 w-4 text-white" />
+                  <span className="text-xs font-medium text-white">WhatsApp</span>
+                </div>
+                <div className="bg-[#e5ddd5] dark:bg-[#0b141a] p-3 min-h-[80px]">
+                  <div className="max-w-[85%] ml-auto bg-[#dcf8c6] dark:bg-[#005c4b] rounded-lg rounded-tr-none p-2.5 shadow-sm">
+                    <p className="text-xs text-[#111b21] dark:text-[#e9edef] whitespace-pre-line leading-relaxed">
+                      {renderPreviewMessage(data.messageTemplate)}
+                    </p>
+                    <p className="text-[10px] text-[#667781] dark:text-[#8696a0] text-right mt-1">
+                      08:32 ✓✓
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* SMS Preview */}
+              {data.smsEnabled && (
+                <div className="rounded-lg overflow-hidden border">
+                  <div className="bg-muted px-3 py-2 flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground">SMS</span>
+                  </div>
+                  <div className="bg-background p-3 min-h-[60px]">
+                    <div className="max-w-[85%] bg-muted rounded-lg rounded-tl-none p-2.5">
+                      <p className="text-xs text-foreground whitespace-pre-line leading-relaxed">
+                        {renderPreviewMessage(data.smsTemplate)}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground text-right mt-1">08:32</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="text-xs text-muted-foreground text-center space-y-1">
               <p>⏱ WhatsApp: delay aleatório de 2-7 min</p>
               <p>📱 SMS: envio imediato (sem delay)</p>
@@ -471,7 +603,7 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
     }
   };
 
-  const stepTitles = ["Créditos", "DDD", "TAG", "Mensagem WA", "SMS", "WhatsApp", "Confirmar"];
+  const stepTitles = ["Créditos", "DDD + TAG", "Mensagem WA", "SMS", "WhatsApp", "Confirmar"];
 
   return (
     <Sheet open={open} onOpenChange={() => !submitting && onClose()}>
