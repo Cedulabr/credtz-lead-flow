@@ -67,9 +67,25 @@ export function useAutoLead() {
     return () => { supabase.removeChannel(channel); };
   }, [activeJob?.id, fetchMessages, fetchJobs]);
 
-  // Helper: get gestor's SMS credits and gestor ID
+  // Helper: get gestor's SMS credits and gestor ID (admin bypasses user_companies)
   const getGestorSmsInfo = useCallback(async (): Promise<{ gestorId: string; credits: number } | null> => {
     if (!user?.id) return null;
+
+    // Admin: busca direto
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileData?.role === 'admin') {
+      const { data: creditData } = await supabase
+        .from("sms_credits")
+        .select("credits_balance")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      return { gestorId: user.id, credits: creditData?.credits_balance ?? 0 };
+    }
 
     const { data: ucData } = await supabase
       .from("user_companies")
