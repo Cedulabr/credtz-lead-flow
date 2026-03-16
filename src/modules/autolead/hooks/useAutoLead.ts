@@ -67,9 +67,25 @@ export function useAutoLead() {
     return () => { supabase.removeChannel(channel); };
   }, [activeJob?.id, fetchMessages, fetchJobs]);
 
-  // Helper: get gestor's SMS credits and gestor ID
+  // Helper: get gestor's SMS credits and gestor ID (admin bypasses user_companies)
   const getGestorSmsInfo = useCallback(async (): Promise<{ gestorId: string; credits: number } | null> => {
     if (!user?.id) return null;
+
+    // Admin: busca direto
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileData?.role === 'admin') {
+      const { data: creditData } = await supabase
+        .from("sms_credits")
+        .select("credits_balance")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      return { gestorId: user.id, credits: creditData?.credits_balance ?? 0 };
+    }
 
     const { data: ucData } = await supabase
       .from("user_companies")
@@ -179,20 +195,20 @@ export function useAutoLead() {
       .limit(1)
       .maybeSingle();
 
-    // 1. Request leads via existing RPC
-    const { data: leads, error: leadsError } = await supabase.rpc(
-      "request_leads_with_credits" as any,
+    // 1. Request leads via existing RPC (5-param overload with ddd_filter)
+    const { data: leads, error: leadsError } = await (supabase as any).rpc(
+      "request_leads_with_credits",
       {
         leads_requested: wizardData.quantidade,
         ddd_filter: wizardData.ddds.length > 0 ? wizardData.ddds : null,
         convenio_filter: wizardData.tipoLead === "todos" ? null : wizardData.tipoLead,
         banco_filter: null,
         produto_filter: null,
-        tag_filter: wizardData.tags && wizardData.tags.length > 0 ? wizardData.tags : null,
       }
     );
 
     if (leadsError) {
+      console.error("RPC request_leads_with_credits error:", leadsError);
       toast.error(leadsError.message || "Erro ao solicitar leads");
       return null;
     }

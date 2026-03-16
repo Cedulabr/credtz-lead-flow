@@ -1,87 +1,80 @@
 
 
-## AutoLead — Correção de 4 Bugs Críticos
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Problemas Identificados
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-**1. SMS mostra "sem créditos" para Admin**
-O código busca SMS credits via `user_companies` → encontra gestor → busca `sms_credits`. Admin não está em `user_companies`, então `ucData` é null e credits fica 0. Mesmo problema em `AutoLeadHome`, `AutoLeadWizard` e `useAutoLead.getGestorSmsInfo`.
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-**Solução**: Se o usuário for admin (profile.role === 'admin'), buscar diretamente em `sms_credits` com o próprio user_id, sem passar por `user_companies`.
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
 
-**2. Tags não aparecem**
-O wizard busca tags de `activate_leads.origem`, mas a RPC `request_leads_with_credits` filtra por `leads_database.tag`. As tags reais no banco são: "PMT Alta", "Premium", "Tomadores".
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
 
-**Solução**: Buscar tags de `leads_database.tag` (DISTINCT, WHERE is_available = true) em vez de `activate_leads.origem`.
+---
 
-**3. "Nenhum lead disponível com os filtros selecionados"**
-Há 184K leads disponíveis. O problema é que o `useAutoLead.createJob` chama a RPC com `as any` e passa `tag_filter` — mas a RPC que está rodando no banco pode estar retornando erro silencioso por conta do overload. Além disso, o código não loga o erro real do RPC.
+### 2. Conectar Base OFF ao PostgreSQL externo
 
-**Solução**: Remover o `as any` cast; garantir que os parâmetros estejam corretos; melhorar tratamento de erro para mostrar a mensagem real.
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
 
-**4. Gestor/Admin precisa gerir disparos**
-Falta uma seção de gerenciamento onde admin/gestor veja todos os jobs de autolead da empresa.
+**Arquitetura:**
 
-**Solução**: Adicionar uma aba "Gestão" no AutoLeadModule que mostra todos os jobs da empresa (para gestor) ou todos os jobs (para admin), com ações de pausar/retomar/cancelar.
+```text
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
+```
 
-### Arquivos a Modificar
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
 
-| Arquivo | Ação |
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+
+---
+
+### 3. Simplificar modulo Base OFF - apenas Consulta
+
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
+
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+
+---
+
+### Arquivos a modificar
+
+| Arquivo | Mudanca |
 |---|---|
-| `src/modules/autolead/components/AutoLeadWizard.tsx` | Fix: SMS credits para admin (busca direta); tags de `leads_database.tag` |
-| `src/modules/autolead/components/AutoLeadHome.tsx` | Fix: SMS credits para admin (busca direta) |
-| `src/modules/autolead/hooks/useAutoLead.ts` | Fix: `getGestorSmsInfo` para admin; remover `as any` da RPC; corrigir params; admin vê todos os jobs |
-| `src/modules/autolead/AutoLeadModule.tsx` | Adicionar aba "Gestão" para admin/gestor |
-| `src/modules/autolead/components/AutoLeadManagement.tsx` | **Novo** — Painel de gestão com lista de todos os jobs, filtros por usuário, ações de controle |
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
 
-### Detalhes Técnicos
+---
 
-**Fix SMS Credits (Admin bypass)**
-```typescript
-// Em vez de buscar via user_companies, admin busca direto:
-if (profile?.role === 'admin') {
-  const { data } = await supabase
-    .from("sms_credits")
-    .select("credits_balance")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  setSmsCredits(data?.credits_balance ?? 0);
-  setIsGestor(true); // admin tem poderes de gestor
-  return;
-}
-```
+### Pergunta necessaria
 
-**Fix Tags (fonte correta)**
-```typescript
-// Buscar de leads_database em vez de activate_leads
-const { data: tagData } = await supabase
-  .from("leads_database")
-  .select("tag")
-  .not("tag", "is", null)
-  .eq("is_available", true)
-  .limit(500);
-const unique = [...new Set(tagData?.map(l => l.tag).filter(Boolean))];
-setAvailableTags(unique);
-```
-
-**Fix RPC Call (remover `as any`, params corretos)**
-```typescript
-const { data: leads, error: leadsError } = await supabase.rpc(
-  "request_leads_with_credits",
-  {
-    leads_requested: wizardData.quantidade,
-    ddd_filter: wizardData.ddds.length > 0 ? wizardData.ddds : null,
-    convenio_filter: wizardData.tipoLead === "todos" ? null : wizardData.tipoLead,
-    banco_filter: null,
-    produto_filter: null,
-    tag_filter: wizardData.tags?.length > 0 ? wizardData.tags : null,
-  }
-);
-```
-
-**Painel de Gestão** — Componente com:
-- Tabela de todos os jobs (admin: todos; gestor: da empresa)
-- Colunas: Usuário, Status, Leads enviados, SMS, Data, Ações
-- Botões de Pausar/Retomar/Cancelar por job
-- Contador de jobs ativos
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 
