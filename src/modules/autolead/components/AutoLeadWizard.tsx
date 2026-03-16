@@ -37,6 +37,7 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
 
   const [smsCredits, setSmsCredits] = useState<number | null>(null);
   const [loadingSmsCredits, setLoadingSmsCredits] = useState(true);
+  const [isGestor, setIsGestor] = useState(false);
 
   const [data, setData] = useState<WizardData>({
     quantidade: Math.min(10, credits),
