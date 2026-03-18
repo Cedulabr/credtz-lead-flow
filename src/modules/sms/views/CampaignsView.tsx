@@ -1067,7 +1067,24 @@ export const CampaignsView = ({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Create Campaign - Mobile uses Sheet, Desktop uses Dialog */}
+      {/* Delete List Confirmation */}
+      <AlertDialog open={!!deleteListTarget} onOpenChange={() => setDeleteListTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Lista de Contatos</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a lista "{deleteListTarget?.name}" com <strong>{deleteListTarget?.contact_count}</strong> contatos? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteList} disabled={deletingList} className="bg-destructive hover:bg-destructive/90">
+              {deletingList ? <><Loader2 className="h-4 w-4 animate-spin" /> Excluindo...</> : "Excluir Lista"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {isMobile ? (
         <Sheet open={dialogOpen} onOpenChange={setDialogOpen}>
           <SheetContent side="bottom" className="h-[92vh] flex flex-col p-4">
