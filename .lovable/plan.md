@@ -1,80 +1,50 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## SMS Disparos — Solicitar Novos Leads + Filtros Melhorados
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### O que existe hoje
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+A aba "Disparos" já possui uma seção "Leads" dentro do dialog de Nova Campanha (linhas 480-507 de `CampaignsView.tsx`) que importa leads **já existentes** dos módulos. Porém:
+- Não há como solicitar **novos** leads diretamente
+- Falta o status "autolead" nos filtros
+- Não há orientação inteligente sobre créditos SMS vs Leads Premium
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+### Mudanças
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
-
----
-
-### 2. Conectar Base OFF ao PostgreSQL externo
-
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
-
-**Arquitetura:**
-
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
-```
-
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
-
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
-
----
-
-### 3. Simplificar modulo Base OFF - apenas Consulta
-
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
-
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
-
----
-
-### Arquivos a modificar
-
-| Arquivo | Mudanca |
+| Arquivo | Ação |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
+| `src/modules/sms/views/CampaignsView.tsx` | Adicionar botão "+Leads" que abre modal de solicitação; atualizar filtros de status; adicionar banner de orientação de créditos |
+| `src/modules/sms/types.ts` | Adicionar "autolead" aos filtros de status |
 
----
+### Detalhes
 
-### Pergunta necessaria
+**1. Filtro de status atualizado**
 
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+Substituir `LEAD_STATUS_FILTERS` para incluir os campos solicitados:
+- Novos, AutoLead, Em Andamento, Agendado (alinhado com o pipeline do Leads Premium)
+
+**2. Botão "+Leads" (solicitar novos leads)**
+
+Dentro da tab "Leads" do dialog, abaixo do botão "Importar Leads", adicionar um botão "+Leads" estilizado que abre um mini-wizard inline (não um modal separado) com:
+- Seletor de convênio (busca de `leads_database` como o `RequestLeadsModal`)
+- Seletor de DDD (chips com os DDDs principais)
+- Seletor de tags (busca de `leads_database.tag`)
+- Input de quantidade
+- Chama a mesma RPC `request_leads_with_credits` e depois importa os leads retornados para a lista de contatos SMS
+
+**3. Banner inteligente de créditos**
+
+Buscar ambos os saldos (SMS via `get_user_sms_credits` + Leads via `get_user_credits`) e exibir:
+- Se tem mais SMS que leads: "Você tem 400 disparos SMS mas apenas 50 leads. Solicite mais leads!"
+- Se tem mais leads que SMS: "Você tem 200 leads mas apenas 30 SMS. Adquira mais créditos SMS!"
+- Se ambos zero: bloqueio com orientação ao gestor
+
+O banner aparece no topo da seção "Leads" do dialog, com cores amber/blue conforme o caso.
+
+**4. Fluxo completo**
+
+Usuário abre Nova Campanha → Vai em "Leads" na origem:
+1. Vê banner de créditos orientando
+2. Pode importar leads já trabalhados (existente) filtrando por status (Novos, AutoLead, Andamento, Agendado)
+3. Pode clicar "+Leads" para solicitar novos leads do banco → escolhe convênio, DDD, tag, quantidade → sistema puxa via RPC → cria lista de contatos SMS automaticamente
 
