@@ -128,13 +128,15 @@ async function sendBatchViaYupChat(
     return { to: formatted, body: c.message };
   });
 
+  const callbackUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/sms-status-callback`;
+
   const res = await fetch("https://api.yup.chat/v1/sms/messages", {
     method: "POST",
     headers: {
       Authorization: `Basic ${basicAuth}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ messages, default: { normalize: true } }),
+    body: JSON.stringify({ messages, default: { normalize: true, status_callback: callbackUrl } }),
   });
 
   const data = await res.json();

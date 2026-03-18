@@ -50,3 +50,9 @@ verify_jwt = false
 
 [functions.joinbank-proxy]
 verify_jwt = false
+
+[functions.sms-status-callback]
+verify_jwt = false
+
+[functions.sms-check-status]
+verify_jwt = false
