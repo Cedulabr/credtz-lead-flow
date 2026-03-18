@@ -139,19 +139,19 @@ export const CampaignsView = ({
       let leads: { name: string; phone: string; source_id: string }[] = [];
       const statusMap: Record<string, Record<string, string[]>> = {
         activate_leads: {
-          novo: ["novo", "new"], aguardando: ["aguardando", "aguardando_contato"],
-          em_andamento: ["em_andamento", "contatado", "interessado"],
-          fechado: ["fechado", "convertido", "sem_interesse", "recusado"],
+          novo: ["novo", "new"], autolead: ["autolead"],
+          em_andamento: ["em_andamento", "contatado", "interessado", "aguardando", "aguardando_contato"],
+          agendado: ["agendado", "contato_futuro"],
         },
         leads_premium: {
-          novo: ["new_lead"], aguardando: ["aguardando", "contato_futuro"],
+          novo: ["new_lead"], autolead: ["autolead", "auto_lead"],
           em_andamento: ["em_andamento", "interessado", "simulacao"],
-          fechado: ["fechado", "convertido", "sem_interesse"],
+          agendado: ["contato_futuro", "agendamento"],
         },
         televendas: {
-          novo: ["solicitar_digitacao"], aguardando: ["proposta_pendente", "pago_aguardando", "cancelado_aguardando"],
-          em_andamento: ["em_andamento", "devolvido"],
-          fechado: ["proposta_paga", "proposta_cancelada"],
+          novo: ["solicitar_digitacao"], autolead: [],
+          em_andamento: ["em_andamento", "devolvido", "proposta_pendente"],
+          agendado: ["pago_aguardando", "cancelado_aguardando"],
         },
       };
 
