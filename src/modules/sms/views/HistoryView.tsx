@@ -15,6 +15,7 @@ const STATUS_ICON: Record<string, { icon: typeof Clock; color: string; label: st
   sent: { icon: Send, color: "text-blue-600", label: "Enviado" },
   delivered: { icon: CheckCircle, color: "text-emerald-600", label: "Entregue" },
   failed: { icon: XCircle, color: "text-red-600", label: "Falhou" },
+  undelivered: { icon: PhoneOff, color: "text-amber-600", label: "Não Entregue" },
 };
 
 export const HistoryView = ({ history, onRefresh }: HistoryViewProps) => {
