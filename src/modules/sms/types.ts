@@ -79,10 +79,10 @@ export const LEAD_SOURCE_OPTIONS = [
 ] as const;
 
 export const LEAD_STATUS_FILTERS = [
-  { value: "novo", label: "Novo" },
-  { value: "aguardando", label: "Aguardando" },
+  { value: "novo", label: "Novos" },
+  { value: "autolead", label: "AutoLead" },
   { value: "em_andamento", label: "Em Andamento" },
-  { value: "fechado", label: "Fechado" },
+  { value: "agendado", label: "Agendado" },
 ] as const;
 
 export const CAMPAIGN_STATUS_CONFIG: Record<string, { label: string; emoji: string; color: string }> = {
