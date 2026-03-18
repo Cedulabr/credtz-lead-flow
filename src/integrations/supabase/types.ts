@@ -4630,10 +4630,13 @@ export type Database = {
       sms_history: {
         Row: {
           campaign_id: string | null
+          carrier: string | null
           company_id: string | null
           contact_name: string | null
           created_at: string
           delivered_at: string | null
+          delivery_status: string | null
+          error_code: string | null
           error_message: string | null
           id: string
           message: string
@@ -4648,10 +4651,13 @@ export type Database = {
         }
         Insert: {
           campaign_id?: string | null
+          carrier?: string | null
           company_id?: string | null
           contact_name?: string | null
           created_at?: string
           delivered_at?: string | null
+          delivery_status?: string | null
+          error_code?: string | null
           error_message?: string | null
           id?: string
           message: string
@@ -4666,10 +4672,13 @@ export type Database = {
         }
         Update: {
           campaign_id?: string | null
+          carrier?: string | null
           company_id?: string | null
           contact_name?: string | null
           created_at?: string
           delivered_at?: string | null
+          delivery_status?: string | null
+          error_code?: string | null
           error_message?: string | null
           id?: string
           message?: string
