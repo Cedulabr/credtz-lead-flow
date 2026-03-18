@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Send, Rocket, Users, Zap, Loader2, RefreshCw, Trash2, AlertTriangle, MessageSquare, Download } from "lucide-react";
+import { Plus, Send, Rocket, Users, Zap, Loader2, RefreshCw, Trash2, AlertTriangle, MessageSquare, Download, Sparkles, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,13 +39,14 @@ export const CampaignsView = ({
   onRefresh,
   onRefreshLists,
 }: CampaignsViewProps) => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, profile } = useAuth();
   const { companyId } = useUserCompany();
   const { logActivity } = useActivityLogger();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendingCampaignId, setSendingCampaignId] = useState<string | null>(null);
   const [smsCredits, setSmsCredits] = useState<number | null>(null);
+  const [leadCredits, setLeadCredits] = useState<number | null>(null);
   const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
 
   // Delete state
@@ -65,6 +66,16 @@ export const CampaignsView = ({
   const [leadStatusFilter, setLeadStatusFilter] = useState("all");
   const [importingLeads, setImportingLeads] = useState(false);
   const [importedCount, setImportedCount] = useState(0);
+
+  // +Leads wizard state
+  const [showLeadWizard, setShowLeadWizard] = useState(false);
+  const [wizardConvenio, setWizardConvenio] = useState("all");
+  const [wizardDdds, setWizardDdds] = useState<string[]>([]);
+  const [wizardTag, setWizardTag] = useState("all");
+  const [wizardQuantidade, setWizardQuantidade] = useState(10);
+  const [requestingLeads, setRequestingLeads] = useState(false);
+  const [availableConvenios, setAvailableConvenios] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   // Fetch SMS credits
   useEffect(() => {
