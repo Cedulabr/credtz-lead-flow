@@ -58,9 +58,12 @@ export interface SmsHistoryRecord {
   phone: string;
   contact_name: string | null;
   message: string;
-  status: "pending" | "sent" | "delivered" | "failed";
+  status: "pending" | "sent" | "delivered" | "failed" | "undelivered";
   provider_message_id: string | null;
   error_message: string | null;
+  error_code: string | null;
+  carrier: string | null;
+  delivery_status: string | null;
   sent_at: string | null;
   delivered_at: string | null;
   sent_by: string;
