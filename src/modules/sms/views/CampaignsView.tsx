@@ -77,15 +77,38 @@ export const CampaignsView = ({
   const [availableConvenios, setAvailableConvenios] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
 
-  // Fetch SMS credits
+  // Fetch SMS + Lead credits
   useEffect(() => {
     const fetchCredits = async () => {
       if (!user) return;
-      const { data, error } = await supabase.rpc('get_user_sms_credits', { target_user_id: user.id });
-      if (!error) setSmsCredits(data ?? 0);
+      const [smsRes, leadRes] = await Promise.all([
+        supabase.rpc('get_user_sms_credits', { target_user_id: user.id }),
+        supabase.rpc('get_user_credits', { target_user_id: user.id }),
+      ]);
+      if (!smsRes.error) setSmsCredits(smsRes.data ?? 0);
+      if (!leadRes.error) setLeadCredits(leadRes.data ?? 0);
     };
     fetchCredits();
   }, [user, campaigns]);
+
+  // Fetch available convenios and tags for +Leads wizard
+  useEffect(() => {
+    const fetchOptions = async () => {
+      const [convRes, tagRes] = await Promise.all([
+        supabase.from("leads_database").select("convenio").not("convenio", "is", null).eq("is_available", true).limit(500),
+        supabase.from("leads_database").select("tag").not("tag", "is", null).eq("is_available", true).limit(500),
+      ]);
+      if (convRes.data) {
+        const unique = [...new Set(convRes.data.map(r => r.convenio).filter(Boolean))] as string[];
+        setAvailableConvenios(unique.sort());
+      }
+      if (tagRes.data) {
+        const unique = [...new Set(tagRes.data.map(r => r.tag).filter(Boolean))] as string[];
+        setAvailableTags(unique.sort());
+      }
+    };
+    if (showLeadWizard) fetchOptions();
+  }, [showLeadWizard]);
 
   // Apply template content
   useEffect(() => {
