@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { History, CheckCircle, XCircle, Clock, Send, RefreshCw, CircleDollarSign } from "lucide-react";
+import { History, CheckCircle, XCircle, Clock, Send, RefreshCw, CircleDollarSign, PhoneOff, Radio } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SmsHistoryRecord } from "../types";
