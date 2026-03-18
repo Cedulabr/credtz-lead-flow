@@ -80,6 +80,8 @@ async function sendViaYupChat(phone: string, message: string): Promise<SmsResult
 
   const basicAuth = btoa(`${yupId}:${yupToken}`);
 
+  const callbackUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/sms-status-callback`;
+
   const res = await fetch("https://api.yup.chat/v1/sms/messages", {
     method: "POST",
     headers: {
@@ -88,7 +90,7 @@ async function sendViaYupChat(phone: string, message: string): Promise<SmsResult
     },
     body: JSON.stringify({
       messages: [{ to: formatted, body: message }],
-      default: { normalize: true },
+      default: { normalize: true, status_callback: callbackUrl },
     }),
   });
 
