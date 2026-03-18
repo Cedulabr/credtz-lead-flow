@@ -115,6 +115,8 @@ export const HistoryView = ({ history, onRefresh }: HistoryViewProps) => {
                   <span className="text-[10px] text-muted-foreground font-mono">{record.phone}</span>
                   <Badge variant={sendType === "automatico" ? "default" : "outline"} className="text-[9px] h-4">{sendType === "automatico" ? "Auto" : "Manual"}</Badge>
                   {(record as any).provider && <Badge variant="outline" className="text-[9px] h-4 gap-0.5">{(record as any).provider === "yup_chat" ? "💬 Yup" : "📱 Twilio"}</Badge>}
+                  {(record as any).carrier && <Badge variant="outline" className="text-[9px] h-4 gap-0.5"><Radio className="h-2.5 w-2.5" />{(record as any).carrier}</Badge>}
+                  {(record as any).error_code && <Badge variant="outline" className="text-[9px] h-4 border-red-300 text-red-500">#{(record as any).error_code}</Badge>}
                   {isCreditError && <Badge variant="outline" className="text-[9px] h-4 border-amber-400 text-amber-600">💰 Crédito</Badge>}
                 </div>
                 <p className="text-xs text-muted-foreground truncate">{record.message}</p>

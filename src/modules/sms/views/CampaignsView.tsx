@@ -528,25 +528,44 @@ export const CampaignsView = ({
   const handleDownloadReport = async (campaignId: string, campaignName: string) => {
     setDownloadingReportId(campaignId);
     try {
+      // Step 1: Check real-time status from Yup Chat API
+      toast.info("Verificando status das mensagens...");
+      try {
+        const { data: checkResult } = await supabase.functions.invoke("sms-check-status", {
+          body: { campaign_id: campaignId },
+        });
+        if (checkResult?.updated > 0) {
+          toast.success(`${checkResult.updated} mensagem(ns) atualizada(s): ${checkResult.delivered || 0} entregues, ${checkResult.failed || 0} falhas`);
+        }
+      } catch (e) {
+        console.warn("Status check failed, generating report with cached data:", e);
+      }
+
+      // Step 2: Fetch updated history
       const { data, error } = await supabase
         .from("sms_history")
-        .select("contact_name, phone, status, error_message, send_type, sent_at, created_at")
+        .select("contact_name, phone, status, error_message, error_code, carrier, delivery_status, send_type, sent_at, delivered_at, created_at")
         .eq("campaign_id", campaignId)
         .order("status");
       if (error) throw error;
       if (!data || data.length === 0) { toast.info("Nenhum registro encontrado"); return; }
 
       const sorted = [...data].sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9));
-      const header = "Nome;Telefone;Status;Erro;Provedor;Data Envio";
-      const rows = sorted.map((h) => {
+      const header = "Nome;Telefone;Status;Status Detalhado;Operadora;Código Erro;Erro;Provedor;Data Envio;Data Entrega";
+      const rows = sorted.map((h: any) => {
         const dt = h.sent_at || h.created_at;
+        const STATUS_LABELS: Record<string, string> = { delivered: "Entregue", sent: "Enviado", failed: "Falhou", pending: "Pendente", undelivered: "Não Entregue" };
         return [
           h.contact_name || "Sem nome",
           h.phone,
-          STATUS_PT[h.status] || h.status,
+          STATUS_LABELS[h.status] || h.status,
+          h.delivery_status || "",
+          h.carrier || "",
+          h.error_code || "",
           (h.error_message || "").replace(/;/g, ","),
           h.send_type || "",
           dt ? new Date(dt).toLocaleString("pt-BR") : "",
+          h.delivered_at ? new Date(h.delivered_at).toLocaleString("pt-BR") : "",
         ].join(";");
       });
       const csv = "\uFEFF" + header + "\n" + rows.join("\n");
@@ -559,9 +578,10 @@ export const CampaignsView = ({
       a.click();
       URL.revokeObjectURL(url);
 
-      const sentCount = data.filter(d => d.status === 'sent' || d.status === 'delivered').length;
-      const failedCount = data.filter(d => d.status === 'failed').length;
-      toast.success(`Relatório baixado: ${sentCount} enviados, ${failedCount} falhas, ${data.length} total`);
+      const deliveredCount = data.filter((d: any) => d.status === 'delivered').length;
+      const sentCount = data.filter((d: any) => d.status === 'sent').length;
+      const failedCount = data.filter((d: any) => d.status === 'failed').length;
+      toast.success(`Relatório: ${deliveredCount} entregues, ${sentCount} enviados, ${failedCount} falhas, ${data.length} total`);
     } catch { toast.error("Erro ao gerar relatório"); } finally { setDownloadingReportId(null); }
   };
 
