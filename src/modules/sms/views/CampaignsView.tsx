@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Send, Rocket, Users, Zap, Loader2, RefreshCw, Trash2, AlertTriangle, MessageSquare, Download, Sparkles, Info, Phone, UserCheck, FileText } from "lucide-react";
+import { Plus, Send, Rocket, Users, Zap, Loader2, RefreshCw, Trash2, AlertTriangle, MessageSquare, Download, Sparkles, Info, Phone, UserCheck, FileText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUserCompany } from "../hooks/useUserCompany";
+import { useGestorCompany } from "@/hooks/useGestorCompany";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { toast } from "sonner";
 import {
@@ -50,6 +51,7 @@ export const CampaignsView = ({
 }: CampaignsViewProps) => {
   const { user, isAdmin, profile } = useAuth();
   const { companyId } = useUserCompany();
+  const { isGestor } = useGestorCompany();
   const { logActivity } = useActivityLogger();
   const isMobile = useIsMobile();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -63,6 +65,9 @@ export const CampaignsView = ({
   const [deleteTarget, setDeleteTarget] = useState<SmsCampaign | null>(null);
   // Mark failed state
   const [markFailedTarget, setMarkFailedTarget] = useState<SmsCampaign | null>(null);
+  // Delete list state
+  const [deleteListTarget, setDeleteListTarget] = useState<SmsContactList | null>(null);
+  const [deletingList, setDeletingList] = useState(false);
 
   // Form state
   const [campaignName, setCampaignName] = useState("");
@@ -499,6 +504,27 @@ export const CampaignsView = ({
   const STATUS_PT: Record<string, string> = { delivered: "Entregue", sent: "Enviado", failed: "Falhou", pending: "Pendente" };
   const STATUS_ORDER: Record<string, number> = { delivered: 0, sent: 1, pending: 2, failed: 3 };
 
+  const canManageLists = isAdmin || isGestor;
+
+  const handleDeleteList = async () => {
+    if (!deleteListTarget) return;
+    setDeletingList(true);
+    try {
+      // Delete contacts first, then the list
+      await supabase.from("sms_contacts").delete().eq("list_id", deleteListTarget.id);
+      const { error } = await supabase.from("sms_contact_lists").delete().eq("id", deleteListTarget.id);
+      if (error) throw error;
+      if (selectedList === deleteListTarget.id) setSelectedList("none");
+      toast.success(`Lista "${deleteListTarget.name}" excluída com ${deleteListTarget.contact_count} contatos`);
+      setDeleteListTarget(null);
+      onRefreshLists();
+    } catch {
+      toast.error("Erro ao excluir lista");
+    } finally {
+      setDeletingList(false);
+    }
+  };
+
   const handleDownloadReport = async (campaignId: string, campaignName: string) => {
     setDownloadingReportId(campaignId);
     try {
@@ -571,7 +597,7 @@ export const CampaignsView = ({
             <TabsTrigger value="list" className="gap-1.5"><Users className="h-3.5 w-3.5" /> Lista</TabsTrigger>
             <TabsTrigger value="leads" className="gap-1.5"><Zap className="h-3.5 w-3.5" /> Leads</TabsTrigger>
           </TabsList>
-          <TabsContent value="list" className="mt-3">
+          <TabsContent value="list" className="mt-3 space-y-3">
             <Select value={selectedList} onValueChange={setSelectedList}>
               <SelectTrigger><SelectValue placeholder="Selecionar lista" /></SelectTrigger>
               <SelectContent>
@@ -579,6 +605,30 @@ export const CampaignsView = ({
                 {contactLists.map((l) => (<SelectItem key={l.id} value={l.id}>👥 {l.name} ({l.contact_count})</SelectItem>))}
               </SelectContent>
             </Select>
+            {/* List management for admin/gestor */}
+            {canManageLists && contactLists.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Gerenciar Listas</Label>
+                <div className="max-h-40 overflow-y-auto space-y-1 rounded-lg border border-border/50 p-2">
+                  {contactLists.map((l) => (
+                    <div key={l.id} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 transition-colors group">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">{l.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{l.contact_count} contatos · {new Date(l.created_at).toLocaleDateString("pt-BR")}</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setDeleteListTarget(l)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 h-7 w-7 shrink-0"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </TabsContent>
           <TabsContent value="leads" className="mt-3 space-y-3">
             {/* Credit comparison banner */}
@@ -1017,7 +1067,24 @@ export const CampaignsView = ({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Create Campaign - Mobile uses Sheet, Desktop uses Dialog */}
+      {/* Delete List Confirmation */}
+      <AlertDialog open={!!deleteListTarget} onOpenChange={() => setDeleteListTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Lista de Contatos</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a lista "{deleteListTarget?.name}" com <strong>{deleteListTarget?.contact_count}</strong> contatos? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteList} disabled={deletingList} className="bg-destructive hover:bg-destructive/90">
+              {deletingList ? <><Loader2 className="h-4 w-4 animate-spin" /> Excluindo...</> : "Excluir Lista"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {isMobile ? (
         <Sheet open={dialogOpen} onOpenChange={setDialogOpen}>
           <SheetContent side="bottom" className="h-[92vh] flex flex-col p-4">

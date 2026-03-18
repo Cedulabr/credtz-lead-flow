@@ -1,34 +1,80 @@
 
 
-## SMS Disparos — Correções de Visibilidade e Gestão de Listas
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Diagnóstico
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-**Build Error**: O erro `Failed to load native binding` do `@swc/core` é um problema de infraestrutura do servidor de desenvolvimento, não do código. Ele impede que as últimas alterações (botão +Leads, deduplicação) apareçam no preview. Uma recarga resolve.
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-**Código já implementado**: O botão "+Leads" (linha 619-727) e a lógica de deduplicação (linha 138-184) já existem no código de `CampaignsView.tsx`. Estão dentro da aba "Leads" no dialog de Nova Campanha. O motivo de não aparecerem é o build travado.
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
 
-**Problema real identificado**: Falta a funcionalidade de **apagar listas importadas**. A screenshot mostra múltiplas listas "Leads Premium" repetidas que poluem a interface. Admin/Gestor precisa poder excluí-las.
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
 
-### Mudanças
+---
 
-| Arquivo | Ação |
+### 2. Conectar Base OFF ao PostgreSQL externo
+
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+
+**Arquitetura:**
+
+```text
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
+```
+
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+
+---
+
+### 3. Simplificar modulo Base OFF - apenas Consulta
+
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
+
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+
+---
+
+### Arquivos a modificar
+
+| Arquivo | Mudanca |
 |---|---|
-| `src/modules/sms/views/CampaignsView.tsx` | Adicionar botão de excluir lista ao lado de cada lista no seletor; permitir para admin e gestor |
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
 
-### Detalhes
+---
 
-**1. Excluir listas importadas**
+### Pergunta necessaria
 
-No seletor de listas (linha 575-581), adicionar para cada lista um botão de lixeira visível para admin/gestor. Ao clicar:
-- Confirmar com AlertDialog
-- Excluir os `sms_contacts` vinculados à lista
-- Excluir a `sms_contact_lists`
-- Atualizar a lista via `onRefreshLists()`
-
-Implementação: Substituir o `Select` simples por um layout que mostra as listas com botões de ação, ou adicionar uma seção dedicada "Gerenciar Listas" com botões de exclusão abaixo do seletor.
-
-**2. Deduplicação entre listas (melhoria)**
-
-Adicionar ao nome da lista o count de contatos para facilitar identificação, e ao importar, verificar duplicatas entre TODAS as listas do usuário (já implementado no código atual).
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 
