@@ -504,6 +504,27 @@ export const CampaignsView = ({
   const STATUS_PT: Record<string, string> = { delivered: "Entregue", sent: "Enviado", failed: "Falhou", pending: "Pendente" };
   const STATUS_ORDER: Record<string, number> = { delivered: 0, sent: 1, pending: 2, failed: 3 };
 
+  const canManageLists = isAdmin || isGestor;
+
+  const handleDeleteList = async () => {
+    if (!deleteListTarget) return;
+    setDeletingList(true);
+    try {
+      // Delete contacts first, then the list
+      await supabase.from("sms_contacts").delete().eq("list_id", deleteListTarget.id);
+      const { error } = await supabase.from("sms_contact_lists").delete().eq("id", deleteListTarget.id);
+      if (error) throw error;
+      if (selectedList === deleteListTarget.id) setSelectedList("none");
+      toast.success(`Lista "${deleteListTarget.name}" excluída com ${deleteListTarget.contact_count} contatos`);
+      setDeleteListTarget(null);
+      onRefreshLists();
+    } catch {
+      toast.error("Erro ao excluir lista");
+    } finally {
+      setDeletingList(false);
+    }
+  };
+
   const handleDownloadReport = async (campaignId: string, campaignName: string) => {
     setDownloadingReportId(campaignId);
     try {
