@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUserCompany } from "../hooks/useUserCompany";
+import { useGestorCompany } from "@/hooks/useGestorCompany";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { toast } from "sonner";
 import {
