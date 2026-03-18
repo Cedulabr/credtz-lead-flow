@@ -65,6 +65,9 @@ export const CampaignsView = ({
   const [deleteTarget, setDeleteTarget] = useState<SmsCampaign | null>(null);
   // Mark failed state
   const [markFailedTarget, setMarkFailedTarget] = useState<SmsCampaign | null>(null);
+  // Delete list state
+  const [deleteListTarget, setDeleteListTarget] = useState<SmsContactList | null>(null);
+  const [deletingList, setDeletingList] = useState(false);
 
   // Form state
   const [campaignName, setCampaignName] = useState("");
