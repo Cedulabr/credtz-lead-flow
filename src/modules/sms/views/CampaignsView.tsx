@@ -51,6 +51,7 @@ export const CampaignsView = ({
 }: CampaignsViewProps) => {
   const { user, isAdmin, profile } = useAuth();
   const { companyId } = useUserCompany();
+  const { isGestor } = useGestorCompany();
   const { logActivity } = useActivityLogger();
   const isMobile = useIsMobile();
   const [dialogOpen, setDialogOpen] = useState(false);
