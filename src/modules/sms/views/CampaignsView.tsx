@@ -597,7 +597,7 @@ export const CampaignsView = ({
             <TabsTrigger value="list" className="gap-1.5"><Users className="h-3.5 w-3.5" /> Lista</TabsTrigger>
             <TabsTrigger value="leads" className="gap-1.5"><Zap className="h-3.5 w-3.5" /> Leads</TabsTrigger>
           </TabsList>
-          <TabsContent value="list" className="mt-3">
+          <TabsContent value="list" className="mt-3 space-y-3">
             <Select value={selectedList} onValueChange={setSelectedList}>
               <SelectTrigger><SelectValue placeholder="Selecionar lista" /></SelectTrigger>
               <SelectContent>
@@ -605,6 +605,30 @@ export const CampaignsView = ({
                 {contactLists.map((l) => (<SelectItem key={l.id} value={l.id}>👥 {l.name} ({l.contact_count})</SelectItem>))}
               </SelectContent>
             </Select>
+            {/* List management for admin/gestor */}
+            {canManageLists && contactLists.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Gerenciar Listas</Label>
+                <div className="max-h-40 overflow-y-auto space-y-1 rounded-lg border border-border/50 p-2">
+                  {contactLists.map((l) => (
+                    <div key={l.id} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 transition-colors group">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">{l.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{l.contact_count} contatos · {new Date(l.created_at).toLocaleDateString("pt-BR")}</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setDeleteListTarget(l)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 h-7 w-7 shrink-0"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </TabsContent>
           <TabsContent value="leads" className="mt-3 space-y-3">
             {/* Credit comparison banner */}
