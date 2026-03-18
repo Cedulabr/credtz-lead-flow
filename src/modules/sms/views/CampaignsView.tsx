@@ -217,6 +217,73 @@ export const CampaignsView = ({
     }
   };
 
+  const FEATURED_DDDS = ['11', '21', '31', '71', '41', '51', '61', '81', '85', '27'];
+
+  const handleRequestNewLeads = async () => {
+    if (!user) return;
+    const maxByLeadCredits = isAdmin ? wizardQuantidade : (leadCredits ?? 0);
+    const maxBySmsCredits = isAdmin ? wizardQuantidade : (smsCredits ?? 0);
+    const effectiveMax = Math.min(maxByLeadCredits, maxBySmsCredits);
+
+    if (!isAdmin && effectiveMax <= 0) {
+      toast.error("Sem créditos suficientes. Solicite recarga ao gestor.");
+      return;
+    }
+    const qty = Math.min(wizardQuantidade, isAdmin ? wizardQuantidade : effectiveMax);
+    if (qty <= 0) { toast.error("Quantidade inválida"); return; }
+
+    setRequestingLeads(true);
+    try {
+      const { data: leads, error } = await (supabase as any).rpc("request_leads_with_credits", {
+        leads_requested: qty,
+        ddd_filter: wizardDdds.length > 0 ? wizardDdds : null,
+        convenio_filter: wizardConvenio === "all" ? null : wizardConvenio,
+        banco_filter: null,
+        produto_filter: null,
+      });
+      if (error) throw error;
+      if (!leads || leads.length === 0) { toast.error("Nenhum lead disponível com esses filtros"); return; }
+
+      const listName = `+Leads Premium - ${new Date().toLocaleDateString("pt-BR")}`;
+      const { data: listData, error: listError } = await supabase
+        .from("sms_contact_lists").insert({ name: listName, created_by: user.id, company_id: companyId || null } as any).select("id").single();
+      if (listError) throw listError;
+
+      const contacts = leads.map((l: any) => ({
+        list_id: listData.id, name: l.name, phone: (l.phone || "").replace(/\D/g, ""),
+        source: "leads_premium", source_id: l.id || l.lead_id,
+      }));
+      const { error: cErr } = await supabase.from("sms_contacts").insert(contacts as any);
+      if (cErr) throw cErr;
+
+      setSelectedList(listData.id);
+      setContactSource("list");
+      setImportedCount(leads.length);
+      setShowLeadWizard(false);
+      onRefreshLists();
+
+      const [smsRes, leadRes] = await Promise.all([
+        supabase.rpc('get_user_sms_credits', { target_user_id: user.id }),
+        supabase.rpc('get_user_credits', { target_user_id: user.id }),
+      ]);
+      if (!smsRes.error) setSmsCredits(smsRes.data ?? 0);
+      if (!leadRes.error) setLeadCredits(leadRes.data ?? 0);
+
+      logActivity({
+        action: 'request_leads_for_sms',
+        module: 'sms',
+        description: `Solicitou ${leads.length} leads premium para campanha SMS`,
+        metadata: { count: leads.length, convenio: wizardConvenio, ddds: wizardDdds, tag: wizardTag },
+      });
+      toast.success(`${leads.length} leads solicitados e importados!`);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Erro ao solicitar leads");
+    } finally {
+      setRequestingLeads(false);
+    }
+  };
+
   const handleCreateCampaign = async () => {
     if (!campaignName.trim() || !messageContent.trim()) { toast.error("Preencha nome e mensagem"); return; }
     if (selectedList === "none") { toast.error("Selecione uma lista"); return; }
