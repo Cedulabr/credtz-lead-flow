@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Send, Rocket, Users, Zap, Loader2, RefreshCw, Trash2, AlertTriangle, MessageSquare, Download } from "lucide-react";
+import { Plus, Send, Rocket, Users, Zap, Loader2, RefreshCw, Trash2, AlertTriangle, MessageSquare, Download, Sparkles, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,13 +39,14 @@ export const CampaignsView = ({
   onRefresh,
   onRefreshLists,
 }: CampaignsViewProps) => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, profile } = useAuth();
   const { companyId } = useUserCompany();
   const { logActivity } = useActivityLogger();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendingCampaignId, setSendingCampaignId] = useState<string | null>(null);
   const [smsCredits, setSmsCredits] = useState<number | null>(null);
+  const [leadCredits, setLeadCredits] = useState<number | null>(null);
   const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
 
   // Delete state
@@ -66,15 +67,48 @@ export const CampaignsView = ({
   const [importingLeads, setImportingLeads] = useState(false);
   const [importedCount, setImportedCount] = useState(0);
 
-  // Fetch SMS credits
+  // +Leads wizard state
+  const [showLeadWizard, setShowLeadWizard] = useState(false);
+  const [wizardConvenio, setWizardConvenio] = useState("all");
+  const [wizardDdds, setWizardDdds] = useState<string[]>([]);
+  const [wizardTag, setWizardTag] = useState("all");
+  const [wizardQuantidade, setWizardQuantidade] = useState(10);
+  const [requestingLeads, setRequestingLeads] = useState(false);
+  const [availableConvenios, setAvailableConvenios] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+
+  // Fetch SMS + Lead credits
   useEffect(() => {
     const fetchCredits = async () => {
       if (!user) return;
-      const { data, error } = await supabase.rpc('get_user_sms_credits', { target_user_id: user.id });
-      if (!error) setSmsCredits(data ?? 0);
+      const [smsRes, leadRes] = await Promise.all([
+        supabase.rpc('get_user_sms_credits', { target_user_id: user.id }),
+        supabase.rpc('get_user_credits', { target_user_id: user.id }),
+      ]);
+      if (!smsRes.error) setSmsCredits(smsRes.data ?? 0);
+      if (!leadRes.error) setLeadCredits(leadRes.data ?? 0);
     };
     fetchCredits();
   }, [user, campaigns]);
+
+  // Fetch available convenios and tags for +Leads wizard
+  useEffect(() => {
+    const fetchOptions = async () => {
+      const [convRes, tagRes] = await Promise.all([
+        supabase.from("leads_database").select("convenio").not("convenio", "is", null).eq("is_available", true).limit(500),
+        supabase.from("leads_database").select("tag").not("tag", "is", null).eq("is_available", true).limit(500),
+      ]);
+      if (convRes.data) {
+        const unique = [...new Set(convRes.data.map(r => r.convenio).filter(Boolean))] as string[];
+        setAvailableConvenios(unique.sort());
+      }
+      if (tagRes.data) {
+        const unique = [...new Set(tagRes.data.map(r => r.tag).filter(Boolean))] as string[];
+        setAvailableTags(unique.sort());
+      }
+    };
+    if (showLeadWizard) fetchOptions();
+  }, [showLeadWizard]);
 
   // Apply template content
   useEffect(() => {
@@ -105,19 +139,19 @@ export const CampaignsView = ({
       let leads: { name: string; phone: string; source_id: string }[] = [];
       const statusMap: Record<string, Record<string, string[]>> = {
         activate_leads: {
-          novo: ["novo", "new"], aguardando: ["aguardando", "aguardando_contato"],
-          em_andamento: ["em_andamento", "contatado", "interessado"],
-          fechado: ["fechado", "convertido", "sem_interesse", "recusado"],
+          novo: ["novo", "new"], autolead: ["autolead"],
+          em_andamento: ["em_andamento", "contatado", "interessado", "aguardando", "aguardando_contato"],
+          agendado: ["agendado", "contato_futuro"],
         },
         leads_premium: {
-          novo: ["new_lead"], aguardando: ["aguardando", "contato_futuro"],
+          novo: ["new_lead"], autolead: ["autolead", "auto_lead"],
           em_andamento: ["em_andamento", "interessado", "simulacao"],
-          fechado: ["fechado", "convertido", "sem_interesse"],
+          agendado: ["contato_futuro", "agendamento"],
         },
         televendas: {
-          novo: ["solicitar_digitacao"], aguardando: ["proposta_pendente", "pago_aguardando", "cancelado_aguardando"],
-          em_andamento: ["em_andamento", "devolvido"],
-          fechado: ["proposta_paga", "proposta_cancelada"],
+          novo: ["solicitar_digitacao"], autolead: [],
+          em_andamento: ["em_andamento", "devolvido", "proposta_pendente"],
+          agendado: ["pago_aguardando", "cancelado_aguardando"],
         },
       };
 
@@ -180,6 +214,73 @@ export const CampaignsView = ({
       toast.error("Erro ao importar leads");
     } finally {
       setImportingLeads(false);
+    }
+  };
+
+  const FEATURED_DDDS = ['11', '21', '31', '71', '41', '51', '61', '81', '85', '27'];
+
+  const handleRequestNewLeads = async () => {
+    if (!user) return;
+    const maxByLeadCredits = isAdmin ? wizardQuantidade : (leadCredits ?? 0);
+    const maxBySmsCredits = isAdmin ? wizardQuantidade : (smsCredits ?? 0);
+    const effectiveMax = Math.min(maxByLeadCredits, maxBySmsCredits);
+
+    if (!isAdmin && effectiveMax <= 0) {
+      toast.error("Sem créditos suficientes. Solicite recarga ao gestor.");
+      return;
+    }
+    const qty = Math.min(wizardQuantidade, isAdmin ? wizardQuantidade : effectiveMax);
+    if (qty <= 0) { toast.error("Quantidade inválida"); return; }
+
+    setRequestingLeads(true);
+    try {
+      const { data: leads, error } = await (supabase as any).rpc("request_leads_with_credits", {
+        leads_requested: qty,
+        ddd_filter: wizardDdds.length > 0 ? wizardDdds : null,
+        convenio_filter: wizardConvenio === "all" ? null : wizardConvenio,
+        banco_filter: null,
+        produto_filter: null,
+      });
+      if (error) throw error;
+      if (!leads || leads.length === 0) { toast.error("Nenhum lead disponível com esses filtros"); return; }
+
+      const listName = `+Leads Premium - ${new Date().toLocaleDateString("pt-BR")}`;
+      const { data: listData, error: listError } = await supabase
+        .from("sms_contact_lists").insert({ name: listName, created_by: user.id, company_id: companyId || null } as any).select("id").single();
+      if (listError) throw listError;
+
+      const contacts = leads.map((l: any) => ({
+        list_id: listData.id, name: l.name, phone: (l.phone || "").replace(/\D/g, ""),
+        source: "leads_premium", source_id: l.id || l.lead_id,
+      }));
+      const { error: cErr } = await supabase.from("sms_contacts").insert(contacts as any);
+      if (cErr) throw cErr;
+
+      setSelectedList(listData.id);
+      setContactSource("list");
+      setImportedCount(leads.length);
+      setShowLeadWizard(false);
+      onRefreshLists();
+
+      const [smsRes, leadRes] = await Promise.all([
+        supabase.rpc('get_user_sms_credits', { target_user_id: user.id }),
+        supabase.rpc('get_user_credits', { target_user_id: user.id }),
+      ]);
+      if (!smsRes.error) setSmsCredits(smsRes.data ?? 0);
+      if (!leadRes.error) setLeadCredits(leadRes.data ?? 0);
+
+      logActivity({
+        action: 'request_leads_for_sms',
+        module: 'sms',
+        description: `Solicitou ${leads.length} leads premium para campanha SMS`,
+        metadata: { count: leads.length, convenio: wizardConvenio, ddds: wizardDdds, tag: wizardTag },
+      });
+      toast.success(`${leads.length} leads solicitados e importados!`);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Erro ao solicitar leads");
+    } finally {
+      setRequestingLeads(false);
     }
   };
 
@@ -478,6 +579,41 @@ export const CampaignsView = ({
                   </Select>
                 </TabsContent>
                 <TabsContent value="leads" className="mt-3 space-y-3">
+                  {/* Credit comparison banner */}
+                  {!isAdmin && smsCredits !== null && leadCredits !== null && (
+                    <div className={`rounded-lg p-3 text-xs flex items-start gap-2 ${
+                      smsCredits > 0 && leadCredits <= 0
+                        ? "bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400"
+                        : leadCredits > 0 && smsCredits <= 0
+                        ? "bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-400"
+                        : smsCredits <= 0 && leadCredits <= 0
+                        ? "bg-destructive/10 border border-destructive/20 text-destructive"
+                        : "bg-primary/5 border border-primary/20 text-primary"
+                    }`}>
+                      <Info className="h-4 w-4 mt-0.5 shrink-0" />
+                      <div>
+                        {smsCredits > 0 && leadCredits <= 0 && (
+                          <p>Você tem <strong>{smsCredits}</strong> disparos SMS mas <strong>0</strong> créditos de leads. Solicite mais leads ao gestor!</p>
+                        )}
+                        {leadCredits > 0 && smsCredits <= 0 && (
+                          <p>Você tem <strong>{leadCredits}</strong> leads disponíveis mas <strong>0</strong> créditos SMS. Adquira mais créditos SMS!</p>
+                        )}
+                        {smsCredits <= 0 && leadCredits <= 0 && (
+                          <p>Sem créditos de SMS e Leads. Solicite recarga ao seu gestor.</p>
+                        )}
+                        {smsCredits > 0 && leadCredits > 0 && (
+                          <p>📊 <strong>{smsCredits}</strong> SMS · <strong>{leadCredits}</strong> Leads Premium disponíveis. Pode solicitar até <strong>{Math.min(smsCredits, leadCredits)}</strong> leads.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {isAdmin && (
+                    <div className="rounded-lg p-3 text-xs flex items-center gap-2 bg-primary/5 border border-primary/20 text-primary">
+                      <Info className="h-4 w-4 shrink-0" />
+                      <p>Admin: créditos ilimitados para SMS e Leads Premium.</p>
+                    </div>
+                  )}
+
                   <div>
                     <Label className="text-xs">Módulo de Origem</Label>
                     <div className="grid grid-cols-3 gap-2 mt-1">
@@ -500,10 +636,108 @@ export const CampaignsView = ({
                       ))}
                     </div>
                   </div>
-                  <Button onClick={handleImportLeads} disabled={importingLeads} className="w-full gap-2" variant="secondary">
-                    <Zap className="h-4 w-4" /> {importingLeads ? "Importando..." : "Importar Leads"}
-                  </Button>
-                  {importedCount > 0 && <p className="text-xs text-green-600 font-medium">✅ {importedCount} leads importados</p>}
+                  <div className="flex gap-2">
+                    <Button onClick={handleImportLeads} disabled={importingLeads} className="flex-1 gap-2" variant="secondary">
+                      <Zap className="h-4 w-4" /> {importingLeads ? "Importando..." : "Importar Leads"}
+                    </Button>
+                    <Button onClick={() => setShowLeadWizard(!showLeadWizard)} variant="outline" className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5">
+                      <Sparkles className="h-4 w-4" /> +Leads
+                    </Button>
+                  </div>
+                  {importedCount > 0 && <p className="text-xs text-green-600 dark:text-green-400 font-medium">✅ {importedCount} leads importados</p>}
+
+                  {/* +Leads inline wizard */}
+                  <AnimatePresence>
+                    {showLeadWizard && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                            <Sparkles className="h-4 w-4" />
+                            Solicitar Novos Leads Premium
+                          </div>
+
+                          {/* Convênio */}
+                          <div>
+                            <Label className="text-xs">Convênio</Label>
+                            <Select value={wizardConvenio} onValueChange={setWizardConvenio}>
+                              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">Todos</SelectItem>
+                                {availableConvenios.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* DDDs */}
+                          <div>
+                            <Label className="text-xs">DDDs (opcional)</Label>
+                            <div className="flex flex-wrap gap-1.5 mt-1">
+                              {FEATURED_DDDS.map(ddd => (
+                                <button
+                                  key={ddd}
+                                  onClick={() => setWizardDdds(prev => prev.includes(ddd) ? prev.filter(d => d !== ddd) : [...prev, ddd])}
+                                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                                    wizardDdds.includes(ddd)
+                                      ? "bg-primary text-primary-foreground"
+                                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                  }`}
+                                >
+                                  {ddd}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Tags */}
+                          {availableTags.length > 0 && (
+                            <div>
+                              <Label className="text-xs">Tag</Label>
+                              <Select value={wizardTag} onValueChange={setWizardTag}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">Todas</SelectItem>
+                                  {availableTags.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
+                          {/* Quantidade */}
+                          <div>
+                            <Label className="text-xs">Quantidade</Label>
+                            <Input
+                              type="number" min={1} max={isAdmin ? 999 : Math.min(smsCredits ?? 0, leadCredits ?? 0)}
+                              value={wizardQuantidade}
+                              onChange={e => setWizardQuantidade(Math.max(1, Number(e.target.value)))}
+                              className="h-8 text-xs"
+                            />
+                            {!isAdmin && smsCredits !== null && leadCredits !== null && (
+                              <p className="text-[10px] text-muted-foreground mt-1">
+                                Máx: {Math.min(smsCredits, leadCredits)} (limitado pelo menor saldo)
+                              </p>
+                            )}
+                          </div>
+
+                          <Button
+                            onClick={handleRequestNewLeads}
+                            disabled={requestingLeads || (!isAdmin && (leadCredits ?? 0) <= 0)}
+                            className="w-full gap-2"
+                          >
+                            {requestingLeads ? (
+                              <><Loader2 className="h-4 w-4 animate-spin" /> Solicitando...</>
+                            ) : (
+                              <><Sparkles className="h-4 w-4" /> Gerar {wizardQuantidade} Leads</>
+                            )}
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </TabsContent>
               </Tabs>
             </div>
