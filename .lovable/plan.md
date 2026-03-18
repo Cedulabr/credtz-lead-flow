@@ -1,110 +1,80 @@
 
 
-## SMS Disparos — Deduplicação, +Leads Visível, Relatórios e UX Mobile
+## Plano: Permissoes + Base OFF com PostgreSQL externo
 
-### Problemas Identificados
+### 1. Adicionar modulos novos em "Gerenciar Permissoes"
 
-1. **Importação duplica contatos** — `handleImportLeads` insere sem verificar se o telefone/CPF já existe em listas anteriores
-2. **Botão +Leads não aparece** — Ele existe no código (linha 643) mas está dentro da aba "Leads" do dialog. Precisa ser mais visível e o fluxo mais intuitivo
-3. **Sem registro de histórico de disparos** — O `handleSendCampaign` chama a edge function mas não gera relatório detalhado com nome+telefone visível no frontend
-4. **Sem aviso de múltiplos telefones por CPF** — Leads com phone + phone2 não são tratados
-5. **UX mobile fraca** — Dialog não é otimizado para telas pequenas
+O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
 
-### Nota sobre o Build Error
+| Modulo | Chave | Faltando |
+|---|---|---|
+| Comunicacao SMS | `can_access_sms` | Sim |
+| WhatsApp | `can_access_whatsapp` | Sim |
 
-O erro "Failed to load native binding" do `@swc/core` é um problema de infraestrutura do servidor de desenvolvimento, não do código. Ele se resolve sozinho ao recarregar. As mudanças de código abaixo não estão relacionadas.
+**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
 
-### Mudanças
+---
 
-| Arquivo | Ação |
+### 2. Conectar Base OFF ao PostgreSQL externo
+
+O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
+
+**Arquitetura:**
+
+```text
+Frontend (busca CPF/Nome)
+    |
+    v
+Edge Function "baseoff-external-query"
+    |  (usa pg driver do Deno)
+    v
+PostgreSQL 76.13.229.101:6432
+    |
+    v
+Retorna clientes + contratos
+```
+
+**Passos:**
+- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
+- **Criar edge function** `baseoff-external-query` que:
+  - Recebe `search_term` (CPF, NB, telefone ou nome)
+  - Conecta ao PG externo via `deno-postgres`
+  - Busca na tabela de clientes + contratos associados
+  - Retorna dados transformados com oportunidades de credito
+- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
+
+**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
+
+---
+
+### 3. Simplificar modulo Base OFF - apenas Consulta
+
+**Remover do `BaseOffModule.tsx`:**
+- Tab "Clientes" e componente `ClientesView`
+- Tab "Importar" e componente `ImportEngine`
+- Remover o sistema de tabs completamente (sobra apenas Consulta)
+
+**Melhorar visao mobile da Consulta:**
+- Cards de resultado com layout otimizado para toque (areas maiores)
+- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
+- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
+
+---
+
+### Arquivos a modificar
+
+| Arquivo | Mudanca |
 |---|---|
-| `src/modules/sms/views/CampaignsView.tsx` | Refatorar completamente: deduplicação, +Leads visível, múltiplos telefones, histórico, mobile UX |
-| `src/modules/sms/types.ts` | Sem mudanças |
+| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
+| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
+| `supabase/config.toml` | Registrar nova edge function |
+| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
+| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
+| Secrets do Supabase | Armazenar credenciais do PG externo |
 
-### Detalhes Técnicos
+---
 
-**1. Deduplicação na Importação**
+### Pergunta necessaria
 
-Antes de inserir contatos na lista, buscar todos os telefones já existentes em `sms_contacts` do mesmo `created_by`:
-
-```typescript
-// Buscar contatos já existentes nas listas do usuário
-const { data: existingContacts } = await supabase
-  .from("sms_contacts")
-  .select("phone, list_id")
-  .in("list_id", contactLists.map(l => l.id));
-
-const existingPhones = new Set(existingContacts?.map(c => c.phone) || []);
-const newLeads = leads.filter(l => !existingPhones.has(l.phone));
-const duplicateCount = leads.length - newLeads.length;
-
-if (duplicateCount > 0 && newLeads.length > 0) {
-  // Mostrar dialog: "X contatos já foram importados. Deseja importar apenas os Y novos?"
-}
-if (newLeads.length === 0) {
-  toast.info("Todos os contatos já foram importados anteriormente.");
-  return;
-}
-```
-
-Usar um `AlertDialog` intermediário para confirmar com o usuário antes de prosseguir.
-
-**2. +Leads Mais Visível**
-
-- Mover o botão "+Leads" para fora da aba "Leads" — colocá-lo como um botão secundário ao lado de "Nova Campanha" no header
-- OU tornar o wizard parte do fluxo principal dentro da aba Leads, sempre visível (não escondido atrás de toggle)
-- Decisão: Manter dentro da aba Leads mas tornar o wizard **sempre expandido** quando a aba Leads está selecionada, com o botão "+Leads" em destaque (estilo card com borda colorida) no topo
-
-**3. Múltiplos Telefones por CPF**
-
-Ao importar de `leads` ou `leads_database`, verificar `phone2`:
-
-```typescript
-// Contar leads com múltiplos telefones
-const leadsWithMultiplePhones = rawLeads.filter(l => l.phone2);
-if (leadsWithMultiplePhones.length > 0) {
-  // Mostrar dialog: "X leads possuem mais de um número. Enviar para todos os números?"
-  // Se sim: duplicar o contato com phone2
-}
-```
-
-**4. Histórico de Disparos Melhorado**
-
-O relatório CSV já existe (linha 362-396) mas falta:
-- Adicionar o nome do contato no relatório (já está com `contact_name`)
-- Após disparo, salvar um resumo na campanha (campo metadata ou notes)
-- Mostrar mini-resumo inline no card da campanha
-
-Após o `handleSendCampaign`, atualizar o card para mostrar: "Último disparo: X enviados, Y falhas — [Baixar Relatório]"
-
-**5. UX Mobile**
-
-- Dialog: usar `max-w-[95vw]` e `max-h-[85vh]` em mobile
-- Botões de status: usar `grid-cols-2` em mobile em vez de `grid-cols-3`
-- Wizard +Leads: layout empilhado em mobile
-- DDDs: scroll horizontal em mobile
-
-### Fluxo Interativo Proposto
-
-```
-Usuário abre "Nova Campanha"
-  → Preenche nome e mensagem
-  → Vai em "Leads" na origem
-    → Vê banner de créditos
-    → Escolhe módulo (Activate/Leads/Televendas)
-    → Escolhe status (Novos/AutoLead/Andamento/Agendado)
-    → Clica "Importar Leads"
-      → Sistema verifica duplicatas
-      → Se tem duplicatas: "130 contatos encontrados, 45 já importados. Importar apenas os 85 novos?"
-      → Se tem múltiplos telefones: "12 leads possuem 2 números. Enviar para ambos?"
-      → Importa e confirma
-    → OU clica "+Leads" (botão em destaque)
-      → Wizard inline abre: Convênio, DDD, Tag, Quantidade
-      → Gera leads e importa automaticamente
-  → Cria campanha
-  → Clica "Disparar"
-    → Sistema envia e registra histórico
-    → Card mostra resumo: enviados/falhas
-    → Botão "Relatório" gera CSV com nome+telefone+status+erro
-```
+Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
 

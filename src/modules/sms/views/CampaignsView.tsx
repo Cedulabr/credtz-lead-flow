@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Send, Rocket, Users, Zap, Loader2, RefreshCw, Trash2, AlertTriangle, MessageSquare, Download, Sparkles, Info } from "lucide-react";
+import { Plus, Send, Rocket, Users, Zap, Loader2, RefreshCw, Trash2, AlertTriangle, MessageSquare, Download, Sparkles, Info, Phone, UserCheck, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,10 +8,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useUserCompany } from "../hooks/useUserCompany";
 import { useActivityLogger } from "@/hooks/useActivityLogger";
 import { toast } from "sonner";
@@ -32,6 +35,12 @@ interface CampaignsViewProps {
   onRefreshLists: () => void;
 }
 
+interface PendingImport {
+  newLeads: { name: string; phone: string; source_id: string }[];
+  duplicateCount: number;
+  multiPhoneLeads: { name: string; phone: string; phone2: string; source_id: string }[];
+}
+
 export const CampaignsView = ({
   campaigns,
   templates,
@@ -42,6 +51,7 @@ export const CampaignsView = ({
   const { user, isAdmin, profile } = useAuth();
   const { companyId } = useUserCompany();
   const { logActivity } = useActivityLogger();
+  const isMobile = useIsMobile();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendingCampaignId, setSendingCampaignId] = useState<string | null>(null);
@@ -66,6 +76,12 @@ export const CampaignsView = ({
   const [leadStatusFilter, setLeadStatusFilter] = useState("all");
   const [importingLeads, setImportingLeads] = useState(false);
   const [importedCount, setImportedCount] = useState(0);
+
+  // Deduplication dialog state
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [showMultiPhoneDialog, setShowMultiPhoneDialog] = useState(false);
+  const [includeMultiPhones, setIncludeMultiPhones] = useState(false);
 
   // +Leads wizard state
   const [showLeadWizard, setShowLeadWizard] = useState(false);
@@ -118,14 +134,132 @@ export const CampaignsView = ({
     }
   }, [selectedTemplate, templates]);
 
+  // ─── Deduplication check ───
+  const checkDuplicatesAndImport = async (rawLeads: { name: string; phone: string; source_id: string }[], multiPhoneLeads: { name: string; phone: string; phone2: string; source_id: string }[]) => {
+    if (!user) return;
+
+    // Fetch existing contacts from all user's lists
+    const userListIds = contactLists.map(l => l.id);
+    let existingPhones = new Set<string>();
+
+    if (userListIds.length > 0) {
+      // Fetch in batches to avoid limits
+      const batchSize = 50;
+      for (let i = 0; i < userListIds.length; i += batchSize) {
+        const batch = userListIds.slice(i, i + batchSize);
+        const { data } = await supabase
+          .from("sms_contacts")
+          .select("phone")
+          .in("list_id", batch);
+        if (data) data.forEach(c => existingPhones.add(c.phone));
+      }
+    }
+
+    const newLeads = rawLeads.filter(l => !existingPhones.has(l.phone));
+    const duplicateCount = rawLeads.length - newLeads.length;
+
+    // Filter multi-phone leads not already imported
+    const filteredMultiPhone = multiPhoneLeads.filter(l => !existingPhones.has(l.phone2));
+
+    if (duplicateCount > 0 && newLeads.length > 0) {
+      setPendingImport({ newLeads, duplicateCount, multiPhoneLeads: filteredMultiPhone });
+      setShowDuplicateDialog(true);
+      return;
+    }
+
+    if (newLeads.length === 0) {
+      toast.info("Todos os contatos já foram importados anteriormente.");
+      setImportingLeads(false);
+      return;
+    }
+
+    // No duplicates — check multi-phone
+    if (filteredMultiPhone.length > 0) {
+      setPendingImport({ newLeads, duplicateCount: 0, multiPhoneLeads: filteredMultiPhone });
+      setShowMultiPhoneDialog(true);
+      return;
+    }
+
+    // All clear — import directly
+    await finalizeImport(newLeads, false);
+  };
+
+  const handleDuplicateConfirm = async () => {
+    setShowDuplicateDialog(false);
+    if (!pendingImport) return;
+
+    // Check multi-phone after duplicate confirmation
+    if (pendingImport.multiPhoneLeads.length > 0) {
+      setShowMultiPhoneDialog(true);
+      return;
+    }
+
+    await finalizeImport(pendingImport.newLeads, false);
+  };
+
+  const handleMultiPhoneConfirm = async (includeExtra: boolean) => {
+    setShowMultiPhoneDialog(false);
+    setIncludeMultiPhones(includeExtra);
+    if (!pendingImport) return;
+
+    await finalizeImport(pendingImport.newLeads, includeExtra);
+  };
+
+  const finalizeImport = async (leads: { name: string; phone: string; source_id: string }[], addMultiPhones: boolean) => {
+    if (!user) return;
+    try {
+      // Add phone2 entries if user confirmed
+      let allLeads = [...leads];
+      if (addMultiPhones && pendingImport?.multiPhoneLeads) {
+        const extraEntries = pendingImport.multiPhoneLeads.map(l => ({
+          name: l.name,
+          phone: l.phone2,
+          source_id: l.source_id,
+        }));
+        allLeads = [...allLeads, ...extraEntries];
+      }
+
+      if (allLeads.length === 0) {
+        toast.info("Nenhum contato novo para importar.");
+        return;
+      }
+
+      const listName = `${LEAD_SOURCE_OPTIONS.find((o) => o.value === leadSource)?.label} - ${new Date().toLocaleDateString("pt-BR")}`;
+      const { data: listData, error: listError } = await supabase
+        .from("sms_contact_lists").insert({ name: listName, created_by: user.id, company_id: companyId || null } as any).select("id").single();
+      if (listError) throw listError;
+
+      const contacts = allLeads.map((l) => ({ list_id: listData.id, name: l.name, phone: l.phone, source: leadSource, source_id: l.source_id }));
+      const { error: contactsError } = await supabase.from("sms_contacts").insert(contacts as any);
+      if (contactsError) throw contactsError;
+
+      setImportedCount(allLeads.length);
+      setSelectedList(listData.id);
+      setContactSource("list");
+      onRefreshLists();
+      logActivity({
+        action: 'import_leads',
+        module: 'sms',
+        description: `Importou ${allLeads.length} leads de ${leadSource} para campanha SMS`,
+        metadata: { source: leadSource, count: allLeads.length, list_id: listData.id },
+      });
+      toast.success(`${allLeads.length} leads importados com sucesso!`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao importar leads");
+    } finally {
+      setImportingLeads(false);
+      setPendingImport(null);
+    }
+  };
+
   const handleImportLeads = async () => {
     if (!isAdmin && !companyId) {
-      toast.error("Empresa não identificada. Aguarde ou entre em contato com o suporte.");
+      toast.error("Empresa não identificada.");
       return;
     }
     setImportingLeads(true);
     try {
-      // Fetch company user IDs for filtering tables where company_id is NULL
       let companyUserIds: string[] = [];
       if (!isAdmin && companyId) {
         const { data: companyUsers } = await supabase
@@ -137,6 +271,8 @@ export const CampaignsView = ({
       }
 
       let leads: { name: string; phone: string; source_id: string }[] = [];
+      let multiPhoneLeads: { name: string; phone: string; phone2: string; source_id: string }[] = [];
+
       const statusMap: Record<string, Record<string, string[]>> = {
         activate_leads: {
           novo: ["novo", "new"], autolead: ["autolead"],
@@ -158,7 +294,6 @@ export const CampaignsView = ({
       if (leadSource === "activate_leads") {
         let query = supabase.from("activate_leads").select("id, nome, telefone, status");
         if (!isAdmin && companyUserIds.length > 0) query = query.or(`assigned_to.in.(${companyUserIds.join(',')}),created_by.in.(${companyUserIds.join(',')})`);
-
         if (leadStatusFilter !== "all") {
           const statuses = statusMap.activate_leads[leadStatusFilter] || [];
           if (statuses.length) query = query.in("status", statuses);
@@ -166,15 +301,18 @@ export const CampaignsView = ({
         const { data } = await query.limit(500);
         leads = (data || []).map((l) => ({ name: l.nome, phone: l.telefone.replace(/\D/g, ""), source_id: l.id }));
       } else if (leadSource === "leads_premium") {
-        let query = supabase.from("leads").select("id, name, phone, status");
+        let query = supabase.from("leads").select("id, name, phone, phone2, status");
         if (!isAdmin && companyUserIds.length > 0) query = query.or(`assigned_to.in.(${companyUserIds.join(',')}),requested_by.in.(${companyUserIds.join(',')})`);
-
         if (leadStatusFilter !== "all") {
           const statuses = statusMap.leads_premium[leadStatusFilter] || [];
           if (statuses.length) query = query.in("status", statuses);
         }
         const { data } = await query.limit(500);
         leads = (data || []).map((l: any) => ({ name: l.name, phone: (l.phone || "").replace(/\D/g, ""), source_id: l.id }));
+        // Detect multi-phone leads
+        multiPhoneLeads = (data || [])
+          .filter((l: any) => l.phone2 && l.phone2.replace(/\D/g, "").length >= 10)
+          .map((l: any) => ({ name: l.name, phone: (l.phone || "").replace(/\D/g, ""), phone2: l.phone2.replace(/\D/g, ""), source_id: l.id }));
       } else if (leadSource === "televendas") {
         let query = supabase.from("televendas").select("id, nome, telefone, status");
         if (!isAdmin && companyId) query = query.eq("company_id", companyId);
@@ -187,32 +325,13 @@ export const CampaignsView = ({
       }
 
       leads = leads.filter((l) => l.phone.length >= 10);
-      if (leads.length === 0) { toast.error("Nenhum lead encontrado"); return; }
+      if (leads.length === 0) { toast.error("Nenhum lead encontrado com esse filtro"); setImportingLeads(false); return; }
 
-      const listName = `${LEAD_SOURCE_OPTIONS.find((o) => o.value === leadSource)?.label} - ${new Date().toLocaleDateString("pt-BR")}`;
-      const { data: listData, error: listError } = await supabase
-        .from("sms_contact_lists").insert({ name: listName, created_by: user?.id, company_id: companyId || null } as any).select("id").single();
-      if (listError) throw listError;
-
-      const contacts = leads.map((l) => ({ list_id: listData.id, name: l.name, phone: l.phone, source: leadSource, source_id: l.source_id }));
-      const { error: contactsError } = await supabase.from("sms_contacts").insert(contacts as any);
-      if (contactsError) throw contactsError;
-
-      setImportedCount(leads.length);
-      setSelectedList(listData.id);
-      setContactSource("list");
-      onRefreshLists();
-      logActivity({
-        action: 'import_leads',
-        module: 'sms',
-        description: `Importou ${leads.length} leads de ${leadSource} para campanha SMS`,
-        metadata: { source: leadSource, count: leads.length, list_id: listData.id },
-      });
-      toast.success(`${leads.length} leads importados`);
+      // Deduplicate check
+      await checkDuplicatesAndImport(leads, multiPhoneLeads);
     } catch (e) {
       console.error(e);
       toast.error("Erro ao importar leads");
-    } finally {
       setImportingLeads(false);
     }
   };
@@ -249,16 +368,28 @@ export const CampaignsView = ({
         .from("sms_contact_lists").insert({ name: listName, created_by: user.id, company_id: companyId || null } as any).select("id").single();
       if (listError) throw listError;
 
-      const contacts = leads.map((l: any) => ({
+      // Check for multi-phone leads from request
+      const multiPhones = leads.filter((l: any) => l.phone2 && l.phone2.replace(/\D/g, "").length >= 10);
+      let allContacts = leads.map((l: any) => ({
         list_id: listData.id, name: l.name, phone: (l.phone || "").replace(/\D/g, ""),
         source: "leads_premium", source_id: l.id || l.lead_id,
       }));
-      const { error: cErr } = await supabase.from("sms_contacts").insert(contacts as any);
+
+      if (multiPhones.length > 0) {
+        // Add phone2 entries automatically for requested leads
+        const extraContacts = multiPhones.map((l: any) => ({
+          list_id: listData.id, name: l.name, phone: l.phone2.replace(/\D/g, ""),
+          source: "leads_premium", source_id: l.id || l.lead_id,
+        }));
+        allContacts = [...allContacts, ...extraContacts];
+      }
+
+      const { error: cErr } = await supabase.from("sms_contacts").insert(allContacts as any);
       if (cErr) throw cErr;
 
       setSelectedList(listData.id);
       setContactSource("list");
-      setImportedCount(leads.length);
+      setImportedCount(allContacts.length);
       setShowLeadWizard(false);
       onRefreshLists();
 
@@ -272,10 +403,10 @@ export const CampaignsView = ({
       logActivity({
         action: 'request_leads_for_sms',
         module: 'sms',
-        description: `Solicitou ${leads.length} leads premium para campanha SMS`,
-        metadata: { count: leads.length, convenio: wizardConvenio, ddds: wizardDdds, tag: wizardTag },
+        description: `Solicitou ${allContacts.length} leads premium para campanha SMS`,
+        metadata: { count: allContacts.length, convenio: wizardConvenio, ddds: wizardDdds, tag: wizardTag, multi_phones: multiPhones.length },
       });
-      toast.success(`${leads.length} leads solicitados e importados!`);
+      toast.success(`${allContacts.length} leads solicitados e importados!${multiPhones.length > 0 ? ` (${multiPhones.length} com 2 números)` : ''}`);
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || "Erro ao solicitar leads");
@@ -313,6 +444,7 @@ export const CampaignsView = ({
   const resetForm = () => {
     setCampaignName(""); setSelectedTemplate("none"); setMessageContent("");
     setSelectedList("none"); setContactSource("list"); setImportedCount(0);
+    setShowLeadWizard(false); setPendingImport(null);
   };
 
   const handleSendCampaign = async (campaignId: string) => {
@@ -321,6 +453,15 @@ export const CampaignsView = ({
       const { data, error } = await supabase.functions.invoke("send-sms", { body: { campaign_id: campaignId } });
       if (error) throw error;
       if (data?.error) { toast.error(data.error); return; }
+
+      // Log dispatch result
+      logActivity({
+        action: 'send_campaign',
+        module: 'sms',
+        description: `Disparou campanha SMS: ${data.sent} enviados, ${data.failed} falhas`,
+        metadata: { campaign_id: campaignId, sent: data.sent, failed: data.failed },
+      });
+
       toast.success(`Disparo concluído: ${data.sent} enviados, ${data.failed} falhas`);
       onRefresh();
     } catch (e: any) {
@@ -333,7 +474,6 @@ export const CampaignsView = ({
   const handleDeleteCampaign = async () => {
     if (!deleteTarget) return;
     try {
-      // Delete history records first
       await supabase.from("sms_history").delete().eq("campaign_id", deleteTarget.id);
       const { error } = await supabase.from("sms_campaigns").delete().eq("id", deleteTarget.id);
       if (error) throw error;
@@ -375,7 +515,7 @@ export const CampaignsView = ({
       const rows = sorted.map((h) => {
         const dt = h.sent_at || h.created_at;
         return [
-          h.contact_name || "",
+          h.contact_name || "Sem nome",
           h.phone,
           STATUS_PT[h.status] || h.status,
           (h.error_message || "").replace(/;/g, ","),
@@ -392,74 +532,339 @@ export const CampaignsView = ({
       a.download = `relatorio-${safeName}-${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success(`Relatório com ${data.length} registros baixado`);
+
+      const sentCount = data.filter(d => d.status === 'sent' || d.status === 'delivered').length;
+      const failedCount = data.filter(d => d.status === 'failed').length;
+      toast.success(`Relatório baixado: ${sentCount} enviados, ${failedCount} falhas, ${data.length} total`);
     } catch { toast.error("Erro ao gerar relatório"); } finally { setDownloadingReportId(null); }
   };
+
+  // ─── Campaign Creation Form ───
+  const campaignForm = (
+    <div className="space-y-4 sm:space-y-5">
+      <div>
+        <Label>Nome da Campanha</Label>
+        <Input value={campaignName} onChange={(e) => setCampaignName(e.target.value)} placeholder="Ex: Promo Março 2026" />
+      </div>
+      <div>
+        <Label>Template (opcional)</Label>
+        <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+          <SelectTrigger><SelectValue placeholder="Selecionar template" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Nenhum</SelectItem>
+            {templates.map((t) => (<SelectItem key={t.id} value={t.id}>📝 {t.name}</SelectItem>))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label>Mensagem</Label>
+        <Textarea value={messageContent} onChange={(e) => setMessageContent(e.target.value)} placeholder="Digite a mensagem..." rows={3} />
+        <p className="text-[11px] text-muted-foreground mt-1">
+          {messageContent.length}/160 caracteres
+          {messageContent.length > 160 && ` (${Math.ceil(messageContent.length / 153)} segmentos)`}
+        </p>
+      </div>
+      <div>
+        <Label className="mb-2 block">Origem dos Contatos</Label>
+        <Tabs value={contactSource} onValueChange={setContactSource}>
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="list" className="gap-1.5"><Users className="h-3.5 w-3.5" /> Lista</TabsTrigger>
+            <TabsTrigger value="leads" className="gap-1.5"><Zap className="h-3.5 w-3.5" /> Leads</TabsTrigger>
+          </TabsList>
+          <TabsContent value="list" className="mt-3">
+            <Select value={selectedList} onValueChange={setSelectedList}>
+              <SelectTrigger><SelectValue placeholder="Selecionar lista" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Selecione uma lista</SelectItem>
+                {contactLists.map((l) => (<SelectItem key={l.id} value={l.id}>👥 {l.name} ({l.contact_count})</SelectItem>))}
+              </SelectContent>
+            </Select>
+          </TabsContent>
+          <TabsContent value="leads" className="mt-3 space-y-3">
+            {/* Credit comparison banner */}
+            {!isAdmin && smsCredits !== null && leadCredits !== null && (
+              <div className={`rounded-lg p-3 text-xs flex items-start gap-2 ${
+                smsCredits > 0 && leadCredits <= 0
+                  ? "bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400"
+                  : leadCredits > 0 && smsCredits <= 0
+                  ? "bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-400"
+                  : smsCredits <= 0 && leadCredits <= 0
+                  ? "bg-destructive/10 border border-destructive/20 text-destructive"
+                  : "bg-primary/5 border border-primary/20 text-primary"
+              }`}>
+                <Info className="h-4 w-4 mt-0.5 shrink-0" />
+                <div>
+                  {smsCredits > 0 && leadCredits <= 0 && (
+                    <p>Você tem <strong>{smsCredits}</strong> disparos SMS mas <strong>0</strong> créditos de leads. Solicite mais leads ao gestor!</p>
+                  )}
+                  {leadCredits > 0 && smsCredits <= 0 && (
+                    <p>Você tem <strong>{leadCredits}</strong> leads disponíveis mas <strong>0</strong> créditos SMS. Adquira mais créditos SMS!</p>
+                  )}
+                  {smsCredits <= 0 && leadCredits <= 0 && (
+                    <p>Sem créditos de SMS e Leads. Solicite recarga ao seu gestor.</p>
+                  )}
+                  {smsCredits > 0 && leadCredits > 0 && (
+                    <p>📊 <strong>{smsCredits}</strong> SMS · <strong>{leadCredits}</strong> Leads Premium disponíveis</p>
+                  )}
+                </div>
+              </div>
+            )}
+            {isAdmin && (
+              <div className="rounded-lg p-3 text-xs flex items-center gap-2 bg-primary/5 border border-primary/20 text-primary">
+                <Info className="h-4 w-4 shrink-0" />
+                <p>Admin: créditos ilimitados para SMS e Leads Premium.</p>
+              </div>
+            )}
+
+            {/* +Leads Card - Always visible and highlighted */}
+            <div className="rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 p-4 space-y-3">
+              <button
+                onClick={() => setShowLeadWizard(!showLeadWizard)}
+                className="w-full flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <p>Solicitar Novos Leads</p>
+                    <p className="text-[10px] font-normal text-muted-foreground">Puxar leads do banco premium</p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-primary border-primary/30 text-[10px]">
+                  {!isAdmin && leadCredits !== null ? `${leadCredits} créditos` : '∞'}
+                </Badge>
+              </button>
+
+              <AnimatePresence>
+                {showLeadWizard && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="space-y-3 pt-2 border-t border-primary/20">
+                      {/* Convênio */}
+                      <div>
+                        <Label className="text-xs">Convênio</Label>
+                        <Select value={wizardConvenio} onValueChange={setWizardConvenio}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos</SelectItem>
+                            {availableConvenios.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* DDDs */}
+                      <div>
+                        <Label className="text-xs">DDDs (opcional)</Label>
+                        <ScrollArea className={isMobile ? "w-full" : ""}>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {FEATURED_DDDS.map(ddd => (
+                              <button
+                                key={ddd}
+                                onClick={() => setWizardDdds(prev => prev.includes(ddd) ? prev.filter(d => d !== ddd) : [...prev, ddd])}
+                                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                                  wizardDdds.includes(ddd)
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                }`}
+                              >
+                                {ddd}
+                              </button>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </div>
+
+                      {/* Tags */}
+                      {availableTags.length > 0 && (
+                        <div>
+                          <Label className="text-xs">Tag</Label>
+                          <Select value={wizardTag} onValueChange={setWizardTag}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Todas</SelectItem>
+                              {availableTags.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {/* Quantidade */}
+                      <div>
+                        <Label className="text-xs">Quantidade</Label>
+                        <Input
+                          type="number" min={1} max={isAdmin ? 999 : Math.min(smsCredits ?? 0, leadCredits ?? 0)}
+                          value={wizardQuantidade}
+                          onChange={e => setWizardQuantidade(Math.max(1, Number(e.target.value)))}
+                          className="h-8 text-xs"
+                        />
+                        {!isAdmin && smsCredits !== null && leadCredits !== null && (
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            Máx: {Math.min(smsCredits, leadCredits)} (limitado pelo menor saldo)
+                          </p>
+                        )}
+                      </div>
+
+                      <Button
+                        onClick={handleRequestNewLeads}
+                        disabled={requestingLeads || (!isAdmin && (leadCredits ?? 0) <= 0)}
+                        className="w-full gap-2"
+                      >
+                        {requestingLeads ? (
+                          <><Loader2 className="h-4 w-4 animate-spin" /> Solicitando...</>
+                        ) : (
+                          <><Sparkles className="h-4 w-4" /> Gerar {wizardQuantidade} Leads</>
+                        )}
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Separator */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-[10px] text-muted-foreground uppercase font-medium">ou importar existentes</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            <div>
+              <Label className="text-xs">Módulo de Origem</Label>
+              <div className={`grid gap-2 mt-1 ${isMobile ? 'grid-cols-1' : 'grid-cols-3'}`}>
+                {LEAD_SOURCE_OPTIONS.map((opt) => (
+                  <Button key={opt.value} variant={leadSource === opt.value ? "default" : "outline"} size="sm"
+                    onClick={() => setLeadSource(opt.value)} className="text-xs gap-1">
+                    {opt.icon} {opt.label.split(" ")[0]}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Filtrar por Status</Label>
+              <div className={`grid gap-2 mt-1 ${isMobile ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                <Button variant={leadStatusFilter === "all" ? "default" : "outline"} size="sm"
+                  onClick={() => setLeadStatusFilter("all")} className="text-xs">Todos</Button>
+                {LEAD_STATUS_FILTERS.map((s) => (
+                  <Button key={s.value} variant={leadStatusFilter === s.value ? "default" : "outline"} size="sm"
+                    onClick={() => setLeadStatusFilter(s.value)} className="text-xs">{s.label}</Button>
+                ))}
+              </div>
+            </div>
+            <Button onClick={handleImportLeads} disabled={importingLeads} className="w-full gap-2" variant="secondary">
+              {importingLeads ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Verificando duplicatas...</>
+              ) : (
+                <><Zap className="h-4 w-4" /> Importar Leads Existentes</>
+              )}
+            </Button>
+            {importedCount > 0 && (
+              <div className="rounded-lg p-3 bg-green-500/10 border border-green-500/20 flex items-center gap-2">
+                <UserCheck className="h-4 w-4 text-green-600" />
+                <p className="text-xs text-green-700 dark:text-green-400 font-medium">
+                  ✅ {importedCount} leads importados e prontos para disparo
+                </p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+
+  const campaignFooter = (
+    <div className={`flex gap-2 ${isMobile ? 'flex-col' : ''}`}>
+      <Button variant="outline" onClick={() => setDialogOpen(false)} className={isMobile ? 'w-full' : ''}>Cancelar</Button>
+      <Button onClick={handleCreateCampaign} disabled={saving} className={`gap-2 ${isMobile ? 'w-full' : ''}`}>
+        <Send className="h-4 w-4" /> {saving ? "Criando..." : "Criar Campanha"}
+      </Button>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <div className="h-9 w-9 rounded-lg bg-emerald-500/10 flex items-center justify-center">
             <Rocket className="h-5 w-5 text-emerald-500" />
           </div>
-          <h2 className="text-lg font-semibold">Campanhas SMS</h2>
+          <h2 className="text-base sm:text-lg font-semibold">Campanhas SMS</h2>
           {smsCredits !== null && (
-            <Badge variant="outline" className="gap-1.5 text-sm">
-              <MessageSquare className="h-3.5 w-3.5" />
+            <Badge variant="outline" className="gap-1.5 text-xs sm:text-sm">
+              <MessageSquare className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
               {isAdmin ? '∞' : smsCredits} créditos
             </Badge>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={onRefresh} className="gap-2 text-sm">
-            <RefreshCw className="h-4 w-4" /> Atualizar
+          <Button variant="outline" onClick={onRefresh} size={isMobile ? "sm" : "default"} className="gap-1.5 text-xs sm:text-sm">
+            <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> {isMobile ? '' : 'Atualizar'}
           </Button>
-          <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="gap-2">
-            <Plus className="h-4 w-4" /> Nova Campanha
+          <Button onClick={() => { resetForm(); setDialogOpen(true); }} size={isMobile ? "sm" : "default"} className="gap-1.5">
+            <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Nova Campanha
           </Button>
         </div>
       </div>
 
       {campaigns.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <div className="h-16 w-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
-            <Rocket className="h-8 w-8 opacity-40" />
+        <div className="text-center py-12 sm:py-16 text-muted-foreground">
+          <div className="h-14 w-14 sm:h-16 sm:w-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
+            <Rocket className="h-7 w-7 sm:h-8 sm:w-8 opacity-40" />
           </div>
-          <p className="font-medium">Nenhuma campanha criada</p>
+          <p className="font-medium text-sm sm:text-base">Nenhuma campanha criada</p>
+          <p className="text-xs text-muted-foreground mt-1">Clique em "Nova Campanha" para começar</p>
         </div>
       ) : (
         <div className="space-y-2">
           <AnimatePresence>
             {campaigns.map((c, index) => {
               const statusConfig = CAMPAIGN_STATUS_CONFIG[c.status] || CAMPAIGN_STATUS_CONFIG.draft;
+              const hasResults = c.sent_count > 0 || c.failed_count > 0;
               return (
                 <motion.div
                   key={c.id}
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.03 }}
-                  className="p-4 rounded-xl border border-border/50 bg-card hover:shadow-sm transition-all"
+                  className="p-3 sm:p-4 rounded-xl border border-border/50 bg-card hover:shadow-sm transition-all"
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  <div className={`flex ${isMobile ? 'flex-col gap-3' : 'items-center justify-between gap-3'}`}>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span>{statusConfig.emoji}</span>
                         <h3 className="font-semibold text-sm truncate">{c.name}</h3>
                         <span className={`text-xs font-medium ${statusConfig.color}`}>{statusConfig.label}</span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1 truncate">{c.message_content}</p>
-                      <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
+                      <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground flex-wrap">
                         <span>👥 {c.total_recipients} destinatários</span>
-                        <span>✅ {c.sent_count} enviados</span>
+                        {hasResults && <span className="text-green-600">✅ {c.sent_count} enviados</span>}
                         {c.failed_count > 0 && <span className="text-red-500">❌ {c.failed_count} falhas</span>}
                       </div>
+                      {/* Dispatch summary */}
+                      {hasResults && (
+                        <div className="mt-2 p-2 rounded-lg bg-muted/50 text-[11px] flex items-center gap-2 flex-wrap">
+                          <FileText className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-muted-foreground">
+                            Último disparo: {c.sent_count + c.failed_count} processados
+                          </span>
+                          {c.completed_at && (
+                            <span className="text-muted-foreground">
+                              — {new Date(c.completed_at).toLocaleDateString("pt-BR")}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div className="flex flex-col items-end gap-2">
+                    <div className={`flex ${isMobile ? 'items-center justify-between' : 'flex-col items-end gap-2'}`}>
                       <span className="text-[11px] text-muted-foreground">
                         {new Date(c.created_at).toLocaleDateString("pt-BR")}
                       </span>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         {(c.status === "draft" || c.status === "scheduled") && (
                           <Button size="sm" onClick={() => handleSendCampaign(c.id)} disabled={sendingCampaignId === c.id} className="gap-1.5 text-xs">
                             {sendingCampaignId === c.id ? (
@@ -481,7 +886,7 @@ export const CampaignsView = ({
                         )}
                         {c.status === "sending" && isAdmin && (
                           <Button size="sm" variant="outline" onClick={() => setMarkFailedTarget(c)} className="gap-1 text-xs text-amber-600 border-amber-300">
-                            <AlertTriangle className="h-3 w-3" /> Marcar Falhou
+                            <AlertTriangle className="h-3 w-3" /> {isMobile ? '' : 'Marcar Falhou'}
                           </Button>
                         )}
                         {isAdmin && (
@@ -521,7 +926,7 @@ export const CampaignsView = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Marcar como Falhou</AlertDialogTitle>
             <AlertDialogDescription>
-              A campanha "{markFailedTarget?.name}" será marcada como falhou. Use isso para campanhas travadas no status "Enviando".
+              A campanha "{markFailedTarget?.name}" será marcada como falhou. Use para campanhas travadas no status "Enviando".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -531,225 +936,119 @@ export const CampaignsView = ({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Create Campaign Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Send className="h-5 w-5 text-primary" /> Nova Campanha SMS
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-5">
-            <div>
-              <Label>Nome da Campanha</Label>
-              <Input value={campaignName} onChange={(e) => setCampaignName(e.target.value)} placeholder="Ex: Promo Março 2026" />
+      {/* Duplicate Contacts Alert */}
+      <AlertDialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <AlertDialogContent className={isMobile ? "max-w-[95vw]" : ""}>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-900/30">
+                <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+              </div>
+              <AlertDialogTitle>Contatos Duplicados Detectados</AlertDialogTitle>
             </div>
-            <div>
-              <Label>Template (opcional)</Label>
-              <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-                <SelectTrigger><SelectValue placeholder="Selecionar template" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum</SelectItem>
-                  {templates.map((t) => (<SelectItem key={t.id} value={t.id}>📝 {t.name}</SelectItem>))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Mensagem</Label>
-              <Textarea value={messageContent} onChange={(e) => setMessageContent(e.target.value)} placeholder="Digite a mensagem..." rows={3} />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                {messageContent.length}/160 caracteres
-                {messageContent.length > 160 && ` (${Math.ceil(messageContent.length / 153)} segmentos)`}
-              </p>
-            </div>
-            <div>
-              <Label className="mb-2 block">Origem dos Contatos</Label>
-              <Tabs value={contactSource} onValueChange={setContactSource}>
-                <TabsList className="w-full grid grid-cols-2">
-                  <TabsTrigger value="list" className="gap-1.5"><Users className="h-3.5 w-3.5" /> Lista</TabsTrigger>
-                  <TabsTrigger value="leads" className="gap-1.5"><Zap className="h-3.5 w-3.5" /> Leads</TabsTrigger>
-                </TabsList>
-                <TabsContent value="list" className="mt-3">
-                  <Select value={selectedList} onValueChange={setSelectedList}>
-                    <SelectTrigger><SelectValue placeholder="Selecionar lista" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Selecione uma lista</SelectItem>
-                      {contactLists.map((l) => (<SelectItem key={l.id} value={l.id}>👥 {l.name} ({l.contact_count})</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-                </TabsContent>
-                <TabsContent value="leads" className="mt-3 space-y-3">
-                  {/* Credit comparison banner */}
-                  {!isAdmin && smsCredits !== null && leadCredits !== null && (
-                    <div className={`rounded-lg p-3 text-xs flex items-start gap-2 ${
-                      smsCredits > 0 && leadCredits <= 0
-                        ? "bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400"
-                        : leadCredits > 0 && smsCredits <= 0
-                        ? "bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-400"
-                        : smsCredits <= 0 && leadCredits <= 0
-                        ? "bg-destructive/10 border border-destructive/20 text-destructive"
-                        : "bg-primary/5 border border-primary/20 text-primary"
-                    }`}>
-                      <Info className="h-4 w-4 mt-0.5 shrink-0" />
-                      <div>
-                        {smsCredits > 0 && leadCredits <= 0 && (
-                          <p>Você tem <strong>{smsCredits}</strong> disparos SMS mas <strong>0</strong> créditos de leads. Solicite mais leads ao gestor!</p>
-                        )}
-                        {leadCredits > 0 && smsCredits <= 0 && (
-                          <p>Você tem <strong>{leadCredits}</strong> leads disponíveis mas <strong>0</strong> créditos SMS. Adquira mais créditos SMS!</p>
-                        )}
-                        {smsCredits <= 0 && leadCredits <= 0 && (
-                          <p>Sem créditos de SMS e Leads. Solicite recarga ao seu gestor.</p>
-                        )}
-                        {smsCredits > 0 && leadCredits > 0 && (
-                          <p>📊 <strong>{smsCredits}</strong> SMS · <strong>{leadCredits}</strong> Leads Premium disponíveis. Pode solicitar até <strong>{Math.min(smsCredits, leadCredits)}</strong> leads.</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {isAdmin && (
-                    <div className="rounded-lg p-3 text-xs flex items-center gap-2 bg-primary/5 border border-primary/20 text-primary">
-                      <Info className="h-4 w-4 shrink-0" />
-                      <p>Admin: créditos ilimitados para SMS e Leads Premium.</p>
-                    </div>
-                  )}
-
-                  <div>
-                    <Label className="text-xs">Módulo de Origem</Label>
-                    <div className="grid grid-cols-3 gap-2 mt-1">
-                      {LEAD_SOURCE_OPTIONS.map((opt) => (
-                        <Button key={opt.value} variant={leadSource === opt.value ? "default" : "outline"} size="sm"
-                          onClick={() => setLeadSource(opt.value)} className="text-xs gap-1">
-                          {opt.icon} {opt.label.split(" ")[0]}
-                        </Button>
-                      ))}
-                    </div>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p className="text-muted-foreground">
+                  Encontramos contatos que já foram importados anteriormente.
+                </p>
+                <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Total encontrados:</span>
+                    <span className="font-semibold">{(pendingImport?.newLeads.length ?? 0) + (pendingImport?.duplicateCount ?? 0)}</span>
                   </div>
-                  <div>
-                    <Label className="text-xs">Filtrar por Status</Label>
-                    <div className="grid grid-cols-3 gap-2 mt-1">
-                      <Button variant={leadStatusFilter === "all" ? "default" : "outline"} size="sm"
-                        onClick={() => setLeadStatusFilter("all")} className="text-xs">Todos</Button>
-                      {LEAD_STATUS_FILTERS.map((s) => (
-                        <Button key={s.value} variant={leadStatusFilter === s.value ? "default" : "outline"} size="sm"
-                          onClick={() => setLeadStatusFilter(s.value)} className="text-xs">{s.label}</Button>
-                      ))}
-                    </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-amber-600">⚠️ Já importados:</span>
+                    <span className="font-semibold text-amber-600">{pendingImport?.duplicateCount ?? 0}</span>
                   </div>
-                  <div className="flex gap-2">
-                    <Button onClick={handleImportLeads} disabled={importingLeads} className="flex-1 gap-2" variant="secondary">
-                      <Zap className="h-4 w-4" /> {importingLeads ? "Importando..." : "Importar Leads"}
-                    </Button>
-                    <Button onClick={() => setShowLeadWizard(!showLeadWizard)} variant="outline" className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5">
-                      <Sparkles className="h-4 w-4" /> +Leads
-                    </Button>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-green-600">✅ Novos contatos:</span>
+                    <span className="font-semibold text-green-600">{pendingImport?.newLeads.length ?? 0}</span>
                   </div>
-                  {importedCount > 0 && <p className="text-xs text-green-600 dark:text-green-400 font-medium">✅ {importedCount} leads importados</p>}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Importar apenas os contatos novos evita disparos duplicados e economiza créditos.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setShowDuplicateDialog(false); setImportingLeads(false); setPendingImport(null); }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleDuplicateConfirm} className="bg-primary hover:bg-primary/90">
+              Importar {pendingImport?.newLeads.length ?? 0} Novos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-                  {/* +Leads inline wizard */}
-                  <AnimatePresence>
-                    {showLeadWizard && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
-                          <div className="flex items-center gap-2 text-sm font-semibold text-primary">
-                            <Sparkles className="h-4 w-4" />
-                            Solicitar Novos Leads Premium
-                          </div>
-
-                          {/* Convênio */}
-                          <div>
-                            <Label className="text-xs">Convênio</Label>
-                            <Select value={wizardConvenio} onValueChange={setWizardConvenio}>
-                              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">Todos</SelectItem>
-                                {availableConvenios.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          {/* DDDs */}
-                          <div>
-                            <Label className="text-xs">DDDs (opcional)</Label>
-                            <div className="flex flex-wrap gap-1.5 mt-1">
-                              {FEATURED_DDDS.map(ddd => (
-                                <button
-                                  key={ddd}
-                                  onClick={() => setWizardDdds(prev => prev.includes(ddd) ? prev.filter(d => d !== ddd) : [...prev, ddd])}
-                                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                                    wizardDdds.includes(ddd)
-                                      ? "bg-primary text-primary-foreground"
-                                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                                  }`}
-                                >
-                                  {ddd}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Tags */}
-                          {availableTags.length > 0 && (
-                            <div>
-                              <Label className="text-xs">Tag</Label>
-                              <Select value={wizardTag} onValueChange={setWizardTag}>
-                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="all">Todas</SelectItem>
-                                  {availableTags.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-
-                          {/* Quantidade */}
-                          <div>
-                            <Label className="text-xs">Quantidade</Label>
-                            <Input
-                              type="number" min={1} max={isAdmin ? 999 : Math.min(smsCredits ?? 0, leadCredits ?? 0)}
-                              value={wizardQuantidade}
-                              onChange={e => setWizardQuantidade(Math.max(1, Number(e.target.value)))}
-                              className="h-8 text-xs"
-                            />
-                            {!isAdmin && smsCredits !== null && leadCredits !== null && (
-                              <p className="text-[10px] text-muted-foreground mt-1">
-                                Máx: {Math.min(smsCredits, leadCredits)} (limitado pelo menor saldo)
-                              </p>
-                            )}
-                          </div>
-
-                          <Button
-                            onClick={handleRequestNewLeads}
-                            disabled={requestingLeads || (!isAdmin && (leadCredits ?? 0) <= 0)}
-                            className="w-full gap-2"
-                          >
-                            {requestingLeads ? (
-                              <><Loader2 className="h-4 w-4 animate-spin" /> Solicitando...</>
-                            ) : (
-                              <><Sparkles className="h-4 w-4" /> Gerar {wizardQuantidade} Leads</>
-                            )}
-                          </Button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </TabsContent>
-              </Tabs>
+      {/* Multiple Phones Alert */}
+      <AlertDialog open={showMultiPhoneDialog} onOpenChange={setShowMultiPhoneDialog}>
+        <AlertDialogContent className={isMobile ? "max-w-[95vw]" : ""}>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/30">
+                <Phone className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <AlertDialogTitle>Leads com Múltiplos Números</AlertDialogTitle>
             </div>
-          </div>
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreateCampaign} disabled={saving} className="gap-2">
-              <Send className="h-4 w-4" /> {saving ? "Criando..." : "Criar Campanha"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p className="text-muted-foreground">
+                  <strong>{pendingImport?.multiPhoneLeads.length ?? 0}</strong> leads possuem mais de um número de telefone registrado.
+                </p>
+                <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
+                  <p className="text-muted-foreground">Deseja enviar SMS para <strong>todos</strong> os números desses leads?</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    📱 Ao confirmar, cada lead com 2 números receberá o disparo em ambos os telefones.
+                  </p>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className={isMobile ? "flex-col gap-2" : ""}>
+            <AlertDialogCancel onClick={() => handleMultiPhoneConfirm(false)}>
+              Apenas 1 número por lead
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleMultiPhoneConfirm(true)} className="bg-blue-600 hover:bg-blue-700">
+              Enviar para todos os números
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Create Campaign - Mobile uses Sheet, Desktop uses Dialog */}
+      {isMobile ? (
+        <Sheet open={dialogOpen} onOpenChange={setDialogOpen}>
+          <SheetContent side="bottom" className="h-[92vh] flex flex-col p-4">
+            <SheetHeader className="flex-shrink-0 pb-2">
+              <SheetTitle className="flex items-center gap-2 text-lg">
+                <Send className="h-5 w-5 text-primary" /> Nova Campanha SMS
+              </SheetTitle>
+            </SheetHeader>
+            <ScrollArea className="flex-1">
+              {campaignForm}
+            </ScrollArea>
+            <div className="flex-shrink-0 pt-4 border-t sticky bottom-0 bg-background">
+              {campaignFooter}
+            </div>
+          </SheetContent>
+        </Sheet>
+      ) : (
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Send className="h-5 w-5 text-primary" /> Nova Campanha SMS
+              </DialogTitle>
+            </DialogHeader>
+            {campaignForm}
+            <DialogFooter className="mt-4">
+              {campaignFooter}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
