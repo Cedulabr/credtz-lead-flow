@@ -579,6 +579,41 @@ export const CampaignsView = ({
                   </Select>
                 </TabsContent>
                 <TabsContent value="leads" className="mt-3 space-y-3">
+                  {/* Credit comparison banner */}
+                  {!isAdmin && smsCredits !== null && leadCredits !== null && (
+                    <div className={`rounded-lg p-3 text-xs flex items-start gap-2 ${
+                      smsCredits > 0 && leadCredits <= 0
+                        ? "bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400"
+                        : leadCredits > 0 && smsCredits <= 0
+                        ? "bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-400"
+                        : smsCredits <= 0 && leadCredits <= 0
+                        ? "bg-destructive/10 border border-destructive/20 text-destructive"
+                        : "bg-primary/5 border border-primary/20 text-primary"
+                    }`}>
+                      <Info className="h-4 w-4 mt-0.5 shrink-0" />
+                      <div>
+                        {smsCredits > 0 && leadCredits <= 0 && (
+                          <p>Você tem <strong>{smsCredits}</strong> disparos SMS mas <strong>0</strong> créditos de leads. Solicite mais leads ao gestor!</p>
+                        )}
+                        {leadCredits > 0 && smsCredits <= 0 && (
+                          <p>Você tem <strong>{leadCredits}</strong> leads disponíveis mas <strong>0</strong> créditos SMS. Adquira mais créditos SMS!</p>
+                        )}
+                        {smsCredits <= 0 && leadCredits <= 0 && (
+                          <p>Sem créditos de SMS e Leads. Solicite recarga ao seu gestor.</p>
+                        )}
+                        {smsCredits > 0 && leadCredits > 0 && (
+                          <p>📊 <strong>{smsCredits}</strong> SMS · <strong>{leadCredits}</strong> Leads Premium disponíveis. Pode solicitar até <strong>{Math.min(smsCredits, leadCredits)}</strong> leads.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {isAdmin && (
+                    <div className="rounded-lg p-3 text-xs flex items-center gap-2 bg-primary/5 border border-primary/20 text-primary">
+                      <Info className="h-4 w-4 shrink-0" />
+                      <p>Admin: créditos ilimitados para SMS e Leads Premium.</p>
+                    </div>
+                  )}
+
                   <div>
                     <Label className="text-xs">Módulo de Origem</Label>
                     <div className="grid grid-cols-3 gap-2 mt-1">
@@ -601,10 +636,108 @@ export const CampaignsView = ({
                       ))}
                     </div>
                   </div>
-                  <Button onClick={handleImportLeads} disabled={importingLeads} className="w-full gap-2" variant="secondary">
-                    <Zap className="h-4 w-4" /> {importingLeads ? "Importando..." : "Importar Leads"}
-                  </Button>
-                  {importedCount > 0 && <p className="text-xs text-green-600 font-medium">✅ {importedCount} leads importados</p>}
+                  <div className="flex gap-2">
+                    <Button onClick={handleImportLeads} disabled={importingLeads} className="flex-1 gap-2" variant="secondary">
+                      <Zap className="h-4 w-4" /> {importingLeads ? "Importando..." : "Importar Leads"}
+                    </Button>
+                    <Button onClick={() => setShowLeadWizard(!showLeadWizard)} variant="outline" className="gap-1.5 border-primary/30 text-primary hover:bg-primary/5">
+                      <Sparkles className="h-4 w-4" /> +Leads
+                    </Button>
+                  </div>
+                  {importedCount > 0 && <p className="text-xs text-green-600 dark:text-green-400 font-medium">✅ {importedCount} leads importados</p>}
+
+                  {/* +Leads inline wizard */}
+                  <AnimatePresence>
+                    {showLeadWizard && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                            <Sparkles className="h-4 w-4" />
+                            Solicitar Novos Leads Premium
+                          </div>
+
+                          {/* Convênio */}
+                          <div>
+                            <Label className="text-xs">Convênio</Label>
+                            <Select value={wizardConvenio} onValueChange={setWizardConvenio}>
+                              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">Todos</SelectItem>
+                                {availableConvenios.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* DDDs */}
+                          <div>
+                            <Label className="text-xs">DDDs (opcional)</Label>
+                            <div className="flex flex-wrap gap-1.5 mt-1">
+                              {FEATURED_DDDS.map(ddd => (
+                                <button
+                                  key={ddd}
+                                  onClick={() => setWizardDdds(prev => prev.includes(ddd) ? prev.filter(d => d !== ddd) : [...prev, ddd])}
+                                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                                    wizardDdds.includes(ddd)
+                                      ? "bg-primary text-primary-foreground"
+                                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                  }`}
+                                >
+                                  {ddd}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Tags */}
+                          {availableTags.length > 0 && (
+                            <div>
+                              <Label className="text-xs">Tag</Label>
+                              <Select value={wizardTag} onValueChange={setWizardTag}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">Todas</SelectItem>
+                                  {availableTags.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
+                          {/* Quantidade */}
+                          <div>
+                            <Label className="text-xs">Quantidade</Label>
+                            <Input
+                              type="number" min={1} max={isAdmin ? 999 : Math.min(smsCredits ?? 0, leadCredits ?? 0)}
+                              value={wizardQuantidade}
+                              onChange={e => setWizardQuantidade(Math.max(1, Number(e.target.value)))}
+                              className="h-8 text-xs"
+                            />
+                            {!isAdmin && smsCredits !== null && leadCredits !== null && (
+                              <p className="text-[10px] text-muted-foreground mt-1">
+                                Máx: {Math.min(smsCredits, leadCredits)} (limitado pelo menor saldo)
+                              </p>
+                            )}
+                          </div>
+
+                          <Button
+                            onClick={handleRequestNewLeads}
+                            disabled={requestingLeads || (!isAdmin && (leadCredits ?? 0) <= 0)}
+                            className="w-full gap-2"
+                          >
+                            {requestingLeads ? (
+                              <><Loader2 className="h-4 w-4 animate-spin" /> Solicitando...</>
+                            ) : (
+                              <><Sparkles className="h-4 w-4" /> Gerar {wizardQuantidade} Leads</>
+                            )}
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </TabsContent>
               </Tabs>
             </div>
