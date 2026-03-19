@@ -1,80 +1,36 @@
 
 
-## Plano: Permissoes + Base OFF com PostgreSQL externo
+## SMS — Botão "Atualizar Status" separado do Relatório
 
-### 1. Adicionar modulos novos em "Gerenciar Permissoes"
+### Problema
 
-O array `PERMISSION_MODULES` em `UsersList.tsx` esta faltando 2 modulos que ja existem na navegacao:
+Os envios SMS levam até 20 minutos para a operadora atualizar o status real (entregue/falhou). Hoje o status só é verificado ao clicar "Relatório", o que força o usuário a baixar o CSV para saber se atualizou. O usuário precisa de um botão separado para **atualizar os status** antes de baixar o relatório.
 
-| Modulo | Chave | Faltando |
-|---|---|---|
-| Comunicacao SMS | `can_access_sms` | Sim |
-| WhatsApp | `can_access_whatsapp` | Sim |
+### Mudança
 
-**Correcao:** Adicionar essas 2 entradas ao array `PERMISSION_MODULES` (linha 66-84).
-
----
-
-### 2. Conectar Base OFF ao PostgreSQL externo
-
-O frontend nao consegue conectar diretamente a um PostgreSQL externo. A solucao e criar uma **Edge Function** que recebe o termo de busca, consulta o banco externo e retorna os resultados.
-
-**Arquitetura:**
-
-```text
-Frontend (busca CPF/Nome)
-    |
-    v
-Edge Function "baseoff-external-query"
-    |  (usa pg driver do Deno)
-    v
-PostgreSQL 76.13.229.101:6432
-    |
-    v
-Retorna clientes + contratos
-```
-
-**Passos:**
-- **Armazenar credenciais como secrets** do Supabase (BASEOFF_PG_HOST, BASEOFF_PG_PORT, BASEOFF_PG_USER, BASEOFF_PG_PASSWORD, BASEOFF_PG_DATABASE) -- nunca no codigo
-- **Criar edge function** `baseoff-external-query` que:
-  - Recebe `search_term` (CPF, NB, telefone ou nome)
-  - Conecta ao PG externo via `deno-postgres`
-  - Busca na tabela de clientes + contratos associados
-  - Retorna dados transformados com oportunidades de credito
-- **Atualizar `useOptimizedSearch.ts`** para chamar a edge function em vez do RPC `search_baseoff_clients`
-
-**Nota importante:** Preciso saber a estrutura das tabelas no seu PostgreSQL externo (nomes das tabelas e colunas). Se forem as mesmas do Supabase (`baseoff_clients`, `baseoff_contracts`), posso manter a mesma logica. Caso contrario, precisarei adaptar.
-
----
-
-### 3. Simplificar modulo Base OFF - apenas Consulta
-
-**Remover do `BaseOffModule.tsx`:**
-- Tab "Clientes" e componente `ClientesView`
-- Tab "Importar" e componente `ImportEngine`
-- Remover o sistema de tabs completamente (sobra apenas Consulta)
-
-**Melhorar visao mobile da Consulta:**
-- Cards de resultado com layout otimizado para toque (areas maiores)
-- Exibir oportunidades de credito de forma destacada (margem disponivel, contratos refinanciaveis, saldo devedor)
-- Detalhe do cliente em tela cheia mobile com scroll suave entre secoes
-
----
-
-### Arquivos a modificar
-
-| Arquivo | Mudanca |
+| Arquivo | Ação |
 |---|---|
-| `src/components/UsersList.tsx` | Adicionar `can_access_sms` e `can_access_whatsapp` ao PERMISSION_MODULES |
-| `supabase/functions/baseoff-external-query/index.ts` | Nova edge function para consulta ao PG externo |
-| `supabase/config.toml` | Registrar nova edge function |
-| `src/modules/baseoff/BaseOffModule.tsx` | Remover tabs Clientes/Importar, manter so Consulta |
-| `src/modules/baseoff/hooks/useOptimizedSearch.ts` | Chamar edge function em vez de RPC |
-| Secrets do Supabase | Armazenar credenciais do PG externo |
+| `src/modules/sms/views/CampaignsView.tsx` | Adicionar botão "Atualizar Status" ao lado do botão "Relatório" nos cards de campanha; separar a lógica de check-status do download |
 
----
+### Detalhes
 
-### Pergunta necessaria
+**1. Novo botão "Atualizar Status"**
 
-Antes de implementar a edge function, preciso confirmar: **as tabelas no seu PostgreSQL externo se chamam `baseoff_clients` e `baseoff_contracts`?** Ou possuem nomes/estrutura diferente? Se puder compartilhar os nomes das tabelas e colunas principais, a integracao sera precisa.
+Ao lado do botão "Relatório", adicionar um botão com ícone `RefreshCw` que:
+- Chama `sms-check-status` com o `campaign_id`
+- Mostra spinner durante a verificação
+- Exibe toast com resumo: "X atualizadas: Y entregues, Z falhas"
+- Atualiza os contadores inline no card (sent_count, failed_count) chamando `onRefresh()`
+
+**2. Botão "Relatório" simplificado**
+
+O `handleDownloadReport` continuará chamando `sms-check-status` antes de gerar o CSV (para garantir dados frescos), mas agora o usuário também pode atualizar manualmente antes de baixar.
+
+**3. Estado de loading separado**
+
+Novo state `checkingStatusId` para controlar o spinner do botão "Atualizar Status" independente do `downloadingReportId`.
+
+**4. Visibilidade**
+
+Ambos os botões aparecerão para campanhas com status `completed`, `failed` ou `sending`.
 
