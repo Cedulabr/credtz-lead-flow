@@ -60,6 +60,7 @@ export const CampaignsView = ({
   const [smsCredits, setSmsCredits] = useState<number | null>(null);
   const [leadCredits, setLeadCredits] = useState<number | null>(null);
   const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
+  const [checkingStatusId, setCheckingStatusId] = useState<string | null>(null);
 
   // Delete state
   const [deleteTarget, setDeleteTarget] = useState<SmsCampaign | null>(null);
