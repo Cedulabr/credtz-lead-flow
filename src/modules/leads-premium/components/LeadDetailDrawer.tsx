@@ -947,12 +947,33 @@ export function LeadDetailDrawer({
     </>
   );
 
+  const handleWhatsAppSent = async (info: WhatsAppSentInfo) => {
+    if (!lead || !user) return;
+    const currentHistory = lead.history
+      ? (typeof lead.history === 'string' ? JSON.parse(lead.history) : lead.history)
+      : [];
+    const newEntry = {
+      action: 'whatsapp_sent',
+      timestamp: new Date().toISOString(),
+      user_id: user.id,
+      user_name: profile?.name || profile?.email || '',
+      whatsapp_instance: info.instanceName,
+      whatsapp_number: info.instancePhone,
+      sent_via: info.sentVia,
+    };
+    await supabase
+      .from('leads')
+      .update({ history: JSON.stringify([...currentHistory, newEntry]) } as any)
+      .eq('id', lead.id);
+  };
+
   const whatsAppDialog = (
     <WhatsAppSendDialog
       open={showWhatsAppDialog}
       onOpenChange={setShowWhatsAppDialog}
       clientName={lead.name}
       clientPhone={lead.phone}
+      onSent={handleWhatsAppSent}
     />
   );
 

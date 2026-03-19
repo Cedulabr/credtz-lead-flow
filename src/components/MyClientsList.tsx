@@ -2277,6 +2277,16 @@ export function MyClientsList() {
         clientName={whatsAppClient?.name || ""}
         clientPhone={whatsAppClient?.phone || ""}
         sourceModule="meus_clientes"
+        onSent={async (info: WhatsAppSentInfo) => {
+          if (!user?.id || !selectedClient) return;
+          await supabase.from("client_interactions").insert({
+            proposta_id: selectedClient.id,
+            user_id: user.id,
+            interaction_type: 'whatsapp_sent',
+            notes: `WhatsApp enviado via ${info.sentVia === 'api' ? 'API' : 'link'}${info.instanceName ? ` | Instância: ${info.instanceName}` : ''}${info.instancePhone ? ` | Número: ${info.instancePhone}` : ''}`,
+            metadata: { whatsapp_instance: info.instanceName, whatsapp_number: info.instancePhone, sent_via: info.sentVia },
+          });
+        }}
       />
     </AnimatedContainer>
   );

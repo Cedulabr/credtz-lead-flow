@@ -2934,6 +2934,16 @@ export const ActivateLeads = () => {
         onOpenChange={setShowWhatsAppDialog}
         clientName={whatsAppLead?.nome || ""}
         clientPhone={whatsAppLead?.telefone || ""}
+        onSent={async (info: WhatsAppSentInfo) => {
+          if (!user?.id || !whatsAppLead) return;
+          await supabase.from('activate_leads_history').insert({
+            lead_id: whatsAppLead.id,
+            user_id: user.id,
+            action_type: 'whatsapp_sent',
+            notes: `WhatsApp enviado via ${info.sentVia === 'api' ? 'API' : 'link'}${info.instanceName ? ` | Instância: ${info.instanceName}` : ''}${info.instancePhone ? ` | Número: ${info.instancePhone}` : ''}`,
+            metadata: { whatsapp_instance: info.instanceName, whatsapp_number: info.instancePhone, sent_via: info.sentVia },
+          });
+        }}
       />
     </motion.div>
   );

@@ -1122,6 +1122,16 @@ export function MyClientsKanban() {
         onOpenChange={setShowWhatsAppDialog}
         clientName={selectedProposta?.["Nome do cliente"] || ""}
         clientPhone={selectedProposta?.whatsapp || selectedProposta?.telefone || ""}
+        onSent={async (info: WhatsAppSentInfo) => {
+          if (!user?.id || !selectedProposta) return;
+          await supabase.from("pipeline_history").insert({
+            proposta_id: selectedProposta.id,
+            changed_by: user.id,
+            from_stage: selectedProposta.pipeline_stage,
+            to_stage: selectedProposta.pipeline_stage,
+            notes: `WhatsApp enviado via ${info.sentVia === 'api' ? 'API' : 'link'}${info.instanceName ? ` | Instância: ${info.instanceName}` : ''}${info.instancePhone ? ` | Número: ${info.instancePhone}` : ''}`,
+          });
+        }}
       />
     </div>
   );

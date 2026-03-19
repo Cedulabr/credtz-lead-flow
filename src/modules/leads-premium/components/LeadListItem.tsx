@@ -208,6 +208,25 @@ export function LeadListItem({ lead, onClick, onSimulation, onTyping, onStatusCh
       onOpenChange={setShowWhatsAppDialog}
       clientName={lead.name}
       clientPhone={lead.phone}
+      onSent={async (info: WhatsAppSentInfo) => {
+        if (!user) return;
+        const currentHistory = lead.history
+          ? (typeof lead.history === 'string' ? JSON.parse(lead.history) : lead.history)
+          : [];
+        const newEntry = {
+          action: 'whatsapp_sent',
+          timestamp: new Date().toISOString(),
+          user_id: user.id,
+          user_name: profile?.name || profile?.email || '',
+          whatsapp_instance: info.instanceName,
+          whatsapp_number: info.instancePhone,
+          sent_via: info.sentVia,
+        };
+        await supabase
+          .from('leads')
+          .update({ history: JSON.stringify([...currentHistory, newEntry]) } as any)
+          .eq('id', lead.id);
+      }}
     />
     </>
   );
