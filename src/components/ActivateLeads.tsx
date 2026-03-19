@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { WhatsAppSendDialog } from '@/components/WhatsAppSendDialog';
+import { WhatsAppSendDialog, type WhatsAppSentInfo } from '@/components/WhatsAppSendDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
