@@ -967,14 +967,24 @@ export const CampaignsView = ({
                           </Button>
                         )}
                         {(c.status === "completed" || c.status === "failed" || c.status === "sending") && (
-                          <Button size="sm" variant="outline" onClick={() => handleDownloadReport(c.id, c.name)} disabled={downloadingReportId === c.id} className="gap-1.5 text-xs">
-                            {downloadingReportId === c.id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Download className="h-3 w-3" />
-                            )}
-                            Relatório
-                          </Button>
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => handleUpdateStatus(c.id)} disabled={checkingStatusId === c.id} className="gap-1.5 text-xs">
+                              {checkingStatusId === c.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-3 w-3" />
+                              )}
+                              {isMobile ? '' : 'Atualizar Status'}
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleDownloadReport(c.id, c.name)} disabled={downloadingReportId === c.id} className="gap-1.5 text-xs">
+                              {downloadingReportId === c.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Download className="h-3 w-3" />
+                              )}
+                              Relatório
+                            </Button>
+                          </>
                         )}
                         {c.status === "sending" && isAdmin && (
                           <Button size="sm" variant="outline" onClick={() => setMarkFailedTarget(c)} className="gap-1 text-xs text-amber-600 border-amber-300">
