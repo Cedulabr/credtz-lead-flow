@@ -60,6 +60,7 @@ export const CampaignsView = ({
   const [smsCredits, setSmsCredits] = useState<number | null>(null);
   const [leadCredits, setLeadCredits] = useState<number | null>(null);
   const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
+  const [checkingStatusId, setCheckingStatusId] = useState<string | null>(null);
 
   // Delete state
   const [deleteTarget, setDeleteTarget] = useState<SmsCampaign | null>(null);
@@ -499,6 +500,27 @@ export const CampaignsView = ({
       setMarkFailedTarget(null);
       onRefresh();
     } catch { toast.error("Erro ao atualizar"); }
+  };
+
+  const handleUpdateStatus = async (campaignId: string) => {
+    setCheckingStatusId(campaignId);
+    try {
+      toast.info("Verificando status das mensagens com a operadora...");
+      const { data: checkResult } = await supabase.functions.invoke("sms-check-status", {
+        body: { campaign_id: campaignId },
+      });
+      if (checkResult?.updated > 0) {
+        toast.success(`${checkResult.updated} atualizada(s): ${checkResult.delivered || 0} entregues, ${checkResult.failed || 0} falhas, ${checkResult.undelivered || 0} não entregues`);
+      } else {
+        toast.info("Nenhuma alteração de status encontrada");
+      }
+      onRefresh();
+    } catch (e) {
+      console.error("Status check error:", e);
+      toast.error("Erro ao verificar status");
+    } finally {
+      setCheckingStatusId(null);
+    }
   };
 
   const STATUS_PT: Record<string, string> = { delivered: "Entregue", sent: "Enviado", failed: "Falhou", pending: "Pendente" };
@@ -945,14 +967,24 @@ export const CampaignsView = ({
                           </Button>
                         )}
                         {(c.status === "completed" || c.status === "failed" || c.status === "sending") && (
-                          <Button size="sm" variant="outline" onClick={() => handleDownloadReport(c.id, c.name)} disabled={downloadingReportId === c.id} className="gap-1.5 text-xs">
-                            {downloadingReportId === c.id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Download className="h-3 w-3" />
-                            )}
-                            Relatório
-                          </Button>
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => handleUpdateStatus(c.id)} disabled={checkingStatusId === c.id} className="gap-1.5 text-xs">
+                              {checkingStatusId === c.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-3 w-3" />
+                              )}
+                              {isMobile ? '' : 'Atualizar Status'}
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleDownloadReport(c.id, c.name)} disabled={downloadingReportId === c.id} className="gap-1.5 text-xs">
+                              {downloadingReportId === c.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Download className="h-3 w-3" />
+                              )}
+                              Relatório
+                            </Button>
+                          </>
                         )}
                         {c.status === "sending" && isAdmin && (
                           <Button size="sm" variant="outline" onClick={() => setMarkFailedTarget(c)} className="gap-1 text-xs text-amber-600 border-amber-300">
