@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { WhatsAppSendDialog } from "@/components/WhatsAppSendDialog";
+import { WhatsAppSendDialog, type WhatsAppSentInfo } from "@/components/WhatsAppSendDialog";
 import { Lead, UserProfile, PIPELINE_STAGES, HistoryEntry, REJECTION_REASONS, BANKS_LIST } from "../types";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
