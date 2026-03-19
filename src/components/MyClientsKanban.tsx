@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { WhatsAppSendDialog } from "@/components/WhatsAppSendDialog";
+import { WhatsAppSendDialog, type WhatsAppSentInfo } from "@/components/WhatsAppSendDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
