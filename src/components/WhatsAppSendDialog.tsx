@@ -120,6 +120,11 @@ export function WhatsAppSendDialog({
     const fullPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
     const encoded = encodeURIComponent(message);
     window.open(`https://wa.me/${fullPhone}?text=${encoded}`, "_blank");
+    onSent?.({
+      instanceName: '',
+      instancePhone: null,
+      sentVia: 'link'
+    });
     onOpenChange(false);
   };
 
