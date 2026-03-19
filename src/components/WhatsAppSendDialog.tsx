@@ -15,6 +15,12 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
+export interface WhatsAppSentInfo {
+  instanceName: string;
+  instancePhone: string | null;
+  sentVia: 'api' | 'link';
+}
+
 interface WhatsAppSendDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -25,6 +31,7 @@ interface WhatsAppSendDialogProps {
   mediaName?: string;
   sourceModule?: string;
   sourceRecordId?: string;
+  onSent?: (info: WhatsAppSentInfo) => void;
 }
 
 export function WhatsAppSendDialog({
@@ -37,6 +44,7 @@ export function WhatsAppSendDialog({
   mediaName,
   sourceModule,
   sourceRecordId,
+  onSent,
 }: WhatsAppSendDialogProps) {
   const { instances, hasInstances, sending, sendTextMessage, sendMediaMessage, scheduleMessage, loadingInstances } = useWhatsApp();
   const [message, setMessage] = useState(defaultMessage);
@@ -80,7 +88,14 @@ export function WhatsAppSendDialog({
         sourceModule,
         sourceRecordId,
       );
-      if (success) onOpenChange(false);
+      if (success) {
+        onSent?.({
+          instanceName: selectedInstance?.instance_name || '',
+          instancePhone: selectedInstance?.phone_number || null,
+          sentVia: 'api'
+        });
+        onOpenChange(false);
+      }
       return;
     }
 
@@ -90,7 +105,14 @@ export function WhatsAppSendDialog({
     } else {
       success = await sendTextMessage(fullPhone, message, clientName, selectedInstanceId);
     }
-    if (success) onOpenChange(false);
+    if (success) {
+      onSent?.({
+        instanceName: selectedInstance?.instance_name || '',
+        instancePhone: selectedInstance?.phone_number || null,
+        sentVia: 'api'
+      });
+      onOpenChange(false);
+    }
   };
 
   const handleFallback = () => {
@@ -98,6 +120,11 @@ export function WhatsAppSendDialog({
     const fullPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
     const encoded = encodeURIComponent(message);
     window.open(`https://wa.me/${fullPhone}?text=${encoded}`, "_blank");
+    onSent?.({
+      instanceName: '',
+      instancePhone: null,
+      sentVia: 'link'
+    });
     onOpenChange(false);
   };
 

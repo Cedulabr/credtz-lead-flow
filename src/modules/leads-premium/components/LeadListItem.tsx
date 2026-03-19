@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Phone, MessageCircle, Clock, Calculator, FileText, ChevronRight, Send } from "lucide-react";
-import { WhatsAppSendDialog } from "@/components/WhatsAppSendDialog";
+import { WhatsAppSendDialog, type WhatsAppSentInfo } from "@/components/WhatsAppSendDialog";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -22,6 +24,7 @@ interface LeadListItemProps {
 
 export function LeadListItem({ lead, onClick, onSimulation, onTyping, onStatusChange, canEdit = true }: LeadListItemProps) {
   const isMobile = useIsMobile();
+  const { user, profile } = useAuth();
   const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
   const config = PIPELINE_STAGES[lead.status] || PIPELINE_STAGES.new_lead;
 
@@ -205,6 +208,25 @@ export function LeadListItem({ lead, onClick, onSimulation, onTyping, onStatusCh
       onOpenChange={setShowWhatsAppDialog}
       clientName={lead.name}
       clientPhone={lead.phone}
+      onSent={async (info: WhatsAppSentInfo) => {
+        if (!user) return;
+        const currentHistory = lead.history
+          ? (typeof lead.history === 'string' ? JSON.parse(lead.history) : lead.history)
+          : [];
+        const newEntry = {
+          action: 'whatsapp_sent',
+          timestamp: new Date().toISOString(),
+          user_id: user.id,
+          user_name: profile?.name || profile?.email || '',
+          whatsapp_instance: info.instanceName,
+          whatsapp_number: info.instancePhone,
+          sent_via: info.sentVia,
+        };
+        await supabase
+          .from('leads')
+          .update({ history: JSON.stringify([...currentHistory, newEntry]) } as any)
+          .eq('id', lead.id);
+      }}
     />
     </>
   );
