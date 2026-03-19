@@ -24,6 +24,7 @@ interface LeadListItemProps {
 
 export function LeadListItem({ lead, onClick, onSimulation, onTyping, onStatusChange, canEdit = true }: LeadListItemProps) {
   const isMobile = useIsMobile();
+  const { user, profile } = useAuth();
   const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
   const config = PIPELINE_STAGES[lead.status] || PIPELINE_STAGES.new_lead;
 
