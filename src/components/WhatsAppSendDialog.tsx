@@ -88,7 +88,14 @@ export function WhatsAppSendDialog({
         sourceModule,
         sourceRecordId,
       );
-      if (success) onOpenChange(false);
+      if (success) {
+        onSent?.({
+          instanceName: selectedInstance?.instance_name || '',
+          instancePhone: selectedInstance?.phone_number || null,
+          sentVia: 'api'
+        });
+        onOpenChange(false);
+      }
       return;
     }
 
