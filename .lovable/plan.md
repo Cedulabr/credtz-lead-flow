@@ -1,36 +1,60 @@
 
 
-## SMS — Botão "Atualizar Status" separado do Relatório
+## Registrar Número WhatsApp Usado no Histórico do Lead
 
-### Problema
+### Abordagem
 
-Os envios SMS levam até 20 minutos para a operadora atualizar o status real (entregue/falhou). Hoje o status só é verificado ao clicar "Relatório", o que força o usuário a baixar o CSV para saber se atualizou. O usuário precisa de um botão separado para **atualizar os status** antes de baixar o relatório.
+Adicionar um callback `onSent` ao `WhatsAppSendDialog` que retorna os dados da instância usada (nome da instância e número de telefone). Cada módulo consumidor usará esse callback para registrar no histórico do lead qual número WhatsApp foi utilizado para o contato.
 
-### Mudança
+### Mudanças
 
 | Arquivo | Ação |
 |---|---|
-| `src/modules/sms/views/CampaignsView.tsx` | Adicionar botão "Atualizar Status" ao lado do botão "Relatório" nos cards de campanha; separar a lógica de check-status do download |
+| `src/components/WhatsAppSendDialog.tsx` | Adicionar prop `onSent` com callback que retorna `{ instanceName, instancePhone, sentVia }`. Chamar após envio bem-sucedido |
+| `src/modules/leads-premium/components/LeadDetailDrawer.tsx` | Consumir `onSent` para registrar no history do lead via `updateLeadStatus` |
+| `src/modules/leads-premium/components/LeadListItem.tsx` | Consumir `onSent` para registrar no history do lead |
+| `src/components/ActivateLeads.tsx` | Consumir `onSent` para salvar no histórico do activate_lead |
+| `src/components/MyClientsList.tsx` | Consumir `onSent` para registrar contato WhatsApp no histórico |
+| `src/components/MyClientsKanban.tsx` | Consumir `onSent` para registrar contato WhatsApp no histórico |
 
 ### Detalhes
 
-**1. Novo botão "Atualizar Status"**
+**1. WhatsAppSendDialog — nova prop `onSent`**
 
-Ao lado do botão "Relatório", adicionar um botão com ícone `RefreshCw` que:
-- Chama `sms-check-status` com o `campaign_id`
-- Mostra spinner durante a verificação
-- Exibe toast com resumo: "X atualizadas: Y entregues, Z falhas"
-- Atualiza os contadores inline no card (sent_count, failed_count) chamando `onRefresh()`
+```typescript
+interface WhatsAppSendDialogProps {
+  // ... existing
+  onSent?: (info: { instanceName: string; instancePhone: string | null; sentVia: 'api' | 'link' }) => void;
+}
+```
 
-**2. Botão "Relatório" simplificado**
+No `handleSend`, após sucesso, chamar:
+```typescript
+onSent?.({
+  instanceName: selectedInstance?.instance_name || '',
+  instancePhone: selectedInstance?.phone_number || null,
+  sentVia: 'api'
+});
+```
 
-O `handleDownloadReport` continuará chamando `sms-check-status` antes de gerar o CSV (para garantir dados frescos), mas agora o usuário também pode atualizar manualmente antes de baixar.
+No `handleFallback`, chamar com `sentVia: 'link'`.
 
-**3. Estado de loading separado**
+**2. Módulos consumidores — registrar no histórico**
 
-Novo state `checkingStatusId` para controlar o spinner do botão "Atualizar Status" independente do `downloadingReportId`.
+Cada módulo adicionará uma entrada de histórico com action `whatsapp_sent` contendo:
+```json
+{
+  "action": "whatsapp_sent",
+  "timestamp": "...",
+  "user_id": "...",
+  "user_name": "...",
+  "whatsapp_instance": "Instância Principal",
+  "whatsapp_number": "5585999999999",
+  "sent_via": "api"
+}
+```
 
-**4. Visibilidade**
-
-Ambos os botões aparecerão para campanhas com status `completed`, `failed` ou `sending`.
+- **Leads Premium**: Usar a função `updateLeadStatus` existente ou inserir diretamente no campo `history` (JSONB) do lead
+- **Activate Leads**: Atualizar o campo de observações ou histórico do activate_lead
+- **Meus Clientes**: Registrar no histórico da proposta (tabela `televendas` ou `clientes`)
 
