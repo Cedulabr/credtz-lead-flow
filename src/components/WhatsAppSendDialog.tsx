@@ -44,6 +44,7 @@ export function WhatsAppSendDialog({
   mediaName,
   sourceModule,
   sourceRecordId,
+  onSent,
 }: WhatsAppSendDialogProps) {
   const { instances, hasInstances, sending, sendTextMessage, sendMediaMessage, scheduleMessage, loadingInstances } = useWhatsApp();
   const [message, setMessage] = useState(defaultMessage);
