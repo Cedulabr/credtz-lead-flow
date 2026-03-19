@@ -502,6 +502,27 @@ export const CampaignsView = ({
     } catch { toast.error("Erro ao atualizar"); }
   };
 
+  const handleUpdateStatus = async (campaignId: string) => {
+    setCheckingStatusId(campaignId);
+    try {
+      toast.info("Verificando status das mensagens com a operadora...");
+      const { data: checkResult } = await supabase.functions.invoke("sms-check-status", {
+        body: { campaign_id: campaignId },
+      });
+      if (checkResult?.updated > 0) {
+        toast.success(`${checkResult.updated} atualizada(s): ${checkResult.delivered || 0} entregues, ${checkResult.failed || 0} falhas, ${checkResult.undelivered || 0} não entregues`);
+      } else {
+        toast.info("Nenhuma alteração de status encontrada");
+      }
+      onRefresh();
+    } catch (e) {
+      console.error("Status check error:", e);
+      toast.error("Erro ao verificar status");
+    } finally {
+      setCheckingStatusId(null);
+    }
+  };
+
   const STATUS_PT: Record<string, string> = { delivered: "Entregue", sent: "Enviado", failed: "Falhou", pending: "Pendente" };
   const STATUS_ORDER: Record<string, number> = { delivered: 0, sent: 1, pending: 2, failed: 3 };
 
