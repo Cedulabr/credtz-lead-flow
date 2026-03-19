@@ -15,6 +15,12 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
+export interface WhatsAppSentInfo {
+  instanceName: string;
+  instancePhone: string | null;
+  sentVia: 'api' | 'link';
+}
+
 interface WhatsAppSendDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -25,6 +31,7 @@ interface WhatsAppSendDialogProps {
   mediaName?: string;
   sourceModule?: string;
   sourceRecordId?: string;
+  onSent?: (info: WhatsAppSentInfo) => void;
 }
 
 export function WhatsAppSendDialog({
