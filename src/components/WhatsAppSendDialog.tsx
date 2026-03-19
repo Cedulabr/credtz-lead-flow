@@ -105,7 +105,14 @@ export function WhatsAppSendDialog({
     } else {
       success = await sendTextMessage(fullPhone, message, clientName, selectedInstanceId);
     }
-    if (success) onOpenChange(false);
+    if (success) {
+      onSent?.({
+        instanceName: selectedInstance?.instance_name || '',
+        instancePhone: selectedInstance?.phone_number || null,
+        sentVia: 'api'
+      });
+      onOpenChange(false);
+    }
   };
 
   const handleFallback = () => {
