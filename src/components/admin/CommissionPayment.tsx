@@ -42,7 +42,7 @@ export function CommissionPayment() {
   const [proposals, setProposals] = useState<PaidProposal[]>([]);
   const [existingIds, setExistingIds] = useState<Set<string>>(new Set());
   const [rules, setRules] = useState<CommissionRule[]>([]);
-  const [companies, setCompanies] = useState<{ id: string; nome: string }[]>([]);
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [posting, setPosting] = useState<string | null>(null);
   const [postingAll, setPostingAll] = useState(false);
