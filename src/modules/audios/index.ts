@@ -1,0 +1,1 @@
+export { AudiosModule } from './AudiosModule';

@@ -1,0 +1,101 @@
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import type { AudioFile } from '../types';
+
+export function useAudioFiles() {
+  const { user, profile } = useAuth();
+  const [audios, setAudios] = useState<AudioFile[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchAudios = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('audio_files')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching audios:', error);
+    } else {
+      setAudios((data as unknown as AudioFile[]) || []);
+    }
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => { fetchAudios(); }, [fetchAudios]);
+
+  const uploadAudio = async (title: string, file: File): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      const ext = file.name.split('.').pop() || 'mp3';
+      const filePath = `${user.id}/${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('audio-files')
+        .upload(filePath, file, { contentType: file.type });
+
+      if (uploadError) throw uploadError;
+
+      const companyId = (profile as any)?.company_id || null;
+
+      const { error: insertError } = await supabase
+        .from('audio_files')
+        .insert({
+          user_id: user.id,
+          company_id: companyId,
+          title,
+          file_path: filePath,
+          file_size: file.size,
+          mime_type: file.type || 'audio/mpeg',
+        } as any);
+
+      if (insertError) throw insertError;
+
+      toast.success('Áudio salvo com sucesso!');
+      await fetchAudios();
+      return true;
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      toast.error('Erro ao salvar áudio: ' + err.message);
+      return false;
+    }
+  };
+
+  const deleteAudio = async (audio: AudioFile) => {
+    try {
+      await supabase.storage.from('audio-files').remove([audio.file_path]);
+      const { error } = await supabase.from('audio_files').delete().eq('id', audio.id as any);
+      if (error) throw error;
+      toast.success('Áudio removido');
+      setAudios(prev => prev.filter(a => a.id !== audio.id));
+    } catch (err: any) {
+      toast.error('Erro ao remover: ' + err.message);
+    }
+  };
+
+  const getPublicUrl = (filePath: string) => {
+    const { data } = supabase.storage.from('audio-files').getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  const downloadAsBase64 = async (filePath: string): Promise<{ base64: string; mimeType: string } | null> => {
+    try {
+      const { data, error } = await supabase.storage.from('audio-files').download(filePath);
+      if (error || !data) return null;
+      const buffer = await data.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return { base64: btoa(binary), mimeType: data.type || 'audio/mpeg' };
+    } catch {
+      return null;
+    }
+  };
+
+  return { audios, loading, uploadAudio, deleteAudio, getPublicUrl, downloadAsBase64, refetch: fetchAudios };
+}
