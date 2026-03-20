@@ -1,52 +1,43 @@
 
 
-## Fix: Consultor "Sem nome" no Pagamento de Comissão
+## Fix: Botões de Ação e Nomes no Conta Corrente
 
-### Diagnóstico
+### Problemas Identificados
 
-A query de profiles no client-side está retornando vazia porque a função `has_role()` na RLS verifica `profiles.role` contra o enum `app_role` (que só tem 'admin' e 'partner'). Se o usuário logado não passar no check de RLS, a consulta retorna zero perfis — resultando em "Sem nome" para todos.
+1. **Botões não aparecem para comissões com R$ 0,00**: A condição `commission.commission_amount > 0` (linha 912) oculta Editar/Estornar/Apagar quando o valor é zero. Comissões lançadas com valor errado (R$ 0,00) ficam sem botão de edição.
 
-Os nomes **existem** no banco (confirmado via query direta: Ana Luiza, Jamily Silva, Alana Rodrigues, etc.), mas o client não consegue lê-los.
-
-### Solução
-
-Criar uma função RPC `get_profiles_by_ids` com `SECURITY DEFINER` que retorna id, name, email e user_percentage_profile, bypass de RLS. Atualizar o `CommissionPayment` para usar essa RPC.
+2. **Nomes de usuários vazios**: O `fetchCommissions` consulta `profiles` diretamente (linha 157), que pode ser bloqueado por RLS — mesmo problema já corrigido no `CommissionPayment`. Precisa usar a RPC `get_profiles_by_ids`.
 
 ### Mudanças
 
-| Componente | Ação |
+| Arquivo | Ação |
 |---|---|
-| Migration SQL | Criar RPC `get_profiles_by_ids(user_ids uuid[])` SECURITY DEFINER que retorna name, email, level |
-| `src/components/admin/CommissionPayment.tsx` | Substituir query direta de profiles pela chamada RPC; garantir que nomes apareçam no filtro "Funcionário" e coluna "Consultor" |
+| `src/components/ContaCorrente.tsx` | Trocar query de profiles por `get_profiles_by_ids` RPC; remover condição `commission_amount > 0` dos botões Editar/Apagar; manter condição de estorno apenas para `status !== 'refunded'` |
 
 ### Detalhes
 
-**1. RPC**
-
-```sql
-CREATE OR REPLACE FUNCTION public.get_profiles_by_ids(user_ids uuid[])
-RETURNS TABLE(id uuid, name text, email text, user_percentage_profile text)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = 'public'
-AS $$
-  SELECT p.id, p.name, p.email, p.user_percentage_profile
-  FROM public.profiles p
-  WHERE p.id = ANY(user_ids);
-$$;
-```
-
-**2. CommissionPayment.tsx — trocar query**
+**1. Fix botões de ação**
 
 ```typescript
-// Antes:
-const { data: profiles } = await supabase
-  .from('profiles')
-  .select('id, name, email, user_percentage_profile')
-  .in('id', userIds);
+// Antes (linha 912): botões só aparecem se valor > 0
+{commission.commission_amount > 0 && ( <> Editar / Apagar / Estornar </> )}
 
-// Depois:
-const { data: profiles } = await supabase
-  .rpc('get_profiles_by_ids', { user_ids: userIds });
+// Depois: botões aparecem para todas exceto estornos
+{commission.status !== 'refunded' && ( <> Editar / Apagar / Estornar </> )}
 ```
 
-Os nomes reais (Ana Luiza, Jamily Silva, etc.) passarão a aparecer tanto na coluna "Consultor" quanto no filtro "Funcionário".
+- Editar e Apagar: disponíveis para qualquer comissão que não seja estorno
+- Estornar: disponível para `paid` ou `pending` com valor > 0
+- Marcar como Pago: mantém condição `pending` + valor > 0
+
+**2. Fix nomes de usuários via RPC**
+
+```typescript
+// Trocar:
+const { data: profilesData } = await supabase.from('profiles').select(...)
+// Por:
+const { data: profilesData } = await supabase.rpc('get_profiles_by_ids', { user_ids: userIds });
+```
+
+Também aplicar fallback `profile.name || profile.email?.split('@')[0]` para garantir que nunca mostre vazio.
 
