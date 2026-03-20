@@ -104,9 +104,7 @@ export function CommissionPayment() {
       const userIds = [...new Set(pendingProposals.map((p: any) => p.user_id))];
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, name, email, user_percentage_profile')
-          .in('id', userIds);
+          .rpc('get_profiles_by_ids', { user_ids: userIds });
 
         const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
@@ -115,7 +113,7 @@ export function CommissionPayment() {
           return {
             ...p,
             user_name: profile?.name || profile?.email?.split('@')[0] || 'Sem nome',
-            user_level: profile?.user_percentage_profile || 'Bronze',
+            user_level: profile?.level || 'Bronze',
           };
         });
         setProposals(enriched);
