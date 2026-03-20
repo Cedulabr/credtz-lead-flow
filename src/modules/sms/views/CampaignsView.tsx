@@ -287,8 +287,16 @@ export const CampaignsView = ({
         },
         leads_premium: {
           novo: ["new_lead"], autolead: ["autolead", "auto_lead"],
-          em_andamento: ["em_andamento", "interessado", "simulacao"],
-          agendado: ["contato_futuro", "agendamento"],
+          aguardando_retorno: ["aguardando_retorno"],
+          agendamento: ["agendamento", "contato_futuro"],
+          fechado: ["cliente_fechado"],
+          recusado: ["recusou_oferta", "sem_interesse", "nao_e_cliente", "sem_retorno", "nao_e_whatsapp"],
+        },
+        meus_clientes: {
+          aguardando_retorno: ["aguardando_retorno"],
+          contato_futuro: ["contato_futuro"],
+          em_andamento: ["em_andamento"],
+          fechado: ["cliente_fechado", "fechado"],
         },
         televendas: {
           novo: ["solicitar_digitacao"], autolead: [],
