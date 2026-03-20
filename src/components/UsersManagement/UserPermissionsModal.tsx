@@ -4,10 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Target, DollarSign, Settings, MessageSquare, BarChart3 } from "lucide-react";
+import { ShoppingCart, Target, DollarSign, Settings, MessageSquare, BarChart3, RefreshCw } from "lucide-react";
 import { UserData, PERMISSION_MODULES, PERMISSION_CATEGORIES } from "./types";
 import { UserAvatar } from "./UserAvatar";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   comercial: ShoppingCart,
@@ -27,6 +30,32 @@ interface UserPermissionsModalProps {
 
 export function UserPermissionsModal({ open, onOpenChange, user, onSave }: UserPermissionsModalProps) {
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+  const [syncing, setSyncing] = useState(false);
+  const { isAdmin } = useAuth();
+
+  const handleSyncModules = async () => {
+    setSyncing(true);
+    try {
+      const columnNames = PERMISSION_MODULES.map(m => m.key);
+      const { data, error } = await supabase.rpc('sync_permission_columns', {
+        column_names: columnNames,
+      } as any);
+
+      if (error) throw error;
+
+      const result = data as any;
+      const added = result?.added || [];
+      if (added.length > 0) {
+        toast.success(`${added.length} novo(s) módulo(s) sincronizado(s): ${added.join(', ')}`);
+      } else {
+        toast.info('Todos os módulos já estão sincronizados');
+      }
+    } catch (err: any) {
+      toast.error('Erro ao sincronizar: ' + (err.message || 'Erro desconhecido'));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -64,6 +93,18 @@ export function UserPermissionsModal({ open, onOpenChange, user, onSave }: UserP
           <Badge variant="secondary" className="text-xs">
             {enabledCount}/{PERMISSION_MODULES.length} ativas
           </Badge>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSyncModules}
+              disabled={syncing}
+              className="h-7 text-xs gap-1"
+            >
+              <RefreshCw className={cn("h-3 w-3", syncing && "animate-spin")} />
+              Sincronizar Módulos
+            </Button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-5 pr-1">

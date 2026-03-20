@@ -7172,6 +7172,10 @@ export type Database = {
           valor_beneficio: string
         }[]
       }
+      sync_permission_columns: {
+        Args: { column_names: string[] }
+        Returns: Json
+      }
       text_contains_numbers: { Args: { input_text: string }; Returns: boolean }
       trigger_duplicate_scan_after_import: {
         Args: { p_import_log_id?: string; p_module?: string }
