@@ -1,83 +1,62 @@
 
 
-## SMS Disparos — Adicionar "Meus Clientes" + Filtros por Status do Kanban
+## Evolução Financeiro — Propostas Pagas do Televendas Sobem para Comissões
 
 ### Problema
 
-O módulo de origem no disparo SMS não inclui "Meus Clientes" (tabela `propostas`). Além disso, os filtros de status do Leads Premium mostram "Em Andamento" em vez dos status reais do Kanban (Novos, Auto Leads, Aguardando Retorno, Agendamento, Fechados, Recusados).
+Hoje, as comissões são lançadas manualmente no Conta Corrente. Quando uma proposta é marcada como `proposta_paga` no Televendas, nada acontece no módulo Financeiro. O admin precisa criar manualmente cada comissão.
+
+### Abordagem
+
+Criar uma nova seção "Pagamento de Comissão" no módulo Financeiro que lista automaticamente todas as propostas com status `proposta_paga` da tabela `televendas`. O admin poderá visualizar essas propostas, calcular a comissão com base nas `commission_rules` e lançar o pagamento (inserir na tabela `commissions`) com um clique.
 
 ### Mudanças
 
-| Arquivo | Ação |
+| Componente | Ação |
 |---|---|
-| `src/modules/sms/types.ts` | Adicionar "Meus Clientes" ao `LEAD_SOURCE_OPTIONS`; substituir `LEAD_STATUS_FILTERS` por filtros dinâmicos por módulo |
-| `src/modules/sms/views/CampaignsView.tsx` | Adicionar query para `propostas` no `handleImportLeads`; renderizar filtros de status dinâmicos conforme o módulo selecionado; adicionar `statusMap` para `meus_clientes` |
+| Migration SQL | Adicionar coluna `televendas_id` (uuid, nullable, unique) na tabela `commissions` para vincular comissão à proposta de origem e evitar duplicatas |
+| `src/components/admin/AdminFinance.tsx` | Adicionar seção "Pagamento de Comissão" no menu do Financeiro |
+| `src/components/admin/CommissionPayment.tsx` (novo) | Componente que lista propostas pagas do televendas sem comissão lançada, permite calcular e lançar comissão |
 
 ### Detalhes
 
-**1. types.ts — Novo source + filtros por módulo**
+**1. Migration — vincular commissions ao televendas**
 
-```typescript
-export const LEAD_SOURCE_OPTIONS = [
-  { value: "activate_leads", label: "Activate Leads", icon: "⚡" },
-  { value: "leads_premium", label: "Leads Premium", icon: "💎" },
-  { value: "meus_clientes", label: "Meus Clientes", icon: "👤" },
-  { value: "televendas", label: "Televendas", icon: "📞" },
-];
-
-export const LEAD_STATUS_FILTERS_BY_SOURCE: Record<string, {value:string;label:string}[]> = {
-  activate_leads: [
-    { value: "novo", label: "Novos" },
-    { value: "autolead", label: "AutoLead" },
-    { value: "em_andamento", label: "Em Andamento" },
-    { value: "agendado", label: "Agendado" },
-  ],
-  leads_premium: [
-    { value: "novo", label: "Novos" },
-    { value: "autolead", label: "AutoLead" },
-    { value: "aguardando_retorno", label: "Aguard. Retorno" },
-    { value: "agendamento", label: "Agendamento" },
-    { value: "fechado", label: "Fechados" },
-    { value: "recusado", label: "Recusados" },
-  ],
-  meus_clientes: [
-    { value: "aguardando_retorno", label: "Aguard. Retorno" },
-    { value: "contato_futuro", label: "Contato Futuro" },
-    { value: "em_andamento", label: "Em Andamento" },
-    { value: "fechado", label: "Fechado" },
-  ],
-  televendas: [
-    { value: "novo", label: "Novos" },
-    { value: "em_andamento", label: "Em Andamento" },
-    { value: "agendado", label: "Agendado" },
-  ],
-};
+```sql
+ALTER TABLE public.commissions 
+  ADD COLUMN IF NOT EXISTS televendas_id text UNIQUE;
 ```
 
-**2. CampaignsView.tsx — Query para `propostas` + filtros dinâmicos**
+Isso permite saber quais propostas já tiveram comissão lançada (evita duplicatas).
 
-No `handleImportLeads`, adicionar bloco `meus_clientes`:
-- Query da tabela `propostas` filtrando por `company_id` ou `user_id`
-- Mapear `client_name` → name, `client_phone` → phone
-- Filtrar por `client_status` conforme statusMap
+**2. CommissionPayment — novo componente**
 
-No `statusMap`, adicionar:
-```typescript
-meus_clientes: {
-  aguardando_retorno: ["aguardando_retorno"],
-  contato_futuro: ["contato_futuro"],
-  em_andamento: ["em_andamento"],
-  fechado: ["cliente_fechado", "fechado"],
-},
-leads_premium: {
-  novo: ["new_lead"],
-  autolead: ["autolead", "auto_lead"],
-  aguardando_retorno: ["aguardando_retorno"],
-  agendamento: ["agendamento", "contato_futuro"],
-  fechado: ["cliente_fechado"],
-  recusado: ["recusou_oferta", "sem_interesse", "nao_e_cliente"],
-},
+- Busca propostas com `status = 'proposta_paga'` da tabela `televendas`
+- Faz LEFT JOIN lógico: exclui as que já possuem registro em `commissions` via `televendas_id`
+- Para cada proposta mostra: nome, CPF, banco, tipo operação, parcela, saldo devedor, data pagamento, usuário
+- Busca `commission_rules` ativas para o banco/produto da proposta + nível do usuário
+- Calcula automaticamente o valor da comissão
+- Botão "Lançar Comissão" que insere na tabela `commissions` com `televendas_id` preenchido
+- Botão "Lançar Todas" para processar em lote
+- Filtros: por empresa, por período, por banco
+- Badge com contagem de propostas pendentes de comissão
+
+**3. AdminFinance — nova entrada no menu**
+
+Adicionar item "Pagamento de Comissão" com ícone `Receipt` e cor azul, ao lado do "Conta Corrente" existente.
+
+### Fluxo
+
+```text
+Televendas: Proposta marcada como "Proposta Paga"
+                    ↓
+Financeiro > Pagamento de Comissão:
+  - Lista propostas pagas sem comissão lançada
+  - Calcula comissão com base nas regras (banco + produto + nível do usuário)
+  - Admin revisa e clica "Lançar Comissão"
+                    ↓
+Tabela commissions: Nova entrada criada com televendas_id vinculado
+                    ↓
+Conta Corrente / Minhas Comissões: Comissão aparece para o usuário
 ```
-
-Na renderização dos filtros, trocar `LEAD_STATUS_FILTERS` por `LEAD_STATUS_FILTERS_BY_SOURCE[leadSource]` para mostrar filtros contextuais ao módulo selecionado. Resetar `leadStatusFilter` para "all" quando trocar de módulo.
 
