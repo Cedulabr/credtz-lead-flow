@@ -1,49 +1,50 @@
 
 
-## Fix: Áudios — Visibilidade para Todos + Isolamento por Empresa
+## Botão "Sincronizar Módulos" no Gerenciar Permissões
 
-### Diagnóstico
+### Problema
 
-**Problema 1 — Áudio não aparece para não-admin**: O toggle "Enviar áudio?" no WhatsAppSendDialog só aparece quando `audios.length > 0`. O upload salva `company_id` usando `(profile as any)?.company_id`, mas o campo `company_id` **não existe na tabela `profiles`** — está na tabela `user_companies`. Resultado: `company_id` é salvo como `null`. A RLS permite ver áudios onde `user_id = auth.uid()` OU `company_id IN get_user_company_ids()`. Com `company_id = null`, só o próprio uploader vê seus áudios. Outros usuários da empresa não veem nada → toggle não aparece.
-
-**Problema 2 — Sem isolamento por empresa**: Como `company_id` é sempre `null`, não há isolamento. Se corrigirmos salvando o `company_id` real, a RLS existente já faz o isolamento correto.
+Quando um novo módulo é criado e adicionado ao `PERMISSION_MODULES`, a coluna correspondente (`can_access_*`) pode não existir na tabela `profiles`. Isso exige edição manual de migrations. O usuário quer um botão que force a criação automática das colunas faltantes.
 
 ### Mudanças
 
-| Arquivo | Ação |
+| Componente | Ação |
 |---|---|
-| `src/modules/audios/hooks/useAudioFiles.ts` | No `uploadAudio`, buscar `company_id` de `user_companies` em vez de `profile.company_id`; no `fetchAudios` e `deleteAudio`, permitir gestor deletar áudios da empresa |
-| `src/modules/audios/AudiosModule.tsx` | Mostrar quem enviou o áudio (nome do usuário) para contexto em empresas |
-| Migration SQL | Atualizar RLS de DELETE para permitir gestor deletar áudios da empresa; adicionar UPDATE policy |
+| Migration SQL | Criar função RPC `sync_permission_columns(column_names text[])` que verifica quais colunas faltam na tabela `profiles` e as cria como `boolean DEFAULT true` |
+| `src/components/UsersManagement/UserPermissionsModal.tsx` | Adicionar botão "Sincronizar Módulos" no header que chama a RPC com todas as keys do `PERMISSION_MODULES`, mostra resultado (X colunas criadas) e recarrega |
 
 ### Detalhes
 
-**1. useAudioFiles — company_id correto no upload**
-
-```typescript
-// Buscar company_id real de user_companies
-const { data: ucData } = await supabase
-  .from('user_companies')
-  .select('company_id')
-  .eq('user_id', user.id)
-  .eq('is_active', true)
-  .limit(1)
-  .maybeSingle();
-
-const companyId = ucData?.company_id || null;
-```
-
-**2. RLS — gestor pode deletar áudios da empresa**
+**1. RPC `sync_permission_columns`**
 
 ```sql
-DROP POLICY IF EXISTS "Users delete own audios" ON public.audio_files;
-CREATE POLICY "Users delete own or company audios" ON public.audio_files
-  FOR DELETE TO authenticated USING (
-    user_id = auth.uid()
-    OR public.is_global_admin(auth.uid())
-    OR company_id IN (SELECT public.get_user_company_ids(auth.uid()))
-  );
+CREATE OR REPLACE FUNCTION public.sync_permission_columns(column_names text[])
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  col text;
+  added text[] := '{}';
+BEGIN
+  FOREACH col IN ARRAY column_names LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = col
+    ) THEN
+      EXECUTE format('ALTER TABLE public.profiles ADD COLUMN %I boolean DEFAULT true', col);
+      added := array_append(added, col);
+    END IF;
+  END LOOP;
+  RETURN jsonb_build_object('added', added, 'total_checked', array_length(column_names, 1));
+END;
+$$;
 ```
 
-**3. Fix áudios existentes** — Migration para atualizar áudios com `company_id = null` usando o `user_companies` do uploader.
+Restrita a admin via check interno ou via RLS (apenas admin pode chamar).
+
+**2. Botão no modal**
+
+Ao lado do badge "X/Y ativas", adicionar botão com ícone `RefreshCw` + tooltip "Sincronizar novos módulos". Ao clicar:
+- Chama `supabase.rpc('sync_permission_columns', { column_names: PERMISSION_MODULES.map(m => m.key) })`
+- Se `added.length > 0`: toast "X novos módulos sincronizados: [nomes]"
+- Se `added.length === 0`: toast "Todos os módulos já estão sincronizados"
+- Recarrega o usuário para refletir os novos campos
 
