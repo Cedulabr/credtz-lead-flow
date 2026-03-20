@@ -21,6 +21,9 @@ export interface WhatsAppSentInfo {
   instanceName: string;
   instancePhone: string | null;
   sentVia: 'api' | 'link';
+  message: string;
+  audioTitle?: string;
+  clientPhone: string;
 }
 
 interface WhatsAppSendDialogProps {
