@@ -1,14 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { CheckCircle, Loader2, Search, Receipt, AlertCircle } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface PaidProposal {
   id: string;
@@ -49,6 +51,15 @@ export function CommissionPayment() {
   const [searchTerm, setSearchTerm] = useState('');
   const [companyFilter, setCompanyFilter] = useState('all');
   const [bankFilter, setBankFilter] = useState('all');
+  const [userFilter, setUserFilter] = useState('all');
+  const [monthFilter, setMonthFilter] = useState('all');
+
+  // Dialog state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedProposal, setSelectedProposal] = useState<PaidProposal | null>(null);
+  const [commissionMode, setCommissionMode] = useState<'percentual' | 'fixo'>('percentual');
+  const [commissionInput, setCommissionInput] = useState('');
+  const [dialogPosting, setDialogPosting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -57,7 +68,6 @@ export function CommissionPayment() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Fetch paid proposals, existing commission televendas_ids, rules, companies, and profiles in parallel
       const [proposalsRes, commissionsRes, rulesRes, companiesRes] = await Promise.all([
         supabase
           .from('televendas')
@@ -87,26 +97,24 @@ export function CommissionPayment() {
       setRules(rulesRes.data || []);
       setCompanies(companiesRes.data || []);
 
-      // Filter out proposals that already have commissions
       const pendingProposals = (proposalsRes.data || []).filter(
         (p: any) => !existingSet.has(p.id)
       );
 
-      // Fetch user profiles for names and levels
       const userIds = [...new Set(pendingProposals.map((p: any) => p.user_id))];
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, name, user_percentage_profile')
+          .select('id, name, email, user_percentage_profile')
           .in('id', userIds);
 
         const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
-        
+
         const enriched = pendingProposals.map((p: any) => {
           const profile = profileMap.get(p.user_id);
           return {
             ...p,
-            user_name: profile?.name || 'Sem nome',
+            user_name: profile?.name || profile?.email?.split('@')[0] || 'Sem nome',
             user_level: profile?.user_percentage_profile || 'Bronze',
           };
         });
@@ -123,7 +131,6 @@ export function CommissionPayment() {
   };
 
   const calculateCommission = (proposal: PaidProposal): { amount: number; percentage: number; baseValue: number; rule: CommissionRule | null } => {
-    // Find matching rule: bank + product + user_level
     const matchingRule = rules.find(r => {
       const bankMatch = r.bank_name.toLowerCase() === proposal.banco.toLowerCase();
       const productMatch = r.product_name.toLowerCase() === proposal.tipo_operacao.toLowerCase();
@@ -131,7 +138,6 @@ export function CommissionPayment() {
       return bankMatch && productMatch && levelMatch;
     });
 
-    // Fallback: match just bank + product (any level)
     const fallbackRule = !matchingRule
       ? rules.find(r => {
           const bankMatch = r.bank_name.toLowerCase() === proposal.banco.toLowerCase();
@@ -146,7 +152,6 @@ export function CommissionPayment() {
       return { amount: 0, percentage: 0, baseValue: proposal.parcela, rule: null };
     }
 
-    // Determine base value based on calculation_model
     let baseValue = proposal.parcela;
     if (rule.calculation_model === 'saldo_devedor' && proposal.saldo_devedor) {
       baseValue = proposal.saldo_devedor;
@@ -158,43 +163,77 @@ export function CommissionPayment() {
     if (rule.commission_type === 'percentual' || rule.commission_type === 'percentage') {
       amount = baseValue * (percentage / 100);
     } else {
-      amount = percentage; // fixed value
+      amount = percentage;
     }
 
     return { amount, percentage, baseValue, rule };
   };
 
-  const handlePostCommission = async (proposal: PaidProposal) => {
-    setPosting(proposal.id);
+  const getDialogCommissionValues = (proposal: PaidProposal) => {
+    const calc = calculateCommission(proposal);
+    const inputVal = parseFloat(commissionInput) || 0;
+    let baseValue = calc.baseValue;
+    let percentage = 0;
+    let amount = 0;
+
+    if (commissionMode === 'percentual') {
+      percentage = inputVal;
+      amount = baseValue * (inputVal / 100);
+    } else {
+      amount = inputVal;
+      percentage = baseValue > 0 ? (inputVal / baseValue) * 100 : 0;
+    }
+
+    return { amount, percentage, baseValue };
+  };
+
+  const openDialog = (proposal: PaidProposal) => {
+    setSelectedProposal(proposal);
+    const calc = calculateCommission(proposal);
+    if (calc.rule) {
+      const isPercentual = calc.rule.commission_type === 'percentual' || calc.rule.commission_type === 'percentage';
+      setCommissionMode(isPercentual ? 'percentual' : 'fixo');
+      setCommissionInput(String(calc.rule.commission_value));
+    } else {
+      setCommissionMode('percentual');
+      setCommissionInput('');
+    }
+    setDialogOpen(true);
+  };
+
+  const handleConfirmCommission = async () => {
+    if (!selectedProposal) return;
+    setDialogPosting(true);
     try {
-      const { amount, percentage, baseValue } = calculateCommission(proposal);
+      const { amount, percentage, baseValue } = getDialogCommissionValues(selectedProposal);
 
       const { error } = await supabase.from('commissions').insert({
-        user_id: proposal.user_id,
-        client_name: proposal.nome,
-        cpf: proposal.cpf,
-        bank_name: proposal.banco,
-        product_type: proposal.tipo_operacao,
+        user_id: selectedProposal.user_id,
+        client_name: selectedProposal.nome,
+        cpf: selectedProposal.cpf,
+        bank_name: selectedProposal.banco,
+        product_type: selectedProposal.tipo_operacao,
         credit_value: baseValue,
         commission_percentage: percentage,
         commission_amount: amount,
-        proposal_date: proposal.data_venda,
-        payment_date: proposal.data_pagamento,
-        company_id: proposal.company_id,
+        proposal_date: selectedProposal.data_venda,
+        payment_date: selectedProposal.data_pagamento,
+        company_id: selectedProposal.company_id,
         status: 'pago',
-        televendas_id: proposal.id,
+        televendas_id: selectedProposal.id,
       } as any);
 
       if (error) throw error;
 
-      setProposals(prev => prev.filter(p => p.id !== proposal.id));
-      setExistingIds(prev => new Set([...prev, proposal.id]));
-      toast({ title: 'Comissão lançada com sucesso!', description: `${proposal.nome} — R$ ${amount.toFixed(2)}` });
+      setProposals(prev => prev.filter(p => p.id !== selectedProposal.id));
+      setExistingIds(prev => new Set([...prev, selectedProposal.id]));
+      toast({ title: 'Comissão lançada!', description: `${selectedProposal.nome} — R$ ${amount.toFixed(2)}` });
+      setDialogOpen(false);
     } catch (error: any) {
       console.error('Error posting commission:', error);
       toast({ title: 'Erro ao lançar comissão', description: error.message, variant: 'destructive' });
     } finally {
-      setPosting(null);
+      setDialogPosting(false);
     }
   };
 
@@ -239,6 +278,31 @@ export function CommissionPayment() {
     setPostingAll(false);
   };
 
+  // Derived: unique users
+  const uniqueUsers = useMemo(() => {
+    const map = new Map<string, string>();
+    proposals.forEach(p => {
+      if (!map.has(p.user_id)) map.set(p.user_id, p.user_name || 'Sem nome');
+    });
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [proposals]);
+
+  // Derived: unique months
+  const uniqueMonths = useMemo(() => {
+    const set = new Map<string, string>();
+    proposals.forEach(p => {
+      const dateStr = p.data_pagamento || p.data_venda;
+      if (!dateStr) return;
+      try {
+        const d = parseISO(dateStr);
+        const key = format(d, 'yyyy-MM');
+        const label = format(d, 'MMM/yyyy', { locale: ptBR });
+        set.set(key, label.charAt(0).toUpperCase() + label.slice(1));
+      } catch { /* skip */ }
+    });
+    return [...set.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [proposals]);
+
   const filteredProposals = useMemo(() => {
     return proposals.filter(p => {
       const matchSearch = !searchTerm ||
@@ -246,9 +310,18 @@ export function CommissionPayment() {
         p.cpf.includes(searchTerm);
       const matchCompany = companyFilter === 'all' || p.company_id === companyFilter;
       const matchBank = bankFilter === 'all' || p.banco.toLowerCase() === bankFilter.toLowerCase();
-      return matchSearch && matchCompany && matchBank;
+      const matchUser = userFilter === 'all' || p.user_id === userFilter;
+      const matchMonth = (() => {
+        if (monthFilter === 'all') return true;
+        const dateStr = p.data_pagamento || p.data_venda;
+        if (!dateStr) return false;
+        try {
+          return format(parseISO(dateStr), 'yyyy-MM') === monthFilter;
+        } catch { return false; }
+      })();
+      return matchSearch && matchCompany && matchBank && matchUser && matchMonth;
     });
-  }, [proposals, searchTerm, companyFilter, bankFilter]);
+  }, [proposals, searchTerm, companyFilter, bankFilter, userFilter, monthFilter]);
 
   const uniqueBanks = useMemo(() => {
     return [...new Set(proposals.map(p => p.banco))].sort();
@@ -261,6 +334,8 @@ export function CommissionPayment() {
       </div>
     );
   }
+
+  const dialogCalc = selectedProposal ? getDialogCommissionValues(selectedProposal) : null;
 
   return (
     <div className="space-y-4">
@@ -291,49 +366,74 @@ export function CommissionPayment() {
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome ou CPF..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nome ou CPF..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={companyFilter} onValueChange={setCompanyFilter}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Empresa" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas empresas</SelectItem>
+                  {companies.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={bankFilter} onValueChange={setBankFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Banco" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos bancos</SelectItem>
+                  {uniqueBanks.map(b => (
+                    <SelectItem key={b} value={b}>{b}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={companyFilter} onValueChange={setCompanyFilter}>
-              <SelectTrigger className="w-full sm:w-[200px]">
-                <SelectValue placeholder="Empresa" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas empresas</SelectItem>
-                {companies.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={bankFilter} onValueChange={setBankFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Banco" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos bancos</SelectItem>
-                {uniqueBanks.map(b => (
-                  <SelectItem key={b} value={b}>{b}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {filteredProposals.length > 0 && (
-              <Button
-                onClick={handlePostAll}
-                isLoading={postingAll}
-                loadingText="Lançando..."
-                className="gap-2"
-              >
-                <Receipt className="h-4 w-4" />
-                Lançar Todas ({filteredProposals.length})
-              </Button>
-            )}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Select value={userFilter} onValueChange={setUserFilter}>
+                <SelectTrigger className="w-full sm:w-[220px]">
+                  <SelectValue placeholder="Funcionário" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos funcionários</SelectItem>
+                  {uniqueUsers.map(([id, name]) => (
+                    <SelectItem key={id} value={id}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={monthFilter} onValueChange={setMonthFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Mês" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos meses</SelectItem>
+                  {uniqueMonths.map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {filteredProposals.length > 0 && (
+                <Button
+                  onClick={handlePostAll}
+                  disabled={postingAll}
+                  className="gap-2 ml-auto"
+                >
+                  {postingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
+                  {postingAll ? 'Lançando...' : `Lançar Todas (${filteredProposals.length})`}
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -410,9 +510,7 @@ export function CommissionPayment() {
                       <TableCell className="text-right">
                         <Button
                           size="sm"
-                          onClick={() => handlePostCommission(proposal)}
-                          isLoading={posting === proposal.id}
-                          loadingText="..."
+                          onClick={() => openDialog(proposal)}
                           disabled={!!posting || postingAll}
                         >
                           Lançar
@@ -426,6 +524,97 @@ export function CommissionPayment() {
           </CardContent>
         </Card>
       )}
+
+      {/* Commission Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Lançar Comissão</DialogTitle>
+            <DialogDescription>Defina o valor da comissão para esta proposta.</DialogDescription>
+          </DialogHeader>
+          {selectedProposal && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="text-muted-foreground">Cliente</div>
+                <div className="font-medium">{selectedProposal.nome}</div>
+                <div className="text-muted-foreground">CPF</div>
+                <div>{selectedProposal.cpf}</div>
+                <div className="text-muted-foreground">Banco</div>
+                <div>{selectedProposal.banco}</div>
+                <div className="text-muted-foreground">Operação</div>
+                <div>{selectedProposal.tipo_operacao}</div>
+                <div className="text-muted-foreground">Parcela</div>
+                <div className="tabular-nums">R$ {selectedProposal.parcela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                {selectedProposal.saldo_devedor && (
+                  <>
+                    <div className="text-muted-foreground">Saldo Devedor</div>
+                    <div className="tabular-nums">R$ {selectedProposal.saldo_devedor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                  </>
+                )}
+                <div className="text-muted-foreground">Consultor</div>
+                <div>{selectedProposal.user_name}</div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Tipo de comissão</label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={commissionMode === 'percentual' ? 'default' : 'outline'}
+                    onClick={() => setCommissionMode('percentual')}
+                  >
+                    Percentual (%)
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={commissionMode === 'fixo' ? 'default' : 'outline'}
+                    onClick={() => setCommissionMode('fixo')}
+                  >
+                    Valor Fixo (R$)
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  {commissionMode === 'percentual' ? 'Percentual (%)' : 'Valor fixo (R$)'}
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder={commissionMode === 'percentual' ? 'Ex: 2.5' : 'Ex: 150.00'}
+                  value={commissionInput}
+                  onChange={e => setCommissionInput(e.target.value)}
+                />
+              </div>
+
+              {dialogCalc && (
+                <div className="rounded-md bg-muted p-3 text-center">
+                  <div className="text-xs text-muted-foreground mb-1">Valor da comissão</div>
+                  <div className="text-xl font-bold tabular-nums text-emerald-600">
+                    R$ {dialogCalc.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {dialogCalc.percentage.toFixed(2)}% sobre R$ {dialogCalc.baseValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={dialogPosting}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmCommission} disabled={dialogPosting || !commissionInput}>
+              {dialogPosting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirmar Lançamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
