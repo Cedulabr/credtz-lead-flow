@@ -96,7 +96,7 @@ export function WhatsAppSendDialog({
         selectedInstanceId, fullPhone, message, scheduledAt, clientName, sourceModule, sourceRecordId,
       );
       if (success) {
-        onSent?.({ instanceName: selectedInstance?.instance_name || '', instancePhone: selectedInstance?.phone_number || null, sentVia: 'api' });
+        onSent?.({ instanceName: selectedInstance?.instance_name || '', instancePhone: selectedInstance?.phone_number || null, sentVia: 'api', message, clientPhone: fullPhone });
         onOpenChange(false);
       }
       return;
