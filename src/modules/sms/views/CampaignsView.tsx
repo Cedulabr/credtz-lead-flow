@@ -336,6 +336,16 @@ export const CampaignsView = ({
         }
         const { data } = await query.limit(500);
         leads = (data || []).map((l: any) => ({ name: l.nome, phone: (l.telefone || "").replace(/\D/g, ""), source_id: l.id }));
+      } else if (leadSource === "meus_clientes") {
+        let query = supabase.from("propostas").select("id, client_name, client_phone, client_status");
+        if (!isAdmin && companyId) query = query.eq("company_id", companyId);
+        else if (!isAdmin && companyUserIds.length > 0) query = query.in("user_id", companyUserIds);
+        if (leadStatusFilter !== "all") {
+          const statuses = statusMap.meus_clientes[leadStatusFilter] || [];
+          if (statuses.length) query = query.in("client_status", statuses);
+        }
+        const { data } = await query.limit(500);
+        leads = (data || []).map((l: any) => ({ name: l.client_name || "", phone: (l.client_phone || "").replace(/\D/g, ""), source_id: l.id }));
       }
 
       leads = leads.filter((l) => l.phone.length >= 10);
