@@ -633,6 +633,8 @@ export function CommissionPayment() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={dialogPosting}>
               Cancelar
