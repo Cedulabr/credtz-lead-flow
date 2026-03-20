@@ -61,6 +61,9 @@ export const AutoLeadModule = lazy(() => import('@/modules/autolead/AutoLeadModu
 // Digitação
 export const DigitacaoModule = lazy(() => import('@/modules/digitacao/DigitacaoModule').then(m => ({ default: m.DigitacaoModule })));
 
+// Audios
+export const AudiosModule = lazy(() => import('@/modules/audios/AudiosModule').then(m => ({ default: m.AudiosModule })));
+
 // Base OFF legacy
 export const BaseOff = lazy(() => import('./BaseOff').then(m => ({ default: m.BaseOff })));
 export const BaseOffModern = lazy(() => import('./BaseOffModern').then(m => ({ default: m.BaseOffModern })));
