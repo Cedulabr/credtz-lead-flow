@@ -4,10 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Target, DollarSign, Settings, MessageSquare, BarChart3 } from "lucide-react";
+import { ShoppingCart, Target, DollarSign, Settings, MessageSquare, BarChart3, RefreshCw } from "lucide-react";
 import { UserData, PERMISSION_MODULES, PERMISSION_CATEGORIES } from "./types";
 import { UserAvatar } from "./UserAvatar";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   comercial: ShoppingCart,
