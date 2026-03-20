@@ -39,7 +39,17 @@ export function useAudioFiles() {
 
       if (uploadError) throw uploadError;
 
-      const companyId = (profile as any)?.company_id || null;
+      // Fetch real company_id from user_companies
+      const { data: ucData } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      const companyId = ucData?.company_id || null;
 
       const { error: insertError } = await supabase
         .from('audio_files')
