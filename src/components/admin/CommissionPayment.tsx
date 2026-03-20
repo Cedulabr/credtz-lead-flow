@@ -74,7 +74,7 @@ export function CommissionPayment() {
           .eq('is_active', true),
         supabase
           .from('companies')
-          .select('id, nome')
+          .select('id, name')
           .eq('is_active', true),
       ]);
 
