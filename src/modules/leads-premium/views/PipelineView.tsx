@@ -37,7 +37,7 @@ interface PipelineViewProps {
 const PIPELINE_COLUMNS = [
   { key: 'new_lead', icon: Sparkles, label: 'Novos' },
   { key: 'autolead', icon: Bot, label: 'Auto Leads' },
-  { key: 'em_andamento', icon: TrendingUp, label: 'Em Andamento' },
+  { key: 'aguardando_retorno', icon: Clock, label: 'Aguard. Retorno' },
   { key: 'agendamento', icon: Calendar, label: 'Agendamento' },
   { key: 'cliente_fechado', icon: CheckCircle, label: 'Fechados' },
   { key: 'recusou_oferta', icon: XCircle, label: 'Recusados' },
