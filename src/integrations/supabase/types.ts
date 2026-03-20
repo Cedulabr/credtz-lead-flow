@@ -3889,6 +3889,7 @@ export type Database = {
         Row: {
           can_access_activate_leads: boolean | null
           can_access_alertas: boolean | null
+          can_access_audios: boolean | null
           can_access_autolead: boolean | null
           can_access_baseoff_consulta: boolean | null
           can_access_colaborativo: boolean | null
@@ -3930,6 +3931,7 @@ export type Database = {
         Insert: {
           can_access_activate_leads?: boolean | null
           can_access_alertas?: boolean | null
+          can_access_audios?: boolean | null
           can_access_autolead?: boolean | null
           can_access_baseoff_consulta?: boolean | null
           can_access_colaborativo?: boolean | null
@@ -3971,6 +3973,7 @@ export type Database = {
         Update: {
           can_access_activate_leads?: boolean | null
           can_access_alertas?: boolean | null
+          can_access_audios?: boolean | null
           can_access_autolead?: boolean | null
           can_access_baseoff_consulta?: boolean | null
           can_access_colaborativo?: boolean | null
