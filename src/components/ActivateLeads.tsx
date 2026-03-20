@@ -2940,8 +2940,8 @@ export const ActivateLeads = () => {
             lead_id: whatsAppLead.id,
             user_id: user.id,
             action_type: 'whatsapp_sent',
-            notes: `WhatsApp enviado via ${info.sentVia === 'api' ? 'API' : 'link'}${info.instanceName ? ` | Instância: ${info.instanceName}` : ''}${info.instancePhone ? ` | Número: ${info.instancePhone}` : ''}`,
-            metadata: { whatsapp_instance: info.instanceName, whatsapp_number: info.instancePhone, sent_via: info.sentVia },
+            notes: `WhatsApp enviado via ${info.sentVia === 'api' ? 'API' : 'link'}${info.instanceName ? ` | Instância: ${info.instanceName}` : ''}${info.instancePhone ? ` | Número: ${info.instancePhone}` : ''}${info.message ? ` | Msg: ${info.message.substring(0, 200)}` : ''}${info.audioTitle ? ` | Áudio: ${info.audioTitle}` : ''}`,
+            metadata: { whatsapp_instance: info.instanceName, whatsapp_number: info.instancePhone, sent_via: info.sentVia, message: info.message, audio_title: info.audioTitle || null, client_phone: info.clientPhone },
           });
         }}
       />

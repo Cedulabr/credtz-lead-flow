@@ -21,6 +21,9 @@ export interface WhatsAppSentInfo {
   instanceName: string;
   instancePhone: string | null;
   sentVia: 'api' | 'link';
+  message: string;
+  audioTitle?: string;
+  clientPhone: string;
 }
 
 interface WhatsAppSendDialogProps {
@@ -93,7 +96,7 @@ export function WhatsAppSendDialog({
         selectedInstanceId, fullPhone, message, scheduledAt, clientName, sourceModule, sourceRecordId,
       );
       if (success) {
-        onSent?.({ instanceName: selectedInstance?.instance_name || '', instancePhone: selectedInstance?.phone_number || null, sentVia: 'api' });
+        onSent?.({ instanceName: selectedInstance?.instance_name || '', instancePhone: selectedInstance?.phone_number || null, sentVia: 'api', message, clientPhone: fullPhone });
         onOpenChange(false);
       }
       return;
@@ -119,7 +122,7 @@ export function WhatsAppSendDialog({
       }
       const success = await sendMediaMessage(fullPhone, audioData.base64, audioFileName, '', clientName, selectedInstanceId);
       if (success) {
-        onSent?.({ instanceName: selectedInstance?.instance_name || '', instancePhone: selectedInstance?.phone_number || null, sentVia: 'api' });
+        onSent?.({ instanceName: selectedInstance?.instance_name || '', instancePhone: selectedInstance?.phone_number || null, sentVia: 'api', message, audioTitle: selectedAudio?.title, clientPhone: fullPhone });
         onOpenChange(false);
       }
       return;
@@ -132,7 +135,7 @@ export function WhatsAppSendDialog({
       success = await sendTextMessage(fullPhone, message, clientName, selectedInstanceId);
     }
     if (success) {
-      onSent?.({ instanceName: selectedInstance?.instance_name || '', instancePhone: selectedInstance?.phone_number || null, sentVia: 'api' });
+      onSent?.({ instanceName: selectedInstance?.instance_name || '', instancePhone: selectedInstance?.phone_number || null, sentVia: 'api', message, clientPhone: fullPhone });
       onOpenChange(false);
     }
   };
@@ -142,7 +145,7 @@ export function WhatsAppSendDialog({
     const fullPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
     const encoded = encodeURIComponent(message);
     window.open(`https://wa.me/${fullPhone}?text=${encoded}`, "_blank");
-    onSent?.({ instanceName: '', instancePhone: null, sentVia: 'link' });
+    onSent?.({ instanceName: '', instancePhone: null, sentVia: 'link', message, clientPhone: fullPhone });
     onOpenChange(false);
   };
 
