@@ -66,6 +66,7 @@ export const PERMISSION_MODULES = [
   { key: "can_access_whatsapp", label: "WhatsApp", description: "Integração e envio via WhatsApp", category: "comunicacao", defaultValue: false },
   { key: "can_access_radar", label: "Radar de Oportunidades", description: "Buscar oportunidades na base", category: "leads", defaultValue: true },
   { key: "can_access_autolead", label: "AutoLead", description: "Disparo automático de leads", category: "leads", defaultValue: true },
+  { key: "can_access_audios", label: "Áudios", description: "Gerenciar e enviar áudios via WhatsApp", category: "comunicacao", defaultValue: true },
 ] as const;
 
 export const PERMISSION_CATEGORIES = [

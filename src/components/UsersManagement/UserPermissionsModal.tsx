@@ -36,10 +36,10 @@ export function UserPermissionsModal({ open, onOpenChange, user, onSave }: UserP
   const handleSyncModules = async () => {
     setSyncing(true);
     try {
-      const columnNames = PERMISSION_MODULES.map(m => m.key);
-      const { data, error } = await supabase.rpc('sync_permission_columns', {
+      const columnNames: string[] = PERMISSION_MODULES.map(m => m.key);
+      const { data, error } = await supabase.rpc('sync_permission_columns' as any, {
         column_names: columnNames,
-      } as any);
+      });
 
       if (error) throw error;
 
