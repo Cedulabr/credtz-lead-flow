@@ -910,7 +910,7 @@ export function ContaCorrente() {
                         </Button>
                       )}
                       
-                      {commission.commission_amount > 0 && (
+                      {commission.status !== 'refunded' && (
                         <>
                           <Button
                             size="sm"
@@ -932,7 +932,7 @@ export function ContaCorrente() {
                             Apagar
                           </Button>
                           
-                          {(commission.status === 'paid' || commission.status === 'pending') && (
+                          {(commission.status === 'paid' || commission.status === 'pending') && commission.commission_amount > 0 && (
                             <Button
                               size="sm"
                               variant="destructive"
