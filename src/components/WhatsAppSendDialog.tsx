@@ -9,8 +9,9 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { MessageCircle, Send, Loader2, Paperclip, User, CalendarIcon, Clock } from "lucide-react";
+import { MessageCircle, Send, Loader2, Paperclip, User, CalendarIcon, Clock, Mic } from "lucide-react";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
+import { useAudioFiles } from "@/modules/audios/hooks/useAudioFiles";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -47,12 +48,16 @@ export function WhatsAppSendDialog({
   onSent,
 }: WhatsAppSendDialogProps) {
   const { instances, hasInstances, sending, sendTextMessage, sendMediaMessage, scheduleMessage, loadingInstances } = useWhatsApp();
+  const { audios, getPublicUrl, downloadAsBase64 } = useAudioFiles();
   const [message, setMessage] = useState(defaultMessage);
   const [phone, setPhone] = useState(clientPhone);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>("");
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
   const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [sendAudio, setSendAudio] = useState(false);
+  const [selectedAudioId, setSelectedAudioId] = useState<string>("");
+  const [sendingAudio, setSendingAudio] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -61,13 +66,17 @@ export function WhatsAppSendDialog({
       setIsScheduled(false);
       setScheduleDate(undefined);
       setScheduleTime("09:00");
-      // Auto-select first instance
+      setSendAudio(false);
+      setSelectedAudioId("");
       if (instances.length > 0 && !selectedInstanceId) {
         const firstWithToken = instances.find(i => i.hasToken);
         if (firstWithToken) setSelectedInstanceId(firstWithToken.id);
       }
     }
   }, [open, defaultMessage, clientName, clientPhone, instances, selectedInstanceId]);
+
+  const selectedInstance = instances.find(i => i.id === selectedInstanceId);
+  const selectedAudio = audios.find(a => a.id === selectedAudioId);
 
   const handleSend = async () => {
     const cleanPhone = phone.replace(/\D/g, "");
@@ -80,20 +89,32 @@ export function WhatsAppSendDialog({
       scheduledAt.setHours(hours, minutes, 0, 0);
 
       const success = await scheduleMessage(
-        selectedInstanceId,
-        fullPhone,
-        message,
-        scheduledAt,
-        clientName,
-        sourceModule,
-        sourceRecordId,
+        selectedInstanceId, fullPhone, message, scheduledAt, clientName, sourceModule, sourceRecordId,
       );
       if (success) {
-        onSent?.({
-          instanceName: selectedInstance?.instance_name || '',
-          instancePhone: selectedInstance?.phone_number || null,
-          sentVia: 'api'
-        });
+        onSent?.({ instanceName: selectedInstance?.instance_name || '', instancePhone: selectedInstance?.phone_number || null, sentVia: 'api' });
+        onOpenChange(false);
+      }
+      return;
+    }
+
+    // If sending audio, download and send as media
+    if (sendAudio && selectedAudio) {
+      setSendingAudio(true);
+      const audioData = await downloadAsBase64(selectedAudio.file_path);
+      setSendingAudio(false);
+      if (!audioData) return;
+
+      const ext = selectedAudio.file_path.split('.').pop() || 'mp3';
+      const audioFileName = `${selectedAudio.title}.${ext}`;
+
+      // Send text first if present, then audio
+      if (message.trim()) {
+        await sendTextMessage(fullPhone, message, clientName, selectedInstanceId);
+      }
+      const success = await sendMediaMessage(fullPhone, audioData.base64, audioFileName, '', clientName, selectedInstanceId);
+      if (success) {
+        onSent?.({ instanceName: selectedInstance?.instance_name || '', instancePhone: selectedInstance?.phone_number || null, sentVia: 'api' });
         onOpenChange(false);
       }
       return;
@@ -106,11 +127,7 @@ export function WhatsAppSendDialog({
       success = await sendTextMessage(fullPhone, message, clientName, selectedInstanceId);
     }
     if (success) {
-      onSent?.({
-        instanceName: selectedInstance?.instance_name || '',
-        instancePhone: selectedInstance?.phone_number || null,
-        sentVia: 'api'
-      });
+      onSent?.({ instanceName: selectedInstance?.instance_name || '', instancePhone: selectedInstance?.phone_number || null, sentVia: 'api' });
       onOpenChange(false);
     }
   };
@@ -120,15 +137,12 @@ export function WhatsAppSendDialog({
     const fullPhone = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
     const encoded = encodeURIComponent(message);
     window.open(`https://wa.me/${fullPhone}?text=${encoded}`, "_blank");
-    onSent?.({
-      instanceName: '',
-      instancePhone: null,
-      sentVia: 'link'
-    });
+    onSent?.({ instanceName: '', instancePhone: null, sentVia: 'link' });
     onOpenChange(false);
   };
 
-  const selectedInstance = instances.find(i => i.id === selectedInstanceId);
+  const isSending = sending || sendingAudio;
+  const canSend = phone && (message || mediaBase64 || (sendAudio && selectedAudioId)) && !(isScheduled && !scheduleDate);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -170,21 +184,12 @@ export function WhatsAppSendDialog({
 
           <div>
             <Label>Telefone</Label>
-            <Input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="5585999999999"
-            />
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="5585999999999" />
           </div>
 
           <div>
             <Label>Mensagem</Label>
-            <Textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={4}
-              placeholder="Digite sua mensagem..."
-            />
+            <Textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4} placeholder="Digite sua mensagem..." />
           </div>
 
           {mediaBase64 && mediaName && (
@@ -192,6 +197,39 @@ export function WhatsAppSendDialog({
               <Paperclip className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">{mediaName}</span>
               <Badge variant="secondary" className="ml-auto text-xs">Anexo</Badge>
+            </div>
+          )}
+
+          {/* Audio toggle */}
+          {hasInstances && audios.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Mic className="h-4 w-4 text-muted-foreground" />
+                  <Label className="cursor-pointer">Enviar áudio?</Label>
+                </div>
+                <Switch checked={sendAudio} onCheckedChange={setSendAudio} />
+              </div>
+
+              {sendAudio && (
+                <div className="space-y-2">
+                  <Select value={selectedAudioId} onValueChange={setSelectedAudioId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o áudio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {audios.map(a => (
+                        <SelectItem key={a.id} value={a.id}>{a.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedAudio && (
+                    <audio controls className="w-full" preload="none">
+                      <source src={getPublicUrl(selectedAudio.file_path)} type={selectedAudio.mime_type || 'audio/mpeg'} />
+                    </audio>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -234,11 +272,7 @@ export function WhatsAppSendDialog({
               </div>
               <div className="w-28">
                 <Label>Hora</Label>
-                <Input
-                  type="time"
-                  value={scheduleTime}
-                  onChange={(e) => setScheduleTime(e.target.value)}
-                />
+                <Input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} />
               </div>
             </div>
           )}
@@ -251,23 +285,20 @@ export function WhatsAppSendDialog({
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSending}>
             Cancelar
           </Button>
           {hasInstances ? (
             <Button
               onClick={handleSend}
-              disabled={sending || !phone || (!message && !mediaBase64) || (isScheduled && !scheduleDate)}
+              disabled={isSending || !canSend}
               className="gap-2 bg-green-600 hover:bg-green-700"
             >
-              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : isScheduled ? <CalendarIcon className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+              {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : isScheduled ? <CalendarIcon className="h-4 w-4" /> : <Send className="h-4 w-4" />}
               {isScheduled ? "Agendar" : "Enviar"}
             </Button>
           ) : (
-            <Button
-              onClick={handleFallback}
-              className="gap-2 bg-green-600 hover:bg-green-700"
-            >
+            <Button onClick={handleFallback} className="gap-2 bg-green-600 hover:bg-green-700">
               <MessageCircle className="h-4 w-4" />
               Abrir WhatsApp Web
             </Button>
