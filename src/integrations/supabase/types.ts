@@ -6988,6 +6988,15 @@ export type Database = {
           total_records: number
         }[]
       }
+      get_profiles_by_ids: {
+        Args: { user_ids: string[] }
+        Returns: {
+          email: string
+          id: string
+          level: string
+          name: string
+        }[]
+      }
       get_televendas_sales_ranking: {
         Args: { p_company_id: string; p_end_date: string; p_start_date: string }
         Returns: {
