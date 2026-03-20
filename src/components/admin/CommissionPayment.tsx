@@ -629,9 +629,7 @@ export function CommissionPayment() {
                     R$ {dialogCalc.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {dialogCalc.percentage.toFixed(2)}% sobre R$ {dialogCalc.baseValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </div>
-                </div>
+                    {dialogCalc.percentage.toFixed(2)}% sobre R$ {dialogCalc.baseValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({BASE_LABELS[commissionBase]})
               )}
             </div>
           )}
