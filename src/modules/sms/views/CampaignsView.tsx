@@ -827,10 +827,10 @@ export const CampaignsView = ({
 
             <div>
               <Label className="text-xs">Módulo de Origem</Label>
-              <div className={`grid gap-2 mt-1 ${isMobile ? 'grid-cols-1' : 'grid-cols-3'}`}>
+              <div className={`grid gap-2 mt-1 ${isMobile ? 'grid-cols-2' : 'grid-cols-4'}`}>
                 {LEAD_SOURCE_OPTIONS.map((opt) => (
                   <Button key={opt.value} variant={leadSource === opt.value ? "default" : "outline"} size="sm"
-                    onClick={() => setLeadSource(opt.value)} className="text-xs gap-1">
+                    onClick={() => { setLeadSource(opt.value); setLeadStatusFilter("all"); }} className="text-xs gap-1">
                     {opt.icon} {opt.label.split(" ")[0]}
                   </Button>
                 ))}
@@ -841,7 +841,7 @@ export const CampaignsView = ({
               <div className={`grid gap-2 mt-1 ${isMobile ? 'grid-cols-2' : 'grid-cols-3'}`}>
                 <Button variant={leadStatusFilter === "all" ? "default" : "outline"} size="sm"
                   onClick={() => setLeadStatusFilter("all")} className="text-xs">Todos</Button>
-                {LEAD_STATUS_FILTERS.map((s) => (
+                {(LEAD_STATUS_FILTERS_BY_SOURCE[leadSource] || []).map((s) => (
                   <Button key={s.value} variant={leadStatusFilter === s.value ? "default" : "outline"} size="sm"
                     onClick={() => setLeadStatusFilter(s.value)} className="text-xs">{s.label}</Button>
                 ))}
