@@ -83,8 +83,29 @@ export function useAudioFiles() {
 
   const downloadAsBase64 = async (filePath: string): Promise<{ base64: string; mimeType: string } | null> => {
     try {
+      // Try direct download first
       const { data, error } = await supabase.storage.from('audio-files').download(filePath);
-      if (error || !data) return null;
+      if (error || !data) {
+        console.warn('Direct download failed, trying signed URL fallback:', error?.message);
+        // Fallback: use signed URL
+        const { data: signedData, error: signedError } = await supabase.storage
+          .from('audio-files')
+          .createSignedUrl(filePath, 3600);
+        if (signedError || !signedData?.signedUrl) {
+          console.error('Signed URL fallback also failed:', signedError?.message);
+          return null;
+        }
+        const resp = await fetch(signedData.signedUrl);
+        if (!resp.ok) return null;
+        const blob = await resp.blob();
+        const buffer = await blob.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return { base64: btoa(binary), mimeType: blob.type || 'audio/mpeg' };
+      }
       const buffer = await data.arrayBuffer();
       const bytes = new Uint8Array(buffer);
       let binary = '';
@@ -92,7 +113,8 @@ export function useAudioFiles() {
         binary += String.fromCharCode(bytes[i]);
       }
       return { base64: btoa(binary), mimeType: data.type || 'audio/mpeg' };
-    } catch {
+    } catch (err) {
+      console.error('downloadAsBase64 error:', err);
       return null;
     }
   };

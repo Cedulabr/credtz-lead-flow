@@ -104,7 +104,11 @@ export function WhatsAppSendDialog({
       setSendingAudio(true);
       const audioData = await downloadAsBase64(selectedAudio.file_path);
       setSendingAudio(false);
-      if (!audioData) return;
+      if (!audioData) {
+        toast.error("Erro ao baixar áudio. Verifique se o arquivo existe no storage.");
+        return;
+      }
+      console.log(`[WhatsApp] Audio base64 length: ${audioData.base64.length}, mime: ${audioData.mimeType}`);
 
       const ext = selectedAudio.file_path.split('.').pop() || 'mp3';
       const audioFileName = `${selectedAudio.title}.${ext}`;
