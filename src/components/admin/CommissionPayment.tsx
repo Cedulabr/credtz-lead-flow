@@ -58,6 +58,7 @@ export function CommissionPayment() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<PaidProposal | null>(null);
   const [commissionMode, setCommissionMode] = useState<'percentual' | 'fixo'>('percentual');
+  const [commissionBase, setCommissionBase] = useState<'parcela' | 'saldo_devedor' | 'bruto' | 'liquido'>('parcela');
   const [commissionInput, setCommissionInput] = useState('');
   const [dialogPosting, setDialogPosting] = useState(false);
 
