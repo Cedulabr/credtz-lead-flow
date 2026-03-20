@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -103,7 +104,11 @@ export function WhatsAppSendDialog({
       setSendingAudio(true);
       const audioData = await downloadAsBase64(selectedAudio.file_path);
       setSendingAudio(false);
-      if (!audioData) return;
+      if (!audioData) {
+        toast.error("Erro ao baixar áudio. Verifique se o arquivo existe no storage.");
+        return;
+      }
+      console.log(`[WhatsApp] Audio base64 length: ${audioData.base64.length}, mime: ${audioData.mimeType}`);
 
       const ext = selectedAudio.file_path.split('.').pop() || 'mp3';
       const audioFileName = `${selectedAudio.title}.${ext}`;

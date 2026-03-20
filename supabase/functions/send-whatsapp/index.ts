@@ -117,10 +117,6 @@ Deno.serve(async (req) => {
         bytes[i] = binaryStr.charCodeAt(i);
       }
 
-      const formData = new FormData();
-      formData.append("number", normalizedNumber);
-      formData.append("saveOnTicket", "true");
-      
       // Detect MIME type from file extension
       const ext = (mediaName || '').split('.').pop()?.toLowerCase();
       const mimeMap: Record<string, string> = {
@@ -136,8 +132,15 @@ Deno.serve(async (req) => {
         jpeg: 'image/jpeg',
       };
       const detectedMime = mimeMap[ext || ''] || 'application/octet-stream';
-      const blob = new Blob([bytes], { type: detectedMime });
-      formData.append("medias", blob, mediaName);
+      
+      // Use File instead of Blob for proper Content-Disposition in FormData
+      const file = new File([bytes], mediaName, { type: detectedMime });
+      console.log(`Media file created: name=${mediaName}, size=${file.size} bytes, mime=${detectedMime}, ext=${ext}`);
+
+      const formData = new FormData();
+      formData.append("number", normalizedNumber);
+      formData.append("medias", file);
+      formData.append("saveOnTicket", "true");
 
       // If there's also a text message, send it first
       if (message) {
@@ -165,6 +168,7 @@ Deno.serve(async (req) => {
         },
         body: formData,
       });
+      console.log("Media send response status:", ticketzResponse.status);
     } else {
       if (!message) {
         return new Response(
