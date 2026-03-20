@@ -121,7 +121,22 @@ Deno.serve(async (req) => {
       formData.append("number", normalizedNumber);
       formData.append("saveOnTicket", "true");
       
-      const blob = new Blob([bytes], { type: "application/pdf" });
+      // Detect MIME type from file extension
+      const ext = (mediaName || '').split('.').pop()?.toLowerCase();
+      const mimeMap: Record<string, string> = {
+        pdf: 'application/pdf',
+        mp3: 'audio/mpeg',
+        ogg: 'audio/ogg',
+        wav: 'audio/wav',
+        m4a: 'audio/mp4',
+        opus: 'audio/opus',
+        webm: 'audio/webm',
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+      };
+      const detectedMime = mimeMap[ext || ''] || 'application/octet-stream';
+      const blob = new Blob([bytes], { type: detectedMime });
       formData.append("medias", blob, mediaName);
 
       // If there's also a text message, send it first

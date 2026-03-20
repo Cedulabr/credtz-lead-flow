@@ -40,6 +40,7 @@ import {
   LazyRadarModule,
   LazyAutoLeadModule,
   LazyDigitacaoModule,
+  LazyAudiosModule,
 } from "@/components/LazyComponents";
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -125,6 +126,10 @@ const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMes
     permission: 'can_access_digitacao',
     blockedMessage: 'Acesso à Digitação bloqueado pelo administrador',
   },
+  audios: {
+    permission: 'can_access_audios',
+    blockedMessage: 'Acesso ao módulo Áudios bloqueado pelo administrador',
+  },
 };
 
 // ── Main Component ────────────────────────────────────────────────────
@@ -177,6 +182,7 @@ const Index = () => {
     radar: <LazyRadarModule />,
     autolead: <LazyAutoLeadModule />,
     digitacao: <LazyDigitacaoModule />,
+    audios: <LazyAudiosModule />,
   }), [setActiveTab]);
 
   // ── Render active tab ──────────────────────────────────────────────
