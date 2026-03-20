@@ -155,12 +155,13 @@ export function ContaCorrente() {
       if (commissionsData && commissionsData.length > 0) {
         const userIds = [...new Set(commissionsData.map(c => c.user_id))];
         const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, name, email')
-          .in('id', userIds);
+          .rpc('get_profiles_by_ids', { user_ids: userIds });
         
         const profilesMap = new Map(
-          (profilesData || []).map(p => [p.id, p])
+          (profilesData || []).map((p: any) => [p.id, { 
+            name: p.name || p.email?.split('@')[0] || 'Sem nome', 
+            email: p.email 
+          }])
         );
         
         const commissionsWithUsers = commissionsData.map(comm => ({
