@@ -182,6 +182,7 @@ const Index = () => {
     radar: <LazyRadarModule />,
     autolead: <LazyAutoLeadModule />,
     digitacao: <LazyDigitacaoModule />,
+    audios: <LazyAudiosModule />,
   }), [setActiveTab]);
 
   // ── Render active tab ──────────────────────────────────────────────

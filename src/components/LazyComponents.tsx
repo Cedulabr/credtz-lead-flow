@@ -183,3 +183,4 @@ export const LazySystemStatus = withLazyLoading(SystemStatus, FormSkeleton);
 export const LazyRadarModule = withLazyLoading(RadarModule, TableSkeleton);
 export const LazyAutoLeadModule = withLazyLoading(AutoLeadModule, FormSkeleton);
 export const LazyDigitacaoModule = withLazyLoading(DigitacaoModule, FormSkeleton);
+export const LazyAudiosModule = withLazyLoading(AudiosModule, FormSkeleton);

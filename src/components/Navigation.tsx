@@ -42,6 +42,7 @@ const navItems = [
   { id: "radar", label: "Radar de Oportunidades", icon: Radar, permissionKey: "can_access_radar" },
   { id: "autolead", label: "AutoLead", icon: Zap, permissionKey: "can_access_autolead" },
   { id: "digitacao", label: "Digitação", icon: CreditCard, permissionKey: "can_access_digitacao" },
+  { id: "audios", label: "Áudios", icon: Mic, permissionKey: "can_access_audios" },
 ];
 
 // Mobile priority items - only icons
