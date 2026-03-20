@@ -2306,6 +2306,7 @@ export type Database = {
           proposal_date: string | null
           proposal_number: string | null
           status: string
+          televendas_id: string | null
           updated_at: string
           user_id: string
         }
@@ -2325,6 +2326,7 @@ export type Database = {
           proposal_date?: string | null
           proposal_number?: string | null
           status?: string
+          televendas_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -2344,6 +2346,7 @@ export type Database = {
           proposal_date?: string | null
           proposal_number?: string | null
           status?: string
+          televendas_id?: string | null
           updated_at?: string
           user_id?: string
         }

@@ -6,13 +6,15 @@ import {
   Wallet, 
   ChevronRight,
   ArrowLeft,
+  Receipt,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Import existing components
 import { ContaCorrente } from '@/components/ContaCorrente';
+import { CommissionPayment } from '@/components/admin/CommissionPayment';
 
-type FinanceSection = 'menu' | 'conta-corrente';
+type FinanceSection = 'menu' | 'conta-corrente' | 'comissoes';
 
 interface SectionItem {
   id: FinanceSection;
@@ -35,12 +37,22 @@ export function AdminFinance() {
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
     },
+    {
+      id: 'comissoes',
+      label: 'Pagamento de Comissão',
+      description: 'Lançar comissões de propostas pagas',
+      icon: Receipt,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+    },
   ];
 
   const renderContent = () => {
     switch (activeSection) {
       case 'conta-corrente':
         return <ContaCorrente />;
+      case 'comissoes':
+        return <CommissionPayment />;
       default:
         return null;
     }

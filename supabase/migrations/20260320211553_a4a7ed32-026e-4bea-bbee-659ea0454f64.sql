@@ -1,0 +1,1 @@
+ALTER TABLE public.commissions ADD COLUMN IF NOT EXISTS televendas_id text UNIQUE;
