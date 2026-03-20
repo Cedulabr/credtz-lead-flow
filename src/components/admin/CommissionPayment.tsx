@@ -168,10 +168,25 @@ export function CommissionPayment() {
     return { amount, percentage, baseValue, rule };
   };
 
+  const getBaseValueByMode = (proposal: PaidProposal, base: string) => {
+    switch (base) {
+      case 'saldo_devedor': return proposal.saldo_devedor || 0;
+      case 'bruto': return proposal.troco || proposal.parcela;
+      case 'liquido': return proposal.parcela - (proposal.saldo_devedor || 0);
+      default: return proposal.parcela;
+    }
+  };
+
+  const BASE_LABELS: Record<string, string> = {
+    parcela: 'Parcela',
+    saldo_devedor: 'Saldo Devedor',
+    bruto: 'Bruto (Troco)',
+    liquido: 'Líquido',
+  };
+
   const getDialogCommissionValues = (proposal: PaidProposal) => {
-    const calc = calculateCommission(proposal);
     const inputVal = parseFloat(commissionInput) || 0;
-    let baseValue = calc.baseValue;
+    const baseValue = getBaseValueByMode(proposal, commissionBase);
     let percentage = 0;
     let amount = 0;
 
