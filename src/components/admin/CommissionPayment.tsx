@@ -308,7 +308,7 @@ export function CommissionPayment() {
               <SelectContent>
                 <SelectItem value="all">Todas empresas</SelectItem>
                 {companies.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
