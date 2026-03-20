@@ -135,7 +135,7 @@ export function WhatsAppSendDialog({
       success = await sendTextMessage(fullPhone, message, clientName, selectedInstanceId);
     }
     if (success) {
-      onSent?.({ instanceName: selectedInstance?.instance_name || '', instancePhone: selectedInstance?.phone_number || null, sentVia: 'api' });
+      onSent?.({ instanceName: selectedInstance?.instance_name || '', instancePhone: selectedInstance?.phone_number || null, sentVia: 'api', message, clientPhone: fullPhone });
       onOpenChange(false);
     }
   };
