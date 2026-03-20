@@ -1,62 +1,47 @@
 
 
-## Evolução Financeiro — Propostas Pagas do Televendas Sobem para Comissões
+## Melhorias no Pagamento de Comissão
 
-### Problema
+### Problemas Identificados
 
-Hoje, as comissões são lançadas manualmente no Conta Corrente. Quando uma proposta é marcada como `proposta_paga` no Televendas, nada acontece no módulo Financeiro. O admin precisa criar manualmente cada comissão.
-
-### Abordagem
-
-Criar uma nova seção "Pagamento de Comissão" no módulo Financeiro que lista automaticamente todas as propostas com status `proposta_paga` da tabela `televendas`. O admin poderá visualizar essas propostas, calcular a comissão com base nas `commission_rules` e lançar o pagamento (inserir na tabela `commissions`) com um clique.
+1. **Consultor "Sem nome"**: A query busca `profiles.name` mas muitos usuários têm o campo vazio. Precisa buscar `email` como fallback.
+2. **Sem filtro de funcionário**: Não há select para filtrar por consultor específico.
+3. **Sem filtro de mês**: Não há filtro por mês de pagamento/venda.
+4. **"Lançar" executa direto**: Ao clicar em "Lançar", deveria abrir um dialog para o admin definir manualmente % ou valor fixo da comissão antes de confirmar.
 
 ### Mudanças
 
-| Componente | Ação |
+| Arquivo | Ação |
 |---|---|
-| Migration SQL | Adicionar coluna `televendas_id` (uuid, nullable, unique) na tabela `commissions` para vincular comissão à proposta de origem e evitar duplicatas |
-| `src/components/admin/AdminFinance.tsx` | Adicionar seção "Pagamento de Comissão" no menu do Financeiro |
-| `src/components/admin/CommissionPayment.tsx` (novo) | Componente que lista propostas pagas do televendas sem comissão lançada, permite calcular e lançar comissão |
+| `src/components/admin/CommissionPayment.tsx` | Adicionar filtro de funcionário (Select), filtro de mês (Select), dialog de edição de comissão ao clicar "Lançar", fix do nome do consultor usando email como fallback |
 
 ### Detalhes
 
-**1. Migration — vincular commissions ao televendas**
+**1. Fix nome do consultor**
 
-```sql
-ALTER TABLE public.commissions 
-  ADD COLUMN IF NOT EXISTS televendas_id text UNIQUE;
+Na query de profiles, buscar também `email`. No fallback:
+```typescript
+user_name: profile?.name || profile?.email?.split('@')[0] || 'Sem nome',
 ```
 
-Isso permite saber quais propostas já tiveram comissão lançada (evita duplicatas).
+**2. Filtro de funcionário**
 
-**2. CommissionPayment — novo componente**
+Select com lista de consultores únicos extraídos das propostas carregadas. Filtra por `user_id`.
 
-- Busca propostas com `status = 'proposta_paga'` da tabela `televendas`
-- Faz LEFT JOIN lógico: exclui as que já possuem registro em `commissions` via `televendas_id`
-- Para cada proposta mostra: nome, CPF, banco, tipo operação, parcela, saldo devedor, data pagamento, usuário
-- Busca `commission_rules` ativas para o banco/produto da proposta + nível do usuário
-- Calcula automaticamente o valor da comissão
-- Botão "Lançar Comissão" que insere na tabela `commissions` com `televendas_id` preenchido
-- Botão "Lançar Todas" para processar em lote
-- Filtros: por empresa, por período, por banco
-- Badge com contagem de propostas pendentes de comissão
+**3. Filtro de mês**
 
-**3. AdminFinance — nova entrada no menu**
+Select com meses disponíveis extraídos de `data_pagamento` ou `data_venda`. Formato "Mar/2026". Filtra propostas pelo mês selecionado.
 
-Adicionar item "Pagamento de Comissão" com ícone `Receipt` e cor azul, ao lado do "Conta Corrente" existente.
+**4. Dialog ao clicar "Lançar"**
 
-### Fluxo
+Em vez de lançar direto, abre um Dialog com:
+- Info da proposta (cliente, banco, operação, valores)
+- Radio: "Percentual" ou "Valor Fixo"
+- Input numérico para o valor (pré-preenchido com a regra se existir)
+- Preview do valor calculado da comissão
+- Botão "Confirmar Lançamento"
 
-```text
-Televendas: Proposta marcada como "Proposta Paga"
-                    ↓
-Financeiro > Pagamento de Comissão:
-  - Lista propostas pagas sem comissão lançada
-  - Calcula comissão com base nas regras (banco + produto + nível do usuário)
-  - Admin revisa e clica "Lançar Comissão"
-                    ↓
-Tabela commissions: Nova entrada criada com televendas_id vinculado
-                    ↓
-Conta Corrente / Minhas Comissões: Comissão aparece para o usuário
-```
+Ao confirmar, usa os valores editados pelo admin para inserir na tabela `commissions`.
+
+O botão "Lançar Todas" continuará usando a regra automática (ou zero se sem regra) para processar em lote.
 
