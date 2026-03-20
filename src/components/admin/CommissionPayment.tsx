@@ -208,9 +208,11 @@ export function CommissionPayment() {
       const isPercentual = calc.rule.commission_type === 'percentual' || calc.rule.commission_type === 'percentage';
       setCommissionMode(isPercentual ? 'percentual' : 'fixo');
       setCommissionInput(String(calc.rule.commission_value));
+      setCommissionBase(calc.rule.calculation_model === 'saldo_devedor' ? 'saldo_devedor' : 'parcela');
     } else {
       setCommissionMode('percentual');
       setCommissionInput('');
+      setCommissionBase('parcela');
     }
     setDialogOpen(true);
   };
