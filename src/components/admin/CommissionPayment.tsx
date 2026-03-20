@@ -572,6 +572,21 @@ export function CommissionPayment() {
               </div>
 
               <div className="space-y-2">
+                <label className="text-sm font-medium">Base de cálculo</label>
+                <Select value={commissionBase} onValueChange={(v: any) => setCommissionBase(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="parcela">Parcela — R$ {selectedProposal.parcela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</SelectItem>
+                    <SelectItem value="saldo_devedor">Saldo Devedor — R$ {(selectedProposal.saldo_devedor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</SelectItem>
+                    <SelectItem value="bruto">Bruto (Troco) — R$ {(selectedProposal.troco || selectedProposal.parcela).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</SelectItem>
+                    <SelectItem value="liquido">Líquido — R$ {(selectedProposal.parcela - (selectedProposal.saldo_devedor || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <label className="text-sm font-medium">Tipo de comissão</label>
                 <div className="flex gap-2">
                   <Button
