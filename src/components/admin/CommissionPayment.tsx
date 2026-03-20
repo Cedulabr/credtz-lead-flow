@@ -58,6 +58,7 @@ export function CommissionPayment() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<PaidProposal | null>(null);
   const [commissionMode, setCommissionMode] = useState<'percentual' | 'fixo'>('percentual');
+  const [commissionBase, setCommissionBase] = useState<'parcela' | 'saldo_devedor' | 'bruto' | 'liquido'>('parcela');
   const [commissionInput, setCommissionInput] = useState('');
   const [dialogPosting, setDialogPosting] = useState(false);
 
@@ -167,10 +168,25 @@ export function CommissionPayment() {
     return { amount, percentage, baseValue, rule };
   };
 
+  const getBaseValueByMode = (proposal: PaidProposal, base: string) => {
+    switch (base) {
+      case 'saldo_devedor': return proposal.saldo_devedor || 0;
+      case 'bruto': return proposal.troco || proposal.parcela;
+      case 'liquido': return proposal.parcela - (proposal.saldo_devedor || 0);
+      default: return proposal.parcela;
+    }
+  };
+
+  const BASE_LABELS: Record<string, string> = {
+    parcela: 'Parcela',
+    saldo_devedor: 'Saldo Devedor',
+    bruto: 'Bruto (Troco)',
+    liquido: 'Líquido',
+  };
+
   const getDialogCommissionValues = (proposal: PaidProposal) => {
-    const calc = calculateCommission(proposal);
     const inputVal = parseFloat(commissionInput) || 0;
-    let baseValue = calc.baseValue;
+    const baseValue = getBaseValueByMode(proposal, commissionBase);
     let percentage = 0;
     let amount = 0;
 
@@ -192,9 +208,11 @@ export function CommissionPayment() {
       const isPercentual = calc.rule.commission_type === 'percentual' || calc.rule.commission_type === 'percentage';
       setCommissionMode(isPercentual ? 'percentual' : 'fixo');
       setCommissionInput(String(calc.rule.commission_value));
+      setCommissionBase(calc.rule.calculation_model === 'saldo_devedor' ? 'saldo_devedor' : 'parcela');
     } else {
       setCommissionMode('percentual');
       setCommissionInput('');
+      setCommissionBase('parcela');
     }
     setDialogOpen(true);
   };
@@ -554,6 +572,21 @@ export function CommissionPayment() {
               </div>
 
               <div className="space-y-2">
+                <label className="text-sm font-medium">Base de cálculo</label>
+                <Select value={commissionBase} onValueChange={(v: any) => setCommissionBase(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="parcela">Parcela — R$ {selectedProposal.parcela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</SelectItem>
+                    <SelectItem value="saldo_devedor">Saldo Devedor — R$ {(selectedProposal.saldo_devedor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</SelectItem>
+                    <SelectItem value="bruto">Bruto (Troco) — R$ {(selectedProposal.troco || selectedProposal.parcela).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</SelectItem>
+                    <SelectItem value="liquido">Líquido — R$ {(selectedProposal.parcela - (selectedProposal.saldo_devedor || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <label className="text-sm font-medium">Tipo de comissão</label>
                 <div className="flex gap-2">
                   <Button
@@ -596,7 +629,7 @@ export function CommissionPayment() {
                     R$ {dialogCalc.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {dialogCalc.percentage.toFixed(2)}% sobre R$ {dialogCalc.baseValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    {dialogCalc.percentage.toFixed(2)}% sobre R$ {dialogCalc.baseValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({BASE_LABELS[commissionBase]})
                   </div>
                 </div>
               )}
