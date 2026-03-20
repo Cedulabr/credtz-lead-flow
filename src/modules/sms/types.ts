@@ -78,15 +78,40 @@ export type SmsTab = "televendas_sms" | "automation" | "remarketing" | "campaign
 export const LEAD_SOURCE_OPTIONS = [
   { value: "activate_leads", label: "Activate Leads", icon: "⚡" },
   { value: "leads_premium", label: "Leads Premium", icon: "💎" },
+  { value: "meus_clientes", label: "Meus Clientes", icon: "👤" },
   { value: "televendas", label: "Televendas", icon: "📞" },
 ] as const;
 
-export const LEAD_STATUS_FILTERS = [
-  { value: "novo", label: "Novos" },
-  { value: "autolead", label: "AutoLead" },
-  { value: "em_andamento", label: "Em Andamento" },
-  { value: "agendado", label: "Agendado" },
-] as const;
+export const LEAD_STATUS_FILTERS_BY_SOURCE: Record<string, { value: string; label: string }[]> = {
+  activate_leads: [
+    { value: "novo", label: "Novos" },
+    { value: "autolead", label: "AutoLead" },
+    { value: "em_andamento", label: "Em Andamento" },
+    { value: "agendado", label: "Agendado" },
+  ],
+  leads_premium: [
+    { value: "novo", label: "Novos" },
+    { value: "autolead", label: "AutoLead" },
+    { value: "aguardando_retorno", label: "Aguard. Retorno" },
+    { value: "agendamento", label: "Agendamento" },
+    { value: "fechado", label: "Fechados" },
+    { value: "recusado", label: "Recusados" },
+  ],
+  meus_clientes: [
+    { value: "aguardando_retorno", label: "Aguard. Retorno" },
+    { value: "contato_futuro", label: "Contato Futuro" },
+    { value: "em_andamento", label: "Em Andamento" },
+    { value: "fechado", label: "Fechado" },
+  ],
+  televendas: [
+    { value: "novo", label: "Novos" },
+    { value: "em_andamento", label: "Em Andamento" },
+    { value: "agendado", label: "Agendado" },
+  ],
+};
+
+// Legacy export for backward compatibility
+export const LEAD_STATUS_FILTERS = LEAD_STATUS_FILTERS_BY_SOURCE.activate_leads;
 
 export const CAMPAIGN_STATUS_CONFIG: Record<string, { label: string; emoji: string; color: string }> = {
   draft: { label: "Rascunho", emoji: "📝", color: "text-muted-foreground" },

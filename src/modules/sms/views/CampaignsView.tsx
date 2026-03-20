@@ -25,7 +25,7 @@ import {
   SmsContactList,
   CAMPAIGN_STATUS_CONFIG,
   LEAD_SOURCE_OPTIONS,
-  LEAD_STATUS_FILTERS,
+  LEAD_STATUS_FILTERS_BY_SOURCE,
 } from "../types";
 
 interface CampaignsViewProps {
