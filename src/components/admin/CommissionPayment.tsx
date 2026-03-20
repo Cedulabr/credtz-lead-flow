@@ -630,9 +630,9 @@ export function CommissionPayment() {
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {dialogCalc.percentage.toFixed(2)}% sobre R$ {dialogCalc.baseValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({BASE_LABELS[commissionBase]})
+                  </div>
+                </div>
               )}
-            </div>
-          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={dialogPosting}>
               Cancelar
