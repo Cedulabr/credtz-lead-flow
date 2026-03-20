@@ -40,6 +40,7 @@ import {
   LazyRadarModule,
   LazyAutoLeadModule,
   LazyDigitacaoModule,
+  LazyAudiosModule,
 } from "@/components/LazyComponents";
 
 // ── Types ─────────────────────────────────────────────────────────────
