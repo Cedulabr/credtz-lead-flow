@@ -960,6 +960,9 @@ export function LeadDetailDrawer({
       whatsapp_instance: info.instanceName,
       whatsapp_number: info.instancePhone,
       sent_via: info.sentVia,
+      message: info.message,
+      audio_title: info.audioTitle || null,
+      client_phone: info.clientPhone,
     };
     await supabase
       .from('leads')

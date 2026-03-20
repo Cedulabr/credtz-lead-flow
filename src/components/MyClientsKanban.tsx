@@ -1129,7 +1129,7 @@ export function MyClientsKanban() {
             changed_by: user.id,
             from_stage: selectedProposta.pipeline_stage,
             to_stage: selectedProposta.pipeline_stage,
-            notes: `WhatsApp enviado via ${info.sentVia === 'api' ? 'API' : 'link'}${info.instanceName ? ` | Instância: ${info.instanceName}` : ''}${info.instancePhone ? ` | Número: ${info.instancePhone}` : ''}`,
+            notes: `WhatsApp enviado via ${info.sentVia === 'api' ? 'API' : 'link'}${info.instanceName ? ` | Instância: ${info.instanceName}` : ''}${info.instancePhone ? ` | Número: ${info.instancePhone}` : ''}${info.message ? ` | Msg: ${info.message.substring(0, 200)}` : ''}${info.audioTitle ? ` | Áudio: ${info.audioTitle}` : ''}`,
           });
         }}
       />
