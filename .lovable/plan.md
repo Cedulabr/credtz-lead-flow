@@ -1,54 +1,83 @@
 
 
-## Registrar Mensagem e Número no Histórico do Lead (WhatsApp)
+## SMS Disparos — Adicionar "Meus Clientes" + Filtros por Status do Kanban
 
 ### Problema
 
-Hoje o `onSent` do `WhatsAppSendDialog` retorna apenas instância e método de envio, mas **não inclui a mensagem enviada** nem o áudio selecionado. Os módulos salvam no histórico que "WhatsApp foi enviado" mas sem o conteúdo da conversa.
+O módulo de origem no disparo SMS não inclui "Meus Clientes" (tabela `propostas`). Além disso, os filtros de status do Leads Premium mostram "Em Andamento" em vez dos status reais do Kanban (Novos, Auto Leads, Aguardando Retorno, Agendamento, Fechados, Recusados).
 
 ### Mudanças
 
 | Arquivo | Ação |
 |---|---|
-| `src/components/WhatsAppSendDialog.tsx` | Expandir `WhatsAppSentInfo` com `message`, `audioTitle`, `clientPhone`; passar esses dados em todas as chamadas `onSent` |
-| `src/modules/leads-premium/components/LeadDetailDrawer.tsx` | Salvar `message`, `audioTitle` e `clientPhone` no entry de histórico |
-| `src/modules/leads-premium/components/LeadListItem.tsx` | Idem — salvar mensagem e dados no histórico |
-| `src/components/ActivateLeads.tsx` | Incluir `message` e `audioTitle` no metadata/notes do `activate_leads_history` |
-| `src/components/MyClientsList.tsx` | Incluir `message` e `audioTitle` no `client_interactions` |
-| `src/components/MyClientsKanban.tsx` | Incluir `message` e `audioTitle` no `pipeline_history` notes/metadata |
+| `src/modules/sms/types.ts` | Adicionar "Meus Clientes" ao `LEAD_SOURCE_OPTIONS`; substituir `LEAD_STATUS_FILTERS` por filtros dinâmicos por módulo |
+| `src/modules/sms/views/CampaignsView.tsx` | Adicionar query para `propostas` no `handleImportLeads`; renderizar filtros de status dinâmicos conforme o módulo selecionado; adicionar `statusMap` para `meus_clientes` |
 
 ### Detalhes
 
-**1. WhatsAppSentInfo expandido**
+**1. types.ts — Novo source + filtros por módulo**
 
 ```typescript
-export interface WhatsAppSentInfo {
-  instanceName: string;
-  instancePhone: string | null;
-  sentVia: 'api' | 'link';
-  message: string;          // texto enviado
-  audioTitle?: string;       // título do áudio se enviado
-  clientPhone: string;       // telefone do cliente para quem enviou
-}
+export const LEAD_SOURCE_OPTIONS = [
+  { value: "activate_leads", label: "Activate Leads", icon: "⚡" },
+  { value: "leads_premium", label: "Leads Premium", icon: "💎" },
+  { value: "meus_clientes", label: "Meus Clientes", icon: "👤" },
+  { value: "televendas", label: "Televendas", icon: "📞" },
+];
+
+export const LEAD_STATUS_FILTERS_BY_SOURCE: Record<string, {value:string;label:string}[]> = {
+  activate_leads: [
+    { value: "novo", label: "Novos" },
+    { value: "autolead", label: "AutoLead" },
+    { value: "em_andamento", label: "Em Andamento" },
+    { value: "agendado", label: "Agendado" },
+  ],
+  leads_premium: [
+    { value: "novo", label: "Novos" },
+    { value: "autolead", label: "AutoLead" },
+    { value: "aguardando_retorno", label: "Aguard. Retorno" },
+    { value: "agendamento", label: "Agendamento" },
+    { value: "fechado", label: "Fechados" },
+    { value: "recusado", label: "Recusados" },
+  ],
+  meus_clientes: [
+    { value: "aguardando_retorno", label: "Aguard. Retorno" },
+    { value: "contato_futuro", label: "Contato Futuro" },
+    { value: "em_andamento", label: "Em Andamento" },
+    { value: "fechado", label: "Fechado" },
+  ],
+  televendas: [
+    { value: "novo", label: "Novos" },
+    { value: "em_andamento", label: "Em Andamento" },
+    { value: "agendado", label: "Agendado" },
+  ],
+};
 ```
 
-Cada chamada `onSent?.()` no dialog será atualizada para incluir `message`, `selectedAudio?.title` e `fullPhone`.
+**2. CampaignsView.tsx — Query para `propostas` + filtros dinâmicos**
 
-**2. Consumidores — formato do registro**
+No `handleImportLeads`, adicionar bloco `meus_clientes`:
+- Query da tabela `propostas` filtrando por `company_id` ou `user_id`
+- Mapear `client_name` → name, `client_phone` → phone
+- Filtrar por `client_status` conforme statusMap
 
-Todos os módulos passarão a salvar no histórico/metadata:
-
-```json
-{
-  "action": "whatsapp_sent",
-  "whatsapp_instance": "Instância X",
-  "whatsapp_number": "5585999...",
-  "sent_via": "api",
-  "message": "Olá João, tudo bem?",
-  "audio_title": "Áudio de boas-vindas",
-  "client_phone": "5585888..."
-}
+No `statusMap`, adicionar:
+```typescript
+meus_clientes: {
+  aguardando_retorno: ["aguardando_retorno"],
+  contato_futuro: ["contato_futuro"],
+  em_andamento: ["em_andamento"],
+  fechado: ["cliente_fechado", "fechado"],
+},
+leads_premium: {
+  novo: ["new_lead"],
+  autolead: ["autolead", "auto_lead"],
+  aguardando_retorno: ["aguardando_retorno"],
+  agendamento: ["agendamento", "contato_futuro"],
+  fechado: ["cliente_fechado"],
+  recusado: ["recusou_oferta", "sem_interesse", "nao_e_cliente"],
+},
 ```
 
-Isso permite rastreabilidade completa: quem enviou, de qual número, para qual número, e o que foi dito.
+Na renderização dos filtros, trocar `LEAD_STATUS_FILTERS` por `LEAD_STATUS_FILTERS_BY_SOURCE[leadSource]` para mostrar filtros contextuais ao módulo selecionado. Resetar `leadStatusFilter` para "all" quando trocar de módulo.
 
