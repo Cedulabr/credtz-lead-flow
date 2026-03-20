@@ -1,43 +1,47 @@
 
 
-## Fix: Botões de Ação e Nomes no Conta Corrente
+## Adicionar Seleção de Base de Cálculo no Dialog "Lançar Comissão"
 
-### Problemas Identificados
+### Problema
 
-1. **Botões não aparecem para comissões com R$ 0,00**: A condição `commission.commission_amount > 0` (linha 912) oculta Editar/Estornar/Apagar quando o valor é zero. Comissões lançadas com valor errado (R$ 0,00) ficam sem botão de edição.
-
-2. **Nomes de usuários vazios**: O `fetchCommissions` consulta `profiles` diretamente (linha 157), que pode ser bloqueado por RLS — mesmo problema já corrigido no `CommissionPayment`. Precisa usar a RPC `get_profiles_by_ids`.
+Hoje o dialog de lançamento calcula a comissão sempre sobre o valor definido pela `commission_rule` (parcela ou saldo_devedor). O admin precisa poder escolher manualmente sobre qual valor base calcular: **Parcela**, **Saldo Devedor**, **Valor Bruto (troco)** ou **Valor Líquido**.
 
 ### Mudanças
 
 | Arquivo | Ação |
 |---|---|
-| `src/components/ContaCorrente.tsx` | Trocar query de profiles por `get_profiles_by_ids` RPC; remover condição `commission_amount > 0` dos botões Editar/Apagar; manter condição de estorno apenas para `status !== 'refunded'` |
+| `src/components/admin/CommissionPayment.tsx` | Adicionar state `commissionBase` com opções parcela/saldo_devedor/bruto/liquido; renderizar Select no dialog; usar o valor selecionado no cálculo |
 
 ### Detalhes
 
-**1. Fix botões de ação**
+**1. Novo state + opções de base**
 
 ```typescript
-// Antes (linha 912): botões só aparecem se valor > 0
-{commission.commission_amount > 0 && ( <> Editar / Apagar / Estornar </> )}
-
-// Depois: botões aparecem para todas exceto estornos
-{commission.status !== 'refunded' && ( <> Editar / Apagar / Estornar </> )}
+const [commissionBase, setCommissionBase] = useState<'parcela' | 'saldo_devedor' | 'bruto' | 'liquido'>('parcela');
 ```
 
-- Editar e Apagar: disponíveis para qualquer comissão que não seja estorno
-- Estornar: disponível para `paid` ou `pending` com valor > 0
-- Marcar como Pago: mantém condição `pending` + valor > 0
+Opções:
+- **Parcela**: `proposal.parcela`
+- **Saldo Devedor**: `proposal.saldo_devedor`
+- **Bruto (Troco)**: `proposal.troco` (já existe no PaidProposal)
+- **Líquido**: `parcela - (saldo_devedor ou 0)` — diferença entre parcela e saldo devedor
 
-**2. Fix nomes de usuários via RPC**
+**2. Atualizar `getDialogCommissionValues`**
+
+Em vez de usar `calc.baseValue` fixo, calcula o `baseValue` conforme `commissionBase`:
 
 ```typescript
-// Trocar:
-const { data: profilesData } = await supabase.from('profiles').select(...)
-// Por:
-const { data: profilesData } = await supabase.rpc('get_profiles_by_ids', { user_ids: userIds });
+let baseValue = selectedProposal.parcela;
+if (commissionBase === 'saldo_devedor') baseValue = selectedProposal.saldo_devedor || 0;
+else if (commissionBase === 'bruto') baseValue = selectedProposal.troco || selectedProposal.parcela;
+else if (commissionBase === 'liquido') baseValue = selectedProposal.parcela - (selectedProposal.saldo_devedor || 0);
 ```
 
-Também aplicar fallback `profile.name || profile.email?.split('@')[0]` para garantir que nunca mostre vazio.
+**3. Atualizar `openDialog`**
+
+Pré-selecionar a base conforme a `commission_rule` encontrada (se `calculation_model === 'saldo_devedor'` → seleciona saldo_devedor, senão parcela).
+
+**4. UI no dialog**
+
+Adicionar Select "Base de cálculo" entre a info da proposta e o tipo de comissão, com as 4 opções. O preview mostrará "X% sobre R$ Y (Parcela)" com o nome da base selecionada.
 
