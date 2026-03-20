@@ -6,13 +6,15 @@ import {
   Wallet, 
   ChevronRight,
   ArrowLeft,
+  Receipt,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Import existing components
 import { ContaCorrente } from '@/components/ContaCorrente';
+import { CommissionPayment } from '@/components/admin/CommissionPayment';
 
-type FinanceSection = 'menu' | 'conta-corrente';
+type FinanceSection = 'menu' | 'conta-corrente' | 'comissoes';
 
 interface SectionItem {
   id: FinanceSection;
