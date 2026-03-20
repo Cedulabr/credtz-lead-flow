@@ -30,6 +30,32 @@ interface UserPermissionsModalProps {
 
 export function UserPermissionsModal({ open, onOpenChange, user, onSave }: UserPermissionsModalProps) {
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+  const [syncing, setSyncing] = useState(false);
+  const { isAdmin } = useAuth();
+
+  const handleSyncModules = async () => {
+    setSyncing(true);
+    try {
+      const columnNames = PERMISSION_MODULES.map(m => m.key);
+      const { data, error } = await supabase.rpc('sync_permission_columns', {
+        column_names: columnNames,
+      } as any);
+
+      if (error) throw error;
+
+      const result = data as any;
+      const added = result?.added || [];
+      if (added.length > 0) {
+        toast.success(`${added.length} novo(s) módulo(s) sincronizado(s): ${added.join(', ')}`);
+      } else {
+        toast.info('Todos os módulos já estão sincronizados');
+      }
+    } catch (err: any) {
+      toast.error('Erro ao sincronizar: ' + (err.message || 'Erro desconhecido'));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     if (user) {
