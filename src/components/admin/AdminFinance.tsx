@@ -37,12 +37,22 @@ export function AdminFinance() {
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
     },
+    {
+      id: 'comissoes',
+      label: 'Pagamento de Comissão',
+      description: 'Lançar comissões de propostas pagas',
+      icon: Receipt,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+    },
   ];
 
   const renderContent = () => {
     switch (activeSection) {
       case 'conta-corrente':
         return <ContaCorrente />;
+      case 'comissoes':
+        return <CommissionPayment />;
       default:
         return null;
     }
