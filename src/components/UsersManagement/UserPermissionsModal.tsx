@@ -93,6 +93,18 @@ export function UserPermissionsModal({ open, onOpenChange, user, onSave }: UserP
           <Badge variant="secondary" className="text-xs">
             {enabledCount}/{PERMISSION_MODULES.length} ativas
           </Badge>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSyncModules}
+              disabled={syncing}
+              className="h-7 text-xs gap-1"
+            >
+              <RefreshCw className={cn("h-3 w-3", syncing && "animate-spin")} />
+              Sincronizar Módulos
+            </Button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-5 pr-1">
