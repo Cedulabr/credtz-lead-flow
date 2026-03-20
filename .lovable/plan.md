@@ -1,47 +1,52 @@
 
 
-## Melhorias no Pagamento de Comissão
+## Fix: Consultor "Sem nome" no Pagamento de Comissão
 
-### Problemas Identificados
+### Diagnóstico
 
-1. **Consultor "Sem nome"**: A query busca `profiles.name` mas muitos usuários têm o campo vazio. Precisa buscar `email` como fallback.
-2. **Sem filtro de funcionário**: Não há select para filtrar por consultor específico.
-3. **Sem filtro de mês**: Não há filtro por mês de pagamento/venda.
-4. **"Lançar" executa direto**: Ao clicar em "Lançar", deveria abrir um dialog para o admin definir manualmente % ou valor fixo da comissão antes de confirmar.
+A query de profiles no client-side está retornando vazia porque a função `has_role()` na RLS verifica `profiles.role` contra o enum `app_role` (que só tem 'admin' e 'partner'). Se o usuário logado não passar no check de RLS, a consulta retorna zero perfis — resultando em "Sem nome" para todos.
+
+Os nomes **existem** no banco (confirmado via query direta: Ana Luiza, Jamily Silva, Alana Rodrigues, etc.), mas o client não consegue lê-los.
+
+### Solução
+
+Criar uma função RPC `get_profiles_by_ids` com `SECURITY DEFINER` que retorna id, name, email e user_percentage_profile, bypass de RLS. Atualizar o `CommissionPayment` para usar essa RPC.
 
 ### Mudanças
 
-| Arquivo | Ação |
+| Componente | Ação |
 |---|---|
-| `src/components/admin/CommissionPayment.tsx` | Adicionar filtro de funcionário (Select), filtro de mês (Select), dialog de edição de comissão ao clicar "Lançar", fix do nome do consultor usando email como fallback |
+| Migration SQL | Criar RPC `get_profiles_by_ids(user_ids uuid[])` SECURITY DEFINER que retorna name, email, level |
+| `src/components/admin/CommissionPayment.tsx` | Substituir query direta de profiles pela chamada RPC; garantir que nomes apareçam no filtro "Funcionário" e coluna "Consultor" |
 
 ### Detalhes
 
-**1. Fix nome do consultor**
+**1. RPC**
 
-Na query de profiles, buscar também `email`. No fallback:
-```typescript
-user_name: profile?.name || profile?.email?.split('@')[0] || 'Sem nome',
+```sql
+CREATE OR REPLACE FUNCTION public.get_profiles_by_ids(user_ids uuid[])
+RETURNS TABLE(id uuid, name text, email text, user_percentage_profile text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = 'public'
+AS $$
+  SELECT p.id, p.name, p.email, p.user_percentage_profile
+  FROM public.profiles p
+  WHERE p.id = ANY(user_ids);
+$$;
 ```
 
-**2. Filtro de funcionário**
+**2. CommissionPayment.tsx — trocar query**
 
-Select com lista de consultores únicos extraídos das propostas carregadas. Filtra por `user_id`.
+```typescript
+// Antes:
+const { data: profiles } = await supabase
+  .from('profiles')
+  .select('id, name, email, user_percentage_profile')
+  .in('id', userIds);
 
-**3. Filtro de mês**
+// Depois:
+const { data: profiles } = await supabase
+  .rpc('get_profiles_by_ids', { user_ids: userIds });
+```
 
-Select com meses disponíveis extraídos de `data_pagamento` ou `data_venda`. Formato "Mar/2026". Filtra propostas pelo mês selecionado.
-
-**4. Dialog ao clicar "Lançar"**
-
-Em vez de lançar direto, abre um Dialog com:
-- Info da proposta (cliente, banco, operação, valores)
-- Radio: "Percentual" ou "Valor Fixo"
-- Input numérico para o valor (pré-preenchido com a regra se existir)
-- Preview do valor calculado da comissão
-- Botão "Confirmar Lançamento"
-
-Ao confirmar, usa os valores editados pelo admin para inserir na tabela `commissions`.
-
-O botão "Lançar Todas" continuará usando a regra automática (ou zero se sem regra) para processar em lote.
+Os nomes reais (Ana Luiza, Jamily Silva, etc.) passarão a aparecer tanto na coluna "Consultor" quanto no filtro "Funcionário".
 
