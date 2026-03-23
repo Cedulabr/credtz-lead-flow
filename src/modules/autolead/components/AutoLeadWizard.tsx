@@ -32,7 +32,10 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const { instances, loadingInstances } = useWhatsApp();
+  const { audios, loading: loadingAudios, getPublicUrl } = useAudioFiles();
   const [showAllDdds, setShowAllDdds] = useState(false);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   const [smsCredits, setSmsCredits] = useState<number | null>(null);
