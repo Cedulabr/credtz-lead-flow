@@ -104,6 +104,11 @@ const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMes
     permission: 'can_access_alertas',
     blockedMessage: 'Acesso ao Painel de Oportunidades bloqueado pelo administrador',
   },
+  'time-clock': {
+    permission: 'can_access_controle_ponto',
+    blockedMessage: 'Acesso ao Controle de Ponto bloqueado pelo administrador',
+    purchaseMode: true,
+  },
   sms: {
     permission: 'can_access_sms',
     blockedMessage: 'Acesso ao módulo SMS bloqueado pelo administrador',
