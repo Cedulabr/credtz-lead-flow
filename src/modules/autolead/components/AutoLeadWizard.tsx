@@ -663,6 +663,12 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
                     {data.smsEnabled ? `Ativo (${Math.min(data.quantidade, smsCredits || 0)} envios)` : "Desativado"}
                   </span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Áudio:</span>
+                  <span className={cn("font-semibold", data.audioFileId ? "text-primary" : "text-muted-foreground")}>
+                    {data.audioFileId ? `🎵 ${data.audioTitle || 'Selecionado'}` : "Desativado"}
+                  </span>
+                </div>
               </CardContent>
             </Card>
 

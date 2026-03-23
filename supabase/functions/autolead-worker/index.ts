@@ -74,6 +74,7 @@ Deno.serve(async (req) => {
       if (phone.length <= 11) phone = "55" + phone;
 
       try {
+        // Send text message
         const response = await fetch(TICKETZ_URL, {
           method: "POST",
           headers: {
@@ -99,6 +100,47 @@ Deno.serve(async (req) => {
 
           await supabase.rpc("autolead_increment_sent", { p_job_id: msg.job_id });
           sent++;
+
+          // Send audio if configured
+          if (msg.audio_file_id) {
+            try {
+              const { data: audioFile } = await supabase
+                .from("audio_files")
+                .select("file_path, mime_type")
+                .eq("id", msg.audio_file_id)
+                .maybeSingle();
+
+              if (audioFile) {
+                const { data: fileData } = await supabase.storage
+                  .from("audio-files")
+                  .download(audioFile.file_path);
+
+                if (fileData) {
+                  const ext = audioFile.file_path.split('.').pop() || 'ogg';
+                  const mimeType = audioFile.mime_type || 'audio/ogg';
+                  const formData = new FormData();
+                  formData.append("number", phone);
+                  formData.append("body", "");
+                  formData.append("medias", new File([fileData], `audio.${ext}`, { type: mimeType }));
+                  formData.append("saveOnTicket", "true");
+
+                  const audioResponse = await fetch(TICKETZ_URL, {
+                    method: "POST",
+                    headers: {
+                      Authorization: `Bearer ${instance.api_token}`,
+                    },
+                    body: formData,
+                  });
+
+                  const audioRespText = await audioResponse.text();
+                  console.log(`Audio ${msg.id} to ${phone}: ${audioResponse.status} ${audioRespText}`);
+                }
+              }
+            } catch (audioErr: any) {
+              console.error(`Audio send error for ${msg.id}:`, audioErr.message);
+              // Don't fail the whole message for audio error
+            }
+          }
         } else {
           let errorDetail = responseText;
           try {
@@ -123,7 +165,7 @@ Deno.serve(async (req) => {
           status: response.ok ? "sent" : "failed",
           sent_at: response.ok ? new Date().toISOString() : null,
           direction: "outgoing",
-          message_type: "text",
+          message_type: msg.audio_file_id ? "audio" : "text",
           client_name: msg.lead_name,
         });
       } catch (sendError: any) {
