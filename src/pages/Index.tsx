@@ -131,6 +131,10 @@ const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMes
     permission: 'can_access_audios',
     blockedMessage: 'Acesso ao módulo Áudios bloqueado pelo administrador',
   },
+  portflow: {
+    permission: 'can_access_portflow',
+    blockedMessage: 'Acesso ao PortFlow bloqueado pelo administrador',
+  },
 };
 
 // ── Main Component ────────────────────────────────────────────────────
