@@ -265,6 +265,7 @@ export function useAutoLead() {
         started_at: new Date().toISOString(),
         sms_enabled: wizardData.smsEnabled,
         sms_template: wizardData.smsEnabled ? wizardData.smsTemplate : null,
+        audio_file_id: wizardData.audioFileId || null,
       })
       .select("id")
       .single();
