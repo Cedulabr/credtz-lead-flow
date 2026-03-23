@@ -73,6 +73,7 @@ export const TelevendasModule = () => {
     bank: "all",
     dateMode: "criacao",
   });
+  const [origemFilter, setOrigemFilter] = useState<string>("all");
 
   // Detail modal state
   const [selectedTelevenda, setSelectedTelevenda] = useState<Televenda | null>(null);
