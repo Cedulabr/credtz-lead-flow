@@ -53,7 +53,7 @@ type TabConfig = {
 };
 
 // ── Permission-only config (no components here — built in useMemo) ───
-const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMessage' | 'wrapP4'>> = {
+const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMessage' | 'wrapP4' | 'purchaseMode'>> = {
   indicate: {
     permission: 'can_access_indicar',
     blockedMessage: 'Acesso à seção Indicar bloqueado pelo administrador',
