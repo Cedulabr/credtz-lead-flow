@@ -237,7 +237,7 @@ export const TelevendasModule = () => {
       
       return matchesSearch && matchesStatus && matchesProduct && matchesBank && matchesBankStatus && matchesPriority && matchesOrigem;
     });
-  }, [televendas, filters, bankStatusFilter, priorityFilter]);
+  }, [televendas, filters, bankStatusFilter, priorityFilter, origemFilter]);
 
   // Extract unique banks from televendas for filter
   const availableBanks = useMemo(() => {
