@@ -41,6 +41,7 @@ import {
   LazyAutoLeadModule,
   LazyDigitacaoModule,
   LazyAudiosModule,
+  LazyPortFlowModule,
 } from "@/components/LazyComponents";
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -130,6 +131,10 @@ const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMes
     permission: 'can_access_audios',
     blockedMessage: 'Acesso ao módulo Áudios bloqueado pelo administrador',
   },
+  portflow: {
+    permission: 'can_access_portflow',
+    blockedMessage: 'Acesso ao PortFlow bloqueado pelo administrador',
+  },
 };
 
 // ── Main Component ────────────────────────────────────────────────────
@@ -183,6 +188,7 @@ const Index = () => {
     autolead: <LazyAutoLeadModule />,
     digitacao: <LazyDigitacaoModule />,
     audios: <LazyAudiosModule />,
+    portflow: <div className="p-4"><LazyPortFlowModule /></div>,
   }), [setActiveTab]);
 
   // ── Render active tab ──────────────────────────────────────────────

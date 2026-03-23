@@ -5127,6 +5127,7 @@ export type Database = {
           last_sync_at: string | null
           last_sync_by: string | null
           lead_id: string | null
+          modulo_origem: string | null
           motivo_pendencia: string | null
           motivo_pendencia_descricao: string | null
           nome: string
@@ -5162,6 +5163,7 @@ export type Database = {
           last_sync_at?: string | null
           last_sync_by?: string | null
           lead_id?: string | null
+          modulo_origem?: string | null
           motivo_pendencia?: string | null
           motivo_pendencia_descricao?: string | null
           nome: string
@@ -5197,6 +5199,7 @@ export type Database = {
           last_sync_at?: string | null
           last_sync_by?: string | null
           lead_id?: string | null
+          modulo_origem?: string | null
           motivo_pendencia?: string | null
           motivo_pendencia_descricao?: string | null
           nome?: string

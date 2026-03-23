@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw, FileText, Users, ClipboardCheck, Sparkles, Activity } from "lucide-react";
+import { RefreshCw, FileText, Users, ClipboardCheck, Sparkles, Activity, ArrowRightLeft } from "lucide-react";
 import { toast as sonnerToast } from "sonner";
 
 import { 
@@ -73,6 +73,7 @@ export const TelevendasModule = () => {
     bank: "all",
     dateMode: "criacao",
   });
+  const [origemFilter, setOrigemFilter] = useState<string>("all");
 
   // Detail modal state
   const [selectedTelevenda, setSelectedTelevenda] = useState<Televenda | null>(null);
@@ -219,6 +220,7 @@ export const TelevendasModule = () => {
       const matchesProduct = filters.product === "all" || tv.tipo_operacao === filters.product;
       const matchesBank = filters.bank === "all" || tv.banco === filters.bank;
       const matchesBankStatus = !bankStatusFilter || mapToPipelineStatus(tv) === bankStatusFilter;
+      const matchesOrigem = origemFilter === "all" || (tv as any).modulo_origem === origemFilter;
       
       // Priority filter
       let matchesPriority = true;
@@ -233,9 +235,9 @@ export const TelevendasModule = () => {
         }
       }
       
-      return matchesSearch && matchesStatus && matchesProduct && matchesBank && matchesBankStatus && matchesPriority;
+      return matchesSearch && matchesStatus && matchesProduct && matchesBank && matchesBankStatus && matchesPriority && matchesOrigem;
     });
-  }, [televendas, filters, bankStatusFilter, priorityFilter]);
+  }, [televendas, filters, bankStatusFilter, priorityFilter, origemFilter]);
 
   // Extract unique banks from televendas for filter
   const availableBanks = useMemo(() => {
@@ -662,7 +664,27 @@ export const TelevendasModule = () => {
         placeholder="Buscar por nome, CPF, telefone ou ID..."
       />
 
-      {/* ALERTA: Propostas paradas */}
+      {/* Filtro de Origem */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground font-medium">Origem:</span>
+        {[
+          { value: "all", label: "Todos" },
+          { value: "televendas", label: "Televendas" },
+          { value: "portflow", label: "PortFlow", icon: <ArrowRightLeft className="h-3 w-3" /> },
+        ].map((opt) => (
+          <Button
+            key={opt.value}
+            variant={origemFilter === opt.value ? "default" : "outline"}
+            size="sm"
+            onClick={() => setOrigemFilter(opt.value)}
+            className="h-8 rounded-lg gap-1 text-xs"
+          >
+            {opt.icon}
+            {opt.label}
+          </Button>
+        ))}
+      </div>
+
       <StalledAlertBanner
         criticos={centralStats.criticos}
         alertas={centralStats.alertas}
