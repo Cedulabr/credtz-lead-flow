@@ -250,7 +250,7 @@ export function SalesWizard({ moduloOrigem = "televendas" }: SalesWizardProps) {
                 {isPortabilidade ? [
                   <ClientDataStep key="client" data={wizardData} onUpdate={handleUpdate} onValidChange={handleValidChange} />,
                   <ProductStep key="product" data={wizardData} onUpdate={handleUpdate} onValidChange={handleValidChange} />,
-                  <PortabilidadeStep key="portabilidade" data={wizardData} onUpdate={handleUpdate} onValidChange={handleValidChange} />,
+                  <PortabilidadeStep key="portabilidade" data={wizardData} onUpdate={handleUpdate} onValidChange={handleValidChange} moduloOrigem={moduloOrigem} />,
                   <ConfirmStep key="confirm" data={wizardData} onUpdate={handleUpdate} onValidChange={handleValidChange} />,
                 ] : [
                   <ClientDataStep key="client" data={wizardData} onUpdate={handleUpdate} onValidChange={handleValidChange} />,

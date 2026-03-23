@@ -221,7 +221,7 @@ export function PortabilidadeStep({ data, onUpdate, onValidChange, moduloOrigem 
                         {loadingBanks ? (
                           <SelectItem value="_loading" disabled>Carregando...</SelectItem>
                         ) : (
-                          banks.map((bank) => (
+                          filteredBanks.map((bank) => (
                             <SelectItem 
                               key={bank.id} 
                               value={bank.name} 

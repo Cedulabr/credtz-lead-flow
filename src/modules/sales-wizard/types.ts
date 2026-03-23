@@ -88,6 +88,7 @@ export interface WizardStepProps {
   data: Partial<SalesWizardData>;
   onUpdate: (updates: Partial<SalesWizardData>) => void;
   onValidChange: (isValid: boolean) => void;
+  moduloOrigem?: string;
 }
 
 export interface TelevendasBank {
