@@ -151,6 +151,7 @@ export function SalesWizard({ moduloOrigem = "televendas" }: SalesWizardProps) {
         tipo_operacao: wizardData.tipo_operacao,
         observacao: observacaoFinal || null,
         status: initialStatus,
+        modulo_origem: moduloOrigem,
       }).select("id").single();
 
       if (error) throw error;
