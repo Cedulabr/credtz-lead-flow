@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw, FileText, Users, ClipboardCheck, Sparkles, Activity } from "lucide-react";
+import { RefreshCw, FileText, Users, ClipboardCheck, Sparkles, Activity, ArrowRightLeft } from "lucide-react";
 import { toast as sonnerToast } from "sonner";
 
 import { 
