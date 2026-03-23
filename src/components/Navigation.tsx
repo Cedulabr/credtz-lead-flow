@@ -43,6 +43,7 @@ const navItems = [
   { id: "autolead", label: "AutoLead", icon: Zap, permissionKey: "can_access_autolead" },
   { id: "digitacao", label: "Digitação", icon: CreditCard, permissionKey: "can_access_digitacao" },
   { id: "audios", label: "Áudios", icon: Mic, permissionKey: "can_access_audios" },
+  { id: "portflow", label: "PortFlow", icon: ArrowRightLeft, permissionKey: "can_access_portflow" },
 ];
 
 // Mobile priority items - only icons

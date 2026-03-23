@@ -199,16 +199,16 @@ export function SalesWizard({ moduloOrigem = "televendas" }: SalesWizardProps) {
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-4 mb-4">
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
-            <Phone className="h-8 w-8 text-primary" />
+          <div className={`p-4 rounded-2xl border ${isPortFlow ? 'bg-gradient-to-br from-cyan-500/20 to-cyan-500/5 border-cyan-500/20' : 'bg-gradient-to-br from-primary/20 to-primary/5 border-primary/20'}`}>
+            <Phone className={`h-8 w-8 ${isPortFlow ? 'text-cyan-600' : 'text-primary'}`} />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Nova Venda</h1>
-            <p className="text-lg text-muted-foreground">Passo a passo guiado</p>
+            <h1 className="text-3xl font-bold tracking-tight">{isPortFlow ? 'PortFlow' : 'Nova Venda'}</h1>
+            <p className="text-lg text-muted-foreground">{isPortFlow ? 'Portabilidade & Alta Idade' : 'Passo a passo guiado'}</p>
           </div>
-          <Badge variant="secondary" className="ml-auto text-sm px-4 py-2">
+          <Badge variant="secondary" className={`ml-auto text-sm px-4 py-2 ${isPortFlow ? 'bg-cyan-500/10 text-cyan-700 border-cyan-300' : ''}`}>
             <Sparkles className="h-4 w-4 mr-2" />
-            Assistente de Vendas
+            {isPortFlow ? 'PortFlow' : 'Assistente de Vendas'}
           </Badge>
         </div>
       </div>
