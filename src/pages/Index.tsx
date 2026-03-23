@@ -49,10 +49,11 @@ type TabConfig = {
   permission?: string;
   blockedMessage?: string;
   wrapP4?: boolean;
+  purchaseMode?: boolean;
 };
 
 // ── Permission-only config (no components here — built in useMemo) ───
-const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMessage' | 'wrapP4'>> = {
+const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMessage' | 'wrapP4' | 'purchaseMode'>> = {
   indicate: {
     permission: 'can_access_indicar',
     blockedMessage: 'Acesso à seção Indicar bloqueado pelo administrador',
@@ -103,6 +104,11 @@ const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMes
     permission: 'can_access_alertas',
     blockedMessage: 'Acesso ao Painel de Oportunidades bloqueado pelo administrador',
   },
+  'time-clock': {
+    permission: 'can_access_controle_ponto',
+    blockedMessage: 'Acesso ao Controle de Ponto bloqueado pelo administrador',
+    purchaseMode: true,
+  },
   sms: {
     permission: 'can_access_sms',
     blockedMessage: 'Acesso ao módulo SMS bloqueado pelo administrador',
@@ -122,6 +128,7 @@ const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMes
   autolead: {
     permission: 'can_access_autolead',
     blockedMessage: 'Acesso ao AutoLead bloqueado pelo administrador',
+    purchaseMode: true,
   },
   digitacao: {
     permission: 'can_access_digitacao',
@@ -134,6 +141,7 @@ const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMes
   portflow: {
     permission: 'can_access_portflow',
     blockedMessage: 'Acesso ao PortFlow bloqueado pelo administrador',
+    purchaseMode: true,
   },
 };
 
@@ -196,7 +204,7 @@ const Index = () => {
     const permConfig = TAB_PERMISSIONS[activeTab];
 
     if (permConfig?.permission && !hasPermission(permConfig.permission)) {
-      return <BlockedAccess message={permConfig.blockedMessage} />;
+      return <BlockedAccess message={permConfig.blockedMessage} purchaseMode={permConfig.purchaseMode} />;
     }
 
     const component = tabComponents[activeTab as keyof typeof tabComponents];
