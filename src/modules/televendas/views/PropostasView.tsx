@@ -208,6 +208,11 @@ export const PropostasView = ({
                           {opBadge.emoji} {tv.tipo_operacao}
                         </span>
                       )}
+                      {(tv as any).modulo_origem === 'portflow' && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full border font-semibold bg-cyan-100 text-cyan-700 border-cyan-300 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-700">
+                          🔄 PortFlow
+                        </span>
+                      )}
                       {!isFinal && priority !== "normal" && (
                         <PriorityBadge priority={priority} diasParado={diasParado} size="sm" />
                       )}
