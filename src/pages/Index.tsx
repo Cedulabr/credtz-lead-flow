@@ -41,6 +41,7 @@ import {
   LazyAutoLeadModule,
   LazyDigitacaoModule,
   LazyAudiosModule,
+  LazyPortFlowModule,
 } from "@/components/LazyComponents";
 
 // ── Types ─────────────────────────────────────────────────────────────
