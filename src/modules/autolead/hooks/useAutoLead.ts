@@ -204,6 +204,7 @@ export function useAutoLead() {
         convenio_filter: wizardData.tipoLead === "todos" ? null : wizardData.tipoLead,
         banco_filter: null,
         produto_filter: null,
+        tag_filter: wizardData.tags.length > 0 ? wizardData.tags : null,
       }
     );
 
@@ -264,6 +265,7 @@ export function useAutoLead() {
         started_at: new Date().toISOString(),
         sms_enabled: wizardData.smsEnabled,
         sms_template: wizardData.smsEnabled ? wizardData.smsTemplate : null,
+        audio_file_id: wizardData.audioFileId || null,
       })
       .select("id")
       .single();
@@ -321,6 +323,7 @@ export function useAutoLead() {
         message: personalizedMsg,
         status: "scheduled",
         scheduled_at: currentTime.toISOString(),
+        audio_file_id: wizardData.audioFileId || null,
       };
     });
 
