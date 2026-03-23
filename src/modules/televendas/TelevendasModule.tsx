@@ -220,6 +220,7 @@ export const TelevendasModule = () => {
       const matchesProduct = filters.product === "all" || tv.tipo_operacao === filters.product;
       const matchesBank = filters.bank === "all" || tv.banco === filters.bank;
       const matchesBankStatus = !bankStatusFilter || mapToPipelineStatus(tv) === bankStatusFilter;
+      const matchesOrigem = origemFilter === "all" || (tv as any).modulo_origem === origemFilter;
       
       // Priority filter
       let matchesPriority = true;
@@ -234,7 +235,7 @@ export const TelevendasModule = () => {
         }
       }
       
-      return matchesSearch && matchesStatus && matchesProduct && matchesBank && matchesBankStatus && matchesPriority;
+      return matchesSearch && matchesStatus && matchesProduct && matchesBank && matchesBankStatus && matchesPriority && matchesOrigem;
     });
   }, [televendas, filters, bankStatusFilter, priorityFilter]);
 
