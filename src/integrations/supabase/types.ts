@@ -7081,62 +7081,26 @@ export type Database = {
           tipo_beneficio: string
         }[]
       }
-      request_leads_with_credits:
-        | {
-            Args: {
-              banco_filter?: string
-              convenio_filter?: string
-              leads_requested?: number
-              produto_filter?: string
-            }
-            Returns: {
-              banco: string
-              convenio: string
-              cpf: string
-              lead_id: string
-              name: string
-              phone: string
-              tipo_beneficio: string
-            }[]
-          }
-        | {
-            Args: {
-              banco_filter?: string
-              convenio_filter?: string
-              ddd_filter?: string[]
-              leads_requested?: number
-              produto_filter?: string
-            }
-            Returns: {
-              banco: string
-              convenio: string
-              cpf: string
-              id: string
-              name: string
-              phone: string
-              phone2: string
-            }[]
-          }
-        | {
-            Args: {
-              banco_filter?: string
-              convenio_filter?: string
-              ddd_filter?: string[]
-              leads_requested?: number
-              produto_filter?: string
-              tag_filter?: string[]
-            }
-            Returns: {
-              banco: string
-              convenio: string
-              cpf: string
-              id: string
-              name: string
-              phone: string
-              phone2: string
-              tag: string
-            }[]
-          }
+      request_leads_with_credits: {
+        Args: {
+          banco_filter?: string
+          convenio_filter?: string
+          ddd_filter?: string[]
+          leads_requested?: number
+          produto_filter?: string
+          tag_filter?: string[]
+        }
+        Returns: {
+          banco: string
+          convenio: string
+          cpf: string
+          id: string
+          name: string
+          phone: string
+          phone2: string
+          tag: string
+        }[]
+      }
       sanitize_activate_lead: { Args: { lead_id: string }; Returns: Json }
       scan_activate_leads_duplicates: {
         Args: never
