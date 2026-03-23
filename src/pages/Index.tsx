@@ -49,6 +49,7 @@ type TabConfig = {
   permission?: string;
   blockedMessage?: string;
   wrapP4?: boolean;
+  purchaseMode?: boolean;
 };
 
 // ── Permission-only config (no components here — built in useMemo) ───
