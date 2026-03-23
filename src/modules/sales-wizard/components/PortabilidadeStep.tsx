@@ -13,8 +13,15 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-export function PortabilidadeStep({ data, onUpdate, onValidChange }: WizardStepProps) {
+export function PortabilidadeStep({ data, onUpdate, onValidChange, moduloOrigem }: WizardStepProps) {
   const { banks, isLoading: loadingBanks } = useBanks();
+
+  const filteredBanks = moduloOrigem === 'portflow'
+    ? banks.filter(b => 
+        b.name.toUpperCase().includes('BRB') || 
+        b.name.toUpperCase().includes('AGIBANK')
+      )
+    : banks;
 
   useEffect(() => {
     // Validação: Credora Original, Parcela Atual, Saldo Devedor e Proponente são obrigatórios
