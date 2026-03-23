@@ -10,11 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CompactStepIndicator } from "@/components/ui/form-wizard";
-import { ChevronLeft, ChevronRight, Check, Loader2, Zap, MessageSquare, AlertTriangle, ChevronDown, Smartphone, Phone } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Loader2, Zap, MessageSquare, AlertTriangle, ChevronDown, Smartphone, Phone, Music, Play, Pause } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAudioFiles } from "@/modules/audios/hooks/useAudioFiles";
 import {
   DEFAULT_MESSAGE, TIPOS_LEAD, FEATURED_DDDS, ALL_DDDS, DDD_CITIES,
   QUANTITY_PRESETS, SMS_TEMPLATES, WHATSAPP_TEMPLATES, type WizardData
