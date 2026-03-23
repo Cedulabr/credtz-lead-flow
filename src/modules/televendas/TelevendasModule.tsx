@@ -664,7 +664,27 @@ export const TelevendasModule = () => {
         placeholder="Buscar por nome, CPF, telefone ou ID..."
       />
 
-      {/* ALERTA: Propostas paradas */}
+      {/* Filtro de Origem */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground font-medium">Origem:</span>
+        {[
+          { value: "all", label: "Todos" },
+          { value: "televendas", label: "Televendas" },
+          { value: "portflow", label: "PortFlow", icon: <ArrowRightLeft className="h-3 w-3" /> },
+        ].map((opt) => (
+          <Button
+            key={opt.value}
+            variant={origemFilter === opt.value ? "default" : "outline"}
+            size="sm"
+            onClick={() => setOrigemFilter(opt.value)}
+            className="h-8 rounded-lg gap-1 text-xs"
+          >
+            {opt.icon}
+            {opt.label}
+          </Button>
+        ))}
+      </div>
+
       <StalledAlertBanner
         criticos={centralStats.criticos}
         alertas={centralStats.alertas}
