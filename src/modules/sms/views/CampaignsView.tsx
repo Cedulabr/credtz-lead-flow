@@ -383,6 +383,7 @@ export const CampaignsView = ({
         convenio_filter: wizardConvenio === "all" ? null : wizardConvenio,
         banco_filter: null,
         produto_filter: null,
+        tag_filter: null,
       });
       if (error) throw error;
       if (!leads || leads.length === 0) { toast.error("Nenhum lead disponível com esses filtros"); return; }
