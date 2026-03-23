@@ -64,6 +64,9 @@ export const DigitacaoModule = lazy(() => import('@/modules/digitacao/DigitacaoM
 // Audios
 export const AudiosModule = lazy(() => import('@/modules/audios/AudiosModule').then(m => ({ default: m.AudiosModule })));
 
+// PortFlow
+export const PortFlowModule = lazy(() => import('@/modules/portflow/PortFlowModule').then(m => ({ default: m.PortFlowModule })));
+
 // Base OFF legacy
 export const BaseOff = lazy(() => import('./BaseOff').then(m => ({ default: m.BaseOff })));
 export const BaseOffModern = lazy(() => import('./BaseOffModern').then(m => ({ default: m.BaseOffModern })));
