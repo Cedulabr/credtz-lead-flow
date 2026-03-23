@@ -422,6 +422,92 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
                 </div>
               </div>
             )}
+
+            {/* Audio section */}
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Music className="h-5 w-5 text-primary" />
+                  <Label className="text-sm font-medium">Incluir áudio na mensagem</Label>
+                </div>
+                <Switch
+                  checked={!!data.audioFileId}
+                  onCheckedChange={checked => {
+                    if (!checked) {
+                      if (audioElement) { audioElement.pause(); setAudioElement(null); }
+                      setPlayingAudioId(null);
+                      setData(prev => ({ ...prev, audioFileId: undefined, audioTitle: undefined }));
+                    }
+                  }}
+                  disabled={audios.length === 0}
+                />
+              </div>
+
+              {audios.length === 0 && (
+                <p className="text-xs text-muted-foreground">Nenhum áudio disponível. Cadastre áudios no módulo Áudios.</p>
+              )}
+
+              {(data.audioFileId || audios.length > 0) && (
+                <div className="space-y-2">
+                  {loadingAudios ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Carregando áudios...
+                    </div>
+                  ) : (
+                    audios.map(audio => (
+                      <Card
+                        key={audio.id}
+                        className={cn(
+                          "cursor-pointer transition-all",
+                          data.audioFileId === audio.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                        )}
+                        onClick={() => {
+                          setData(prev => ({
+                            ...prev,
+                            audioFileId: prev.audioFileId === audio.id ? undefined : audio.id,
+                            audioTitle: prev.audioFileId === audio.id ? undefined : audio.title,
+                          }));
+                        }}
+                      >
+                        <CardContent className="p-3 flex items-center gap-3">
+                          <Checkbox checked={data.audioFileId === audio.id} />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{audio.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {audio.file_size ? `${(audio.file_size / 1024).toFixed(0)} KB` : 'Áudio'}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0"
+                            onClick={e => {
+                              e.stopPropagation();
+                              if (playingAudioId === audio.id && audioElement) {
+                                audioElement.pause();
+                                setPlayingAudioId(null);
+                                setAudioElement(null);
+                              } else {
+                                if (audioElement) audioElement.pause();
+                                const url = getPublicUrl(audio.file_path);
+                                const el = new Audio(url);
+                                el.play();
+                                el.onended = () => { setPlayingAudioId(null); setAudioElement(null); };
+                                setPlayingAudioId(audio.id);
+                                setAudioElement(el);
+                              }
+                            }}
+                          >
+                            {playingAudioId === audio.id ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                  <p className="text-xs text-muted-foreground">O áudio será enviado logo após a mensagem de texto.</p>
+                </div>
+              )}
+            </div>
           </div>
         );
 
