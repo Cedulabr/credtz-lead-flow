@@ -123,6 +123,7 @@ const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMes
   autolead: {
     permission: 'can_access_autolead',
     blockedMessage: 'Acesso ao AutoLead bloqueado pelo administrador',
+    purchaseMode: true,
   },
   digitacao: {
     permission: 'can_access_digitacao',
