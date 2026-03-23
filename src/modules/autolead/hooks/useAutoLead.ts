@@ -323,6 +323,7 @@ export function useAutoLead() {
         message: personalizedMsg,
         status: "scheduled",
         scheduled_at: currentTime.toISOString(),
+        audio_file_id: wizardData.audioFileId || null,
       };
     });
 

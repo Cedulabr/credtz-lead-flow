@@ -52,6 +52,8 @@ export interface WizardData {
   whatsappInstanceIds: string[];
   smsEnabled: boolean;
   smsTemplate: string;
+  audioFileId?: string;
+  audioTitle?: string;
 }
 
 export const DEFAULT_MESSAGE = `Olá {{nome}}, tudo bem?

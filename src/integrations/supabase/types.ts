@@ -682,6 +682,7 @@ export type Database = {
       }
       autolead_jobs: {
         Row: {
+          audio_file_id: string | null
           company_id: string | null
           created_at: string
           finished_at: string | null
@@ -710,6 +711,7 @@ export type Database = {
           whatsapp_instance_ids: string[] | null
         }
         Insert: {
+          audio_file_id?: string | null
           company_id?: string | null
           created_at?: string
           finished_at?: string | null
@@ -738,6 +740,7 @@ export type Database = {
           whatsapp_instance_ids?: string[] | null
         }
         Update: {
+          audio_file_id?: string | null
           company_id?: string | null
           created_at?: string
           finished_at?: string | null
@@ -777,6 +780,7 @@ export type Database = {
       }
       autolead_messages: {
         Row: {
+          audio_file_id: string | null
           created_at: string
           error_message: string | null
           id: string
@@ -791,6 +795,7 @@ export type Database = {
           whatsapp_instance_id: string
         }
         Insert: {
+          audio_file_id?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
@@ -805,6 +810,7 @@ export type Database = {
           whatsapp_instance_id: string
         }
         Update: {
+          audio_file_id?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
