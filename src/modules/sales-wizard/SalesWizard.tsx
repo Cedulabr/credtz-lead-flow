@@ -34,7 +34,12 @@ const PORTABILIDADE_WIZARD_STEPS = [
   { id: "confirm", title: "Confirmar", icon: CheckCircle2 },
 ];
 
-export function SalesWizard() {
+interface SalesWizardProps {
+  moduloOrigem?: string;
+}
+
+export function SalesWizard({ moduloOrigem = "televendas" }: SalesWizardProps) {
+  const isPortFlow = moduloOrigem === "portflow";
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
