@@ -188,6 +188,7 @@ const Index = () => {
     autolead: <LazyAutoLeadModule />,
     digitacao: <LazyDigitacaoModule />,
     audios: <LazyAudiosModule />,
+    portflow: <div className="p-4"><LazyPortFlowModule /></div>,
   }), [setActiveTab]);
 
   // ── Render active tab ──────────────────────────────────────────────
