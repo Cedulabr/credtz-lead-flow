@@ -199,7 +199,7 @@ const Index = () => {
     const permConfig = TAB_PERMISSIONS[activeTab];
 
     if (permConfig?.permission && !hasPermission(permConfig.permission)) {
-      return <BlockedAccess message={permConfig.blockedMessage} />;
+      return <BlockedAccess message={permConfig.blockedMessage} purchaseMode={permConfig.purchaseMode} />;
     }
 
     const component = tabComponents[activeTab as keyof typeof tabComponents];
