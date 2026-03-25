@@ -1,0 +1,1 @@
+export { VoicerModule } from './VoicerModule';

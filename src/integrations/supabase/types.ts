@@ -653,6 +653,107 @@ export type Database = {
           },
         ]
       }
+      audio_generations: {
+        Row: {
+          ab_test_group: string | null
+          audio_url: string | null
+          campaign_id: string | null
+          characters_count: number | null
+          company_id: string | null
+          created_at: string | null
+          credits_used: number | null
+          duration_seconds: number | null
+          file_path: string | null
+          id: string
+          settings_json: Json | null
+          status: string | null
+          text_converted: string | null
+          text_original: string
+          user_id: string
+          voice_id: string
+          voice_name: string | null
+        }
+        Insert: {
+          ab_test_group?: string | null
+          audio_url?: string | null
+          campaign_id?: string | null
+          characters_count?: number | null
+          company_id?: string | null
+          created_at?: string | null
+          credits_used?: number | null
+          duration_seconds?: number | null
+          file_path?: string | null
+          id?: string
+          settings_json?: Json | null
+          status?: string | null
+          text_converted?: string | null
+          text_original: string
+          user_id: string
+          voice_id: string
+          voice_name?: string | null
+        }
+        Update: {
+          ab_test_group?: string | null
+          audio_url?: string | null
+          campaign_id?: string | null
+          characters_count?: number | null
+          company_id?: string | null
+          created_at?: string | null
+          credits_used?: number | null
+          duration_seconds?: number | null
+          file_path?: string | null
+          id?: string
+          settings_json?: Json | null
+          status?: string | null
+          text_converted?: string | null
+          text_original?: string
+          user_id?: string
+          voice_id?: string
+          voice_name?: string | null
+        }
+        Relationships: []
+      }
+      audio_variations: {
+        Row: {
+          audio_url: string | null
+          created_at: string | null
+          file_path: string | null
+          generation_id: string | null
+          id: string
+          selected: boolean | null
+          text_content: string
+          variation_index: number | null
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string | null
+          file_path?: string | null
+          generation_id?: string | null
+          id?: string
+          selected?: boolean | null
+          text_content: string
+          variation_index?: number | null
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string | null
+          file_path?: string | null
+          generation_id?: string | null
+          id?: string
+          selected?: boolean | null
+          text_content?: string
+          variation_index?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_variations_generation_id_fkey"
+            columns: ["generation_id"]
+            isOneToOne: false
+            referencedRelation: "audio_generations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           id: string
@@ -6557,6 +6658,99 @@ export type Database = {
           version?: number
         }
         Relationships: []
+      }
+      voicer_ab_tests: {
+        Row: {
+          campaign_id: string | null
+          created_at: string | null
+          generation_a_id: string | null
+          generation_b_id: string | null
+          id: string
+          notes: string | null
+          user_id: string
+          winner_id: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          created_at?: string | null
+          generation_a_id?: string | null
+          generation_b_id?: string | null
+          id?: string
+          notes?: string | null
+          user_id: string
+          winner_id?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          created_at?: string | null
+          generation_a_id?: string | null
+          generation_b_id?: string | null
+          id?: string
+          notes?: string | null
+          user_id?: string
+          winner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voicer_ab_tests_generation_a_id_fkey"
+            columns: ["generation_a_id"]
+            isOneToOne: false
+            referencedRelation: "audio_generations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voicer_ab_tests_generation_b_id_fkey"
+            columns: ["generation_b_id"]
+            isOneToOne: false
+            referencedRelation: "audio_generations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voicer_ab_tests_winner_id_fkey"
+            columns: ["winner_id"]
+            isOneToOne: false
+            referencedRelation: "audio_generations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voicer_credit_transactions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          description: string | null
+          generation_id: string | null
+          id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          description?: string | null
+          generation_id?: string | null
+          id?: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          description?: string | null
+          generation_id?: string | null
+          id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voicer_credit_transactions_generation_id_fkey"
+            columns: ["generation_id"]
+            isOneToOne: false
+            referencedRelation: "audio_generations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_conversations: {
         Row: {

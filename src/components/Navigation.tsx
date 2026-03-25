@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2, UserCircle, Clock, ChevronRight, Target, MessageSquare, MessageCircle, Radar, CreditCard, Mic, ArrowRightLeft } from "lucide-react";
+import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2, UserCircle, Clock, ChevronRight, Target, MessageSquare, MessageCircle, Radar, CreditCard, Mic, ArrowRightLeft, AudioLines } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -44,6 +44,7 @@ const navItems = [
   { id: "digitacao", label: "Digitação", icon: CreditCard, permissionKey: "can_access_digitacao" },
   { id: "audios", label: "Áudios", icon: Mic, permissionKey: "can_access_audios" },
   { id: "portflow", label: "PortFlow", icon: ArrowRightLeft, permissionKey: "can_access_portflow" },
+  { id: "voicer", label: "Easyn Voicer", icon: AudioLines, permissionKey: "can_access_voicer" },
 ];
 
 // Mobile priority items - only icons
