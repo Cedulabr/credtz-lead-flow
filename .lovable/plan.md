@@ -1,88 +1,188 @@
 
 
-## AutoLead — Layout Responsivo Desktop + TAG com Destaque
+## Módulo Easyn Voicer — Studio de Geração de Áudios com IA
 
-### Problemas Identificados
+### Visao Geral
 
-1. **TAG não aparece para gestor/usuário**: A query de tags busca na `leads_database` com filtro `is_available = true`. A RLS permite SELECT para todos quando `is_available = true`, mas falhas silenciosas podem esconder os resultados. Falta tratamento de erro e fallback.
+Modulo completo de TTS integrado ao CRM, usando ElevenLabs para geração de voz e Lovable AI (ja disponivel) para sugestao de variaveis e geracao de variacoes anti-spam. Comecaremos pelo **Studio completo** (etapa 1) conforme solicitado.
 
-2. **Layout ruim no desktop**: O módulo inteiro usa `max-w-lg mx-auto` (512px max) — projetado para mobile. No desktop (1791px), fica um bloco estreito centralizado. O wizard usa `Sheet side="bottom"` que é adequado para mobile mas estranho no desktop.
+### Arquitetura
 
-3. **TAG sem destaque**: A seção TAG está abaixo do scroll, separada apenas por um `border-t` fino, facilmente ignorada.
+- **ElevenLabs API**: chamada via Edge Function (chave no servidor, nunca no client)
+- **Lovable AI**: usada para sugestao de variaveis e geracao de variacoes (LOVABLE_API_KEY ja configurada)
+- **Storage**: audios salvos no Supabase Storage bucket `voicer-audios`
+- **Banco**: tabelas dedicadas para o modulo
 
-### Mudanças
+### Pré-requisito: API Key ElevenLabs
 
-| Arquivo | Ação |
+Sera necessario adicionar o secret `ELEVENLABS_API_KEY` via ferramenta de secrets. O usuario precisara fornecer a chave.
+
+### Tabelas (Migration SQL)
+
+```sql
+-- audio_generations: historico de audios gerados
+CREATE TABLE public.audio_generations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  company_id uuid,
+  campaign_id text,
+  text_original text NOT NULL,
+  text_converted text,
+  voice_id text NOT NULL,
+  voice_name text,
+  audio_url text,
+  file_path text,
+  duration_seconds numeric,
+  characters_count integer DEFAULT 0,
+  credits_used numeric DEFAULT 0,
+  settings_json jsonb DEFAULT '{}',
+  ab_test_group text, -- 'a' | 'b' | null
+  status text DEFAULT 'pending', -- pending | processing | ready | error
+  created_at timestamptz DEFAULT now()
+);
+
+-- audio_variations: variacoes anti-spam
+CREATE TABLE public.audio_variations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  generation_id uuid REFERENCES public.audio_generations(id) ON DELETE CASCADE,
+  variation_index integer DEFAULT 0,
+  text_content text NOT NULL,
+  audio_url text,
+  file_path text,
+  selected boolean DEFAULT false,
+  created_at timestamptz DEFAULT now()
+);
+
+-- voicer_credit_transactions: historico de consumo separado
+CREATE TABLE public.voicer_credit_transactions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  type text NOT NULL, -- 'debit' | 'credit'
+  amount numeric NOT NULL,
+  description text,
+  generation_id uuid REFERENCES public.audio_generations(id),
+  created_at timestamptz DEFAULT now()
+);
+
+-- ab_tests
+CREATE TABLE public.voicer_ab_tests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  generation_a_id uuid REFERENCES public.audio_generations(id),
+  generation_b_id uuid REFERENCES public.audio_generations(id),
+  winner_id uuid REFERENCES public.audio_generations(id),
+  campaign_id text,
+  notes text,
+  created_at timestamptz DEFAULT now()
+);
+
+-- RLS
+ALTER TABLE public.audio_generations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audio_variations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.voicer_credit_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.voicer_ab_tests ENABLE ROW LEVEL SECURITY;
+
+-- Policies: users see own data
+CREATE POLICY "Users manage own generations" ON public.audio_generations
+  FOR ALL TO authenticated USING (user_id = auth.uid());
+CREATE POLICY "Users manage own variations" ON public.audio_variations
+  FOR ALL TO authenticated USING (
+    generation_id IN (SELECT id FROM public.audio_generations WHERE user_id = auth.uid())
+  );
+CREATE POLICY "Users manage own voicer credits" ON public.voicer_credit_transactions
+  FOR ALL TO authenticated USING (user_id = auth.uid());
+CREATE POLICY "Users manage own ab tests" ON public.voicer_ab_tests
+  FOR ALL TO authenticated USING (user_id = auth.uid());
+
+-- Storage bucket
+INSERT INTO storage.buckets (id, name, public) VALUES ('voicer-audios', 'voicer-audios', true)
+ON CONFLICT DO NOTHING;
+```
+
+### Edge Functions
+
+| Funcao | Descricao |
 |---|---|
-| `AutoLeadWizard.tsx` | No desktop, usar `Dialog` em vez de `Sheet bottom`; grid 2 colunas para DDD; TAG com visual destacado (borda colorida, header com icone); adicionar error handling na query de tags |
-| `AutoLeadHome.tsx` | Layout responsivo: no desktop usar grid 2 colunas (créditos + SMS à esquerda, job ativo + histórico à direita); remover `max-w-lg` no desktop |
-| `AutoLeadModule.tsx` | Ajustar container para largura responsiva |
+| `elevenlabs-tts` | POST: recebe texto, voice_id, settings. Chama ElevenLabs, retorna audio binario |
+| `elevenlabs-voices` | GET: lista vozes disponiveis, cacheia por 1h |
+| `voicer-ai-suggest` | POST: usa Lovable AI para inserir variaveis de emocao no texto |
+| `voicer-ai-variations` | POST: usa Lovable AI para gerar ate 10 variacoes anti-spam |
 
-### Detalhes Técnicos
+### Estrutura de Arquivos
 
-**1. Wizard — Dialog no Desktop, Sheet no Mobile**
+```
+src/modules/voicer/
+  VoicerModule.tsx          -- Container principal com abas
+  types.ts                  -- Tipos do modulo
+  utils/
+    variableConverter.ts    -- Converte {{risada}} → [laughs] etc.
+  hooks/
+    useVoices.ts           -- Lista e cacheia vozes ElevenLabs
+    useVoicerCredits.ts    -- Saldo e transacoes de creditos
+    useAudioGeneration.ts  -- Logica de geracao TTS
+  views/
+    StudioView.tsx         -- Editor + seletor de voz + controles + player
+    VariationsView.tsx     -- Gerador anti-spam (etapa futura)
+    ABTestView.tsx         -- Comparacao A/B (etapa futura)
+    HistoryView.tsx        -- Meus audios (etapa futura)
+    CreditsView.tsx        -- Saldo e consumo (etapa futura)
+    SettingsView.tsx       -- Config API key (etapa futura)
+  components/
+    TextEditor.tsx         -- Textarea com variaveis e contador
+    VariableButtons.tsx    -- Botoes de insercao rapida
+    VoiceSelector.tsx      -- Grid de vozes com preview
+    AudioControls.tsx      -- Sliders de estabilidade, similaridade etc.
+    AudioPlayer.tsx        -- Player customizado com download
+    WaveformAnimation.tsx  -- Animacao de onda durante geracao
+```
 
-Usar `useIsMobile()` para alternar entre:
-- Mobile: `Sheet side="bottom"` (mantém comportamento atual)
-- Desktop: `Dialog` com largura `max-w-2xl`, conteúdo com mais espaço
+### Integracao ao CRM
 
+| Arquivo | Acao |
+|---|---|
+| `LazyComponents.tsx` | Adicionar `VoicerModule` lazy |
+| `Navigation.tsx` | Adicionar item "Easyn Voicer" com icone `Mic` |
+| `Index.tsx` | Adicionar tab `voicer` com permissao `can_access_voicer`, registrar no `tabComponents` |
+| `supabase/config.toml` | Registrar edge functions `elevenlabs-tts` e `elevenlabs-voices` |
+
+### Studio (Etapa 1) — Detalhes
+
+**Layout desktop**: 2 colunas. Esquerda: editor de texto com variaveis e contador. Direita: seletor de voz, controles de audio, player.
+
+**Layout mobile**: coluna unica com abas (Texto / Voz / Player).
+
+**Tema**: respeita o tema do app (dark/light), com acentos em roxo/violeta para o modulo.
+
+**Fluxo de geracao**:
+1. Usuario digita texto e insere variaveis via botoes
+2. Seleciona voz (grid com preview)
+3. Ajusta sliders (stability, similarity, style, speed)
+4. Clica "Gerar Audio" → converte variaveis → chama edge function → salva no Storage
+5. Player aparece com opcoes de download, regenerar, salvar
+
+**Conversao de variaveis** (utilitario puro):
 ```typescript
-const isMobile = useIsMobile();
-// Mobile: Sheet side="bottom"
-// Desktop: Dialog com max-w-2xl
+const VARIABLE_MAP = {
+  '{{risada}}': '[laughs]',
+  '{{pausa curta}}': '<break time="0.5s"/>',
+  '{{pausa longa}}': '<break time="1.5s"/>',
+  '{{sussurro}}': '(em voz baixa)',
+  '{{empolgação}}': '[excitedly]',
+  '{{tom triste}}': '[sadly]',
+  '{{tom irritado}}': '[angrily]',
+  '{{tom assustado}}': '[fearfully]',
+  '{{ironia}}': '[sarcastically]',
+  '{{choro}}': '[crying]',
+  '{{suspiro}}': '[sighs]',
+  '{{tom animado}}': '[cheerfully]',
+};
 ```
 
-**2. Step 1 (DDD + TAG) — Layout Melhorado**
+**Creditos**: reutiliza a tabela `user_credits` existente. Custo calculado por caracteres (excluindo `{{...}}`). Debito automatico ao gerar.
 
-- DDD grid: `grid-cols-5` no mobile, `grid-cols-10` no desktop (mostra todos de uma vez)
-- TAG section: visual destacado com borda primária, header com icone de estrela, background sutil, label "Importante" em badge
-- TAG cards: `grid-cols-2` no mobile, `grid-cols-3` no desktop
-- Mover TAG para CIMA do DDD (prioridade visual) ou adicionar destaque visual forte
+### Ordem de Implementacao (nesta mensagem)
 
-```text
-Desktop Step 1 Layout:
-┌──────────────────────────────────────┐
-│ ⭐ Selecione a TAG do lead           │
-│    (IMPORTANTE para segmentação)     │
-│ ┌──────┐ ┌──────┐ ┌──────┐          │
-│ │ INSS │ │Serv. │ │ FGTS │          │
-│ └──────┘ └──────┘ └──────┘          │
-│ ┌──────┐ ┌──────┐ ┌──────┐          │
-│ │Cartão│ │Refin.│ │Todos │          │
-│ └──────┘ └──────┘ └──────┘          │
-├──────────────────────────────────────┤
-│ DDD dos clientes (opcional)          │
-│ [11][12][13]...[99]  (grid amplo)   │
-└──────────────────────────────────────┘
-```
+Apenas **Etapa 1 — Studio completo**: editor, seletor de voz, controles, player, edge functions TTS + voices, tabelas, integracao na navegacao.
 
-**3. AutoLeadHome — Desktop Layout**
-
-```text
-Desktop Layout (>768px):
-┌─────────────────┬──────────────────┐
-│  ⚡ AutoLead     │                  │
-│  Créditos: 150  │  Job Ativo       │
-│  [Iniciar]      │  50/100 enviados │
-│                 │  [Pausar][Detalhe]│
-│  ⚠️ SMS Upsell  │                  │
-│                 │  Histórico       │
-│                 │  - Job 1         │
-│                 │  - Job 2         │
-└─────────────────┴──────────────────┘
-```
-
-Mudar de `max-w-lg mx-auto` para `max-w-5xl mx-auto` com grid responsivo.
-
-**4. Error handling na query de tags**
-
-Adicionar `try/catch` e log na busca de tags para diagnosticar se RLS está bloqueando para gestores/usuários. Garantir que `TIPOS_LEAD` sempre aparece independente da query de `availableTags`.
-
-**5. TAG section com destaque visual**
-
-- Borda `border-primary` no container
-- Background `bg-primary/5`
-- Header com icone de estrela + badge "Importante"
-- Cards maiores com padding adequado
-- Posição acima do DDD (inversão da ordem atual)
+Etapas 2-6 serao implementadas em mensagens futuras.
 
