@@ -1,83 +1,75 @@
 
 
-## Evolucao Easyn Voicer — UI Wevoicer + Variaveis Expandidas + Exemplos
+## Easyn Voicer — Exemplos com Personagens + Créditos para Admin e Usuário
 
-### Contexto
+### 1. Exemplos Prontos — Atualizar scripts e vozes
 
-O usuario quer o Voicer com UX similar ao Wevoicer: editor centralizado com botao de variaveis que abre modal, AudioControls escondido em "Configuracoes Avancadas", botao de exemplos prontos com textos reais de vendas + audio, e vozes em portugues priorizadas.
+**Arquivo**: `src/modules/voicer/components/ExamplesDialog.tsx`
 
-### Mudancas
+Substituir os 4 exemplos atuais por:
 
-| Arquivo | Acao |
+| # | Titulo | Voz ElevenLabs | Gênero | Personagem Fictício |
+|---|--------|---------------|--------|---------------------|
+| 1 | Portabilidade — Abordagem Inicial | Sarah (EXAVITQu4vr4xnSDxMaL) | Feminino | "Ana Beatriz" — Consultora simpática |
+| 2 | Cartão Consignado — Oferta | Laura (FGY2WhTYpPnrIDTdsKH5) | Feminino | "Camila Torres" — Especialista animada |
+| 3 | Refinanciamento — Redução de Parcela | Roger (CwhRBWXzGAHq8TQ4Fs17) | Masculino | "Carlos Eduardo" — Analista cordial |
+| 4 | Novo Empréstimo — Taxa Especial | Daniel (onwK4e9ZLuTAKqWW03F9) | Masculino | "Rafael Lima" — Consultor entusiasmado |
+
+Remover "Cobrança Amigável". Cada exemplo terá:
+- `characterName` e `characterEmoji` (avatar emoji: 👩‍💼, 👩‍🎤, 👨‍💼, 👨‍🔬)
+- Textos de vendas em PT-BR com variáveis de fala
+- Card visual com avatar/emoji do personagem, nome fictício, badge da voz ElevenLabs
+
+O layout do card mostrará o avatar do personagem à esquerda (emoji grande em circle), nome fictício + voz real + botão "Usar".
+
+### 2. Créditos — Tela do Usuário Melhorada
+
+**Arquivo**: `src/modules/voicer/views/CreditsView.tsx`
+
+Adicionar ao topo:
+- Saldo atual grande (já existe)
+- Botão "Entenda como cobramos" que abre Dialog com texto adaptado do PDF (explicação de variáveis, custo por caractere, dicas)
+- Quando saldo = 0: banner "Sem créditos" com botão "Comprar Créditos" (por enquanto abre seção de recarga)
+- Seção "Recarga" com input para o usuário digitar valor desejado + texto "Em breve você poderá comprar na plataforma" + botão desabilitado "Recarregar com PIX"
+
+### 3. Painel Admin — Gerenciar Créditos Voicer
+
+O `AdminCreditsManagement.tsx` já existe com 644 linhas e usa `admin_manage_credits` RPC. Ele já permite adicionar/remover créditos de usuários.
+
+Verificar se já aparece no painel admin. Se não, garantir que esteja acessível. Não precisa duplicar — apenas garantir a rota.
+
+### Arquivos a criar/modificar
+
+| Arquivo | Ação |
 |---|---|
-| `variableConverter.ts` | Expandir variaveis de emocao (30+) baseado no PDF do Wevoicer: tom suave, voz de papai noel, gargalhada, narrador de suspense, fala entusiasmada, tom conspiratório, etc. Manter as atuais + adicionar novas categorias (Tom/Emocao, Estilo/Personagem, Acoes/Efeitos, Pausas). A conversao para ElevenLabs agora passa as variaveis como texto contextual (ex: `{{tom suave}}` vira `[softly]`) ja que ElevenLabs multilingual v2 interpreta essas instrucoes |
-| `VariableButtons.tsx` | Substituir por modal/dialog com categorias organizadas (Tons, Efeitos, Pausas, Personagens). Botao `{*} Variaveis de fala` abre o dialog. Dentro, categorias em abas ou secoes com scroll. Cada variavel clicavel insere no cursor. Texto explicativo no topo. Permitir digitacao livre de variaveis personalizadas |
-| `TextEditor.tsx` | Adicionar botao `{*} Variaveis de fala` (verde, estilo Wevoicer) acima do textarea. Remover VariableButtons inline. Adicionar botao "Limpar texto". Manter contador de caracteres |
-| `AudioControls.tsx` | Manter como esta, mas sera renderizado dentro de um Collapsible/Accordion "Configuracoes Avancadas" no StudioView |
-| `StudioView.tsx` | Redesign completo inspirado no Wevoicer: layout 3 colunas no desktop (sidebar esquerda opcional, editor central, historico direita). Voz selector como dropdown compacto no topo do editor (como Wevoicer). AudioControls dentro de Collapsible "Configuracoes Avancadas". Botao "Gerar Fala" na parte inferior. Botao "Exemplos prontos" no canto inferior esquerdo |
-| `ExamplesDialog.tsx` (novo) | Modal com exemplos prontos de textos de vendas com variaveis. Cada exemplo mostra: voz usada, modelo, texto completo com variaveis. Botao "Usar" copia texto e seleciona voz |
-| `VariablesDialog.tsx` (novo) | Dialog com todas as variaveis organizadas por categoria, com descricao e exemplo. Campo de busca. Secao "Crie suas proprias variaveis" |
-| `VoiceSelector.tsx` | Converter para dropdown/combobox compacto (Select com avatar da voz, nome e botao play). Filtro por idioma PT-BR priorizado |
+| `ExamplesDialog.tsx` | Substituir exemplos, adicionar personagens fictícios com avatares, remover cobrança |
+| `CreditsView.tsx` | Adicionar "Entenda como cobramos" dialog, seção recarga placeholder, banner sem créditos |
+| `StudioView.tsx` | Quando balance = 0, mostrar alerta com botão "Comprar Créditos" que navega para aba créditos |
 
-### Variaveis Expandidas (baseado no PDF)
+### Texto "Entenda como cobramos" (adaptado do PDF)
 
-Categorias:
-- **Tons/Emocoes**: tom suave, irritado, entusiasmado, tom triste, tom animado, tom misterioso, tom conspiratório, tom de urgência, empoderada, indignado, em panico
-- **Estilos/Personagens**: voz de papai noel, cientista maluco, locucao profissional, narrador de suspense, voz de velhinho, locucao coloquial, locucao caricata
-- **Acoes/Efeitos**: risada, gargalhada, suspiro, choro, sorrindo, rindo, respiracao ofegante, puxa o ar e solta, gritando
-- **Pausas**: pausa curta, pausa longa, pausa 2 segundos, pausa 3 segundos, pausa 5 segundos
-- **Modulacao**: enfase, sussurro, voz embriagada, voz sussurrando baixinho, locucao suave, fala entusiasmada, tom desconfiado
-
-### Exemplos Prontos (4 exemplos de vendas)
-
-Cada exemplo tera:
-- Nome da voz ElevenLabs (Diana/Roger/Sarah)
-- Texto completo com variaveis de fala (scripts de televendas reais)
-- Botao "Usar este exemplo" que preenche editor + seleciona voz
-
-Exemplo 1 - Portabilidade:
 ```
-{{locucao amigavel, acolhedora}} Ola! Tudo bem?
-{{locucao profissional e cordial}} Aqui e da CREDTZ, somos especializados credito consignado para o produto Portabilidade. {{sorrindo}}
-{{tom de voz prestativo e ligeiramente urgente}} Eu estou te chamando rapidinho porque surgiram umas oportunidades na renovacao dos seus contratos...
-{{enfase no MUITO, tom entusiasmado}} Que podem te ajudar MUITO agora.
-{{tom levemente conspiratorio, exclusivo}} Inclusive, e algo que nem todo mundo esta conseguindo acessar...
-{{tom amigavel, com um toque de urgencia}} Voce consegue falar comigo agora rapidinho?
+Como funciona a cobrança do Easyn Voicer?
+
+O Easyn Voicer cobra por caractere convertido em áudio.
+
+• 1 crédito = 100 caracteres de texto
+• Variáveis de fala ({{...}}) NÃO são cobradas
+• Espaços e pontuação são contados
+
+Exemplo: Um texto de 450 caracteres custa 5 créditos.
+
+Dicas para economizar:
+1. Use variáveis de fala — elas controlam tom e emoção sem custo extra
+2. Escreva textos objetivos e diretos
+3. Teste com textos curtos antes de gerar a versão final
+4. Use o Gerador de Variações para criar múltiplas versões do mesmo texto
 ```
 
-### Layout Desktop (inspirado Wevoicer)
+### Detalhes técnicos
 
-```text
-+----------------------------------------------------------+
-| [Voz: Diana v] [Modelo: Locutor v]    Saldo: 150 creditos|
-+----------------------------------------------------------+
-|                                                          |
-| {*} Clique e experimente as variaveis de fala            |
-|                                                          |
-| [========= EDITOR DE TEXTO ==========]                   |
-| {{locucao amigavel}} Ola! Tudo bem?                      |
-| ...                                                      |
-|                                                          |
-|                                          604 / 5000      |
-| [Limpar texto]          [Config Avancadas v]             |
-|                                                          |
-| [Exemplos prontos 🆕]      [🎙 Gerar Fala]              |
-+----------------------------------------------------------+
-| [Player - quando audio gerado]                           |
-+----------------------------------------------------------+
-```
-
-### Edge Function TTS
-
-Adicionar `language_code: "pt"` ao body da chamada ElevenLabs para melhorar pronuncia em portugues. Adicionar `speed` ao body (ja tem a variavel mas nao esta sendo enviada).
-
-### Resumo das entregas
-
-1. Expandir variaveis de emocao (12 → 30+) com categorias
-2. Dialog de variaveis com busca e categorias
-3. Dialog de exemplos prontos com textos de vendas
-4. AudioControls dentro de Collapsible "Config Avancadas"
-5. VoiceSelector como dropdown compacto
-6. Layout redesenhado estilo Wevoicer (editor centralizado)
-7. Fix: enviar `speed` e `language_code: "pt"` na API
+- Vozes Sarah e Laura são as mais populares em PT-BR na ElevenLabs (multilingual v2)
+- Roger e Daniel são as vozes masculinas mais usadas em português
+- Personagens fictícios usam emojis como avatar (sem necessidade de imagens externas)
+- A seção de recarga será placeholder visual — sem integração de pagamento por enquanto
 
