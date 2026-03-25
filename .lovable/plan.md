@@ -1,188 +1,83 @@
 
 
-## Módulo Easyn Voicer — Studio de Geração de Áudios com IA
+## Evolucao Easyn Voicer — UI Wevoicer + Variaveis Expandidas + Exemplos
 
-### Visao Geral
+### Contexto
 
-Modulo completo de TTS integrado ao CRM, usando ElevenLabs para geração de voz e Lovable AI (ja disponivel) para sugestao de variaveis e geracao de variacoes anti-spam. Comecaremos pelo **Studio completo** (etapa 1) conforme solicitado.
+O usuario quer o Voicer com UX similar ao Wevoicer: editor centralizado com botao de variaveis que abre modal, AudioControls escondido em "Configuracoes Avancadas", botao de exemplos prontos com textos reais de vendas + audio, e vozes em portugues priorizadas.
 
-### Arquitetura
-
-- **ElevenLabs API**: chamada via Edge Function (chave no servidor, nunca no client)
-- **Lovable AI**: usada para sugestao de variaveis e geracao de variacoes (LOVABLE_API_KEY ja configurada)
-- **Storage**: audios salvos no Supabase Storage bucket `voicer-audios`
-- **Banco**: tabelas dedicadas para o modulo
-
-### Pré-requisito: API Key ElevenLabs
-
-Sera necessario adicionar o secret `ELEVENLABS_API_KEY` via ferramenta de secrets. O usuario precisara fornecer a chave.
-
-### Tabelas (Migration SQL)
-
-```sql
--- audio_generations: historico de audios gerados
-CREATE TABLE public.audio_generations (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  company_id uuid,
-  campaign_id text,
-  text_original text NOT NULL,
-  text_converted text,
-  voice_id text NOT NULL,
-  voice_name text,
-  audio_url text,
-  file_path text,
-  duration_seconds numeric,
-  characters_count integer DEFAULT 0,
-  credits_used numeric DEFAULT 0,
-  settings_json jsonb DEFAULT '{}',
-  ab_test_group text, -- 'a' | 'b' | null
-  status text DEFAULT 'pending', -- pending | processing | ready | error
-  created_at timestamptz DEFAULT now()
-);
-
--- audio_variations: variacoes anti-spam
-CREATE TABLE public.audio_variations (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  generation_id uuid REFERENCES public.audio_generations(id) ON DELETE CASCADE,
-  variation_index integer DEFAULT 0,
-  text_content text NOT NULL,
-  audio_url text,
-  file_path text,
-  selected boolean DEFAULT false,
-  created_at timestamptz DEFAULT now()
-);
-
--- voicer_credit_transactions: historico de consumo separado
-CREATE TABLE public.voicer_credit_transactions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  type text NOT NULL, -- 'debit' | 'credit'
-  amount numeric NOT NULL,
-  description text,
-  generation_id uuid REFERENCES public.audio_generations(id),
-  created_at timestamptz DEFAULT now()
-);
-
--- ab_tests
-CREATE TABLE public.voicer_ab_tests (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  generation_a_id uuid REFERENCES public.audio_generations(id),
-  generation_b_id uuid REFERENCES public.audio_generations(id),
-  winner_id uuid REFERENCES public.audio_generations(id),
-  campaign_id text,
-  notes text,
-  created_at timestamptz DEFAULT now()
-);
-
--- RLS
-ALTER TABLE public.audio_generations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.audio_variations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.voicer_credit_transactions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.voicer_ab_tests ENABLE ROW LEVEL SECURITY;
-
--- Policies: users see own data
-CREATE POLICY "Users manage own generations" ON public.audio_generations
-  FOR ALL TO authenticated USING (user_id = auth.uid());
-CREATE POLICY "Users manage own variations" ON public.audio_variations
-  FOR ALL TO authenticated USING (
-    generation_id IN (SELECT id FROM public.audio_generations WHERE user_id = auth.uid())
-  );
-CREATE POLICY "Users manage own voicer credits" ON public.voicer_credit_transactions
-  FOR ALL TO authenticated USING (user_id = auth.uid());
-CREATE POLICY "Users manage own ab tests" ON public.voicer_ab_tests
-  FOR ALL TO authenticated USING (user_id = auth.uid());
-
--- Storage bucket
-INSERT INTO storage.buckets (id, name, public) VALUES ('voicer-audios', 'voicer-audios', true)
-ON CONFLICT DO NOTHING;
-```
-
-### Edge Functions
-
-| Funcao | Descricao |
-|---|---|
-| `elevenlabs-tts` | POST: recebe texto, voice_id, settings. Chama ElevenLabs, retorna audio binario |
-| `elevenlabs-voices` | GET: lista vozes disponiveis, cacheia por 1h |
-| `voicer-ai-suggest` | POST: usa Lovable AI para inserir variaveis de emocao no texto |
-| `voicer-ai-variations` | POST: usa Lovable AI para gerar ate 10 variacoes anti-spam |
-
-### Estrutura de Arquivos
-
-```
-src/modules/voicer/
-  VoicerModule.tsx          -- Container principal com abas
-  types.ts                  -- Tipos do modulo
-  utils/
-    variableConverter.ts    -- Converte {{risada}} → [laughs] etc.
-  hooks/
-    useVoices.ts           -- Lista e cacheia vozes ElevenLabs
-    useVoicerCredits.ts    -- Saldo e transacoes de creditos
-    useAudioGeneration.ts  -- Logica de geracao TTS
-  views/
-    StudioView.tsx         -- Editor + seletor de voz + controles + player
-    VariationsView.tsx     -- Gerador anti-spam (etapa futura)
-    ABTestView.tsx         -- Comparacao A/B (etapa futura)
-    HistoryView.tsx        -- Meus audios (etapa futura)
-    CreditsView.tsx        -- Saldo e consumo (etapa futura)
-    SettingsView.tsx       -- Config API key (etapa futura)
-  components/
-    TextEditor.tsx         -- Textarea com variaveis e contador
-    VariableButtons.tsx    -- Botoes de insercao rapida
-    VoiceSelector.tsx      -- Grid de vozes com preview
-    AudioControls.tsx      -- Sliders de estabilidade, similaridade etc.
-    AudioPlayer.tsx        -- Player customizado com download
-    WaveformAnimation.tsx  -- Animacao de onda durante geracao
-```
-
-### Integracao ao CRM
+### Mudancas
 
 | Arquivo | Acao |
 |---|---|
-| `LazyComponents.tsx` | Adicionar `VoicerModule` lazy |
-| `Navigation.tsx` | Adicionar item "Easyn Voicer" com icone `Mic` |
-| `Index.tsx` | Adicionar tab `voicer` com permissao `can_access_voicer`, registrar no `tabComponents` |
-| `supabase/config.toml` | Registrar edge functions `elevenlabs-tts` e `elevenlabs-voices` |
+| `variableConverter.ts` | Expandir variaveis de emocao (30+) baseado no PDF do Wevoicer: tom suave, voz de papai noel, gargalhada, narrador de suspense, fala entusiasmada, tom conspiratório, etc. Manter as atuais + adicionar novas categorias (Tom/Emocao, Estilo/Personagem, Acoes/Efeitos, Pausas). A conversao para ElevenLabs agora passa as variaveis como texto contextual (ex: `{{tom suave}}` vira `[softly]`) ja que ElevenLabs multilingual v2 interpreta essas instrucoes |
+| `VariableButtons.tsx` | Substituir por modal/dialog com categorias organizadas (Tons, Efeitos, Pausas, Personagens). Botao `{*} Variaveis de fala` abre o dialog. Dentro, categorias em abas ou secoes com scroll. Cada variavel clicavel insere no cursor. Texto explicativo no topo. Permitir digitacao livre de variaveis personalizadas |
+| `TextEditor.tsx` | Adicionar botao `{*} Variaveis de fala` (verde, estilo Wevoicer) acima do textarea. Remover VariableButtons inline. Adicionar botao "Limpar texto". Manter contador de caracteres |
+| `AudioControls.tsx` | Manter como esta, mas sera renderizado dentro de um Collapsible/Accordion "Configuracoes Avancadas" no StudioView |
+| `StudioView.tsx` | Redesign completo inspirado no Wevoicer: layout 3 colunas no desktop (sidebar esquerda opcional, editor central, historico direita). Voz selector como dropdown compacto no topo do editor (como Wevoicer). AudioControls dentro de Collapsible "Configuracoes Avancadas". Botao "Gerar Fala" na parte inferior. Botao "Exemplos prontos" no canto inferior esquerdo |
+| `ExamplesDialog.tsx` (novo) | Modal com exemplos prontos de textos de vendas com variaveis. Cada exemplo mostra: voz usada, modelo, texto completo com variaveis. Botao "Usar" copia texto e seleciona voz |
+| `VariablesDialog.tsx` (novo) | Dialog com todas as variaveis organizadas por categoria, com descricao e exemplo. Campo de busca. Secao "Crie suas proprias variaveis" |
+| `VoiceSelector.tsx` | Converter para dropdown/combobox compacto (Select com avatar da voz, nome e botao play). Filtro por idioma PT-BR priorizado |
 
-### Studio (Etapa 1) — Detalhes
+### Variaveis Expandidas (baseado no PDF)
 
-**Layout desktop**: 2 colunas. Esquerda: editor de texto com variaveis e contador. Direita: seletor de voz, controles de audio, player.
+Categorias:
+- **Tons/Emocoes**: tom suave, irritado, entusiasmado, tom triste, tom animado, tom misterioso, tom conspiratório, tom de urgência, empoderada, indignado, em panico
+- **Estilos/Personagens**: voz de papai noel, cientista maluco, locucao profissional, narrador de suspense, voz de velhinho, locucao coloquial, locucao caricata
+- **Acoes/Efeitos**: risada, gargalhada, suspiro, choro, sorrindo, rindo, respiracao ofegante, puxa o ar e solta, gritando
+- **Pausas**: pausa curta, pausa longa, pausa 2 segundos, pausa 3 segundos, pausa 5 segundos
+- **Modulacao**: enfase, sussurro, voz embriagada, voz sussurrando baixinho, locucao suave, fala entusiasmada, tom desconfiado
 
-**Layout mobile**: coluna unica com abas (Texto / Voz / Player).
+### Exemplos Prontos (4 exemplos de vendas)
 
-**Tema**: respeita o tema do app (dark/light), com acentos em roxo/violeta para o modulo.
+Cada exemplo tera:
+- Nome da voz ElevenLabs (Diana/Roger/Sarah)
+- Texto completo com variaveis de fala (scripts de televendas reais)
+- Botao "Usar este exemplo" que preenche editor + seleciona voz
 
-**Fluxo de geracao**:
-1. Usuario digita texto e insere variaveis via botoes
-2. Seleciona voz (grid com preview)
-3. Ajusta sliders (stability, similarity, style, speed)
-4. Clica "Gerar Audio" → converte variaveis → chama edge function → salva no Storage
-5. Player aparece com opcoes de download, regenerar, salvar
-
-**Conversao de variaveis** (utilitario puro):
-```typescript
-const VARIABLE_MAP = {
-  '{{risada}}': '[laughs]',
-  '{{pausa curta}}': '<break time="0.5s"/>',
-  '{{pausa longa}}': '<break time="1.5s"/>',
-  '{{sussurro}}': '(em voz baixa)',
-  '{{empolgação}}': '[excitedly]',
-  '{{tom triste}}': '[sadly]',
-  '{{tom irritado}}': '[angrily]',
-  '{{tom assustado}}': '[fearfully]',
-  '{{ironia}}': '[sarcastically]',
-  '{{choro}}': '[crying]',
-  '{{suspiro}}': '[sighs]',
-  '{{tom animado}}': '[cheerfully]',
-};
+Exemplo 1 - Portabilidade:
+```
+{{locucao amigavel, acolhedora}} Ola! Tudo bem?
+{{locucao profissional e cordial}} Aqui e da CREDTZ, somos especializados credito consignado para o produto Portabilidade. {{sorrindo}}
+{{tom de voz prestativo e ligeiramente urgente}} Eu estou te chamando rapidinho porque surgiram umas oportunidades na renovacao dos seus contratos...
+{{enfase no MUITO, tom entusiasmado}} Que podem te ajudar MUITO agora.
+{{tom levemente conspiratorio, exclusivo}} Inclusive, e algo que nem todo mundo esta conseguindo acessar...
+{{tom amigavel, com um toque de urgencia}} Voce consegue falar comigo agora rapidinho?
 ```
 
-**Creditos**: reutiliza a tabela `user_credits` existente. Custo calculado por caracteres (excluindo `{{...}}`). Debito automatico ao gerar.
+### Layout Desktop (inspirado Wevoicer)
 
-### Ordem de Implementacao (nesta mensagem)
+```text
++----------------------------------------------------------+
+| [Voz: Diana v] [Modelo: Locutor v]    Saldo: 150 creditos|
++----------------------------------------------------------+
+|                                                          |
+| {*} Clique e experimente as variaveis de fala            |
+|                                                          |
+| [========= EDITOR DE TEXTO ==========]                   |
+| {{locucao amigavel}} Ola! Tudo bem?                      |
+| ...                                                      |
+|                                                          |
+|                                          604 / 5000      |
+| [Limpar texto]          [Config Avancadas v]             |
+|                                                          |
+| [Exemplos prontos 🆕]      [🎙 Gerar Fala]              |
++----------------------------------------------------------+
+| [Player - quando audio gerado]                           |
++----------------------------------------------------------+
+```
 
-Apenas **Etapa 1 — Studio completo**: editor, seletor de voz, controles, player, edge functions TTS + voices, tabelas, integracao na navegacao.
+### Edge Function TTS
 
-Etapas 2-6 serao implementadas em mensagens futuras.
+Adicionar `language_code: "pt"` ao body da chamada ElevenLabs para melhorar pronuncia em portugues. Adicionar `speed` ao body (ja tem a variavel mas nao esta sendo enviada).
+
+### Resumo das entregas
+
+1. Expandir variaveis de emocao (12 → 30+) com categorias
+2. Dialog de variaveis com busca e categorias
+3. Dialog de exemplos prontos com textos de vendas
+4. AudioControls dentro de Collapsible "Config Avancadas"
+5. VoiceSelector como dropdown compacto
+6. Layout redesenhado estilo Wevoicer (editor centralizado)
+7. Fix: enviar `speed` e `language_code: "pt"` na API
 
