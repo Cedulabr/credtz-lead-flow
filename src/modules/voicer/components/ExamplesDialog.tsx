@@ -9,6 +9,9 @@ import { BookOpen, Mic, Copy } from 'lucide-react';
 interface Example {
   title: string;
   category: string;
+  characterName: string;
+  characterEmoji: string;
+  characterRole: string;
   voiceName: string;
   voiceId: string;
   text: string;
@@ -18,6 +21,9 @@ const EXAMPLES: Example[] = [
   {
     title: 'Portabilidade — Abordagem Inicial',
     category: 'Televendas',
+    characterName: 'Ana Beatriz',
+    characterEmoji: '👩‍💼',
+    characterRole: 'Consultora simpática',
     voiceName: 'Sarah',
     voiceId: 'EXAVITQu4vr4xnSDxMaL',
     text: `{{locução amigável}} Olá! Tudo bem? {{pausa curta}}
@@ -30,6 +36,9 @@ const EXAMPLES: Example[] = [
   {
     title: 'Cartão Consignado — Oferta',
     category: 'Televendas',
+    characterName: 'Camila Torres',
+    characterEmoji: '👩‍🎤',
+    characterRole: 'Especialista animada',
     voiceName: 'Laura',
     voiceId: 'FGY2WhTYpPnrIDTdsKH5',
     text: `{{locução amigável}} Oi! Aqui é da central de benefícios. {{pausa curta}}
@@ -41,6 +50,9 @@ const EXAMPLES: Example[] = [
   {
     title: 'Refinanciamento — Redução de Parcela',
     category: 'Televendas',
+    characterName: 'Carlos Eduardo',
+    characterEmoji: '👨‍💼',
+    characterRole: 'Analista cordial',
     voiceName: 'Roger',
     voiceId: 'CwhRBWXzGAHq8TQ4Fs17',
     text: `{{locução cordial}} Bom dia! Tudo bem com o senhor? {{pausa curta}}
@@ -50,14 +62,19 @@ const EXAMPLES: Example[] = [
 {{tom acolhedor}} Consegue dois minutinhos pra eu mostrar a simulação?`,
   },
   {
-    title: 'Cobrança Amigável — Lembrete',
-    category: 'Cobrança',
-    voiceName: 'Alice',
-    voiceId: 'Xb7hH8MSUJpSbSDYk0k2',
-    text: `{{locução amigável}} Olá! Aqui é da central de atendimento. {{pausa curta}}
-{{tom suave}} Estou entrando em contato porque identificamos uma pendência no seu cadastro que precisa de uma atenção. {{pausa curta}}
-{{tom prestativo}} Mas fique tranquilo, temos condições especiais de negociação que cabem no seu bolso. {{sorrindo}} {{pausa curta}}
-{{tom acolhedor}} Posso te ajudar a resolver isso agora de um jeito bem simples?`,
+    title: 'Novo Empréstimo — Taxa Especial',
+    category: 'Televendas',
+    characterName: 'Rafael Lima',
+    characterEmoji: '👨‍🔬',
+    characterRole: 'Consultor entusiasmado',
+    voiceName: 'Daniel',
+    voiceId: 'onwK4e9ZLuTAKqWW03F9',
+    text: `{{locução amigável}} Olá! Tudo bem? {{pausa curta}}
+{{locução profissional}} Aqui é da central de crédito consignado. {{sorrindo}}
+{{tom entusiasmado}} Tenho uma ótima notícia! O senhor tem margem disponível para um novo empréstimo com taxa ESPECIAL. {{ênfase}} {{pausa curta}}
+{{tom prestativo}} São condições que só estão sendo oferecidas para quem tem um bom histórico, como o senhor. {{pausa curta}}
+{{tom conspiratório}} E o melhor... a taxa está abaixo do que os bancos costumam praticar. {{pausa curta}}
+{{tom acolhedor}} Posso te passar os valores rapidinho?`,
   },
 ];
 
@@ -96,9 +113,13 @@ export function ExamplesDialog({ onUseExample }: ExamplesDialogProps) {
           <div className="space-y-3">
             {EXAMPLES.map((ex, i) => (
               <Card key={i} className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-2xl shrink-0">
+                    {ex.characterEmoji}
+                  </div>
+                  <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-semibold">{ex.title}</h4>
+                    <p className="text-xs text-muted-foreground">{ex.characterName} — {ex.characterRole}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <Badge variant="secondary" className="text-[10px]">{ex.category}</Badge>
                       <Badge variant="outline" className="text-[10px] gap-1">
@@ -106,7 +127,7 @@ export function ExamplesDialog({ onUseExample }: ExamplesDialogProps) {
                       </Badge>
                     </div>
                   </div>
-                  <Button size="sm" onClick={() => handleUse(ex)} className="gap-1.5">
+                  <Button size="sm" onClick={() => handleUse(ex)} className="gap-1.5 shrink-0">
                     <Copy className="h-3.5 w-3.5" /> Usar
                   </Button>
                 </div>
