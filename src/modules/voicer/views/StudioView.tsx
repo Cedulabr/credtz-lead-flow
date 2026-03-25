@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Mic, Coins, ChevronDown, Settings2 } from 'lucide-react';
+import { Mic, Coins, ChevronDown, Settings2, AlertTriangle, ShoppingCart } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { TextEditor } from '../components/TextEditor';
 import { VoiceSelector } from '../components/VoiceSelector';
@@ -66,7 +66,20 @@ export function StudioView() {
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-4">
-      {/* Top bar: voice + credits */}
+      {/* Zero balance alert */}
+      {balance === 0 && (
+        <Card className="border-destructive bg-destructive/5">
+          <CardContent className="py-3 flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
+            <p className="text-sm flex-1">Seus créditos acabaram. Adquira mais para continuar.</p>
+            <Button size="sm" variant="destructive" className="gap-1.5 shrink-0" onClick={() => window.open('https://easyn.com.br/', '_blank')}>
+              <ShoppingCart className="h-3.5 w-3.5" /> Comprar
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Top bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -97,7 +110,7 @@ export function StudioView() {
         </CardContent>
       </Card>
 
-      {/* Advanced settings collapsible */}
+      {/* Advanced settings */}
       <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
         <CollapsibleTrigger asChild>
           <Button variant="ghost" size="sm" className="text-xs text-muted-foreground gap-1.5 w-full justify-center">
@@ -118,7 +131,6 @@ export function StudioView() {
       {/* Actions */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <ExamplesDialog onUseExample={handleUseExample} />
-
         <div className="flex items-center gap-3 sm:ml-auto">
           <div className="text-xs text-muted-foreground flex items-center gap-1.5">
             <Coins className="h-3.5 w-3.5" />
@@ -127,7 +139,7 @@ export function StudioView() {
           <Button
             className="h-10 px-6"
             onClick={handleGenerate}
-            disabled={generating || !text.trim() || !selectedVoice}
+            disabled={generating || !text.trim() || !selectedVoice || balance === 0}
           >
             <Mic className="h-4 w-4 mr-2" />
             {generating ? 'Gerando...' : '🎙️ Gerar Fala'}
