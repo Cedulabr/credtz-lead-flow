@@ -1,75 +1,52 @@
 
 
-## Easyn Voicer — Exemplos com Personagens + Créditos para Admin e Usuário
+## Exemplos Prontos com Audio Demo — Gerar e Reproduzir
 
-### 1. Exemplos Prontos — Atualizar scripts e vozes
+### Objetivo
 
-**Arquivo**: `src/modules/voicer/components/ExamplesDialog.tsx`
+Adicionar botao Play em cada exemplo do dialog "Exemplos Prontos" para que o usuario possa ouvir o audio modelo antes de usar. Os audios serao gerados sob demanda via ElevenLabs TTS (consumindo creditos da API) e cacheados no Supabase Storage para nao regenerar toda vez.
 
-Substituir os 4 exemplos atuais por:
+### Arquitetura
 
-| # | Titulo | Voz ElevenLabs | Gênero | Personagem Fictício |
-|---|--------|---------------|--------|---------------------|
-| 1 | Portabilidade — Abordagem Inicial | Sarah (EXAVITQu4vr4xnSDxMaL) | Feminino | "Ana Beatriz" — Consultora simpática |
-| 2 | Cartão Consignado — Oferta | Laura (FGY2WhTYpPnrIDTdsKH5) | Feminino | "Camila Torres" — Especialista animada |
-| 3 | Refinanciamento — Redução de Parcela | Roger (CwhRBWXzGAHq8TQ4Fs17) | Masculino | "Carlos Eduardo" — Analista cordial |
-| 4 | Novo Empréstimo — Taxa Especial | Daniel (onwK4e9ZLuTAKqWW03F9) | Masculino | "Rafael Lima" — Consultor entusiasmado |
+1. **Edge Function `voicer-generate-example`** (nova): gera o audio do exemplo usando ElevenLabs TTS sem exigir autenticacao de usuario (usa apenas a API key do ElevenLabs). Salva no bucket `voicer-audios` em `examples/{voiceId}-{hash}.mp3`. Retorna a URL publica. Se o arquivo ja existir no storage, retorna a URL diretamente sem chamar a ElevenLabs novamente.
 
-Remover "Cobrança Amigável". Cada exemplo terá:
-- `characterName` e `characterEmoji` (avatar emoji: 👩‍💼, 👩‍🎤, 👨‍💼, 👨‍🔬)
-- Textos de vendas em PT-BR com variáveis de fala
-- Card visual com avatar/emoji do personagem, nome fictício, badge da voz ElevenLabs
+2. **ExamplesDialog.tsx**: Adicionar botao Play circular ao lado do avatar do personagem (como na imagem Wevoicer). Ao clicar, chama a edge function para obter/gerar o audio e toca inline com um mini player. Estado de loading com spinner durante geracao.
 
-O layout do card mostrará o avatar do personagem à esquerda (emoji grande em circle), nome fictício + voz real + botão "Usar".
+### Mudancas
 
-### 2. Créditos — Tela do Usuário Melhorada
-
-**Arquivo**: `src/modules/voicer/views/CreditsView.tsx`
-
-Adicionar ao topo:
-- Saldo atual grande (já existe)
-- Botão "Entenda como cobramos" que abre Dialog com texto adaptado do PDF (explicação de variáveis, custo por caractere, dicas)
-- Quando saldo = 0: banner "Sem créditos" com botão "Comprar Créditos" (por enquanto abre seção de recarga)
-- Seção "Recarga" com input para o usuário digitar valor desejado + texto "Em breve você poderá comprar na plataforma" + botão desabilitado "Recarregar com PIX"
-
-### 3. Painel Admin — Gerenciar Créditos Voicer
-
-O `AdminCreditsManagement.tsx` já existe com 644 linhas e usa `admin_manage_credits` RPC. Ele já permite adicionar/remover créditos de usuários.
-
-Verificar se já aparece no painel admin. Se não, garantir que esteja acessível. Não precisa duplicar — apenas garantir a rota.
-
-### Arquivos a criar/modificar
-
-| Arquivo | Ação |
+| Arquivo | Acao |
 |---|---|
-| `ExamplesDialog.tsx` | Substituir exemplos, adicionar personagens fictícios com avatares, remover cobrança |
-| `CreditsView.tsx` | Adicionar "Entenda como cobramos" dialog, seção recarga placeholder, banner sem créditos |
-| `StudioView.tsx` | Quando balance = 0, mostrar alerta com botão "Comprar Créditos" que navega para aba créditos |
+| `supabase/functions/voicer-generate-example/index.ts` | Nova edge function: recebe `text`, `voiceId`, `exampleKey`. Verifica se ja existe em `voicer-audios/examples/{exampleKey}.mp3`. Se sim, retorna URL publica. Se nao, chama ElevenLabs TTS, faz upload, retorna URL |
+| `src/modules/voicer/components/ExamplesDialog.tsx` | Adicionar botao Play por exemplo com mini player inline. Gerar hash unico por exemplo (baseado no voiceId + titulo). Chamar edge function ao clicar Play. Cachear URL no estado local |
 
-### Texto "Entenda como cobramos" (adaptado do PDF)
+### Edge Function — voicer-generate-example
 
+- Nao requer auth do usuario (os exemplos sao publicos/demonstrativos)
+- Usa `ELEVENLABS_API_KEY` e `SUPABASE_SERVICE_ROLE_KEY`
+- Converte variaveis de fala antes de enviar para ElevenLabs (mesma logica do `convertVariables`)
+- Salva como `examples/{exampleKey}.mp3` no bucket
+- Cache: verifica existencia do arquivo antes de gerar
+
+### ExamplesDialog — Layout atualizado
+
+Cada card tera:
+```text
++--------------------------------------------+
+| [Play] [Emoji]  Titulo                [Usar]|
+|                 Personagem — Role           |
+|                 [Televendas] [Voz: Sarah]   |
++--------------------------------------------+
+| {{locucao amigavel}} Ola! Tudo bem?...      |
++--------------------------------------------+
 ```
-Como funciona a cobrança do Easyn Voicer?
 
-O Easyn Voicer cobra por caractere convertido em áudio.
+O botao Play sera um circulo com icone Play/Pause e spinner durante loading. Audio toca inline (HTML Audio element). Apenas um audio toca por vez (pausa o anterior ao clicar outro).
 
-• 1 crédito = 100 caracteres de texto
-• Variáveis de fala ({{...}}) NÃO são cobradas
-• Espaços e pontuação são contados
+### Conversao de variaveis na Edge Function
 
-Exemplo: Um texto de 450 caracteres custa 5 créditos.
+A edge function precisara converter as variaveis de fala (ex: `{{tom suave}}` -> `[softly]`) antes de enviar para ElevenLabs. Implementar um mapa simplificado inline na edge function com as mesmas conversoes do `variableConverter.ts`.
 
-Dicas para economizar:
-1. Use variáveis de fala — elas controlam tom e emoção sem custo extra
-2. Escreva textos objetivos e diretos
-3. Teste com textos curtos antes de gerar a versão final
-4. Use o Gerador de Variações para criar múltiplas versões do mesmo texto
-```
+### Deploy
 
-### Detalhes técnicos
-
-- Vozes Sarah e Laura são as mais populares em PT-BR na ElevenLabs (multilingual v2)
-- Roger e Daniel são as vozes masculinas mais usadas em português
-- Personagens fictícios usam emojis como avatar (sem necessidade de imagens externas)
-- A seção de recarga será placeholder visual — sem integração de pagamento por enquanto
+Criar e deployar a edge function `voicer-generate-example`. Atualizar `config.toml` se necessario.
 
