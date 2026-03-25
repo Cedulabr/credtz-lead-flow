@@ -24,7 +24,7 @@ EMOTION_VARIABLES.forEach((v) => {
 export function convertVariables(text: string): string {
   let converted = text;
   for (const [variable, replacement] of Object.entries(VARIABLE_MAP)) {
-    converted = converted.replaceAll(variable, replacement);
+    converted = converted.split(variable).join(replacement);
   }
   return converted;
 }
