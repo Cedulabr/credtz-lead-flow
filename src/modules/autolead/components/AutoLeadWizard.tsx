@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,12 +11,13 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CompactStepIndicator } from "@/components/ui/form-wizard";
-import { ChevronLeft, ChevronRight, Check, Loader2, Zap, MessageSquare, AlertTriangle, ChevronDown, Smartphone, Phone, Music, Play, Pause } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Loader2, Zap, MessageSquare, AlertTriangle, ChevronDown, Smartphone, Phone, Music, Play, Pause, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAudioFiles } from "@/modules/audios/hooks/useAudioFiles";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   DEFAULT_MESSAGE, TIPOS_LEAD, FEATURED_DDDS, ALL_DDDS, DDD_CITIES,
   QUANTITY_PRESETS, SMS_TEMPLATES, WHATSAPP_TEMPLATES, type WizardData
@@ -30,6 +32,7 @@ interface AutoLeadWizardProps {
 
 export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWizardProps) {
   const { user, profile } = useAuth();
+  const isMobile = useIsMobile();
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const { instances, loadingInstances } = useWhatsApp();
@@ -59,30 +62,37 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
   const connectedInstances = instances.filter(i => i.hasToken);
   const extraDdds = ALL_DDDS.filter(d => !FEATURED_DDDS.includes(d));
 
-  // Fetch available tags from leads_database
+  // Fetch available tags with error handling
   useEffect(() => {
     if (!open) return;
     const fetchTags = async () => {
-      const { data: tagData } = await supabase
-        .from("leads_database")
-        .select("tag")
-        .not("tag", "is", null)
-        .eq("is_available", true)
-        .limit(500);
-      if (tagData) {
-        const unique = [...new Set(tagData.map((l: any) => l.tag).filter(Boolean))] as string[];
-        setAvailableTags(unique);
+      try {
+        const { data: tagData, error } = await supabase
+          .from("leads_database")
+          .select("tag")
+          .not("tag", "is", null)
+          .eq("is_available", true)
+          .limit(500);
+        if (error) {
+          console.warn("[AutoLead] Tags query error:", error.message);
+          return;
+        }
+        if (tagData) {
+          const unique = [...new Set(tagData.map((l: any) => l.tag).filter(Boolean))] as string[];
+          setAvailableTags(unique);
+        }
+      } catch (err) {
+        console.warn("[AutoLead] Tags fetch failed:", err);
       }
     };
     fetchTags();
   }, [open]);
 
-  // Fetch SMS credits (admin bypasses user_companies)
+  // Fetch SMS credits
   const fetchSmsCredits = useCallback(async () => {
     if (!user?.id) return;
     setLoadingSmsCredits(true);
     try {
-      // Admin: busca direto na sms_credits com próprio user_id
       if (profile?.role === 'admin') {
         const { data: creditData } = await supabase
           .from("sms_credits")
@@ -150,9 +160,9 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
   const canProceed = (): boolean => {
     switch (step) {
       case 0: return data.quantidade > 0 && data.quantidade <= credits;
-      case 1: return true; // DDD + Tags optional
+      case 1: return true;
       case 2: return data.useDefaultMessage || data.messageTemplate.trim().length > 10;
-      case 3: return true; // SMS optional
+      case 3: return true;
       case 4: return data.whatsappInstanceIds.length > 0;
       case 5: return true;
       default: return false;
@@ -243,14 +253,61 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
           </div>
         );
 
-      // Step 1: DDD + TAG (merged)
+      // Step 1: TAG (highlighted) + DDD
       case 1:
         return (
           <div className="space-y-5">
+            {/* TAG Section — highlighted, moved to top */}
+            <div className="space-y-3 rounded-xl border-2 border-primary/50 bg-primary/5 p-4">
+              <div className="flex items-center gap-2">
+                <Star className="h-5 w-5 text-primary fill-primary" />
+                <p className="text-sm font-semibold text-foreground">Selecione a TAG do lead</p>
+                <Badge variant="default" className="text-[10px] px-1.5 py-0">Importante</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                A TAG define o perfil dos leads que serão prospectados
+              </p>
+              <div className={cn("grid gap-2", isMobile ? "grid-cols-2" : "grid-cols-3")}>
+                {TIPOS_LEAD.map(tipo => (
+                  <Card
+                    key={tipo.id}
+                    className={cn(
+                      "cursor-pointer transition-all",
+                      data.tipoLead === tipo.id ? "border-primary bg-primary/10 shadow-sm" : "hover:bg-muted/50"
+                    )}
+                    onClick={() => setData(prev => ({ ...prev, tipoLead: tipo.id }))}
+                  >
+                    <CardContent className="p-3 text-center space-y-1">
+                      <span className="text-2xl">{tipo.icon}</span>
+                      <p className="font-medium text-sm">{tipo.label}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {availableTags.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-primary/20">
+                  <p className="text-xs text-muted-foreground font-medium">Tags disponíveis na base:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableTags.map(tag => (
+                      <Badge
+                        key={tag}
+                        variant={data.tags.includes(tag) ? "default" : "outline"}
+                        className="cursor-pointer text-xs"
+                        onClick={() => toggleTag(tag)}
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* DDD Section */}
             <div className="space-y-3">
               <p className="text-sm font-medium">Selecione o DDD dos clientes <span className="text-muted-foreground font-normal">(opcional)</span></p>
-              <div className="grid grid-cols-5 gap-1.5">
+              <div className={cn("grid gap-1.5", isMobile ? "grid-cols-5" : "grid-cols-10")}>
                 {FEATURED_DDDS.map(ddd => (
                   <button
                     key={ddd}
@@ -279,8 +336,8 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
               </Button>
 
               {showAllDdds && (
-                <ScrollArea className="h-40">
-                  <div className="grid grid-cols-5 gap-1.5">
+                <ScrollArea className={cn(isMobile ? "h-40" : "h-auto max-h-60")}>
+                  <div className={cn("grid gap-1.5", isMobile ? "grid-cols-5" : "grid-cols-10")}>
                     {extraDdds.map(ddd => (
                       <button
                         key={ddd}
@@ -309,50 +366,10 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
                 </div>
               )}
             </div>
-
-            {/* TAG Section */}
-            <div className="space-y-3 border-t pt-4">
-              <p className="text-sm font-medium">Selecione a TAG do lead <span className="text-muted-foreground font-normal">(opcional)</span></p>
-              <div className="grid grid-cols-2 gap-2">
-                {TIPOS_LEAD.map(tipo => (
-                  <Card
-                    key={tipo.id}
-                    className={cn(
-                      "cursor-pointer transition-all",
-                      data.tipoLead === tipo.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
-                    )}
-                    onClick={() => setData(prev => ({ ...prev, tipoLead: tipo.id }))}
-                  >
-                    <CardContent className="p-2.5 text-center space-y-0.5">
-                      <span className="text-xl">{tipo.icon}</span>
-                      <p className="font-medium text-xs">{tipo.label}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              {availableTags.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">Tags disponíveis:</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {availableTags.map(tag => (
-                      <Badge
-                        key={tag}
-                        variant={data.tags.includes(tag) ? "default" : "outline"}
-                        className="cursor-pointer text-xs"
-                        onClick={() => toggleTag(tag)}
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         );
 
-      // Step 2: Mensagem WhatsApp (templates selecionáveis)
+      // Step 2: Mensagem WhatsApp
       case 2:
         return (
           <div className="space-y-4">
@@ -728,38 +745,58 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
     }
   };
 
-  const stepTitles = ["Créditos", "DDD + TAG", "Mensagem WA", "SMS", "WhatsApp", "Confirmar"];
+  const stepTitles = ["Créditos", "TAG + DDD", "Mensagem WA", "SMS", "WhatsApp", "Confirmar"];
+
+  const wizardContent = (
+    <>
+      <div className="flex-1 overflow-y-auto py-3 min-h-0">
+        {renderStep()}
+      </div>
+
+      <div className="flex gap-2 pt-3 pb-[env(safe-area-inset-bottom,0.5rem)] border-t shrink-0">
+        {step > 0 && (
+          <Button variant="outline" onClick={() => setStep(s => s - 1)} disabled={submitting} className="flex-1 h-11">
+            <ChevronLeft className="h-4 w-4 mr-1" /> Voltar
+          </Button>
+        )}
+        {step < totalSteps - 1 ? (
+          <Button onClick={() => setStep(s => s + 1)} disabled={!canProceed()} className="flex-1 h-11">
+            Continuar <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        ) : (
+          <Button onClick={handleConfirm} disabled={submitting || !canProceed()} className="flex-1 h-11 gap-2">
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+            {submitting ? "Processando..." : "Iniciar Prospecção"}
+          </Button>
+        )}
+      </div>
+    </>
+  );
+
+  // Desktop: Dialog, Mobile: Sheet bottom
+  if (isMobile) {
+    return (
+      <Sheet open={open} onOpenChange={() => !submitting && onClose()}>
+        <SheetContent side="bottom" className="h-auto max-h-[calc(100dvh-2rem)] rounded-t-2xl flex flex-col">
+          <SheetHeader className="pb-1 shrink-0">
+            <SheetTitle className="text-base">{stepTitles[step]}</SheetTitle>
+            <CompactStepIndicator currentStep={step} totalSteps={totalSteps} />
+          </SheetHeader>
+          {wizardContent}
+        </SheetContent>
+      </Sheet>
+    );
+  }
 
   return (
-    <Sheet open={open} onOpenChange={() => !submitting && onClose()}>
-      <SheetContent side="bottom" className="h-auto max-h-[calc(100dvh-2rem)] rounded-t-2xl flex flex-col">
-        <SheetHeader className="pb-1 shrink-0">
-          <SheetTitle className="text-base">{stepTitles[step]}</SheetTitle>
+    <Dialog open={open} onOpenChange={() => !submitting && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogHeader className="pb-1 shrink-0">
+          <DialogTitle className="text-lg">{stepTitles[step]}</DialogTitle>
           <CompactStepIndicator currentStep={step} totalSteps={totalSteps} />
-        </SheetHeader>
-
-        <div className="flex-1 overflow-y-auto py-3 min-h-0">
-          {renderStep()}
-        </div>
-
-        <div className="flex gap-2 pt-3 pb-[env(safe-area-inset-bottom,0.5rem)] border-t shrink-0">
-          {step > 0 && (
-            <Button variant="outline" onClick={() => setStep(s => s - 1)} disabled={submitting} className="flex-1 h-11">
-              <ChevronLeft className="h-4 w-4 mr-1" /> Voltar
-            </Button>
-          )}
-          {step < totalSteps - 1 ? (
-            <Button onClick={() => setStep(s => s + 1)} disabled={!canProceed()} className="flex-1 h-11">
-              Continuar <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          ) : (
-            <Button onClick={handleConfirm} disabled={submitting || !canProceed()} className="flex-1 h-11 gap-2">
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-              {submitting ? "Processando..." : "Iniciar Prospecção"}
-            </Button>
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
+        </DialogHeader>
+        {wizardContent}
+      </DialogContent>
+    </Dialog>
   );
 }
