@@ -65,3 +65,6 @@ verify_jwt = false
 
 [functions.voicer-ai-variations]
 verify_jwt = false
+
+[functions.voicer-generate-example]
+verify_jwt = false
