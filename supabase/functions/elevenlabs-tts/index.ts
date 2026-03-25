@@ -77,6 +77,8 @@ serve(async (req) => {
           text,
           model_id: "eleven_multilingual_v2",
           voice_settings: voiceSettings,
+          language_code: "pt",
+          ...(speed !== 1.0 && { speed }),
         }),
       }
     );
