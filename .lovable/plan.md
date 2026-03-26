@@ -1,39 +1,78 @@
 
 
-## Easyn Voicer — Fix Exemplos Prontos + Botao IA para Variaveis
+## AutoLead — Agendamento, Envio Automatico e Multiplos Jobs
 
 ### Problemas Identificados
 
-1. **Audio dos exemplos nao toca**: A edge function `voicer-generate-example` parece nao estar deployada (zero logs). O bucket `voicer-audios` pode nao ser publico, causando erro ao acessar a URL. Alem disso, o `supabase.functions.invoke()` pode estar falhando silenciosamente.
+1. **Mensagens nao enviam**: Nao existe um **cron job** que invoque o `autolead-worker`. A edge function existe mas nunca e chamada, entao as mensagens ficam "scheduled" para sempre.
 
-2. **Variaveis lidas como texto literal**: Na geracao normal (`elevenlabs-tts`), o texto ja chega convertido do cliente (`useAudioGeneration.ts` linha 25 faz `convertVariables(text)`). Mas na edge function `voicer-generate-example`, a conversao esta implementada — o problema e que a funcao provavelmente nao esta deployada ou o bucket nao e publico.
+2. **Sem agendamento de data**: O job inicia imediatamente. O usuario quer poder escolher o dia/hora para iniciar o envio.
 
-3. **Falta botao IA para adicionar variaveis ao texto**: O usuario quer um botao (como nas imagens do Wevoicer — icone de "sparkles") que pega o texto puro e usa IA para inserir variaveis de fala automaticamente.
+3. **Nao permite criar multiplos jobs**: O botao "Iniciar Prospecção" fica desabilitado quando ja existe um job ativo (`activeJob`). O usuario quer configurar varios envios.
+
+4. **Gestores nao veem jobs da equipe**: O hook `useAutoLead.ts` filtra `eq("user_id", user.id)`, entao gestores so veem seus proprios jobs. A RLS ja permite acesso via `is_company_gestor`, mas a query do frontend nao busca por empresa.
 
 ### Solucao
 
-| Arquivo | Acao |
+| Mudanca | Arquivo |
 |---|---|
-| `supabase/functions/voicer-generate-example/index.ts` | Melhorar: adicionar mais logs de debug, tratar erro de bucket inexistente. Remover `<break>` tags SSML que ElevenLabs nao suporta em texto puro — converter pausas para `...` ou remover |
-| `ExamplesDialog.tsx` | Fix: adicionar cache-busting na URL, melhor tratamento de erros, mostrar detalhes do erro |
-| `supabase/functions/voicer-enhance-text/index.ts` (novo) | Edge function que usa Lovable AI para pegar texto puro e adicionar variaveis de fala `{{...}}` |
-| `TextEditor.tsx` | Adicionar botao "sparkles" (✨) que chama a IA para enriquecer o texto com variaveis |
+| Criar cron job para invocar `autolead-worker` a cada minuto | SQL via insert tool (nao migration) |
+| Adicionar step de agendamento no wizard (data/hora de inicio) | `AutoLeadWizard.tsx` |
+| Adicionar campo `scheduled_start_at` ao tipo e ao job | `types.ts`, `useAutoLead.ts` |
+| Permitir multiplos jobs simultaneos | `AutoLeadHome.tsx`, `useAutoLead.ts` |
+| Gestores veem jobs da empresa | `useAutoLead.ts` |
+| Novo status "scheduled" para jobs agendados | `types.ts`, `AutoLeadHome.tsx` |
+| Migration: coluna `scheduled_start_at` na tabela | SQL migration |
 
-### Detalhes Tecnicos
+### Detalhes
 
-**Fix pausas na conversao**: ElevenLabs texto puro nao suporta `<break time="0.5s"/>`. Converter pausas para reticencias ou texto descritivo:
-```typescript
-"{{pausa curta}}": "...",
-"{{pausa longa}}": "......",
-"{{pausa 2 segundos}}": "........",
-```
+**1. Cron Job (causa raiz do envio)**
 
-**Edge Function `voicer-enhance-text`**: Usa Lovable AI (LOVABLE_API_KEY ja disponivel) com prompt que conhece todas as variaveis disponiveis e insere no texto do usuario:
-```
-System: Voce e um especialista em locucao de vendas. Dado um texto, adicione variaveis de fala {{...}} para tornar a locucao mais natural e expressiva. Variaveis disponiveis: {{tom animado}}, {{locucao amigavel}}, {{pausa curta}}, etc. Retorne APENAS o texto modificado.
-```
+Usar `pg_cron` + `pg_net` para invocar `autolead-worker` a cada minuto. Isso e o que faz as mensagens serem processadas. Sem isso, nada envia.
 
-**Botao no TextEditor**: Icone sparkles (✨) ao lado do botao de variaveis. Ao clicar, envia o texto atual para a edge function e substitui pelo texto enriquecido. Loading state com spinner.
+**2. Agendamento no Wizard**
 
-**Fix do audio dos exemplos**: Garantir que o bucket `voicer-audios` seja publico (pode precisar de migration para politica de storage). Adicionar timestamp na URL para evitar cache. Usar `fetch()` direto em vez de `supabase.functions.invoke()` se necessario para melhor controle de erro.
+Adicionar um novo passo (ou campo no passo de confirmacao) com:
+- Opcao "Iniciar agora" (default)
+- Opcao "Agendar para" com date picker + time picker
+- Se agendado, o job e criado com status `scheduled` e `scheduled_start_at`
+- O worker so processa mensagens de jobs com status `running`
+- Um segundo cron ou logica no worker verifica jobs `scheduled` cuja data ja passou e muda para `running`
+
+**3. Multiplos jobs**
+
+- Remover `disabled={!!activeJob}` do botao
+- Mostrar lista de jobs ativos (nao apenas 1)
+- Timeline aceita qualquer job, nao apenas o "activeJob"
+
+**4. Gestores veem jobs da equipe**
+
+No `useAutoLead.ts`, se o usuario for gestor, buscar jobs por `company_id` em vez de `user_id`. A RLS ja permite isso.
+
+### Mudancas nos arquivos
+
+**`types.ts`**: Adicionar `scheduled_start_at?: string` ao `WizardData` e `AutoLeadJob`
+
+**`useAutoLead.ts`**:
+- Buscar `company_id` do usuario
+- Se gestor: query sem filtro `user_id`, usando `company_id`
+- No `createJob`: se `scheduled_start_at` definido, criar job com status `scheduled` em vez de `running`; ajustar `scheduled_at` das mensagens relativo a data agendada
+
+**`AutoLeadWizard.tsx`**:
+- Novo step 6 (antes da confirmacao): "Quando iniciar?"
+- Radio: "Agora" ou "Agendar"
+- Se agendar: date picker + time picker
+- Total de steps passa de 6 para 7
+
+**`AutoLeadHome.tsx`**:
+- Remover `disabled={!!activeJob}` do botao
+- Mostrar multiplos jobs ativos em lista
+- Adicionar status `scheduled` com badge amarelo
+
+**`autolead-worker/index.ts`**:
+- Adicionar logica no inicio: buscar jobs com status `scheduled` onde `scheduled_start_at <= now()` e mudar para `running`
+
+**Migration SQL**: `ALTER TABLE autolead_jobs ADD COLUMN IF NOT EXISTS scheduled_start_at timestamptz`
+
+**Cron Job SQL** (via insert tool): Agendar `autolead-worker` a cada minuto com `pg_cron`
 
