@@ -110,27 +110,36 @@ export function ExamplesDialog({ onUseExample }: ExamplesDialogProps) {
     setPlayingKey(null);
   }, []);
 
+  const playAudioFromUrl = useCallback(async (url: string, key: string) => {
+    const audio = new Audio(url + '?t=' + Date.now());
+    audioRef.current = audio;
+    setPlayingKey(key);
+    audio.onended = () => setPlayingKey(null);
+    audio.onerror = (e) => {
+      console.error('Audio playback error:', e);
+      setPlayingKey(null);
+      toast.error('Erro ao reproduzir áudio. Tente novamente.');
+    };
+    try {
+      await audio.play();
+    } catch (err) {
+      console.error('Play failed:', err);
+      setPlayingKey(null);
+      toast.error('Erro ao reproduzir áudio');
+    }
+  }, []);
+
   const handlePlay = useCallback(async (example: Example) => {
-    // If same audio is playing, pause it
     if (playingKey === example.exampleKey) {
       stopCurrentAudio();
       return;
     }
 
-    // Stop any currently playing audio
     stopCurrentAudio();
 
-    // If we already have the URL cached, play immediately
+    // If we have cached URL, play immediately
     if (audioUrls[example.exampleKey]) {
-      const audio = new Audio(audioUrls[example.exampleKey]);
-      audioRef.current = audio;
-      setPlayingKey(example.exampleKey);
-      audio.onended = () => setPlayingKey(null);
-      audio.onerror = () => {
-        setPlayingKey(null);
-        toast.error('Erro ao reproduzir áudio');
-      };
-      await audio.play();
+      await playAudioFromUrl(audioUrls[example.exampleKey], example.exampleKey);
       return;
     }
 
@@ -145,31 +154,34 @@ export function ExamplesDialog({ onUseExample }: ExamplesDialogProps) {
         },
       });
 
-      if (error) throw error;
-      if (!data?.audioUrl) throw new Error('No audio URL returned');
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Erro na edge function');
+      }
 
-      // Cache the URL
-      setAudioUrls(prev => ({ ...prev, [example.exampleKey]: data.audioUrl }));
-
-      // Play
-      const audio = new Audio(data.audioUrl);
-      audioRef.current = audio;
-      setPlayingKey(example.exampleKey);
-      audio.onended = () => setPlayingKey(null);
-      audio.onerror = () => {
-        setPlayingKey(null);
-        toast.error('Erro ao reproduzir áudio');
-      };
-      await audio.play();
-    } catch (err) {
+      if (data?.audioUrl) {
+        setAudioUrls(prev => ({ ...prev, [example.exampleKey]: data.audioUrl }));
+        await playAudioFromUrl(data.audioUrl, example.exampleKey);
+      } else if (data?.audioBase64) {
+        // Fallback: play from base64 if upload failed
+        const audioBlob = new Blob(
+          [Uint8Array.from(atob(data.audioBase64), c => c.charCodeAt(0))],
+          { type: 'audio/mpeg' }
+        );
+        const blobUrl = URL.createObjectURL(audioBlob);
+        setAudioUrls(prev => ({ ...prev, [example.exampleKey]: blobUrl }));
+        await playAudioFromUrl(blobUrl, example.exampleKey);
+      } else {
+        throw new Error('Nenhum áudio retornado');
+      }
+    } catch (err: any) {
       console.error('Error generating example audio:', err);
-      toast.error('Erro ao gerar áudio do exemplo');
+      toast.error(err?.message || 'Erro ao gerar áudio do exemplo');
     } finally {
       setLoadingKey(null);
     }
-  }, [playingKey, audioUrls, stopCurrentAudio]);
+  }, [playingKey, audioUrls, stopCurrentAudio, playAudioFromUrl]);
 
-  // Clean up audio when dialog closes
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) stopCurrentAudio();
     setOpen(newOpen);
