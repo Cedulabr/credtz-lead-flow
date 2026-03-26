@@ -1,10 +1,12 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Sparkles, Loader2 } from 'lucide-react';
 import { countCharactersExcludingVariables, calculateCreditsCost } from '../utils/variableConverter';
 import { VariablesDialog } from './VariablesDialog';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface TextEditorProps {
   text: string;
@@ -15,6 +17,7 @@ const MAX_CHARS = 5000;
 
 export function TextEditor({ text, onChange }: TextEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isEnhancing, setIsEnhancing] = useState(false);
 
   const charCount = countCharactersExcludingVariables(text);
   const totalLength = text.length;
@@ -40,10 +43,50 @@ export function TextEditor({ text, onChange }: TextEditorProps) {
     }
   };
 
+  const handleEnhanceText = async () => {
+    if (!text || text.trim().length < 10) {
+      toast.error('Digite pelo menos 10 caracteres para usar a IA');
+      return;
+    }
+
+    setIsEnhancing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('voicer-enhance-text', {
+        body: { text },
+      });
+
+      if (error) throw error;
+      if (!data?.enhancedText) throw new Error('IA não retornou texto');
+
+      onChange(data.enhancedText);
+      toast.success('Texto enriquecido com variáveis de fala!');
+    } catch (err: any) {
+      console.error('Error enhancing text:', err);
+      toast.error(err?.message || 'Erro ao enriquecer texto com IA');
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
   return (
     <div className="space-y-3">
       {/* Variable button bar */}
-      <VariablesDialog onInsert={insertVariable} />
+      <div className="flex items-center gap-2">
+        <VariablesDialog onInsert={insertVariable} />
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={handleEnhanceText}
+          disabled={isEnhancing || !text || text.trim().length < 10}
+        >
+          {isEnhancing ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Sparkles className="h-4 w-4" />
+          )}
+          {isEnhancing ? 'Aplicando IA...' : 'Adicionar emoções com IA'}
+        </Button>
+      </div>
 
       <Textarea
         ref={textareaRef}
