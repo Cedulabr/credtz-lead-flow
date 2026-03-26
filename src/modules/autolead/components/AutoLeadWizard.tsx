@@ -849,8 +849,8 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
           </Button>
         ) : (
           <Button onClick={handleConfirm} disabled={submitting || !canProceed()} className="flex-1 h-11 gap-2">
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-            {submitting ? "Processando..." : "Iniciar Prospecção"}
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : scheduleMode === 'scheduled' ? <Calendar className="h-4 w-4" /> : <Zap className="h-4 w-4" />}
+            {submitting ? "Processando..." : scheduleMode === 'scheduled' ? "Agendar Prospecção" : "Iniciar Prospecção"}
           </Button>
         )}
       </div>
