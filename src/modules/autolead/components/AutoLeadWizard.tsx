@@ -673,8 +673,74 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
           </div>
         );
 
-      // Step 5: Resumo + Preview
+      // Step 5: Agendamento
       case 5:
+        const today = new Date().toISOString().split('T')[0];
+        return (
+          <div className="space-y-5">
+            <div className="text-center space-y-1">
+              <Calendar className="h-8 w-8 text-primary mx-auto" />
+              <p className="text-sm font-medium">Quando iniciar o envio?</p>
+              <p className="text-xs text-muted-foreground">Escolha se deseja iniciar agora ou agendar para depois</p>
+            </div>
+
+            <RadioGroup value={scheduleMode} onValueChange={(v) => setScheduleMode(v as 'now' | 'scheduled')}>
+              <Card className={cn("cursor-pointer transition-all", scheduleMode === 'now' && "border-primary bg-primary/5")}
+                onClick={() => setScheduleMode('now')}>
+                <CardContent className="p-4 flex items-center gap-3">
+                  <RadioGroupItem value="now" id="now" />
+                  <div>
+                    <Label htmlFor="now" className="font-medium cursor-pointer">⚡ Iniciar agora</Label>
+                    <p className="text-xs text-muted-foreground">O envio começa imediatamente</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className={cn("cursor-pointer transition-all", scheduleMode === 'scheduled' && "border-primary bg-primary/5")}
+                onClick={() => setScheduleMode('scheduled')}>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <RadioGroupItem value="scheduled" id="scheduled" />
+                    <div>
+                      <Label htmlFor="scheduled" className="font-medium cursor-pointer">📅 Agendar para depois</Label>
+                      <p className="text-xs text-muted-foreground">Escolha o dia e horário de início</p>
+                    </div>
+                  </div>
+
+                  {scheduleMode === 'scheduled' && (
+                    <div className="grid grid-cols-2 gap-3 pl-7">
+                      <div>
+                        <Label className="text-xs">Data</Label>
+                        <Input
+                          type="date"
+                          min={today}
+                          value={scheduleDate}
+                          onChange={e => setScheduleDate(e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Horário</Label>
+                        <Input
+                          type="time"
+                          value={scheduleTime}
+                          onChange={e => setScheduleTime(e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
+                      <p className="col-span-2 text-xs text-muted-foreground">
+                        ⏰ Envios ocorrem entre 08:30 e 18:30. Se agendar fora dessa janela, o envio começará no próximo horário válido.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </RadioGroup>
+          </div>
+        );
+
+      // Step 6: Resumo + Preview
+      case 6:
         return (
           <div className="space-y-4">
             <p className="text-sm font-medium text-center">Resumo da prospecção</p>
@@ -694,6 +760,14 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
                   <span className="text-muted-foreground">Áudio:</span>
                   <span className={cn("font-semibold", data.audioFileId ? "text-primary" : "text-muted-foreground")}>
                     {data.audioFileId ? `🎵 ${data.audioTitle || 'Selecionado'}` : "Desativado"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Início:</span>
+                  <span className={cn("font-semibold", scheduleMode === 'scheduled' ? "text-amber-600" : "text-primary")}>
+                    {scheduleMode === 'scheduled'
+                      ? `📅 ${new Date(`${scheduleDate}T${scheduleTime}`).toLocaleString("pt-BR")}`
+                      : "⚡ Agora"}
                   </span>
                 </div>
               </CardContent>
@@ -755,7 +829,7 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
     }
   };
 
-  const stepTitles = ["Créditos", "TAG + DDD", "Mensagem WA", "SMS", "WhatsApp", "Confirmar"];
+  const stepTitles = ["Créditos", "TAG + DDD", "Mensagem WA", "SMS", "WhatsApp", "Agendamento", "Confirmar"];
 
   const wizardContent = (
     <>
