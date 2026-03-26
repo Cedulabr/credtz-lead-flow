@@ -1,52 +1,39 @@
 
 
-## Exemplos Prontos com Audio Demo — Gerar e Reproduzir
+## Easyn Voicer — Fix Exemplos Prontos + Botao IA para Variaveis
 
-### Objetivo
+### Problemas Identificados
 
-Adicionar botao Play em cada exemplo do dialog "Exemplos Prontos" para que o usuario possa ouvir o audio modelo antes de usar. Os audios serao gerados sob demanda via ElevenLabs TTS (consumindo creditos da API) e cacheados no Supabase Storage para nao regenerar toda vez.
+1. **Audio dos exemplos nao toca**: A edge function `voicer-generate-example` parece nao estar deployada (zero logs). O bucket `voicer-audios` pode nao ser publico, causando erro ao acessar a URL. Alem disso, o `supabase.functions.invoke()` pode estar falhando silenciosamente.
 
-### Arquitetura
+2. **Variaveis lidas como texto literal**: Na geracao normal (`elevenlabs-tts`), o texto ja chega convertido do cliente (`useAudioGeneration.ts` linha 25 faz `convertVariables(text)`). Mas na edge function `voicer-generate-example`, a conversao esta implementada — o problema e que a funcao provavelmente nao esta deployada ou o bucket nao e publico.
 
-1. **Edge Function `voicer-generate-example`** (nova): gera o audio do exemplo usando ElevenLabs TTS sem exigir autenticacao de usuario (usa apenas a API key do ElevenLabs). Salva no bucket `voicer-audios` em `examples/{voiceId}-{hash}.mp3`. Retorna a URL publica. Se o arquivo ja existir no storage, retorna a URL diretamente sem chamar a ElevenLabs novamente.
+3. **Falta botao IA para adicionar variaveis ao texto**: O usuario quer um botao (como nas imagens do Wevoicer — icone de "sparkles") que pega o texto puro e usa IA para inserir variaveis de fala automaticamente.
 
-2. **ExamplesDialog.tsx**: Adicionar botao Play circular ao lado do avatar do personagem (como na imagem Wevoicer). Ao clicar, chama a edge function para obter/gerar o audio e toca inline com um mini player. Estado de loading com spinner durante geracao.
-
-### Mudancas
+### Solucao
 
 | Arquivo | Acao |
 |---|---|
-| `supabase/functions/voicer-generate-example/index.ts` | Nova edge function: recebe `text`, `voiceId`, `exampleKey`. Verifica se ja existe em `voicer-audios/examples/{exampleKey}.mp3`. Se sim, retorna URL publica. Se nao, chama ElevenLabs TTS, faz upload, retorna URL |
-| `src/modules/voicer/components/ExamplesDialog.tsx` | Adicionar botao Play por exemplo com mini player inline. Gerar hash unico por exemplo (baseado no voiceId + titulo). Chamar edge function ao clicar Play. Cachear URL no estado local |
+| `supabase/functions/voicer-generate-example/index.ts` | Melhorar: adicionar mais logs de debug, tratar erro de bucket inexistente. Remover `<break>` tags SSML que ElevenLabs nao suporta em texto puro — converter pausas para `...` ou remover |
+| `ExamplesDialog.tsx` | Fix: adicionar cache-busting na URL, melhor tratamento de erros, mostrar detalhes do erro |
+| `supabase/functions/voicer-enhance-text/index.ts` (novo) | Edge function que usa Lovable AI para pegar texto puro e adicionar variaveis de fala `{{...}}` |
+| `TextEditor.tsx` | Adicionar botao "sparkles" (✨) que chama a IA para enriquecer o texto com variaveis |
 
-### Edge Function — voicer-generate-example
+### Detalhes Tecnicos
 
-- Nao requer auth do usuario (os exemplos sao publicos/demonstrativos)
-- Usa `ELEVENLABS_API_KEY` e `SUPABASE_SERVICE_ROLE_KEY`
-- Converte variaveis de fala antes de enviar para ElevenLabs (mesma logica do `convertVariables`)
-- Salva como `examples/{exampleKey}.mp3` no bucket
-- Cache: verifica existencia do arquivo antes de gerar
-
-### ExamplesDialog — Layout atualizado
-
-Cada card tera:
-```text
-+--------------------------------------------+
-| [Play] [Emoji]  Titulo                [Usar]|
-|                 Personagem — Role           |
-|                 [Televendas] [Voz: Sarah]   |
-+--------------------------------------------+
-| {{locucao amigavel}} Ola! Tudo bem?...      |
-+--------------------------------------------+
+**Fix pausas na conversao**: ElevenLabs texto puro nao suporta `<break time="0.5s"/>`. Converter pausas para reticencias ou texto descritivo:
+```typescript
+"{{pausa curta}}": "...",
+"{{pausa longa}}": "......",
+"{{pausa 2 segundos}}": "........",
 ```
 
-O botao Play sera um circulo com icone Play/Pause e spinner durante loading. Audio toca inline (HTML Audio element). Apenas um audio toca por vez (pausa o anterior ao clicar outro).
+**Edge Function `voicer-enhance-text`**: Usa Lovable AI (LOVABLE_API_KEY ja disponivel) com prompt que conhece todas as variaveis disponiveis e insere no texto do usuario:
+```
+System: Voce e um especialista em locucao de vendas. Dado um texto, adicione variaveis de fala {{...}} para tornar a locucao mais natural e expressiva. Variaveis disponiveis: {{tom animado}}, {{locucao amigavel}}, {{pausa curta}}, etc. Retorne APENAS o texto modificado.
+```
 
-### Conversao de variaveis na Edge Function
+**Botao no TextEditor**: Icone sparkles (✨) ao lado do botao de variaveis. Ao clicar, envia o texto atual para a edge function e substitui pelo texto enriquecido. Loading state com spinner.
 
-A edge function precisara converter as variaveis de fala (ex: `{{tom suave}}` -> `[softly]`) antes de enviar para ElevenLabs. Implementar um mapa simplificado inline na edge function com as mesmas conversoes do `variableConverter.ts`.
-
-### Deploy
-
-Criar e deployar a edge function `voicer-generate-example`. Atualizar `config.toml` se necessario.
+**Fix do audio dos exemplos**: Garantir que o bucket `voicer-audios` seja publico (pode precisar de migration para politica de storage). Adicionar timestamp na URL para evitar cache. Usar `fetch()` direto em vez de `supabase.functions.invoke()` se necessario para melhor controle de erro.
 
