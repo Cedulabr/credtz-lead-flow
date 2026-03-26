@@ -5,7 +5,8 @@ export interface AutoLeadJob {
   total_leads: number;
   leads_sent: number;
   leads_failed: number;
-  status: 'draft' | 'running' | 'paused' | 'completed' | 'cancelled';
+  status: 'draft' | 'scheduled' | 'running' | 'paused' | 'completed' | 'cancelled';
+  scheduled_start_at: string | null;
   message_template: string | null;
   use_default_message: boolean;
   selected_ddds: string[];
