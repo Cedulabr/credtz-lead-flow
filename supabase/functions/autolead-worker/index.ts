@@ -18,6 +18,23 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
+    // 0. Transition scheduled jobs whose start time has arrived
+    const { data: scheduledJobs } = await supabase
+      .from("autolead_jobs")
+      .select("id")
+      .eq("status", "scheduled")
+      .lte("scheduled_start_at", new Date().toISOString());
+
+    if (scheduledJobs && scheduledJobs.length > 0) {
+      for (const sj of scheduledJobs) {
+        await supabase
+          .from("autolead_jobs")
+          .update({ status: "running", started_at: new Date().toISOString() })
+          .eq("id", sj.id);
+        console.log(`Job ${sj.id} transitioned from scheduled to running`);
+      }
+    }
+
     // 1. Fetch scheduled messages that are due
     const { data: messages, error: fetchError } = await supabase
       .from("autolead_messages")
@@ -35,7 +52,7 @@ Deno.serve(async (req) => {
     }
 
     if (!messages || messages.length === 0) {
-      return new Response(JSON.stringify({ processed: 0 }), {
+      return new Response(JSON.stringify({ processed: 0, scheduled_activated: scheduledJobs?.length || 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -44,16 +61,13 @@ Deno.serve(async (req) => {
     let failed = 0;
 
     for (const msg of messages) {
-      // Skip if job is not running
       if (msg.autolead_jobs?.status !== "running") continue;
 
-      // Mark as sending
       await supabase
         .from("autolead_messages")
         .update({ status: "sending" })
         .eq("id", msg.id);
 
-      // Get WhatsApp token for this instance
       const { data: instance } = await supabase
         .from("whatsapp_instances")
         .select("api_token")
@@ -69,12 +83,10 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Normalize phone
       let phone = msg.phone.replace(/\D/g, "");
       if (phone.length <= 11) phone = "55" + phone;
 
       try {
-        // Send text message
         const response = await fetch(TICKETZ_URL, {
           method: "POST",
           headers: {
@@ -138,7 +150,6 @@ Deno.serve(async (req) => {
               }
             } catch (audioErr: any) {
               console.error(`Audio send error for ${msg.id}:`, audioErr.message);
-              // Don't fail the whole message for audio error
             }
           }
         } else {
@@ -157,7 +168,7 @@ Deno.serve(async (req) => {
           failed++;
         }
 
-        // Log in whatsapp_messages for history
+        // Log in whatsapp_messages
         await supabase.from("whatsapp_messages").insert({
           user_id: (await supabase.from("autolead_jobs").select("user_id").eq("id", msg.job_id).single()).data?.user_id,
           phone,

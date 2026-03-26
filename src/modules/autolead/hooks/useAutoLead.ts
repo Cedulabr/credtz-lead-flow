@@ -6,12 +6,37 @@ import type { AutoLeadJob, AutoLeadMessage, WizardData } from "../types";
 import { DEFAULT_MESSAGE } from "../types";
 
 export function useAutoLead() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [jobs, setJobs] = useState<AutoLeadJob[]>([]);
   const [activeJob, setActiveJob] = useState<AutoLeadJob | null>(null);
   const [messages, setMessages] = useState<AutoLeadMessage[]>([]);
   const [credits, setCredits] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [userCompanyId, setUserCompanyId] = useState<string | null>(null);
+  const [isGestorOrAdmin, setIsGestorOrAdmin] = useState(false);
+
+  // Fetch user company info
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchCompany = async () => {
+      if (profile?.role === 'admin') {
+        setIsGestorOrAdmin(true);
+        return;
+      }
+      const { data: ucData } = await supabase
+        .from("user_companies")
+        .select("company_id, company_role")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      if (ucData) {
+        setUserCompanyId(ucData.company_id);
+        setIsGestorOrAdmin(ucData.company_role === 'gestor');
+      }
+    };
+    fetchCompany();
+  }, [user?.id, profile?.role]);
 
   const fetchCredits = useCallback(async () => {
     if (!user?.id) return;
@@ -22,17 +47,28 @@ export function useAutoLead() {
   const fetchJobs = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
-    const { data } = await (supabase as any)
+
+    let query = (supabase as any)
       .from("autolead_jobs")
       .select("*")
-      .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(20);
+
+    // Gestores/admins see company jobs, colaboradores see only their own
+    if (isGestorOrAdmin && userCompanyId) {
+      query = query.eq("company_id", userCompanyId);
+    } else if (profile?.role === 'admin') {
+      // Admin without company sees all (no filter)
+    } else {
+      query = query.eq("user_id", user.id);
+    }
+
+    const { data } = await query;
     setJobs(data || []);
     const active = (data || []).find((j: AutoLeadJob) => j.status === "running" || j.status === "paused");
     setActiveJob(active || null);
     setLoading(false);
-  }, [user?.id]);
+  }, [user?.id, isGestorOrAdmin, userCompanyId, profile?.role]);
 
   const fetchMessages = useCallback(async (jobId: string) => {
     const { data } = await (supabase as any)
@@ -67,18 +103,11 @@ export function useAutoLead() {
     return () => { supabase.removeChannel(channel); };
   }, [activeJob?.id, fetchMessages, fetchJobs]);
 
-  // Helper: get gestor's SMS credits and gestor ID (admin bypasses user_companies)
+  // Helper: get gestor's SMS credits and gestor ID
   const getGestorSmsInfo = useCallback(async (): Promise<{ gestorId: string; credits: number } | null> => {
     if (!user?.id) return null;
 
-    // Admin: busca direto
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (profileData?.role === 'admin') {
+    if (profile?.role === 'admin') {
       const { data: creditData } = await supabase
         .from("sms_credits")
         .select("credits_balance")
@@ -117,7 +146,7 @@ export function useAutoLead() {
       .maybeSingle();
 
     return { gestorId, credits: creditData?.credits_balance ?? 0 };
-  }, [user?.id]);
+  }, [user?.id, profile?.role]);
 
   // Helper: get WhatsApp phone number for SMS template
   const getWhatsAppPhone = useCallback(async (instanceIds: string[]): Promise<string> => {
@@ -132,7 +161,7 @@ export function useAutoLead() {
     return data?.phone_number || "";
   }, []);
 
-  // Send SMS in batch (immediate, no delay)
+  // Send SMS in batch
   const sendSmsBatch = useCallback(async (
     leads: any[],
     smsTemplate: string,
@@ -149,32 +178,16 @@ export function useAutoLead() {
         .replace(/\{\{whatsapp\}\}/g, whatsAppPhone);
 
       const phone = lead.phone;
-      if (!phone) {
-        smsFailed++;
-        continue;
-      }
+      if (!phone) { smsFailed++; continue; }
 
       try {
         const { data: result, error } = await supabase.functions.invoke("send-sms", {
-          body: {
-            phone,
-            message: personalizedMsg,
-            contact_name: lead.name || null,
-            send_type: "autolead",
-          },
+          body: { phone, message: personalizedMsg, contact_name: lead.name || null, send_type: "autolead" },
         });
-
-        if (error || (result && result.error)) {
-          smsFailed++;
-        } else {
-          smsSent++;
-        }
-      } catch {
-        smsFailed++;
-      }
+        if (error || (result && result.error)) { smsFailed++; } else { smsSent++; }
+      } catch { smsFailed++; }
     }
 
-    // Update job SMS counters
     await (supabase as any)
       .from("autolead_jobs")
       .update({ sms_sent: smsSent, sms_failed: smsFailed })
@@ -195,7 +208,7 @@ export function useAutoLead() {
       .limit(1)
       .maybeSingle();
 
-    // 1. Request leads via existing RPC (5-param overload with ddd_filter)
+    // 1. Request leads
     const { data: leads, error: leadsError } = await (supabase as any).rpc(
       "request_leads_with_credits",
       {
@@ -220,33 +233,27 @@ export function useAutoLead() {
       return null;
     }
 
-    // Insert leads into leads table with status 'autolead' for Leads Premium
+    // Insert leads into leads table
     try {
       const leadsToInsert = leadsArray.map((lead: any) => ({
-        name: lead.name,
-        cpf: lead.cpf ?? '',
-        phone: lead.phone,
-        phone2: lead.phone2 || null,
-        convenio: lead.convenio,
-        status: 'autolead',
-        created_by: user.id,
-        assigned_to: user.id,
-        origem_lead: 'AutoLead',
-        banco_operacao: lead.banco,
-        requested_at: new Date().toISOString(),
-        requested_by: user.id,
+        name: lead.name, cpf: lead.cpf ?? '', phone: lead.phone,
+        phone2: lead.phone2 || null, convenio: lead.convenio,
+        status: 'autolead', created_by: user.id, assigned_to: user.id,
+        origem_lead: 'AutoLead', banco_operacao: lead.banco,
+        requested_at: new Date().toISOString(), requested_by: user.id,
         history: JSON.stringify([{
-          action: 'created',
-          timestamp: new Date().toISOString(),
-          user_id: user.id,
-          note: 'Lead gerado via AutoLead'
+          action: 'created', timestamp: new Date().toISOString(),
+          user_id: user.id, note: 'Lead gerado via AutoLead'
         }])
       }));
-
       await supabase.from('leads').insert(leadsToInsert);
     } catch (e) {
       console.error('Erro ao inserir leads no Premium:', e);
     }
+
+    // Determine status based on scheduling
+    const isScheduled = !!wizardData.scheduledStartAt;
+    const jobStatus = isScheduled ? "scheduled" : "running";
 
     // 2. Create job
     const { data: job, error: jobError } = await (supabase as any)
@@ -255,14 +262,15 @@ export function useAutoLead() {
         user_id: user.id,
         company_id: ucData?.company_id || null,
         total_leads: leadsArray.length,
-        status: "running",
+        status: jobStatus,
         message_template: wizardData.useDefaultMessage ? DEFAULT_MESSAGE : wizardData.messageTemplate,
         use_default_message: wizardData.useDefaultMessage,
         selected_ddds: wizardData.ddds,
         selected_tags: wizardData.tags || [],
         tipo_lead: wizardData.tipoLead,
         whatsapp_instance_ids: wizardData.whatsappInstanceIds,
-        started_at: new Date().toISOString(),
+        started_at: isScheduled ? null : new Date().toISOString(),
+        scheduled_start_at: wizardData.scheduledStartAt || null,
         sms_enabled: wizardData.smsEnabled,
         sms_template: wizardData.smsEnabled ? wizardData.smsTemplate : null,
         audio_file_id: wizardData.audioFileId || null,
@@ -275,14 +283,15 @@ export function useAutoLead() {
       return null;
     }
 
-    // 3. Generate scheduled WhatsApp messages with anti-ban logic
+    // 3. Generate scheduled messages
     const template = wizardData.useDefaultMessage ? DEFAULT_MESSAGE : wizardData.messageTemplate;
     const instances = wizardData.whatsappInstanceIds;
     const shuffledLeads = [...leadsArray].sort(() => Math.random() - 0.5);
 
-    const now = new Date();
-    let currentTime = new Date(now);
-    
+    // Base time: scheduled start or now
+    const baseTime = isScheduled ? new Date(wizardData.scheduledStartAt!) : new Date();
+    let currentTime = new Date(baseTime);
+
     const hour = currentTime.getHours();
     const minute = currentTime.getMinutes();
     if (hour < 8 || (hour === 8 && minute < 30)) {
@@ -308,7 +317,6 @@ export function useAutoLead() {
       }
 
       const instanceId = instances[index % instances.length];
-
       const personalizedMsg = template
         .replace(/\{\{nome\}\}/g, lead.name || "")
         .replace(/\{\{cidade\}\}/g, "")
@@ -327,21 +335,18 @@ export function useAutoLead() {
       };
     });
 
-    // Insert messages in batches
     const batchSize = 50;
     for (let i = 0; i < messagesToInsert.length; i += batchSize) {
       const batch = messagesToInsert.slice(i, i + batchSize);
       await (supabase as any).from("autolead_messages").insert(batch);
     }
 
-    // 4. Send SMS immediately if enabled
-    if (wizardData.smsEnabled) {
+    // 4. Send SMS immediately if enabled and not scheduled
+    if (wizardData.smsEnabled && !isScheduled) {
       const smsInfo = await getGestorSmsInfo();
       if (smsInfo && smsInfo.credits > 0) {
-        const smsLeads = leadsArray.slice(0, smsInfo.credits); // limit to available credits
+        const smsLeads = leadsArray.slice(0, smsInfo.credits);
         const whatsAppPhone = await getWhatsAppPhone(wizardData.whatsappInstanceIds);
-
-        // Fire and forget SMS — don't block the job creation
         sendSmsBatch(smsLeads, wizardData.smsTemplate, whatsAppPhone, job.id, ucData?.company_id || null)
           .then(({ smsSent, smsFailed }) => {
             if (smsSent > 0) toast.success(`${smsSent} SMS enviados com sucesso!`);
@@ -352,11 +357,14 @@ export function useAutoLead() {
       }
     }
 
-    toast.success(`Prospecção iniciada com ${leadsArray.length} leads!`);
+    const toastMsg = isScheduled
+      ? `Prospecção agendada com ${leadsArray.length} leads para ${new Date(wizardData.scheduledStartAt!).toLocaleString("pt-BR")}!`
+      : `Prospecção iniciada com ${leadsArray.length} leads!`;
+    toast.success(toastMsg);
     await fetchJobs();
     await fetchCredits();
     return job.id;
-  }, [user?.id, fetchJobs, fetchCredits, getGestorSmsInfo, getWhatsAppPhone, sendSmsBatch]);
+  }, [user?.id, fetchJobs, fetchCredits, getGestorSmsInfo, getWhatsAppPhone, sendSmsBatch, profile?.role]);
 
   const pauseJob = useCallback(async (jobId: string) => {
     await (supabase as any)
