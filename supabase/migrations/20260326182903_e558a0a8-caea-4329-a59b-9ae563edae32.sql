@@ -1,0 +1,1 @@
+ALTER TABLE public.autolead_jobs ADD COLUMN IF NOT EXISTS scheduled_start_at timestamptz;

@@ -795,6 +795,7 @@ export type Database = {
           pause_every: number
           pause_minutes: number
           paused_at: string | null
+          scheduled_start_at: string | null
           selected_ddds: string[] | null
           selected_tags: string[] | null
           send_window_end: string
@@ -824,6 +825,7 @@ export type Database = {
           pause_every?: number
           pause_minutes?: number
           paused_at?: string | null
+          scheduled_start_at?: string | null
           selected_ddds?: string[] | null
           selected_tags?: string[] | null
           send_window_end?: string
@@ -853,6 +855,7 @@ export type Database = {
           pause_every?: number
           pause_minutes?: number
           paused_at?: string | null
+          scheduled_start_at?: string | null
           selected_ddds?: string[] | null
           selected_tags?: string[] | null
           send_window_end?: string
