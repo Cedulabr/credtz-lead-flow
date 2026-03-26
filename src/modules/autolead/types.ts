@@ -55,6 +55,7 @@ export interface WizardData {
   smsTemplate: string;
   audioFileId?: string;
   audioTitle?: string;
+  scheduledStartAt?: string | null;
 }
 
 export const DEFAULT_MESSAGE = `Olá {{nome}}, tudo bem?
