@@ -10,8 +10,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CompactStepIndicator } from "@/components/ui/form-wizard";
-import { ChevronLeft, ChevronRight, Check, Loader2, Zap, MessageSquare, AlertTriangle, ChevronDown, Smartphone, Phone, Music, Play, Pause, Star } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Loader2, Zap, MessageSquare, AlertTriangle, ChevronDown, Smartphone, Phone, Music, Play, Pause, Star, Calendar, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,7 +59,11 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
     smsTemplate: SMS_TEMPLATES[0].template,
   });
 
-  const totalSteps = 6;
+  const [scheduleMode, setScheduleMode] = useState<'now' | 'scheduled'>('now');
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('08:30');
+
+  const totalSteps = 7;
   const connectedInstances = instances.filter(i => i.hasToken);
   const extraDdds = ALL_DDDS.filter(d => !FEATURED_DDDS.includes(d));
 
@@ -164,7 +169,8 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
       case 2: return data.useDefaultMessage || data.messageTemplate.trim().length > 10;
       case 3: return true;
       case 4: return data.whatsappInstanceIds.length > 0;
-      case 5: return true;
+      case 5: return scheduleMode === 'now' || (!!scheduleDate && !!scheduleTime);
+      case 6: return true;
       default: return false;
     }
   };
@@ -172,7 +178,11 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
   const handleConfirm = async () => {
     setSubmitting(true);
     try {
-      await onConfirm(data);
+      const finalData = {
+        ...data,
+        scheduledStartAt: scheduleMode === 'scheduled' ? `${scheduleDate}T${scheduleTime}:00` : null,
+      };
+      await onConfirm(finalData);
       onClose();
     } finally {
       setSubmitting(false);
