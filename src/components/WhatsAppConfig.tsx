@@ -215,9 +215,9 @@ export function WhatsAppConfig() {
 
     let query = (supabase as any)
       .from("whatsapp_messages")
-      .select("*")
+      .select("*, whatsapp_instances:instance_id(instance_name, phone_number)")
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(200);
 
     if (targetUserIds) {
       query = query.in("user_id", targetUserIds);
