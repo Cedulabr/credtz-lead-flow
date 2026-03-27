@@ -437,6 +437,88 @@ export function WhatsAppConfig() {
     }
   };
 
+  // Retry/Edit scheduled message states
+  const [editingScheduled, setEditingScheduled] = useState<any>(null);
+  const [editPhone, setEditPhone] = useState("");
+  const [editMessage, setEditMessage] = useState("");
+  const [editScheduledAt, setEditScheduledAt] = useState("");
+  const [retryAction, setRetryAction] = useState<"send_now" | "reschedule">("send_now");
+  const [retrySending, setRetrySending] = useState(false);
+
+  const openEditScheduled = (msg: any) => {
+    setEditingScheduled(msg);
+    setEditPhone(msg.phone || "");
+    setEditMessage(msg.message || "");
+    setEditScheduledAt("");
+    setRetryAction("send_now");
+  };
+
+  const handleRetryScheduled = async () => {
+    if (!editingScheduled) return;
+    setRetrySending(true);
+    try {
+      if (retryAction === "send_now") {
+        // Get instance token
+        const { data: inst } = await (supabase as any)
+          .from("whatsapp_instances")
+          .select("api_token")
+          .eq("id", editingScheduled.instance_id)
+          .maybeSingle();
+        
+        if (!inst?.api_token) {
+          toast.error("Token não encontrado para esta instância");
+          return;
+        }
+
+        // Send via edge function
+        const { data, error } = await supabase.functions.invoke("send-whatsapp", {
+          body: {
+            apiToken: inst.api_token,
+            number: editPhone,
+            message: editMessage,
+            clientName: editingScheduled.client_name,
+            instanceId: editingScheduled.instance_id,
+            sourceModule: editingScheduled.source_module || "whatsapp",
+          },
+        });
+        if (error) throw error;
+        if (data?.success) {
+          // Update scheduled message status
+          await (supabase as any)
+            .from("whatsapp_scheduled_messages")
+            .update({ status: "sent", phone: editPhone, message: editMessage })
+            .eq("id", editingScheduled.id);
+          toast.success("Mensagem enviada com sucesso!");
+        } else {
+          throw new Error(data?.error || "Falha ao enviar");
+        }
+      } else {
+        // Reschedule
+        if (!editScheduledAt) {
+          toast.error("Selecione uma data/hora para reagendar");
+          return;
+        }
+        await (supabase as any)
+          .from("whatsapp_scheduled_messages")
+          .update({
+            status: "pending",
+            phone: editPhone,
+            message: editMessage,
+            scheduled_at: new Date(editScheduledAt).toISOString(),
+          })
+          .eq("id", editingScheduled.id);
+        toast.success("Mensagem reagendada!");
+      }
+      setEditingScheduled(null);
+      fetchScheduled();
+      fetchMessages();
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao processar");
+    } finally {
+      setRetrySending(false);
+    }
+  };
+
   const getRoleBadge = () => {
     if (role === "admin") return <Badge className="bg-red-500/10 text-red-600 border-red-500/20 gap-1"><Shield className="h-3 w-3" />Admin</Badge>;
     if (role === "gestor") return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20 gap-1"><Users className="h-3 w-3" />Gestor</Badge>;
