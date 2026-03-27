@@ -895,6 +895,63 @@ export function WhatsAppConfig() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit/Retry Scheduled Message Dialog */}
+      <Dialog open={!!editingScheduled} onOpenChange={(open) => !open && setEditingScheduled(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5 text-orange-500" />
+              Editar e Reenviar Mensagem
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Telefone</Label>
+              <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="85999999999" />
+            </div>
+            <div>
+              <Label>Mensagem</Label>
+              <Textarea value={editMessage} onChange={(e) => setEditMessage(e.target.value)} rows={3} />
+            </div>
+            <div>
+              <Label>Ação</Label>
+              <Select value={retryAction} onValueChange={(v) => setRetryAction(v as "send_now" | "reschedule")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="send_now">Enviar Agora</SelectItem>
+                  <SelectItem value="reschedule">Reagendar</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {retryAction === "reschedule" && (
+              <div>
+                <Label>Nova Data/Hora</Label>
+                <Input
+                  type="datetime-local"
+                  value={editScheduledAt}
+                  onChange={(e) => setEditScheduledAt(e.target.value)}
+                />
+              </div>
+            )}
+            {editingScheduled?.error_message && (
+              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-xs flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>Erro anterior: {editingScheduled.error_message}</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingScheduled(null)}>Cancelar</Button>
+            <Button onClick={handleRetryScheduled} disabled={retrySending} className="gap-2">
+              {retrySending ? <Loader2 className="h-4 w-4 animate-spin" /> : retryAction === "send_now" ? <Send className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+              {retryAction === "send_now" ? "Enviar Agora" : "Reagendar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
