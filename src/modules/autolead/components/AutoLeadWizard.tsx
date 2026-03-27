@@ -72,18 +72,13 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
     if (!open) return;
     const fetchTags = async () => {
       try {
-        const { data: tagData, error } = await supabase
-          .from("leads_database")
-          .select("tag")
-          .not("tag", "is", null)
-          .eq("is_available", true)
-          .limit(500);
+        const { data: tagData, error } = await supabase.rpc('get_available_tags');
         if (error) {
           console.warn("[AutoLead] Tags query error:", error.message);
           return;
         }
         if (tagData) {
-          const unique = [...new Set(tagData.map((l: any) => l.tag).filter(Boolean))] as string[];
+          const unique = tagData.map((t: any) => t.tag).filter(Boolean) as string[];
           setAvailableTags(unique);
         }
       } catch (err) {
