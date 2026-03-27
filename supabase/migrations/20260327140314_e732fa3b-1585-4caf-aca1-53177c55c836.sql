@@ -1,0 +1,2 @@
+ALTER TABLE public.whatsapp_messages ADD COLUMN IF NOT EXISTS source_module text;
+ALTER TABLE public.whatsapp_messages ADD COLUMN IF NOT EXISTS instance_id uuid REFERENCES public.whatsapp_instances(id);

@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { apiToken, number, message, mediaBase64, mediaName, clientName, testMode } = body;
+    const { apiToken, number, message, mediaBase64, mediaName, clientName, testMode, instanceId, sourceModule } = body;
 
     if (!apiToken) {
       return new Response(
@@ -214,6 +214,8 @@ Deno.serve(async (req) => {
       direction: "outgoing",
       message_type: messageType,
       client_name: clientName || null,
+      instance_id: instanceId || null,
+      source_module: sourceModule || null,
     });
 
     if (!success) {

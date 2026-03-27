@@ -93,7 +93,7 @@ export function useWhatsApp() {
     return data?.api_token || null;
   }, []);
 
-  const sendTextMessage = useCallback(async (number: string, body: string, clientName?: string, instanceId?: string) => {
+  const sendTextMessage = useCallback(async (number: string, body: string, clientName?: string, instanceId?: string, sourceModule?: string) => {
     const targetId = instanceId || instances.find(i => i.hasToken)?.id;
     if (!targetId) {
       toast.error("Nenhuma instância WhatsApp configurada.");
@@ -107,7 +107,7 @@ export function useWhatsApp() {
     setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("send-whatsapp", {
-        body: { apiToken: token, number, message: body, clientName },
+        body: { apiToken: token, number, message: body, clientName, instanceId: targetId, sourceModule },
       });
       if (error) throw error;
       if (data?.success) {
@@ -125,7 +125,7 @@ export function useWhatsApp() {
     }
   }, [instances, getTokenForInstance]);
 
-  const sendMediaMessage = useCallback(async (number: string, mediaBase64: string, mediaName: string, message?: string, clientName?: string, instanceId?: string) => {
+  const sendMediaMessage = useCallback(async (number: string, mediaBase64: string, mediaName: string, message?: string, clientName?: string, instanceId?: string, sourceModule?: string) => {
     const targetId = instanceId || instances.find(i => i.hasToken)?.id;
     if (!targetId) {
       toast.error("Nenhuma instância WhatsApp configurada.");
@@ -139,7 +139,7 @@ export function useWhatsApp() {
     setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("send-whatsapp", {
-        body: { apiToken: token, number, message, mediaBase64, mediaName, clientName },
+        body: { apiToken: token, number, message, mediaBase64, mediaName, clientName, instanceId: targetId, sourceModule },
       });
       if (error) throw error;
       if (data?.success) {

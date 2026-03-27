@@ -6858,6 +6858,7 @@ export type Database = {
           message_type: string | null
           phone: string
           sent_at: string | null
+          source_module: string | null
           status: string | null
           user_id: string
         }
@@ -6872,6 +6873,7 @@ export type Database = {
           message_type?: string | null
           phone: string
           sent_at?: string | null
+          source_module?: string | null
           status?: string | null
           user_id: string
         }
@@ -6886,6 +6888,7 @@ export type Database = {
           message_type?: string | null
           phone?: string
           sent_at?: string | null
+          source_module?: string | null
           status?: string | null
           user_id?: string
         }
