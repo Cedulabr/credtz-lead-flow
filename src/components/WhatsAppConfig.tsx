@@ -10,9 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import {
   MessageCircle, Save, Loader2, CheckCircle, XCircle, RefreshCw, Send,
-  History, Plus, Trash2, Edit, Phone, Clock, Ban, Building2, User, Shield, Users
+  History, Plus, Trash2, Edit, Phone, Clock, Ban, Building2, User, Shield, Users,
+  AlertTriangle, RotateCcw, Pencil
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
