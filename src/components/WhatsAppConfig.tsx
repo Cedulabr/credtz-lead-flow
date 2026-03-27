@@ -10,9 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import {
   MessageCircle, Save, Loader2, CheckCircle, XCircle, RefreshCw, Send,
-  History, Plus, Trash2, Edit, Phone, Clock, Ban, Building2, User, Shield, Users
+  History, Plus, Trash2, Edit, Phone, Clock, Ban, Building2, User, Shield, Users,
+  AlertTriangle, RotateCcw, Pencil
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -44,6 +46,19 @@ interface Company {
 }
 
 type UserRole = "admin" | "gestor" | "colaborador";
+
+const SOURCE_MODULE_LABELS: Record<string, string> = {
+  autolead: "AutoLead",
+  leads_premium: "Leads Premium",
+  activate_leads: "Ativar Leads",
+  meus_clientes: "Meus Clientes",
+  whatsapp: "WhatsApp",
+};
+
+function sourceModuleLabel(mod?: string | null): string {
+  if (!mod) return "Direto";
+  return SOURCE_MODULE_LABELS[mod] || mod;
+}
 
 export function WhatsAppConfig() {
   const { user, profile } = useAuth();
@@ -213,9 +228,9 @@ export function WhatsAppConfig() {
 
     let query = (supabase as any)
       .from("whatsapp_messages")
-      .select("*")
+      .select("*, whatsapp_instances:instance_id(instance_name, phone_number)")
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(200);
 
     if (targetUserIds) {
       query = query.in("user_id", targetUserIds);
@@ -435,6 +450,88 @@ export function WhatsAppConfig() {
     }
   };
 
+  // Retry/Edit scheduled message states
+  const [editingScheduled, setEditingScheduled] = useState<any>(null);
+  const [editPhone, setEditPhone] = useState("");
+  const [editMessage, setEditMessage] = useState("");
+  const [editScheduledAt, setEditScheduledAt] = useState("");
+  const [retryAction, setRetryAction] = useState<"send_now" | "reschedule">("send_now");
+  const [retrySending, setRetrySending] = useState(false);
+
+  const openEditScheduled = (msg: any) => {
+    setEditingScheduled(msg);
+    setEditPhone(msg.phone || "");
+    setEditMessage(msg.message || "");
+    setEditScheduledAt("");
+    setRetryAction("send_now");
+  };
+
+  const handleRetryScheduled = async () => {
+    if (!editingScheduled) return;
+    setRetrySending(true);
+    try {
+      if (retryAction === "send_now") {
+        // Get instance token
+        const { data: inst } = await (supabase as any)
+          .from("whatsapp_instances")
+          .select("api_token")
+          .eq("id", editingScheduled.instance_id)
+          .maybeSingle();
+        
+        if (!inst?.api_token) {
+          toast.error("Token não encontrado para esta instância");
+          return;
+        }
+
+        // Send via edge function
+        const { data, error } = await supabase.functions.invoke("send-whatsapp", {
+          body: {
+            apiToken: inst.api_token,
+            number: editPhone,
+            message: editMessage,
+            clientName: editingScheduled.client_name,
+            instanceId: editingScheduled.instance_id,
+            sourceModule: editingScheduled.source_module || "whatsapp",
+          },
+        });
+        if (error) throw error;
+        if (data?.success) {
+          // Update scheduled message status
+          await (supabase as any)
+            .from("whatsapp_scheduled_messages")
+            .update({ status: "sent", phone: editPhone, message: editMessage })
+            .eq("id", editingScheduled.id);
+          toast.success("Mensagem enviada com sucesso!");
+        } else {
+          throw new Error(data?.error || "Falha ao enviar");
+        }
+      } else {
+        // Reschedule
+        if (!editScheduledAt) {
+          toast.error("Selecione uma data/hora para reagendar");
+          return;
+        }
+        await (supabase as any)
+          .from("whatsapp_scheduled_messages")
+          .update({
+            status: "pending",
+            phone: editPhone,
+            message: editMessage,
+            scheduled_at: new Date(editScheduledAt).toISOString(),
+          })
+          .eq("id", editingScheduled.id);
+        toast.success("Mensagem reagendada!");
+      }
+      setEditingScheduled(null);
+      fetchScheduled();
+      fetchMessages();
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao processar");
+    } finally {
+      setRetrySending(false);
+    }
+  };
+
   const getRoleBadge = () => {
     if (role === "admin") return <Badge className="bg-red-500/10 text-red-600 border-red-500/20 gap-1"><Shield className="h-3 w-3" />Admin</Badge>;
     if (role === "gestor") return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20 gap-1"><Users className="h-3 w-3" />Gestor</Badge>;
@@ -575,7 +672,7 @@ export function WhatsAppConfig() {
                 <CardTitle className="text-lg flex items-center gap-2">
                   <History className="h-5 w-5" /> Histórico de Mensagens
                 </CardTitle>
-                <CardDescription>Últimas 50 mensagens enviadas</CardDescription>
+                <CardDescription>Últimas 200 mensagens enviadas</CardDescription>
               </div>
               <Button variant="ghost" size="icon" onClick={fetchMessages}>
                 <RefreshCw className="h-4 w-4" />
@@ -591,9 +688,11 @@ export function WhatsAppConfig() {
                       <TableRow>
                         <TableHead>Data</TableHead>
                         {role !== "colaborador" && <TableHead>Usuário</TableHead>}
+                        <TableHead>WhatsApp Usado</TableHead>
                         <TableHead>Telefone</TableHead>
                         <TableHead>Cliente</TableHead>
                         <TableHead>Tipo</TableHead>
+                        <TableHead>Módulo</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -606,10 +705,20 @@ export function WhatsAppConfig() {
                           {role !== "colaborador" && (
                             <TableCell className="text-xs">{msg._user_name || "-"}</TableCell>
                           )}
+                          <TableCell className="text-xs">
+                            {msg.whatsapp_instances?.instance_name
+                              ? `${msg.whatsapp_instances.instance_name}${msg.whatsapp_instances.phone_number ? ` (${msg.whatsapp_instances.phone_number})` : ""}`
+                              : "-"}
+                          </TableCell>
                           <TableCell className="font-mono text-xs">{msg.phone}</TableCell>
                           <TableCell className="text-xs">{msg.client_name || "-"}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="text-xs">{msg.message_type || "text"}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {sourceModuleLabel(msg.source_module)}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             <Badge variant={msg.status === "sent" ? "default" : "destructive"} className="text-xs">
@@ -684,7 +793,20 @@ export function WhatsAppConfig() {
                                 <Ban className="h-3 w-3" />
                               </Button>
                             )}
+                            {msg.status === "failed" && (
+                              <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => openEditScheduled(msg)} title="Editar e Reenviar">
+                                  <Pencil className="h-3 w-3" /> Editar
+                                </Button>
+                              </div>
+                            )}
                           </TableCell>
+                          {msg.status === "failed" && msg.error_message && (
+                            <TableCell colSpan={7} className="text-xs text-destructive py-1 px-4">
+                              <AlertTriangle className="h-3 w-3 inline mr-1" />
+                              {msg.error_message}
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -769,6 +891,63 @@ export function WhatsAppConfig() {
             <Button onClick={handleSave} disabled={saving} className="gap-2 bg-green-600 hover:bg-green-700">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit/Retry Scheduled Message Dialog */}
+      <Dialog open={!!editingScheduled} onOpenChange={(open) => !open && setEditingScheduled(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5 text-orange-500" />
+              Editar e Reenviar Mensagem
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Telefone</Label>
+              <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="85999999999" />
+            </div>
+            <div>
+              <Label>Mensagem</Label>
+              <Textarea value={editMessage} onChange={(e) => setEditMessage(e.target.value)} rows={3} />
+            </div>
+            <div>
+              <Label>Ação</Label>
+              <Select value={retryAction} onValueChange={(v) => setRetryAction(v as "send_now" | "reschedule")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="send_now">Enviar Agora</SelectItem>
+                  <SelectItem value="reschedule">Reagendar</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {retryAction === "reschedule" && (
+              <div>
+                <Label>Nova Data/Hora</Label>
+                <Input
+                  type="datetime-local"
+                  value={editScheduledAt}
+                  onChange={(e) => setEditScheduledAt(e.target.value)}
+                />
+              </div>
+            )}
+            {editingScheduled?.error_message && (
+              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-xs flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>Erro anterior: {editingScheduled.error_message}</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingScheduled(null)}>Cancelar</Button>
+            <Button onClick={handleRetryScheduled} disabled={retrySending} className="gap-2">
+              {retrySending ? <Loader2 className="h-4 w-4 animate-spin" /> : retryAction === "send_now" ? <Send className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+              {retryAction === "send_now" ? "Enviar Agora" : "Reagendar"}
             </Button>
           </DialogFooter>
         </DialogContent>

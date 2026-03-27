@@ -178,6 +178,8 @@ Deno.serve(async (req) => {
           direction: "outgoing",
           message_type: msg.audio_file_id ? "audio" : "text",
           client_name: msg.lead_name,
+          instance_id: msg.whatsapp_instance_id,
+          source_module: "autolead",
         });
       } catch (sendError: any) {
         console.error(`Send error for ${msg.id}:`, sendError);
