@@ -47,6 +47,19 @@ interface Company {
 
 type UserRole = "admin" | "gestor" | "colaborador";
 
+const SOURCE_MODULE_LABELS: Record<string, string> = {
+  autolead: "AutoLead",
+  leads_premium: "Leads Premium",
+  activate_leads: "Ativar Leads",
+  meus_clientes: "Meus Clientes",
+  whatsapp: "WhatsApp",
+};
+
+function sourceModuleLabel(mod?: string | null): string {
+  if (!mod) return "Direto";
+  return SOURCE_MODULE_LABELS[mod] || mod;
+}
+
 export function WhatsAppConfig() {
   const { user, profile } = useAuth();
   const [instances, setInstances] = useState<Instance[]>([]);
@@ -780,7 +793,20 @@ export function WhatsAppConfig() {
                                 <Ban className="h-3 w-3" />
                               </Button>
                             )}
+                            {msg.status === "failed" && (
+                              <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => openEditScheduled(msg)} title="Editar e Reenviar">
+                                  <Pencil className="h-3 w-3" /> Editar
+                                </Button>
+                              </div>
+                            )}
                           </TableCell>
+                          {msg.status === "failed" && msg.error_message && (
+                            <TableCell colSpan={7} className="text-xs text-destructive py-1 px-4">
+                              <AlertTriangle className="h-3 w-3 inline mr-1" />
+                              {msg.error_message}
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
