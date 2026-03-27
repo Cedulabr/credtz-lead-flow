@@ -659,7 +659,7 @@ export function WhatsAppConfig() {
                 <CardTitle className="text-lg flex items-center gap-2">
                   <History className="h-5 w-5" /> Histórico de Mensagens
                 </CardTitle>
-                <CardDescription>Últimas 50 mensagens enviadas</CardDescription>
+                <CardDescription>Últimas 200 mensagens enviadas</CardDescription>
               </div>
               <Button variant="ghost" size="icon" onClick={fetchMessages}>
                 <RefreshCw className="h-4 w-4" />
@@ -675,9 +675,11 @@ export function WhatsAppConfig() {
                       <TableRow>
                         <TableHead>Data</TableHead>
                         {role !== "colaborador" && <TableHead>Usuário</TableHead>}
+                        <TableHead>WhatsApp Usado</TableHead>
                         <TableHead>Telefone</TableHead>
                         <TableHead>Cliente</TableHead>
                         <TableHead>Tipo</TableHead>
+                        <TableHead>Módulo</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -690,10 +692,20 @@ export function WhatsAppConfig() {
                           {role !== "colaborador" && (
                             <TableCell className="text-xs">{msg._user_name || "-"}</TableCell>
                           )}
+                          <TableCell className="text-xs">
+                            {msg.whatsapp_instances?.instance_name
+                              ? `${msg.whatsapp_instances.instance_name}${msg.whatsapp_instances.phone_number ? ` (${msg.whatsapp_instances.phone_number})` : ""}`
+                              : "-"}
+                          </TableCell>
                           <TableCell className="font-mono text-xs">{msg.phone}</TableCell>
                           <TableCell className="text-xs">{msg.client_name || "-"}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="text-xs">{msg.message_type || "text"}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {sourceModuleLabel(msg.source_module)}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             <Badge variant={msg.status === "sent" ? "default" : "destructive"} className="text-xs">
