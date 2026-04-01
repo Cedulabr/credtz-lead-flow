@@ -1,62 +1,91 @@
 
 
-## Fix Historico WhatsApp + Editar/Reenviar Agendamentos Falhos
+## Leads Premium — Status "Sem Possibilidade" + Kanban Editavel (Admin/Gestor)
 
-### Problemas Identificados
+### 1. Adicionar status "sem_possibilidade"
 
-1. **Historico incompleto**: A tabela `whatsapp_messages` nao tem coluna `source_module` — impossivel saber de qual modulo veio a mensagem. O `send-whatsapp` edge function nao recebe nem salva `instance_id` ou `source_module`. O `autolead-worker` insere em `whatsapp_messages` mas tambem sem `source_module`.
+**`src/modules/leads-premium/types.ts`**:
+- Adicionar entrada `sem_possibilidade` em `PIPELINE_STAGES` com label "Sem Possibilidade", cor vermelha/cinza escuro, order 12
+- Adicionar em `STATUS_CATEGORIES.lost`
 
-2. **Agendamentos falhos sem acao**: Tab "Agendamentos" so tem botao Cancelar para pendentes. Mensagens com status `failed` nao tem opcao de editar numero ou reenviar/reagendar.
+**`src/modules/leads-premium/components/LeadStatusBadge.tsx`**:
+- Adicionar icone para `sem_possibilidade` (ex: `MinusCircle`)
 
-3. **Historico nao mostra WhatsApp usado**: A query de historico faz `select("*")` mas nao traz o join com `whatsapp_instances` para mostrar qual instancia/numero foi usado.
+### 2. Kanban editavel — Tabela `pipeline_columns` no banco
 
-### Solucao
-
-#### 1. Migration: adicionar `source_module` a `whatsapp_messages`
-
+**Migration SQL**:
 ```sql
-ALTER TABLE public.whatsapp_messages 
-  ADD COLUMN IF NOT EXISTS source_module text;
+CREATE TABLE public.pipeline_columns (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  module text NOT NULL DEFAULT 'leads_premium',
+  column_key text NOT NULL,
+  label text NOT NULL,
+  icon text NOT NULL DEFAULT 'Circle',
+  color_from text DEFAULT 'from-gray-500',
+  color_to text DEFAULT 'to-gray-600',
+  text_color text DEFAULT 'text-gray-700',
+  bg_color text DEFAULT 'bg-gray-50',
+  border_color text DEFAULT 'border-gray-200',
+  dot_color text DEFAULT 'bg-gray-500',
+  sort_order int NOT NULL DEFAULT 0,
+  is_active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(module, column_key)
+);
+
+ALTER TABLE public.pipeline_columns ENABLE ROW LEVEL SECURITY;
+
+-- Todos autenticados podem ler
+CREATE POLICY "Authenticated can read pipeline_columns"
+  ON public.pipeline_columns FOR SELECT TO authenticated USING (true);
+
+-- Apenas admin pode modificar
+CREATE POLICY "Admin can manage pipeline_columns"
+  ON public.pipeline_columns FOR ALL TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'))
+  WITH CHECK (public.has_role(auth.uid(), 'admin'));
 ```
 
-#### 2. Edge Function `send-whatsapp` — receber e salvar `instanceId` e `sourceModule`
+**Seed com dados iniciais** (insert tool): Inserir as colunas atuais do kanban + `sem_possibilidade` como registros na tabela.
 
-- Aceitar `instanceId` e `sourceModule` no body
-- No insert em `whatsapp_messages`, incluir `instance_id: instanceId`, `source_module: sourceModule`
+### 3. Hook `usePipelineColumns.ts`
 
-#### 3. Hook `useWhatsApp.ts` — passar `instanceId` e `sourceModule` para edge function
+Novo hook que:
+- Busca colunas da tabela `pipeline_columns` filtradas por `module = 'leads_premium'` e `is_active = true`, ordenadas por `sort_order`
+- Fallback para `PIPELINE_COLUMNS` hardcoded se query falhar
+- Funções CRUD para admin/gestor: `addColumn`, `updateColumn`, `removeColumn` (soft delete via `is_active = false`), `reorderColumns`
 
-- `sendTextMessage` e `sendMediaMessage`: adicionar param `sourceModule` e enviar no body junto com `instanceId: targetId`
+### 4. Modal de gerenciamento do Kanban
 
-#### 4. `autolead-worker` — incluir `source_module: 'autolead'` e `instance_id`
+**Novo arquivo**: `src/modules/leads-premium/components/PipelineColumnsManager.tsx`
 
-No insert em `whatsapp_messages` (linha 172), adicionar:
-```
-source_module: 'autolead',
-instance_id: msg.whatsapp_instance_id,
-```
+Dialog acessivel apenas para admin/gestor com:
+- Lista das colunas atuais com drag-to-reorder (ou botoes seta)
+- Para cada coluna: campos para editar label, escolher cor (preset de cores), ativar/desativar
+- Botao "Adicionar Coluna": campo key (slug auto-gerado do label), label, cor
+- Botao "Remover" com confirmacao (soft delete — leads existentes naquele status nao sao afetados)
 
-#### 5. `WhatsAppConfig.tsx` — Historico completo
+### 5. Integrar no PipelineView
 
-**Historico (fetchMessages)**:
-- Mudar query para `select("*, whatsapp_instances(instance_name, phone_number)")` 
-- Adicionar coluna "WhatsApp Usado" na tabela (instance_name + phone)
-- Adicionar coluna "Modulo" mostrando source_module traduzido (autolead → AutoLead, leads_premium → Leads Premium, etc.)
-- Aumentar limit de 100 para 200
+**`src/modules/leads-premium/views/PipelineView.tsx`**:
+- Substituir `PIPELINE_COLUMNS` hardcoded pelo hook `usePipelineColumns`
+- Mapear icones via lookup de string (ex: `'Sparkles' -> Sparkles`)
+- Adicionar botao engrenagem no header do kanban (visivel so para admin/gestor) que abre o `PipelineColumnsManager`
+- O `PIPELINE_STAGES` continua como fallback para cores/badges em outros componentes
 
-**Agendamentos (tab scheduled)**:
-- Para mensagens com status `failed`: mostrar `error_message` e botoes "Editar Numero" + "Enviar Agora" + "Reagendar"
-- Dialog de edicao: campo para editar telefone, opcao de enviar imediatamente ou escolher nova data/hora
-- Ao "Enviar Agora": chamar `send-whatsapp` edge function diretamente e atualizar status
-- Ao "Reagendar": update `scheduled_at` e resetar status para `pending`
+### 6. Atualizar `LeadStatusBadge` e selects de status
 
-### Arquivos Modificados
+Os selects de status em `LeadListItem`, `LeadDetailDrawer` etc. tambem devem consumir as colunas dinamicas para mostrar todas as opcoes disponiveis.
 
-| Arquivo | Mudanca |
-|---------|---------|
-| Migration SQL | Adicionar coluna `source_module` |
-| `supabase/functions/send-whatsapp/index.ts` | Receber/salvar `instanceId` e `sourceModule` |
-| `supabase/functions/autolead-worker/index.ts` | Incluir `source_module` e `instance_id` no log |
-| `src/hooks/useWhatsApp.ts` | Passar `instanceId` e `sourceModule` no body |
-| `src/components/WhatsAppConfig.tsx` | Historico com join + colunas extras; agendamentos falhos editaveis |
+### Resumo de arquivos
+
+| Arquivo | Acao |
+|---------|------|
+| Migration SQL | Criar tabela `pipeline_columns` com RLS |
+| Insert SQL | Popular com colunas atuais + sem_possibilidade |
+| `src/modules/leads-premium/types.ts` | Adicionar `sem_possibilidade` ao PIPELINE_STAGES |
+| `src/modules/leads-premium/components/LeadStatusBadge.tsx` | Icone para novo status |
+| `src/modules/leads-premium/hooks/usePipelineColumns.ts` | Novo hook CRUD |
+| `src/modules/leads-premium/components/PipelineColumnsManager.tsx` | Novo modal de gestao |
+| `src/modules/leads-premium/views/PipelineView.tsx` | Consumir colunas dinamicas + botao config |
 
