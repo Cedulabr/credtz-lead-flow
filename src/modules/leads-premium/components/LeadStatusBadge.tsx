@@ -24,7 +24,8 @@ const STATUS_ICONS: Record<string, React.ElementType> = {
   sem_interesse: Ban,
   nao_e_cliente: UserX,
   sem_retorno: PhoneOff,
-  nao_e_whatsapp: MessageCircle
+  nao_e_whatsapp: MessageCircle,
+  sem_possibilidade: MinusCircle
 };
 
 export function LeadStatusBadge({ status, size = "md", showIcon = true }: LeadStatusBadgeProps) {

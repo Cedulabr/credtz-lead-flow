@@ -218,7 +218,7 @@ export const PIPELINE_STAGES: Record<string, {
 export const STATUS_CATEGORIES = {
   active: ['new_lead', 'autolead', 'em_andamento', 'aguardando_retorno', 'agendamento'],
   converted: ['cliente_fechado'],
-  lost: ['recusou_oferta', 'sem_interesse', 'nao_e_cliente', 'sem_retorno', 'nao_e_whatsapp'],
+  lost: ['recusou_oferta', 'sem_interesse', 'nao_e_cliente', 'sem_retorno', 'nao_e_whatsapp', 'sem_possibilidade'],
   scheduled: ['contato_futuro', 'agendamento']
 };
 
