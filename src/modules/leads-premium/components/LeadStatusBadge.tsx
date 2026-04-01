@@ -3,7 +3,7 @@ import { PIPELINE_STAGES } from "../types";
 import { cn } from "@/lib/utils";
 import { 
   Sparkles, TrendingUp, Clock, CheckCircle, XCircle, 
-  Calendar, UserX, Ban, PhoneOff, MessageCircle 
+  Calendar, UserX, Ban, PhoneOff, MessageCircle, MinusCircle 
 } from "lucide-react";
 
 interface LeadStatusBadgeProps {
