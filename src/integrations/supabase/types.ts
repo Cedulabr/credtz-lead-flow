@@ -532,6 +532,104 @@ export type Database = {
           },
         ]
       }
+      ai_settings: {
+        Row: {
+          ai_mode: string
+          company_id: string | null
+          created_at: string | null
+          fallback_provider: string | null
+          id: string
+          is_active: boolean | null
+          model: string
+          provider: string
+          system_prompt: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ai_mode?: string
+          company_id?: string | null
+          created_at?: string | null
+          fallback_provider?: string | null
+          id?: string
+          is_active?: boolean | null
+          model?: string
+          provider?: string
+          system_prompt?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ai_mode?: string
+          company_id?: string | null
+          created_at?: string | null
+          fallback_provider?: string | null
+          id?: string
+          is_active?: boolean | null
+          model?: string
+          provider?: string
+          system_prompt?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage_log: {
+        Row: {
+          company_id: string | null
+          conversation_id: string | null
+          created_at: string | null
+          id: string
+          mode: string
+          model: string
+          provider: string
+          tokens_used: number | null
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          id?: string
+          mode: string
+          model: string
+          provider: string
+          tokens_used?: number | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          id?: string
+          mode?: string
+          model?: string
+          provider?: string
+          tokens_used?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_usage_log_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       announcements: {
         Row: {
           content: string
@@ -934,6 +1032,66 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "autolead_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_settings: {
+        Row: {
+          ai_enabled: boolean | null
+          ai_mode: string | null
+          auto_assign: boolean | null
+          away_message: string | null
+          business_hours_end: string | null
+          business_hours_start: string | null
+          company_id: string | null
+          created_at: string | null
+          id: string
+          instance_id: string
+          updated_at: string | null
+          welcome_message: string | null
+        }
+        Insert: {
+          ai_enabled?: boolean | null
+          ai_mode?: string | null
+          auto_assign?: boolean | null
+          away_message?: string | null
+          business_hours_end?: string | null
+          business_hours_start?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          instance_id: string
+          updated_at?: string | null
+          welcome_message?: string | null
+        }
+        Update: {
+          ai_enabled?: boolean | null
+          ai_mode?: string | null
+          auto_assign?: boolean | null
+          away_message?: string | null
+          business_hours_end?: string | null
+          business_hours_start?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          instance_id?: string
+          updated_at?: string | null
+          welcome_message?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_settings_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: true
+            referencedRelation: "whatsapp_instances"
             referencedColumns: ["id"]
           },
         ]
@@ -1575,6 +1733,38 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      chat_tags: {
+        Row: {
+          color: string
+          company_id: string | null
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_tags_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       client_deletion_requests: {
         Row: {
@@ -2472,6 +2662,9 @@ export type Database = {
       }
       companies: {
         Row: {
+          business_days: string[] | null
+          business_hours_end: string | null
+          business_hours_start: string | null
           cnpj: string | null
           cor_primaria: string | null
           cor_secundaria: string | null
@@ -2488,6 +2681,9 @@ export type Database = {
           whatsapp_number: string | null
         }
         Insert: {
+          business_days?: string[] | null
+          business_hours_end?: string | null
+          business_hours_start?: string | null
           cnpj?: string | null
           cor_primaria?: string | null
           cor_secundaria?: string | null
@@ -2504,6 +2700,9 @@ export type Database = {
           whatsapp_number?: string | null
         }
         Update: {
+          business_days?: string[] | null
+          business_hours_end?: string | null
+          business_hours_start?: string | null
           cnpj?: string | null
           cor_primaria?: string | null
           cor_secundaria?: string | null
@@ -2638,6 +2837,74 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      conversation_notes: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          note: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          note: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          note?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_notes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_tags: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          tag_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          tag_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_tags_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "chat_tags"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       credits_history: {
         Row: {
@@ -3360,6 +3627,121 @@ export type Database = {
           },
         ]
       }
+      kanban_boards: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kanban_boards_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kanban_columns: {
+        Row: {
+          board_id: string
+          color: string | null
+          created_at: string | null
+          id: string
+          is_fixed: boolean | null
+          name: string
+          position: number
+          sla_minutes: number | null
+        }
+        Insert: {
+          board_id: string
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          is_fixed?: boolean | null
+          name: string
+          position?: number
+          sla_minutes?: number | null
+        }
+        Update: {
+          board_id?: string
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          is_fixed?: boolean | null
+          name?: string
+          position?: number
+          sla_minutes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kanban_columns_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "kanban_boards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      landing_leads: {
+        Row: {
+          cpf: string
+          created_at: string | null
+          email: string
+          estrutura: string | null
+          experiencia: string | null
+          id: string
+          interesse: string | null
+          nome: string
+          termos_aceitos: boolean | null
+          tipo_profissional: string | null
+          whatsapp: string
+        }
+        Insert: {
+          cpf: string
+          created_at?: string | null
+          email: string
+          estrutura?: string | null
+          experiencia?: string | null
+          id?: string
+          interesse?: string | null
+          nome: string
+          termos_aceitos?: boolean | null
+          tipo_profissional?: string | null
+          whatsapp: string
+        }
+        Update: {
+          cpf?: string
+          created_at?: string | null
+          email?: string
+          estrutura?: string | null
+          experiencia?: string | null
+          id?: string
+          interesse?: string | null
+          nome?: string
+          termos_aceitos?: boolean | null
+          tipo_profissional?: string | null
+          whatsapp?: string
+        }
+        Relationships: []
+      }
       lead_alerts: {
         Row: {
           alert_type: string
@@ -4000,6 +4382,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          business_hours_end: string | null
+          business_hours_start: string | null
           can_access_activate_leads: boolean | null
           can_access_alertas: boolean | null
           can_access_audios: boolean | null
@@ -4031,6 +4415,7 @@ export type Database = {
           is_active: boolean | null
           leads_premium_enabled: boolean | null
           level: Database["public"]["Enums"]["user_level"] | null
+          max_instances: number
           name: string | null
           organization_id: number | null
           phone: string | null
@@ -4039,9 +4424,12 @@ export type Database = {
           sector: string | null
           sms_enabled: boolean | null
           updated_at: string | null
+          use_custom_hours: boolean | null
           whatsapp_enabled: boolean | null
         }
         Insert: {
+          business_hours_end?: string | null
+          business_hours_start?: string | null
           can_access_activate_leads?: boolean | null
           can_access_alertas?: boolean | null
           can_access_audios?: boolean | null
@@ -4073,6 +4461,7 @@ export type Database = {
           is_active?: boolean | null
           leads_premium_enabled?: boolean | null
           level?: Database["public"]["Enums"]["user_level"] | null
+          max_instances?: number
           name?: string | null
           organization_id?: number | null
           phone?: string | null
@@ -4081,9 +4470,12 @@ export type Database = {
           sector?: string | null
           sms_enabled?: boolean | null
           updated_at?: string | null
+          use_custom_hours?: boolean | null
           whatsapp_enabled?: boolean | null
         }
         Update: {
+          business_hours_end?: string | null
+          business_hours_start?: string | null
           can_access_activate_leads?: boolean | null
           can_access_alertas?: boolean | null
           can_access_audios?: boolean | null
@@ -4115,6 +4507,7 @@ export type Database = {
           is_active?: boolean | null
           leads_premium_enabled?: boolean | null
           level?: Database["public"]["Enums"]["user_level"] | null
+          max_instances?: number
           name?: string | null
           organization_id?: number | null
           phone?: string | null
@@ -4123,6 +4516,7 @@ export type Database = {
           sector?: string | null
           sms_enabled?: boolean | null
           updated_at?: string | null
+          use_custom_hours?: boolean | null
           whatsapp_enabled?: boolean | null
         }
         Relationships: []
@@ -4478,6 +4872,63 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_messages: {
+        Row: {
+          conversation_id: string
+          created_at: string | null
+          created_by: string
+          error_message: string | null
+          id: string
+          instance_id: string | null
+          message: string
+          phone: string
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string | null
+          created_by: string
+          error_message?: string | null
+          id?: string
+          instance_id?: string | null
+          message: string
+          phone: string
+          scheduled_at: string
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string | null
+          created_by?: string
+          error_message?: string | null
+          id?: string
+          instance_id?: string | null
+          message?: string
+          phone?: string
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_messages_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
             referencedColumns: ["id"]
           },
         ]
@@ -6757,35 +7208,62 @@ export type Database = {
       }
       whatsapp_conversations: {
         Row: {
+          ai_summary: string | null
+          assigned_to: string | null
+          avatar_url: string | null
+          contact_jid: string | null
           contact_name: string | null
           contact_phone: string
           created_at: string
+          entered_column_at: string | null
           id: string
           instance_id: string | null
+          kanban_column_id: string | null
           last_message: string | null
           last_message_at: string | null
+          lead_score: string | null
+          status: string
+          unread_count: number
           updated_at: string
           user_id: string
         }
         Insert: {
+          ai_summary?: string | null
+          assigned_to?: string | null
+          avatar_url?: string | null
+          contact_jid?: string | null
           contact_name?: string | null
           contact_phone: string
           created_at?: string
+          entered_column_at?: string | null
           id?: string
           instance_id?: string | null
+          kanban_column_id?: string | null
           last_message?: string | null
           last_message_at?: string | null
+          lead_score?: string | null
+          status?: string
+          unread_count?: number
           updated_at?: string
           user_id: string
         }
         Update: {
+          ai_summary?: string | null
+          assigned_to?: string | null
+          avatar_url?: string | null
+          contact_jid?: string | null
           contact_name?: string | null
           contact_phone?: string
           created_at?: string
+          entered_column_at?: string | null
           id?: string
           instance_id?: string | null
+          kanban_column_id?: string | null
           last_message?: string | null
           last_message_at?: string | null
+          lead_score?: string | null
+          status?: string
+          unread_count?: number
           updated_at?: string
           user_id?: string
         }
@@ -6795,6 +7273,13 @@ export type Database = {
             columns: ["instance_id"]
             isOneToOne: false
             referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_kanban_column_id_fkey"
+            columns: ["kanban_column_id"]
+            isOneToOne: false
+            referencedRelation: "kanban_columns"
             referencedColumns: ["id"]
           },
         ]
@@ -6848,9 +7333,13 @@ export type Database = {
       }
       whatsapp_messages: {
         Row: {
+          audio_transcription: string | null
           client_name: string | null
+          conversation_id: string | null
           created_at: string
           direction: string | null
+          external_message_id: string | null
+          from_me: boolean
           id: string
           instance_id: string | null
           media_url: string | null
@@ -6863,9 +7352,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          audio_transcription?: string | null
           client_name?: string | null
+          conversation_id?: string | null
           created_at?: string
           direction?: string | null
+          external_message_id?: string | null
+          from_me?: boolean
           id?: string
           instance_id?: string | null
           media_url?: string | null
@@ -6878,9 +7371,13 @@ export type Database = {
           user_id: string
         }
         Update: {
+          audio_transcription?: string | null
           client_name?: string | null
+          conversation_id?: string | null
           created_at?: string
           direction?: string | null
+          external_message_id?: string | null
+          from_me?: boolean
           id?: string
           instance_id?: string | null
           media_url?: string | null
@@ -6893,6 +7390,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "whatsapp_messages_instance_id_fkey"
             columns: ["instance_id"]
@@ -7243,12 +7747,21 @@ export type Database = {
         Returns: boolean
       }
       import_leads_from_csv: { Args: { leads_data: Json }; Returns: Json }
+      increment_unread: { Args: { conv_id: string }; Returns: undefined }
       is_company_gestor: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
       is_gestor_or_admin: { Args: { _user_id: string }; Returns: boolean }
       is_global_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_same_company_gestor: {
+        Args: { _target_user_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_user_gestor_of_any_company: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       merge_activate_leads: {
         Args: {
           keep_lead_id: string
