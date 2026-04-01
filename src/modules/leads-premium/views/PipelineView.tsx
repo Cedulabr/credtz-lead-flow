@@ -3,26 +3,22 @@ import { motion } from "framer-motion";
 import { Lead, LeadStats, PIPELINE_STAGES, UserProfile } from "../types";
 import { LeadMiniCard } from "../components/LeadMiniCard";
 import { ScheduleModal } from "../components/ScheduleModal";
+import { PipelineColumnsManager } from "../components/PipelineColumnsManager";
+import { usePipelineColumns } from "../hooks/usePipelineColumns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { 
-  Sparkles, 
-  TrendingUp, 
-  Clock, 
-  Calendar, 
-  CheckCircle, 
-  XCircle,
-  Users,
-  Target,
-  User,
-  Filter,
-  Bot
+  Sparkles, TrendingUp, Clock, Calendar, CheckCircle, XCircle,
+  Users, Target, User, Filter, Bot, MinusCircle, Ban, PhoneOff,
+  MessageCircle, UserX, Circle, Settings2,
+  type LucideIcon
 } from "lucide-react";
 
 interface PipelineViewProps {
@@ -34,31 +30,32 @@ interface PipelineViewProps {
   stats: LeadStats;
 }
 
-const PIPELINE_COLUMNS = [
-  { key: 'new_lead', icon: Sparkles, label: 'Novos' },
-  { key: 'autolead', icon: Bot, label: 'Auto Leads' },
-  { key: 'aguardando_retorno', icon: Clock, label: 'Aguard. Retorno' },
-  { key: 'agendamento', icon: Calendar, label: 'Agendamento' },
-  { key: 'cliente_fechado', icon: CheckCircle, label: 'Fechados' },
-  { key: 'recusou_oferta', icon: XCircle, label: 'Recusados' },
-];
+const ICON_MAP: Record<string, LucideIcon> = {
+  Sparkles, TrendingUp, Clock, Calendar, CheckCircle, XCircle,
+  Bot, MinusCircle, Ban, PhoneOff, MessageCircle, UserX, Circle,
+  Users, Target, User, Filter, Settings2,
+};
+
+function getIcon(iconName: string): LucideIcon {
+  return ICON_MAP[iconName] || Circle;
+}
 
 export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusChange, stats }: PipelineViewProps) {
   const isMobile = useIsMobile();
   const { profile } = useAuth();
   const isAdminOrGestor = profile?.role === 'admin' || (profile?.role as string) === 'gestor';
+  const { columns: pipelineColumns, isLoading: columnsLoading } = usePipelineColumns();
   
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [draggingLeadId, setDraggingLeadId] = useState<string | null>(null);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [scheduleTargetLead, setScheduleTargetLead] = useState<Lead | null>(null);
+  const [managerOpen, setManagerOpen] = useState(false);
   
-  // Pipeline filters
   const [filterUser, setFilterUser] = useState("all");
   const [filterConvenio, setFilterConvenio] = useState("all");
   const [filterTag, setFilterTag] = useState("all");
 
-  // Extract unique convenios and tags
   const availableConvenios = useMemo(() => {
     const unique = [...new Set(leads.map(l => l.convenio).filter(Boolean))];
     return unique.sort();
@@ -69,7 +66,6 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
     return unique.sort();
   }, [leads]);
 
-  // Filter leads
   const filteredLeads = useMemo(() => {
     return leads.filter(lead => {
       if (filterUser !== "all" && lead.assigned_to !== filterUser && lead.created_by !== filterUser) return false;
@@ -81,11 +77,11 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
 
   const groupedLeads = useMemo(() => {
     const groups: Record<string, Lead[]> = {};
-    PIPELINE_COLUMNS.forEach(col => {
-      groups[col.key] = filteredLeads.filter(l => l.status === col.key).slice(0, 50);
+    pipelineColumns.forEach(col => {
+      groups[col.column_key] = filteredLeads.filter(l => l.status === col.column_key).slice(0, 50);
     });
     return groups;
-  }, [filteredLeads]);
+  }, [filteredLeads, pipelineColumns]);
 
   const handleDragStart = useCallback((e: React.DragEvent, leadId: string) => {
     e.dataTransfer.setData('text/plain', leadId);
@@ -114,7 +110,6 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
     const lead = leads.find(l => l.id === leadId);
     if (!lead || lead.status === targetStatus) return;
     
-    // Intercept drop on "agendamento" to open schedule modal
     if (targetStatus === 'agendamento') {
       setScheduleTargetLead(lead);
       setScheduleModalOpen(true);
@@ -129,7 +124,7 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
     setDraggingLeadId(null);
   }, []);
 
-  if (isLoading) {
+  if (isLoading || columnsLoading) {
     return (
       <div className="p-4 space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -141,12 +136,10 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
     );
   }
 
-  // Filters bar
   const filtersBar = (
     <div className="flex items-center gap-3 flex-wrap mb-4">
       <Filter className="h-4 w-4 text-muted-foreground" />
       
-      {/* User filter - only for admin/gestor */}
       {isAdminOrGestor && users.length > 0 && (
         <Select value={filterUser} onValueChange={setFilterUser}>
           <SelectTrigger className="w-[180px] h-9">
@@ -162,7 +155,6 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
         </Select>
       )}
 
-      {/* Convenio filter */}
       {availableConvenios.length > 0 && (
         <Select value={filterConvenio} onValueChange={setFilterConvenio}>
           <SelectTrigger className="w-[160px] h-9">
@@ -177,7 +169,6 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
         </Select>
       )}
 
-      {/* Tag filter */}
       {availableTags.length > 0 && (
         <Select value={filterTag} onValueChange={setFilterTag}>
           <SelectTrigger className="w-[140px] h-9">
@@ -197,13 +188,27 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
           {filteredLeads.length} leads
         </Badge>
       )}
+
+      {/* Settings button for admin/gestor */}
+      {isAdminOrGestor && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-auto h-9"
+          onClick={() => setManagerOpen(true)}
+        >
+          <Settings2 className="h-4 w-4 mr-1.5" />
+          Editar Funil
+        </Button>
+      )}
     </div>
   );
+
+  const colCount = pipelineColumns.length;
 
   if (isMobile) {
     return (
       <div className="h-full flex flex-col">
-        {/* Quick Stats */}
         <div className="px-4 py-3 grid grid-cols-4 gap-2 border-b bg-muted/30">
           <div className="text-center">
             <p className="text-lg font-bold text-blue-600">{stats.novos}</p>
@@ -225,28 +230,31 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
 
         <div className="px-4 pt-3">{filtersBar}</div>
 
-        {/* Horizontal Scrollable Pipeline */}
         <ScrollArea className="flex-1">
           <div className="flex gap-3 p-4 min-w-max">
-            {PIPELINE_COLUMNS.map((column, colIndex) => {
-              const config = PIPELINE_STAGES[column.key];
-              const columnLeads = groupedLeads[column.key] || [];
-              const Icon = column.icon;
+            {pipelineColumns.map((column, colIndex) => {
+              const config = PIPELINE_STAGES[column.column_key] || {
+                borderColor: column.border_color,
+                bgColor: column.bg_color,
+                textColor: column.text_color,
+              };
+              const columnLeads = groupedLeads[column.column_key] || [];
+              const Icon = getIcon(column.icon);
 
               return (
                 <motion.div
-                  key={column.key}
+                  key={column.column_key}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: colIndex * 0.05 }}
                   className="w-[280px] flex-shrink-0"
                 >
-                  <Card className={`border-t-4 ${config.borderColor} h-full`}>
+                  <Card className={`border-t-4 ${config.borderColor || column.border_color} h-full`}>
                     <CardHeader className="py-3 px-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className={`p-1.5 rounded-lg ${config.bgColor}`}>
-                            <Icon className={`h-4 w-4 ${config.textColor}`} />
+                          <div className={`p-1.5 rounded-lg ${config.bgColor || column.bg_color}`}>
+                            <Icon className={`h-4 w-4 ${config.textColor || column.text_color}`} />
                           </div>
                           <CardTitle className="text-sm font-semibold">
                             {column.label}
@@ -280,6 +288,8 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
           </div>
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
+
+        <PipelineColumnsManager open={managerOpen} onOpenChange={setManagerOpen} />
       </div>
     );
   }
@@ -368,32 +378,35 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
       </div>
 
       {/* Pipeline Columns with Drag & Drop */}
-      <div className="grid grid-cols-6 gap-3">
-        {PIPELINE_COLUMNS.map((column, colIndex) => {
-          const config = PIPELINE_STAGES[column.key];
-          const columnLeads = groupedLeads[column.key] || [];
-          const Icon = column.icon;
-          const isOver = dragOverColumn === column.key;
+      <div className={`grid gap-3`} style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))` }}>
+        {pipelineColumns.map((column, colIndex) => {
+          const config = PIPELINE_STAGES[column.column_key];
+          const borderColor = config?.borderColor || column.border_color;
+          const bgColor = config?.bgColor || column.bg_color;
+          const textColor = config?.textColor || column.text_color;
+          const columnLeads = groupedLeads[column.column_key] || [];
+          const Icon = getIcon(column.icon);
+          const isOver = dragOverColumn === column.column_key;
 
           return (
             <motion.div
-              key={column.key}
+              key={column.column_key}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: colIndex * 0.05 }}
-              onDragOver={(e: any) => handleDragOver(e, column.key)}
+              onDragOver={(e: any) => handleDragOver(e, column.column_key)}
               onDragLeave={handleDragLeave}
-              onDrop={(e: any) => handleDrop(e, column.key)}
+              onDrop={(e: any) => handleDrop(e, column.column_key)}
             >
               <Card className={cn(
-                `border-t-4 ${config.borderColor} h-[calc(100vh-400px)] min-h-[400px] transition-all duration-200`,
+                `border-t-4 ${borderColor} h-[calc(100vh-400px)] min-h-[400px] transition-all duration-200`,
                 isOver && "ring-2 ring-primary bg-primary/5 scale-[1.02]"
               )}>
                 <CardHeader className="py-3 px-4 border-b">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className={`p-1.5 rounded-lg ${config.bgColor}`}>
-                        <Icon className={`h-4 w-4 ${config.textColor}`} />
+                      <div className={`p-1.5 rounded-lg ${bgColor}`}>
+                        <Icon className={`h-4 w-4 ${textColor}`} />
                       </div>
                       <CardTitle className="text-sm font-semibold">
                         {column.label}
@@ -415,8 +428,8 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
                           <p className="text-primary font-medium">Solte aqui</p>
                         ) : (
                           <>
-                            <div className={`w-12 h-12 mx-auto mb-3 rounded-full ${config.bgColor} flex items-center justify-center opacity-50`}>
-                              <Icon className={`h-6 w-6 ${config.textColor}`} />
+                            <div className={`w-12 h-12 mx-auto mb-3 rounded-full ${bgColor} flex items-center justify-center opacity-50`}>
+                              <Icon className={`h-6 w-6 ${textColor}`} />
                             </div>
                             Nenhum lead
                           </>
@@ -455,12 +468,13 @@ export function PipelineView({ leads, users, isLoading, onLeadSelect, onStatusCh
         onOpenChange={setScheduleModalOpen}
         lead={scheduleTargetLead}
         onConfirm={() => {
-          // Trigger a refresh by calling onStatusChange with the same status
           if (scheduleTargetLead && onStatusChange) {
             onStatusChange(scheduleTargetLead.id, 'agendamento');
           }
         }}
       />
+
+      <PipelineColumnsManager open={managerOpen} onOpenChange={setManagerOpen} />
     </div>
   );
 }
