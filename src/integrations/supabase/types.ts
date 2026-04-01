@@ -4315,6 +4315,57 @@ export type Database = {
           },
         ]
       }
+      pipeline_columns: {
+        Row: {
+          bg_color: string | null
+          border_color: string | null
+          color_from: string | null
+          color_to: string | null
+          column_key: string
+          created_at: string | null
+          dot_color: string | null
+          icon: string
+          id: string
+          is_active: boolean | null
+          label: string
+          module: string
+          sort_order: number
+          text_color: string | null
+        }
+        Insert: {
+          bg_color?: string | null
+          border_color?: string | null
+          color_from?: string | null
+          color_to?: string | null
+          column_key: string
+          created_at?: string | null
+          dot_color?: string | null
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          label: string
+          module?: string
+          sort_order?: number
+          text_color?: string | null
+        }
+        Update: {
+          bg_color?: string | null
+          border_color?: string | null
+          color_from?: string | null
+          color_to?: string | null
+          column_key?: string
+          created_at?: string | null
+          dot_color?: string | null
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          label?: string
+          module?: string
+          sort_order?: number
+          text_color?: string | null
+        }
+        Relationships: []
+      }
       pipeline_history: {
         Row: {
           changed_by: string
