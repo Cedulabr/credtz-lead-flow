@@ -202,6 +202,15 @@ export const PIPELINE_STAGES: Record<string, {
     borderColor: "border-violet-200",
     dotColor: "bg-violet-500",
     order: 11
+  },
+  sem_possibilidade: {
+    label: "Sem Possibilidade",
+    color: "from-stone-500 to-stone-700",
+    textColor: "text-stone-700",
+    bgColor: "bg-stone-50",
+    borderColor: "border-stone-300",
+    dotColor: "bg-stone-500",
+    order: 12
   }
 };
 
@@ -209,7 +218,7 @@ export const PIPELINE_STAGES: Record<string, {
 export const STATUS_CATEGORIES = {
   active: ['new_lead', 'autolead', 'em_andamento', 'aguardando_retorno', 'agendamento'],
   converted: ['cliente_fechado'],
-  lost: ['recusou_oferta', 'sem_interesse', 'nao_e_cliente', 'sem_retorno', 'nao_e_whatsapp'],
+  lost: ['recusou_oferta', 'sem_interesse', 'nao_e_cliente', 'sem_retorno', 'nao_e_whatsapp', 'sem_possibilidade'],
   scheduled: ['contato_futuro', 'agendamento']
 };
 

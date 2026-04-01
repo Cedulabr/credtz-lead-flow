@@ -3,7 +3,7 @@ import { PIPELINE_STAGES } from "../types";
 import { cn } from "@/lib/utils";
 import { 
   Sparkles, TrendingUp, Clock, CheckCircle, XCircle, 
-  Calendar, UserX, Ban, PhoneOff, MessageCircle 
+  Calendar, UserX, Ban, PhoneOff, MessageCircle, MinusCircle 
 } from "lucide-react";
 
 interface LeadStatusBadgeProps {
@@ -24,7 +24,8 @@ const STATUS_ICONS: Record<string, React.ElementType> = {
   sem_interesse: Ban,
   nao_e_cliente: UserX,
   sem_retorno: PhoneOff,
-  nao_e_whatsapp: MessageCircle
+  nao_e_whatsapp: MessageCircle,
+  sem_possibilidade: MinusCircle
 };
 
 export function LeadStatusBadge({ status, size = "md", showIcon = true }: LeadStatusBadgeProps) {
