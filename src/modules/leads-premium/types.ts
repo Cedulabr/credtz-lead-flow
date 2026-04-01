@@ -202,6 +202,15 @@ export const PIPELINE_STAGES: Record<string, {
     borderColor: "border-violet-200",
     dotColor: "bg-violet-500",
     order: 11
+  },
+  sem_possibilidade: {
+    label: "Sem Possibilidade",
+    color: "from-stone-500 to-stone-700",
+    textColor: "text-stone-700",
+    bgColor: "bg-stone-50",
+    borderColor: "border-stone-300",
+    dotColor: "bg-stone-500",
+    order: 12
   }
 };
 
