@@ -28,6 +28,7 @@ import { useTelevendasStats } from "./hooks/useTelevendasStats";
 import { SmartSearch } from "./components/SmartSearch";
 import { StatusChangeModal } from "./components/StatusChangeModal";
 import { FiltersDrawer } from "./components/FiltersDrawer";
+import { ExportPDFButton } from "./components/ExportPDFButton";
 import { DetailModal } from "./components/DetailModal";
 import { EditProposalModal } from "./components/EditProposalModal";
 import { CollaboratorEditModal } from "./components/CollaboratorEditModal";
@@ -627,16 +628,24 @@ export const TelevendasModule = () => {
           </Button>
           {/* Sync all */}
           {isGestorOrAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSyncAll}
-              disabled={refreshing}
-              className="h-10 rounded-xl gap-1 text-xs"
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">Sync</span>
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSyncAll}
+                disabled={refreshing}
+                className="h-10 rounded-xl gap-1 text-xs"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                <span className="hidden sm:inline">Sync</span>
+              </Button>
+              <ExportPDFButton
+                filteredTelevendas={filteredTelevendas}
+                filteredStats={filteredStats}
+                filters={filters}
+                isGestorOrAdmin={isGestorOrAdmin}
+              />
+            </>
           )}
           <FiltersDrawer
             filters={filters}
