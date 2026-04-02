@@ -27,7 +27,7 @@ export function useActivateLeads() {
     } finally {
       setIsLoading(false);
     }
-  }, [profile?.company_id]);
+  }, []);
 
   const fetchUsers = useCallback(async () => {
     try {
