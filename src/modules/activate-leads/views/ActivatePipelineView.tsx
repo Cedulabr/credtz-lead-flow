@@ -250,6 +250,7 @@ export function ActivatePipelineView({ leads, users, stats, origens, isLoading, 
                         onClick={onLeadSelect}
                         onDragStart={handleDragStart}
                         isDragging={draggingLeadId === lead.id}
+                        showWorkedTime={filterWorkedToday}
                       />
                     ))
                   )}
