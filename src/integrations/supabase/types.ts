@@ -7855,13 +7855,15 @@ export type Database = {
         }
         Returns: boolean
       }
-      has_role_safe: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+      has_role_safe:
+        | { Args: { _role: string; _user_id: string }; Returns: boolean }
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+            }
+            Returns: boolean
+          }
       import_leads_from_csv: { Args: { leads_data: Json }; Returns: Json }
       increment_unread: { Args: { conv_id: string }; Returns: undefined }
       is_company_gestor: {
