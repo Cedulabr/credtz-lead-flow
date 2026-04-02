@@ -427,9 +427,9 @@ export function LeadsPremiumModule() {
             </div>
             <p className="text-xs text-muted-foreground">créditos disponíveis</p>
           </div>
-          <Button onClick={() => setIsRequestModalOpen(true)} disabled={userCredits <= 0}>
+          <Button onClick={() => setIsRequestModalOpen(true)} disabled={userCredits <= 0 || isOverdueBlocked}>
             <Plus className="h-4 w-4 mr-2" />
-            Pedir Leads
+            {isOverdueBlocked ? 'Bloqueado' : 'Pedir Leads'}
           </Button>
         </div>
       </div>
