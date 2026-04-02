@@ -102,7 +102,7 @@ export const TelevendasModule = () => {
 
   // Centralized stats
   const centralStats = useTelevendasStats(televendas, bankCalculationModel);
-  const filteredStats = useTelevendasStats(filteredTelevendas, bankCalculationModel);
+  
 
   // Check gestor role
   useEffect(() => {
