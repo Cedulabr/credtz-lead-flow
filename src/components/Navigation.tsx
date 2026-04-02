@@ -57,6 +57,10 @@ const mobileNavItems = [
 
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebar-collapsed');
+    return saved === 'true';
+  });
   const { user, profile, signOut, isAdmin } = useAuth();
   const { companyName, logoUrl } = useWhitelabel();
 
