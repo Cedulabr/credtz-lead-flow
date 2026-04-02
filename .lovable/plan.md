@@ -1,28 +1,25 @@
 
 
-## Filtro "Trabalhados Hoje" no Activate Leads (Lista + Pipeline)
+## Fix "Trabalhados Hoje" — Mostrar minutagem e ordenar por mais recente
 
-### Conceito
+### Problemas
 
-Adicionar um filtro toggle/switch "Trabalhados Hoje" que mostra apenas leads cujo `updated_at` é do dia atual. Isso permite ao gestor ver rapidamente quais leads foram movimentados/tratados no dia por cada usuario.
+1. **Lista (`ActivateLeads.tsx`)**: Quando "Trabalhados Hoje" esta ativo, os leads nao sao ordenados do mais recente para o mais antigo. Tambem nao aparece nenhuma coluna/indicador de "Tratado ha Xmin" nas linhas da tabela.
+2. **Pipeline (`ActivatePipelineView.tsx`)**: Ja funciona — cards mostram "Tratado ha 5min" permanentemente e o filtro ordena. Nenhuma mudanca necessaria aqui.
 
-### Arquivos a modificar
+### Solucao
 
-**1. `src/modules/activate-leads/views/ActivatePipelineView.tsx`**
-- Adicionar estado `filterWorkedToday` (boolean, default `false`)
-- Adicionar um botao/toggle "Trabalhados Hoje" na barra de filtros (ao lado dos selects existentes), com icone `CalendarCheck`
-- No `filteredLeads` useMemo, quando ativo, filtrar leads onde `updated_at` esta no dia de hoje (comparar `new Date(l.updated_at).toDateString() === new Date().toDateString()`)
-- Incluir no calculo de `activeFilterCount`
+**Arquivo: `src/components/ActivateLeads.tsx`**
 
-**2. `src/components/ActivateLeads.tsx`**
-- Adicionar o mesmo estado `filterWorkedToday` na secao de filtros da listagem
-- Adicionar botao toggle na barra de filtros existente
-- Aplicar filtro na lista de leads renderizados, filtrando por `updated_at` do dia atual
-- Mostrar badge com quantidade de leads trabalhados hoje quando ativo
+1. **Ordenar por `updated_at` desc quando filtro ativo** — Apos o `filter()` no `filteredLeads` useMemo (~linha 1549), adicionar `.sort()` por `updated_at` descendente quando `filterWorkedToday` esta true
+
+2. **Adicionar coluna "Ultima Atividade" na tabela** — Nova `<TableHead>` "🕐 Ultima Atividade" entre Nome e Telefone. Na celula de cada lead, mostrar o tempo relativo preciso (ex: "Tratado ha 5min", "ha 1h 23min") em texto verde, usando a mesma logica do `getWorkedTimeLabel` do `ActivateLeadCard.tsx`. Esta coluna aparece sempre (nao so quando filtro ativo) para dar visibilidade.
+
+3. **Ajustar `colSpan`** do estado vazio para acomodar a nova coluna
 
 ### Detalhes tecnicos
 
-- O campo `updated_at` ja existe no tipo `ActivateLead` e e atualizado automaticamente quando o status muda (via `updateStatus` no hook)
-- Filtro client-side — sem necessidade de alteracao no banco
-- O toggle usa `Button` com `variant={filterWorkedToday ? "default" : "outline"}` para indicar estado ativo
+- Funcao helper `getWorkedTimeLabel(updatedAt: string)` calculando diff em minutos/horas
+- Coluna com icone Clock + texto emerald-600 igual ao card do Kanban
+- Sort: `result.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())`
 
