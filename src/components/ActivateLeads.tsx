@@ -1505,7 +1505,7 @@ export const ActivateLeads = () => {
   };
 
   const filteredLeads = useMemo(() => {
-    return leads.filter(lead => {
+    const result = leads.filter(lead => {
       const matchesSearch = 
         lead.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
         lead.telefone.includes(searchTerm) ||
@@ -1548,6 +1548,12 @@ export const ActivateLeads = () => {
       
       return matchesSearch && matchesStatus && matchesOrigem && matchesUser && matchesUserFilter && matchesTime && matchesWorkedToday;
     });
+
+    if (filterWorkedToday) {
+      result.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    }
+
+    return result;
   }, [leads, searchTerm, statusFilter, origemFilter, userFilter, timeFilter, filterWorkedToday, isAdmin, isGestor, user?.id]);
 
   // CPF edit handlers
@@ -1896,6 +1902,7 @@ export const ActivateLeads = () => {
                     </TableHead>
                   )}
                   <TableHead className="font-bold text-base">👤 Nome</TableHead>
+                  <TableHead className="font-bold text-base">🕐 Última Atividade</TableHead>
                   <TableHead className="font-bold text-base">📞 Telefone</TableHead>
                   <TableHead className="font-bold text-base">🆔 CPF</TableHead>
                   <TableHead className="font-bold text-base">📈 Simulação</TableHead>
@@ -1906,7 +1913,7 @@ export const ActivateLeads = () => {
               <TableBody>
                 {paginatedLeads.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canAssignLead ? 7 : 6} className="h-40">
+                    <TableCell colSpan={canAssignLead ? 8 : 7} className="h-40">
                       <motion.div 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -1969,6 +1976,29 @@ export const ActivateLeads = () => {
                               </div>
                             </div>
                           </div>
+                        </TableCell>
+                        {/* Última Atividade */}
+                        <TableCell>
+                          {(() => {
+                            const now = new Date();
+                            const updated = new Date(lead.updated_at);
+                            const diffMs = now.getTime() - updated.getTime();
+                            const diffMin = Math.floor(diffMs / 60000);
+                            let label = "agora mesmo";
+                            if (diffMin >= 60) {
+                              const h = Math.floor(diffMin / 60);
+                              const m = diffMin % 60;
+                              label = m > 0 ? `há ${h}h ${m}min` : `há ${h}h`;
+                            } else if (diffMin >= 1) {
+                              label = `há ${diffMin}min`;
+                            }
+                            return (
+                              <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+                                <Clock className="h-3 w-3" />
+                                <span>Tratado {label}</span>
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         {/* Telefone */}
                         <TableCell>
