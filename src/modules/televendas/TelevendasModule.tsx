@@ -28,6 +28,7 @@ import { useTelevendasStats } from "./hooks/useTelevendasStats";
 import { SmartSearch } from "./components/SmartSearch";
 import { StatusChangeModal } from "./components/StatusChangeModal";
 import { FiltersDrawer } from "./components/FiltersDrawer";
+import { ExportPDFButton } from "./components/ExportPDFButton";
 import { DetailModal } from "./components/DetailModal";
 import { EditProposalModal } from "./components/EditProposalModal";
 import { CollaboratorEditModal } from "./components/CollaboratorEditModal";
