@@ -67,6 +67,8 @@ export function LeadsPremiumModule() {
     canEditLead
   } = useLeadsPremium();
 
+  const { overdueLeads, isBlocked: isOverdueBlocked } = useOverdueLeads();
+
   // Fetch pending simulations count
   useEffect(() => {
     const fetchPendingSimulations = async () => {
