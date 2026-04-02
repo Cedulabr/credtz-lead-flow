@@ -80,6 +80,8 @@ export function LeadDetailDrawer({
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showSimulationModal, setShowSimulationModal] = useState(false);
   const [showTypingModal, setShowTypingModal] = useState(false);
+  const [showTreatmentDialog, setShowTreatmentDialog] = useState(false);
+  const [pendingNewStatus, setPendingNewStatus] = useState("");
   const [rejectionForm, setRejectionForm] = useState({
     reason: "",
     offeredValue: "",
