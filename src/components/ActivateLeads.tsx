@@ -2405,6 +2405,16 @@ export const ActivateLeads = () => {
 
                   const cpfClean = manualLeadCpf.replace(/\D/g, '') || null;
 
+                  let manualCompanyId: string | null = null;
+                  const { data: uc } = await supabase
+                    .from('user_companies')
+                    .select('company_id')
+                    .eq('user_id', user.id)
+                    .eq('is_active', true)
+                    .limit(1)
+                    .single();
+                  if (uc?.company_id) manualCompanyId = uc.company_id;
+
                   const { error } = await supabase.from('activate_leads').insert({
                     nome: manualLeadNome.trim(),
                     telefone: phone,
@@ -2412,7 +2422,7 @@ export const ActivateLeads = () => {
                     origem: 'manual',
                     status: 'novo',
                     created_by: user.id,
-                    company_id: companyId || null,
+                    company_id: manualCompanyId,
                   });
 
                   if (error) throw error;
