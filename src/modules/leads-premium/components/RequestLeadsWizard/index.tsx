@@ -31,7 +31,8 @@ const STEPS = [
   { id: 'tipo', title: 'Tipo', icon: '📋' },
   { id: 'perfil', title: 'Perfil', icon: '👤' },
   { id: 'quantidade', title: 'Quantidade', icon: '🔢' },
-  { id: 'resumo', title: 'Confirmar', icon: '✅' },
+  { id: 'resumo', title: 'Resumo', icon: '📝' },
+  { id: 'confirmacao', title: 'Confirmar', icon: '✅' },
 ];
 
 export function RequestLeadsWizard({
