@@ -13,14 +13,10 @@ export function useActivateLeads() {
   const fetchLeads = useCallback(async () => {
     try {
       setIsLoading(true);
-      let query = supabase
+      const query = supabase
         .from("activate_leads")
         .select("*")
         .order("created_at", { ascending: false });
-
-      if (profile?.company_id) {
-        query = query.eq("company_id", profile.company_id);
-      }
 
       const { data, error } = await query;
       if (error) throw error;
