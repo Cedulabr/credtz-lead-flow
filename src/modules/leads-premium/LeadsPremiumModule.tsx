@@ -434,6 +434,17 @@ export function LeadsPremiumModule() {
         </div>
       </div>
 
+      {/* Overdue Banner - Desktop */}
+      {overdueLeads.length > 0 && (
+        <OverdueBlockBanner 
+          overdueLeads={overdueLeads} 
+          onLeadClick={(id) => {
+            const lead = leads.find(l => l.id === id);
+            if (lead) handleLeadSelect(lead);
+          }}
+        />
+      )}
+
       {/* Desktop Tabs */}
       <Tabs value={activeView} onValueChange={(v) => setActiveView(v as any)} className="w-full">
         <div className="flex items-center justify-between">
