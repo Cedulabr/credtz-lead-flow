@@ -1695,6 +1695,10 @@ export const ActivateLeads = () => {
             
             {canImport && (
               <>
+                <Button variant="outline" onClick={() => setIsManualLeadModalOpen(true)} className="hover:bg-primary/10 transition-all duration-300">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">➕ Cadastrar</span>
+                </Button>
                 <Button variant="outline" onClick={() => setIsImportModalOpen(true)} className="hover:bg-primary/10 transition-all duration-300">
                   <Upload className="h-4 w-4 mr-2" />
                   <span className="hidden sm:inline">📤 Importar</span>
