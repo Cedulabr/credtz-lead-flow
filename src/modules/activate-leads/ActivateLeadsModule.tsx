@@ -49,6 +49,8 @@ export function ActivateLeadsModule() {
           <ActivatePipelineView
             leads={leads}
             users={users}
+            stats={stats}
+            origens={origens}
             isLoading={isLoading}
             onLeadSelect={(lead) => {/* TODO: open detail */}}
             onStatusChange={(lead, newStatus) => updateStatus(lead, newStatus)}
