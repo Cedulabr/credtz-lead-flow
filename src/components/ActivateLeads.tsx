@@ -272,6 +272,7 @@ export const ActivateLeads = () => {
   const [origemFilter, setOrigemFilter] = useState<string>('all');
   const [userFilter, setUserFilter] = useState<string>('all');
   const [timeFilter, setTimeFilter] = useState<string>('all');
+  const [filterWorkedToday, setFilterWorkedToday] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [gestorId, setGestorId] = useState<string | null>(null);
   
