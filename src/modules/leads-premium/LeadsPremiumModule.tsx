@@ -249,6 +249,19 @@ export function LeadsPremiumModule() {
           </div>
         </div>
 
+        {/* Overdue Banner - Mobile */}
+        {overdueLeads.length > 0 && (
+          <div className="px-4 pt-2">
+            <OverdueBlockBanner 
+              overdueLeads={overdueLeads} 
+              onLeadClick={(id) => {
+                const lead = leads.find(l => l.id === id);
+                if (lead) handleLeadSelect(lead);
+              }}
+            />
+          </div>
+        )}
+
         {/* View Tabs - No Pipeline on mobile */}
         <div className="border-b px-4 py-2 flex gap-2 overflow-x-auto">
           <Button
