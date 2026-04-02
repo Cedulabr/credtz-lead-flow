@@ -312,6 +312,13 @@ export const ActivateLeads = () => {
   const [parsedLeads, setParsedLeads] = useState<{ nome: string; telefone: string }[]>([]);
   const [importing, setImporting] = useState(false);
   
+  // Manual lead creation states
+  const [isManualLeadModalOpen, setIsManualLeadModalOpen] = useState(false);
+  const [manualLeadNome, setManualLeadNome] = useState('');
+  const [manualLeadTelefone, setManualLeadTelefone] = useState('');
+  const [manualLeadCpf, setManualLeadCpf] = useState('');
+  const [savingManualLead, setSavingManualLead] = useState(false);
+  
   // Pull leads states
   const [pullSource, setPullSource] = useState<string>('');
   const [pullCount, setPullCount] = useState(10);
