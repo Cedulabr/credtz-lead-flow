@@ -1548,6 +1548,12 @@ export const ActivateLeads = () => {
       
       return matchesSearch && matchesStatus && matchesOrigem && matchesUser && matchesUserFilter && matchesTime && matchesWorkedToday;
     });
+
+    if (filterWorkedToday) {
+      result.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    }
+
+    return result;
   }, [leads, searchTerm, statusFilter, origemFilter, userFilter, timeFilter, filterWorkedToday, isAdmin, isGestor, user?.id]);
 
   // CPF edit handlers
