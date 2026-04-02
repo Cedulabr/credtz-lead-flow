@@ -240,6 +240,8 @@ export const TelevendasModule = () => {
     });
   }, [televendas, filters, bankStatusFilter, priorityFilter, origemFilter]);
 
+  const filteredStats = useTelevendasStats(filteredTelevendas, bankCalculationModel);
+
   // Extract unique banks from televendas for filter
   const availableBanks = useMemo(() => {
     const banksSet = new Set(televendas.map((tv) => tv.banco).filter(Boolean));
