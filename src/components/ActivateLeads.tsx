@@ -1807,6 +1807,19 @@ export const ActivateLeads = () => {
                     </SelectContent>
                   </Select>
                 )}
+
+                <Button
+                  variant={filterWorkedToday ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilterWorkedToday(!filterWorkedToday)}
+                  className="h-10"
+                >
+                  <CalendarCheck className="h-4 w-4 mr-1" />
+                  Trabalhados Hoje
+                  {filterWorkedToday && (
+                    <Badge variant="secondary" className="ml-1 text-xs">{filteredLeads.filter(l => new Date(l.updated_at).toDateString() === new Date().toDateString()).length}</Badge>
+                  )}
+                </Button>
               </div>
             </div>
           </CardContent>
