@@ -1865,6 +1865,7 @@ export const ActivateLeads = () => {
                     </TableHead>
                   )}
                   <TableHead className="font-bold text-base">👤 Nome</TableHead>
+                  <TableHead className="font-bold text-base">📞 Telefone</TableHead>
                   <TableHead className="font-bold text-base">🆔 CPF</TableHead>
                   <TableHead className="font-bold text-base">📈 Simulação</TableHead>
                   <TableHead className="font-bold text-base">💬 WhatsApp</TableHead>
@@ -1874,7 +1875,7 @@ export const ActivateLeads = () => {
               <TableBody>
                 {paginatedLeads.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canAssignLead ? 6 : 5} className="h-40">
+                    <TableCell colSpan={canAssignLead ? 7 : 6} className="h-40">
                       <motion.div 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -1937,6 +1938,16 @@ export const ActivateLeads = () => {
                               </div>
                             </div>
                           </div>
+                        </TableCell>
+                        {/* Telefone */}
+                        <TableCell>
+                          <span className="text-sm font-mono">
+                            {lead.telefone.replace(/\D/g, '').length === 11
+                              ? lead.telefone.replace(/\D/g, '').replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3')
+                              : lead.telefone.replace(/\D/g, '').length === 10
+                                ? lead.telefone.replace(/\D/g, '').replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3')
+                                : lead.telefone}
+                          </span>
                         </TableCell>
                         {/* CPF */}
                         <TableCell>
