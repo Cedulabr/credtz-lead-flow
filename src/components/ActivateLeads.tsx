@@ -1902,6 +1902,7 @@ export const ActivateLeads = () => {
                     </TableHead>
                   )}
                   <TableHead className="font-bold text-base">👤 Nome</TableHead>
+                  <TableHead className="font-bold text-base">🕐 Última Atividade</TableHead>
                   <TableHead className="font-bold text-base">📞 Telefone</TableHead>
                   <TableHead className="font-bold text-base">🆔 CPF</TableHead>
                   <TableHead className="font-bold text-base">📈 Simulação</TableHead>
