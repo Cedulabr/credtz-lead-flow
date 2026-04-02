@@ -295,25 +295,73 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
       </AnimatePresence>
 
       {/* Desktop Sidebar */}
-      <div className="hidden md:flex md:flex-col md:w-64 md:bg-card md:border-r md:h-screen md:sticky md:top-0">
-        <div className="p-6 border-b">
-          <div className="flex items-center space-x-3">
+      <div className={cn(
+        "hidden md:flex md:flex-col md:bg-card md:border-r md:h-screen md:sticky md:top-0 transition-all duration-200",
+        isCollapsed ? "md:w-16" : "md:w-64"
+      )}>
+        <div className={cn("border-b flex items-center", isCollapsed ? "p-3 justify-center" : "p-6")}>
+          {isCollapsed ? (
             <img 
               src={logoUrl || easynLogo} 
               alt={`${companyName} Logo`} 
-              className="w-10 h-10 rounded-xl object-contain"
+              className="w-8 h-8 rounded-xl object-contain"
             />
-            <div>
-              <h1 className="text-xl font-bold text-foreground">{companyName}</h1>
-              <p className="text-sm text-muted-foreground">Serviços</p>
+          ) : (
+            <div className="flex items-center space-x-3 flex-1">
+              <img 
+                src={logoUrl || easynLogo} 
+                alt={`${companyName} Logo`} 
+                className="w-10 h-10 rounded-xl object-contain"
+              />
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold text-foreground truncate">{companyName}</h1>
+                <p className="text-sm text-muted-foreground">Serviços</p>
+              </div>
             </div>
-          </div>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setIsCollapsed(prev => {
+                const next = !prev;
+                localStorage.setItem('sidebar-collapsed', String(next));
+                return next;
+              });
+            }}
+            className={cn("h-8 w-8 flex-shrink-0", isCollapsed ? "mt-2" : "ml-2")}
+          >
+            {isCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </Button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
           {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
+            
+            if (isCollapsed) {
+              return (
+                <Tooltip key={item.id}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={isActive ? "default" : "ghost"}
+                      size="icon"
+                      onClick={() => onTabChange(item.id)}
+                      className={cn(
+                        "w-full h-10",
+                        isActive && "shadow-md"
+                      )}
+                    >
+                      <Icon size={20} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {item.label}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            }
             
             return (
               <Button
@@ -326,52 +374,102 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                 )}
               >
                 <Icon size={20} />
-                <span>{item.label}</span>
+                <span className="truncate">{item.label}</span>
               </Button>
             );
           })}
           {isAdmin && (
-            <Button
-              variant="ghost"
-              onClick={() => window.location.href = '/admin'}
-              className="w-full justify-start space-x-3"
-            >
-              <Settings size={20} />
-              <span>Admin</span>
-            </Button>
+            isCollapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => window.location.href = '/admin'}
+                    className="w-full h-10"
+                  >
+                    <Settings size={20} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Admin</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Button
+                variant="ghost"
+                onClick={() => window.location.href = '/admin'}
+                className="w-full justify-start space-x-3"
+              >
+                <Settings size={20} />
+                <span>Admin</span>
+              </Button>
+            )
           )}
         </nav>
 
-        <div className="p-4 border-t">
+        <div className="p-3 border-t">
           {user && (
             <div className="space-y-3">
-              <div className="flex items-center space-x-2 text-sm">
-                <User className="h-4 w-4" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">
-                    {profile?.name || user.email}
-                  </p>
-                  {profile?.role && (
-                    <p className="text-xs text-muted-foreground capitalize">
-                      {profile.role}
-                    </p>
-                  )}
-                </div>
-              </div>
+              {isCollapsed ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex justify-center">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center cursor-default">
+                        <User className="h-4 w-4 text-primary" />
+                      </div>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>{profile?.name || user.email}</p>
+                    {profile?.role && <p className="text-xs capitalize">{profile.role}</p>}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <>
+                  <div className="flex items-center space-x-2 text-sm">
+                    <User className="h-4 w-4 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">
+                        {profile?.name || user.email}
+                      </p>
+                      {profile?.role && (
+                        <p className="text-xs text-muted-foreground capitalize">
+                          {profile.role}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-center">
+                    <ConnectionStatus />
+                  </div>
+                </>
+              )}
               
-              <div className="flex justify-center">
-                <ConnectionStatus />
-              </div>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSignOut}
-                className="w-full justify-start"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
+              {isCollapsed ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleSignOut}
+                      className="w-full h-8"
+                    >
+                      <LogOut className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Sair</TooltipContent>
+                </Tooltip>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSignOut}
+                  className="w-full justify-start"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sair
+                </Button>
+              )}
             </div>
           )}
         </div>
