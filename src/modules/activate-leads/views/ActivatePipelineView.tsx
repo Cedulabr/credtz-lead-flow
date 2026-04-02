@@ -8,7 +8,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { Settings2, Filter, Users, TrendingUp, AlertTriangle, BarChart3, Target, XCircle, Sparkles } from "lucide-react";
+import { Settings2, Filter, Users, TrendingUp, AlertTriangle, BarChart3, Target, XCircle, Sparkles, CalendarCheck } from "lucide-react";
 
 interface ActivatePipelineViewProps {
   leads: ActivateLead[];
@@ -29,18 +29,23 @@ export function ActivatePipelineView({ leads, users, stats, origens, isLoading, 
   const [filterOrigem, setFilterOrigem] = useState("all");
   const [columns, setColumns] = useState<string[]>(PIPELINE_STATUSES);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [filterWorkedToday, setFilterWorkedToday] = useState(false);
 
   const allStatuses = Object.keys(ACTIVATE_STATUS_CONFIG);
 
-  const activeFilterCount = [filterUser, filterStatus, filterOrigem].filter(f => f !== "all").length;
+  const activeFilterCount = [filterUser, filterStatus, filterOrigem].filter(f => f !== "all").length + (filterWorkedToday ? 1 : 0);
 
   const filteredLeads = useMemo(() => {
     let result = leads;
     if (filterUser !== "all") result = result.filter(l => l.assigned_to === filterUser);
     if (filterStatus !== "all") result = result.filter(l => l.status === filterStatus);
     if (filterOrigem !== "all") result = result.filter(l => l.origem === filterOrigem);
+    if (filterWorkedToday) {
+      const today = new Date().toDateString();
+      result = result.filter(l => new Date(l.updated_at).toDateString() === today);
+    }
     return result;
-  }, [leads, filterUser, filterStatus, filterOrigem]);
+  }, [leads, filterUser, filterStatus, filterOrigem, filterWorkedToday]);
 
   const groupedLeads = useMemo(() => {
     const groups: Record<string, ActivateLead[]> = {};
@@ -155,6 +160,18 @@ export function ActivatePipelineView({ leads, users, stats, origens, isLoading, 
             ))}
           </SelectContent>
         </Select>
+
+        <Button
+          variant={filterWorkedToday ? "default" : "outline"}
+          size="sm"
+          onClick={() => setFilterWorkedToday(!filterWorkedToday)}
+        >
+          <CalendarCheck className="h-4 w-4 mr-1" />
+          Trabalhados Hoje
+          {filterWorkedToday && filteredLeads.length > 0 && (
+            <Badge variant="secondary" className="ml-1 text-xs">{filteredLeads.length}</Badge>
+          )}
+        </Button>
 
         <Button variant="outline" size="sm" onClick={() => setShowColumnEditor(!showColumnEditor)}>
           <Settings2 className="h-4 w-4 mr-1" />

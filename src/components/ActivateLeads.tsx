@@ -64,7 +64,8 @@ import {
   Edit,
   Save,
   Send,
-  MoreVertical
+  MoreVertical,
+  CalendarCheck
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -272,6 +273,7 @@ export const ActivateLeads = () => {
   const [origemFilter, setOrigemFilter] = useState<string>('all');
   const [userFilter, setUserFilter] = useState<string>('all');
   const [timeFilter, setTimeFilter] = useState<string>('all');
+  const [filterWorkedToday, setFilterWorkedToday] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [gestorId, setGestorId] = useState<string | null>(null);
   
@@ -1531,10 +1533,15 @@ export const ActivateLeads = () => {
       }
       
       const matchesUser = isAdmin || isGestor || lead.assigned_to === user?.id;
+
+      let matchesWorkedToday = true;
+      if (filterWorkedToday) {
+        matchesWorkedToday = new Date(lead.updated_at).toDateString() === new Date().toDateString();
+      }
       
-      return matchesSearch && matchesStatus && matchesOrigem && matchesUser && matchesUserFilter && matchesTime;
+      return matchesSearch && matchesStatus && matchesOrigem && matchesUser && matchesUserFilter && matchesTime && matchesWorkedToday;
     });
-  }, [leads, searchTerm, statusFilter, origemFilter, userFilter, timeFilter, isAdmin, isGestor, user?.id]);
+  }, [leads, searchTerm, statusFilter, origemFilter, userFilter, timeFilter, filterWorkedToday, isAdmin, isGestor, user?.id]);
 
   // CPF edit handlers
   const openCpfModal = (lead: ActivateLead) => {
@@ -1801,6 +1808,19 @@ export const ActivateLeads = () => {
                     </SelectContent>
                   </Select>
                 )}
+
+                <Button
+                  variant={filterWorkedToday ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilterWorkedToday(!filterWorkedToday)}
+                  className="h-10"
+                >
+                  <CalendarCheck className="h-4 w-4 mr-1" />
+                  Trabalhados Hoje
+                  {filterWorkedToday && (
+                    <Badge variant="secondary" className="ml-1 text-xs">{filteredLeads.filter(l => new Date(l.updated_at).toDateString() === new Date().toDateString()).length}</Badge>
+                  )}
+                </Button>
               </div>
             </div>
           </CardContent>
