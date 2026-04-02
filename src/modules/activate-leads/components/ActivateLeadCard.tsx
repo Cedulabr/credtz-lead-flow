@@ -55,12 +55,10 @@ export function ActivateLeadCard({ lead, onClick, onDragStart, isDragging, showW
           </div>
         </div>
 
-        {showWorkedTime && (
-          <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
-            <Clock className="h-3 w-3" />
-            <span>Tratado {getWorkedTimeLabel()}</span>
-          </div>
-        )}
+        <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+          <Clock className="h-3 w-3" />
+          <span>Tratado {getWorkedTimeLabel()}</span>
+        </div>
 
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Phone className="h-3 w-3" />
