@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActivateLead, ActivateLeadStats, ACTIVATE_STATUS_CONFIG } from "../types";
-import { BarChart3, TrendingUp, Users, Target } from "lucide-react";
+import { BarChart3, TrendingUp, Users, Target, XCircle } from "lucide-react";
 
 interface ActivateMetricsViewProps {
   leads: ActivateLead[];
@@ -10,8 +10,13 @@ interface ActivateMetricsViewProps {
 
 export function ActivateMetricsView({ leads, stats }: ActivateMetricsViewProps) {
   const conversionRate = useMemo(() => {
-    if (stats.total === 0) return 0;
+    if (stats.total === 0) return "0.0";
     return ((stats.fechados / stats.total) * 100).toFixed(1);
+  }, [stats]);
+
+  const lossRate = useMemo(() => {
+    if (stats.total === 0) return "0.0";
+    return ((stats.semPossibilidade / stats.total) * 100).toFixed(1);
   }, [stats]);
 
   const statusDistribution = useMemo(() => {
@@ -30,10 +35,23 @@ export function ActivateMetricsView({ leads, stats }: ActivateMetricsViewProps) 
       .sort((a, b) => b.count - a.count);
   }, [leads, stats]);
 
+  const userBreakdown = useMemo(() => {
+    const byUser: Record<string, { total: number; fechados: number }> = {};
+    leads.forEach(l => {
+      const uid = l.assigned_to || "Não atribuído";
+      if (!byUser[uid]) byUser[uid] = { total: 0, fechados: 0 };
+      byUser[uid].total++;
+      if (l.status === "fechado") byUser[uid].fechados++;
+    });
+    return Object.entries(byUser)
+      .map(([user, data]) => ({ user, ...data, rate: data.total > 0 ? ((data.fechados / data.total) * 100).toFixed(1) : "0" }))
+      .sort((a, b) => b.total - a.total);
+  }, [leads]);
+
   return (
     <div className="space-y-6 p-4">
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -56,6 +74,19 @@ export function ActivateMetricsView({ leads, stats }: ActivateMetricsViewProps) 
               <div>
                 <p className="text-2xl font-bold">{conversionRate}%</p>
                 <p className="text-xs text-muted-foreground">Taxa de Conversão</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-rose-500/10">
+                <XCircle className="h-5 w-5 text-rose-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{lossRate}%</p>
+                <p className="text-xs text-muted-foreground">Taxa de Perda</p>
               </div>
             </div>
           </CardContent>
@@ -101,12 +132,30 @@ export function ActivateMetricsView({ leads, stats }: ActivateMetricsViewProps) 
                 <span className="text-sm flex-1">{label}</span>
                 <span className="text-sm font-medium">{count}</span>
                 <div className="w-24 bg-muted rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${color}`}
-                    style={{ width: `${percentage}%` }}
-                  />
+                  <div className={`h-2 rounded-full ${color}`} style={{ width: `${percentage}%` }} />
                 </div>
                 <span className="text-xs text-muted-foreground w-12 text-right">{percentage}%</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* User Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Performance por Usuário</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {userBreakdown.map(({ user, total, fechados, rate }) => (
+              <div key={user} className="flex items-center gap-3">
+                <span className="text-sm flex-1 truncate">{user}</span>
+                <span className="text-xs text-muted-foreground">{fechados}/{total} leads</span>
+                <div className="w-20 bg-muted rounded-full h-2">
+                  <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${rate}%` }} />
+                </div>
+                <span className="text-xs font-medium w-12 text-right">{rate}%</span>
               </div>
             ))}
           </div>
