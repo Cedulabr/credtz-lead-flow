@@ -36,7 +36,7 @@ export function useActivateLeads() {
     } catch (err) {
       console.error("Error fetching users:", err);
     }
-  }, [profile?.company_id]);
+  }, []);
 
   useEffect(() => {
     fetchLeads();
