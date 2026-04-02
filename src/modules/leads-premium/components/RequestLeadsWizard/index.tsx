@@ -13,6 +13,7 @@ import { StepTipoLead } from "./StepTipoLead";
 import { StepPerfil } from "./StepPerfil";
 import { StepQuantidade } from "./StepQuantidade";
 import { StepResumo } from "./StepResumo";
+import { StepConfirmacao } from "./StepConfirmacao";
 
 interface RequestLeadsWizardProps {
   isOpen: boolean;
