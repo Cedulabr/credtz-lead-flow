@@ -1875,7 +1875,7 @@ export const ActivateLeads = () => {
               <TableBody>
                 {paginatedLeads.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canAssignLead ? 6 : 5} className="h-40">
+                    <TableCell colSpan={canAssignLead ? 7 : 6} className="h-40">
                       <motion.div 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
