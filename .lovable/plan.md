@@ -1,125 +1,133 @@
 
 
-## Full Evolution — Leads Premium & Activate Leads: Deadline, Block, Recycling
+## Evolucao Activate Leads — Sidebar Collapsible + Redesign completo
 
-### Overview
+### Situacao Atual
 
-Implement a 48h treatment deadline system, overdue block banner, mandatory treatment logging, withdrawal confirmation screen, per-user lead locking, and "Not Interested" recycling after 60 days.
+1. **48h Deadline NAO foi aplicado ao Activate Leads** — foi implementado apenas no Leads Premium (`useOverdueLeads`, `OverdueBlockBanner`, `TreatmentLogDialog`). O `ActivateLeads.tsx` (2950 linhas) nao referencia nenhuma dessas funcionalidades.
+2. **Sidebar** (`Navigation.tsx`, 476 linhas) e fixa em 64px desktop, sem collapse. Ja existe `sidebar.tsx` do shadcn com suporte a `collapsible="icon"`.
+3. **Activate Leads** e um arquivo monolitico sem views separadas, sem Kanban, sem tabs — apenas lista/tabela.
 
-### 1. Database Migration
+### Escopo de Trabalho
 
-**New columns on `leads` table:**
-- `withdrawn_at timestamptz` — exact moment the lead was withdrawn (set during `requestLeads`)
-- `treatment_deadline timestamptz` — auto-calculated as `withdrawn_at + 48h`
-- `treated_at timestamptz` — when the user first changed status from `new_lead`
-- `treatment_status text DEFAULT 'pending'` — values: `pending`, `treated`, `overdue`
+---
 
-**New table `lead_treatment_log`:**
-```sql
-CREATE TABLE public.lead_treatment_log (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  lead_id uuid REFERENCES public.leads(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  status text NOT NULL, -- contacted, no_answer, scheduled, not_interested, etc.
-  contact_date timestamptz NOT NULL,
-  notes text,
-  follow_up_date timestamptz, -- auto-set for "no_answer"
-  follow_up_completed boolean DEFAULT false,
-  created_at timestamptz DEFAULT now()
-);
+### TASK 1 — Collapsible Sidebar
+
+**Arquivo**: `src/components/Navigation.tsx`
+
+Refatorar a sidebar desktop (linhas 293-374) para suportar collapse:
+
+- Adicionar estado `isCollapsed` persistido em `localStorage`
+- Botao toggle (ChevronLeft/ChevronRight) no topo da sidebar
+- Largura expandida: `w-64` (220px) — colapsada: `w-16` (60px)
+- Transicao CSS `transition-all duration-200`
+- Quando colapsado: mostrar apenas icones com `Tooltip` para labels
+- User info na parte inferior: colapsado mostra apenas avatar circular
+- Logo: colapsado mostra apenas o icone (sem texto)
+- Mobile nao muda (ja usa menu overlay)
+- Todos os 28 nav items continuam funcionais
+
+---
+
+### TASK 2 — Modularizar Activate Leads (arquitetura igual ao Leads Premium)
+
+Criar nova estrutura modular:
+
+```text
+src/modules/activate-leads/
+  ActivateLeadsModule.tsx        # Componente principal (como LeadsPremiumModule.tsx)
+  types.ts                       # Tipos e STATUS_CONFIG
+  hooks/
+    useActivateLeads.ts          # Hook principal (fetch, update, stats)
+    useActivateOverdueLeads.ts   # Hook 48h (reutiliza logica do Leads Premium adaptada para activate_leads)
+  views/
+    ActivateListView.tsx         # Vista Lista (tabela atual refatorada)
+    ActivatePipelineView.tsx     # Vista Kanban (novo)
+    ActivateMetricsView.tsx      # Vista Metricas (novo)
+    ActivateSimulationsView.tsx  # Vista Simulacoes (reutiliza SimulationManager)
+  components/
+    ActivateOverdueBanner.tsx    # Banner 48h para activate leads
+    ActivateLeadCard.tsx         # Card para Kanban
 ```
 
-**Update blacklist expiry**: Change `leads_blacklist` insert for `sem_interesse` from 30 days to 60 days (recycling requirement).
+**Manter**: `src/components/ActivateLeads.tsx` como redirect/deprecado apontando para o novo modulo, para nao quebrar imports existentes.
 
-**Index**: `CREATE INDEX idx_leads_treatment_deadline ON leads(treatment_deadline) WHERE treatment_status = 'pending'`
+---
 
-### 2. Update `request_leads_with_credits` RPC
+### TASK 3 — Aplicar 48h Deadline ao Activate Leads
 
-Add to the function after inserting into `leads_distribution`:
-```sql
--- The frontend will set withdrawn_at and treatment_deadline on insert into leads table
-```
+- Criar `useActivateOverdueLeads.ts` — query `activate_leads` onde `status = 'novo'` e `created_at + 48h < now()`
+- Criar `ActivateOverdueBanner.tsx` — banner vermelho full-width (mesma UX do Leads Premium)
+- Integrar no `ActivateLeadsModule.tsx`: bloquear botoes Gerar/Importar/Puxar se houver leads vencidos
+- Alertas progressivos em 24h e 36h (toast)
 
-Actually, the RPC only returns data from `leads_database`. The insert into `leads` happens in `useLeadsPremium.ts` line 303-324. We'll add `withdrawn_at` and `treatment_deadline` there.
+Nota: A tabela `activate_leads` ja tem `created_at` como timestamp de referencia (nao tem `withdrawn_at` como `leads`). Usaremos `created_at` como marco de retirada para o calculo de 48h, ja que os leads sao criados/importados pelo usuario.
 
-### 3. Withdrawal Confirmation Screen (Fix quantity bug + preview)
+---
 
-**New RPC function `preview_available_leads`:**
-```sql
-CREATE FUNCTION public.preview_available_leads(
-  convenio_filter text, ddd_filter text[], tag_filter text[], max_count int
-) RETURNS TABLE(name text, phone_masked text, convenio text, total_available bigint)
-```
-Returns masked phone (e.g., `(11) 9****-1234`) and total count. No locking, read-only.
+### TASK 4 — Redesign Header + KPI Cards (estilo Leads Premium)
 
-**New Step in RequestLeadsWizard** — `StepConfirmacao.tsx`:
-- Before final submission, calls `preview_available_leads`
-- Shows: requested qty vs available qty, list of lead names with masked phones
-- Warning if available < requested
-- Confirm / Cancel buttons
+**Header**: 
+- Icone rocket + "Activate Leads" titulo + subtitulo
+- Botoes de acao (Gerar, Importar, Puxar, Historico) alinhados a direita como CTAs
+- Badge de creditos/total no canto superior direito (pill estilizado)
 
-### 4. Overdue Block Banner
+**KPI Cards**:
+- Substituir cards coloridos por cards brancos com borda lateral colorida (left-border accent)
+- Numero grande bold + label pequeno abaixo
+- Stats: Total, Novos, Em Andamento, 2a Tentativa, Fechados, Sem Possibilidade, Alertas
 
-**New component `OverdueBlockBanner.tsx`:**
-- Query leads where `treatment_status = 'pending'` AND `treatment_deadline < now()`
-- Full-width red banner with `position: sticky` at top of content area
-- Lists each overdue lead: name, withdrawn date, time elapsed
-- Blocks the "Pedir Leads" button (disable + tooltip)
-- Only disappears when all overdue leads are treated
+---
 
-**New hook `useOverdueLeads.ts`:**
-- Polls every 60s for overdue leads belonging to current user
-- Returns `{ overdueLeads, hasOverdue, isBlocked }`
-- Also handles progressive notification toasts at 24h and 36h marks
+### TASK 5 — Tabs + Pipeline Kanban
 
-### 5. Mandatory Treatment Logging
+**Tabs**: Lista | Pipeline | Metricas | Simulacoes (mesma barra do Leads Premium)
 
-**Update `LeadDetailDrawer.tsx`:**
-- When changing status from `new_lead` to any other status, require treatment log entry
-- Dialog with: status select, contact datetime, notes (required), follow-up date (auto for "no_answer")
-- Insert into `lead_treatment_log` + update `leads.treated_at` and `treatment_status = 'treated'`
+**Kanban (ActivatePipelineView.tsx)**:
+- Colunas: Novos, Em Andamento, 2a Tentativa, Fechados, Sem Possibilidade, Alertas
+- Cards com: nome, telefone, tag de origem, tempo relativo ("ha X horas")
+- Header de coluna com nome + badge de contagem
+- Drag-and-drop para mover leads entre status (desktop)
+- Mobile: scroll horizontal com snap
 
-**"No Answer" follow-up enforcement:**
-- Auto-create follow-up task (entry in `lead_treatment_log` with `follow_up_date`)
-- Show badge/alert on leads with pending follow-ups
-- Block status change until follow-up is logged
+**Filtros (toolbar)**:
+- Dropdown pills: "Todos Usuarios", "Todos Status", "Periodo"
+- Botao "Editar Funil" (admin/gestor) — reutilizar PipelineColumnsManager do Leads Premium adaptado
 
-### 6. Per-User Lead Lock (Race condition fix)
+---
 
-Already partially implemented via `FOR UPDATE SKIP LOCKED` in the RPC. Strengthen:
-- The `leads_distribution` table already records `lead_id` + `user_id` with `expires_at = 10 years`
-- The `NOT EXISTS` check on `leads_distribution` prevents other users from getting the same lead
-- **No additional changes needed** — the current RPC handles this correctly at database level
+### TASK 6 — Restyle Lista
 
-### 7. "Not Interested" Recycling (60 days)
+- Manter colunas: Nome, CPF, Simulacao, WhatsApp, Acoes
+- Cards brancos com sombra sutil, cantos arredondados, hover suave
+- Secao "Simulacoes Prontas" mantida como banner fixo no topo
+- Responsivo completo
 
-**Update `useLeadsPremium.updateLeadStatus`:**
-- When setting status to `sem_interesse`, call `blacklist_lead_premium` RPC but with 60-day expiry instead of 30
-- The existing `release_expired_blacklisted_leads` cron already handles un-blacklisting
+---
 
-**Update blacklist function or create new one:**
-```sql
-CREATE OR REPLACE FUNCTION public.blacklist_lead_with_duration(
-  lead_cpf text, reason text, duration_days int DEFAULT 30
-)
-```
+### Detalhes Tecnicos
 
-- Remove lead from user's portfolio (`assigned_to = null`, `status = 'sem_interesse'`)
-- Set `is_available = false` in `leads_database`
-- Insert into `leads_blacklist` with `expires_at = now() + duration_days`
-- Preserve full history in `leads.history` JSON
+**Sidebar**: Usa CSS `transition-all duration-200` + `overflow-hidden` para labels. Tooltip wrapping via shadcn `TooltipProvider` ja presente no arquivo.
 
-### Files Summary
+**Kanban Activate Leads**: Reutiliza padrao do `PipelineView.tsx` do Leads Premium — `useMemo` para agrupar leads por status, `onDragStart`/`onDrop` handlers, `ScrollArea` horizontal no mobile.
 
-| File | Action |
-|------|--------|
-| Migration SQL | Add columns to `leads`, create `lead_treatment_log`, create `preview_available_leads` RPC, create `blacklist_lead_with_duration` |
-| `src/modules/leads-premium/hooks/useLeadsPremium.ts` | Set `withdrawn_at`/`treatment_deadline` on insert; update recycling logic |
-| `src/modules/leads-premium/hooks/useOverdueLeads.ts` | New hook for overdue detection + progressive alerts |
-| `src/modules/leads-premium/components/OverdueBlockBanner.tsx` | New full-width red banner component |
-| `src/modules/leads-premium/components/TreatmentLogDialog.tsx` | New mandatory treatment dialog |
-| `src/modules/leads-premium/components/RequestLeadsWizard/StepConfirmacao.tsx` | New confirmation step with preview |
-| `src/modules/leads-premium/components/RequestLeadsWizard/index.tsx` | Add confirmation step to wizard flow |
-| `src/modules/leads-premium/LeadsPremiumModule.tsx` | Integrate banner + block logic |
-| `src/modules/leads-premium/components/LeadDetailDrawer.tsx` | Require treatment log on status change |
+**48h para Activate Leads**: Query direta na tabela `activate_leads` filtrando `status = 'novo'` e `created_at` antigo. Sem necessidade de migration (campos ja existem).
+
+### Arquivos a criar/modificar
+
+| Arquivo | Acao |
+|---------|------|
+| `src/components/Navigation.tsx` | Refatorar sidebar desktop com collapse |
+| `src/modules/activate-leads/ActivateLeadsModule.tsx` | Novo componente principal |
+| `src/modules/activate-leads/types.ts` | STATUS_CONFIG + tipos |
+| `src/modules/activate-leads/hooks/useActivateLeads.ts` | Hook principal |
+| `src/modules/activate-leads/hooks/useActivateOverdueLeads.ts` | Hook 48h |
+| `src/modules/activate-leads/views/ActivateListView.tsx` | Lista refatorada |
+| `src/modules/activate-leads/views/ActivatePipelineView.tsx` | Kanban novo |
+| `src/modules/activate-leads/views/ActivateMetricsView.tsx` | Metricas |
+| `src/modules/activate-leads/components/ActivateOverdueBanner.tsx` | Banner bloqueio |
+| `src/modules/activate-leads/components/ActivateLeadCard.tsx` | Card Kanban |
+| `src/components/ActivateLeads.tsx` | Redirect para novo modulo |
+| Ponto de entrada (Index.tsx ou App.tsx) | Atualizar import |
 
