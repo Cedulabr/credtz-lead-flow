@@ -689,19 +689,19 @@ export const TelevendasModule = () => {
       </div>
 
       <StalledAlertBanner
-        criticos={centralStats.criticos}
-        alertas={centralStats.alertas}
+        criticos={filteredStats.criticos}
+        alertas={filteredStats.alertas}
         onFilterByPriority={handleFilterByPriority}
       />
 
       {/* BLOCO 1 — Visão Executiva */}
-      <DashboardCards stats={centralStats} />
+      <DashboardCards stats={filteredStats} />
 
       {/* BLOCO 2 — Pipeline Operacional */}
       <BankingPipeline
-        pipelineCounts={centralStats.pipelineCounts}
-        criticos={centralStats.criticos}
-        alertas={centralStats.alertas}
+        pipelineCounts={filteredStats.pipelineCounts}
+        criticos={filteredStats.criticos}
+        alertas={filteredStats.alertas}
         onFilterByBankStatus={handleFilterByBankStatus}
         selectedBankStatus={bankStatusFilter}
         onFilterByPriority={handleFilterByPriority}
@@ -710,7 +710,7 @@ export const TelevendasModule = () => {
 
       {/* BLOCO 3 — Produção do Mês */}
       <ProductionBar
-        stats={centralStats}
+        stats={filteredStats}
         isGestorOrAdmin={isGestorOrAdmin}
       />
 
