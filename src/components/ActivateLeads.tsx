@@ -1532,10 +1532,15 @@ export const ActivateLeads = () => {
       }
       
       const matchesUser = isAdmin || isGestor || lead.assigned_to === user?.id;
+
+      let matchesWorkedToday = true;
+      if (filterWorkedToday) {
+        matchesWorkedToday = new Date(lead.updated_at).toDateString() === new Date().toDateString();
+      }
       
-      return matchesSearch && matchesStatus && matchesOrigem && matchesUser && matchesUserFilter && matchesTime;
+      return matchesSearch && matchesStatus && matchesOrigem && matchesUser && matchesUserFilter && matchesTime && matchesWorkedToday;
     });
-  }, [leads, searchTerm, statusFilter, origemFilter, userFilter, timeFilter, isAdmin, isGestor, user?.id]);
+  }, [leads, searchTerm, statusFilter, origemFilter, userFilter, timeFilter, filterWorkedToday, isAdmin, isGestor, user?.id]);
 
   // CPF edit handlers
   const openCpfModal = (lead: ActivateLead) => {

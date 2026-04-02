@@ -161,6 +161,18 @@ export function ActivatePipelineView({ leads, users, stats, origens, isLoading, 
           </SelectContent>
         </Select>
 
+        <Button
+          variant={filterWorkedToday ? "default" : "outline"}
+          size="sm"
+          onClick={() => setFilterWorkedToday(!filterWorkedToday)}
+        >
+          <CalendarCheck className="h-4 w-4 mr-1" />
+          Trabalhados Hoje
+          {filterWorkedToday && filteredLeads.length > 0 && (
+            <Badge variant="secondary" className="ml-1 text-xs">{filteredLeads.length}</Badge>
+          )}
+        </Button>
+
         <Button variant="outline" size="sm" onClick={() => setShowColumnEditor(!showColumnEditor)}>
           <Settings2 className="h-4 w-4 mr-1" />
           Editar Funil
