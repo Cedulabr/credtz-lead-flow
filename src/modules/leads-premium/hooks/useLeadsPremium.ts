@@ -300,6 +300,7 @@ export function useLeadsPremium() {
 
       if (data?.length > 0) {
         const requestedAt = new Date().toISOString();
+        const deadlineDate = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
         const leadsToInsert = data.map((lead: any) => ({
           name: lead.name,
           cpf: lead.cpf ?? '',
@@ -314,6 +315,9 @@ export function useLeadsPremium() {
           banco_operacao: lead.banco,
           requested_at: requestedAt,
           requested_by: user.id,
+          withdrawn_at: requestedAt,
+          treatment_deadline: deadlineDate,
+          treatment_status: 'pending',
           history: JSON.stringify([{
             action: 'created',
             timestamp: requestedAt,
