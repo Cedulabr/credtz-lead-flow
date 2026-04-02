@@ -43,6 +43,12 @@ export function useActivateLeads() {
     fetchUsers();
   }, [fetchLeads, fetchUsers]);
 
+  const origens = useMemo(() => {
+    const set = new Set<string>();
+    leads.forEach(l => { if (l.origem) set.add(l.origem); });
+    return Array.from(set).sort();
+  }, [leads]);
+
   const stats: ActivateLeadStats = useMemo(() => {
     const s: ActivateLeadStats = {
       total: leads.length,
@@ -52,8 +58,11 @@ export function useActivateLeads() {
       fechados: 0,
       semPossibilidade: 0,
       alertas: 0,
+      conversionRate: 0,
+      avgTimeHours: 0,
     };
     const now = new Date();
+    let totalHours = 0;
     leads.forEach((l) => {
       switch (l.status) {
         case "novo": s.novos++; break;
@@ -62,13 +71,15 @@ export function useActivateLeads() {
         case "fechado": s.fechados++; break;
         case "sem_possibilidade": s.semPossibilidade++; break;
       }
-      // Alert if novo and older than 24h
       const created = new Date(l.created_at);
       const hoursOld = (now.getTime() - created.getTime()) / (1000 * 60 * 60);
-      if (l.status === "novo" && hoursOld > 24) {
+      totalHours += hoursOld;
+      if (l.status === "novo" && hoursOld >= 48) {
         s.alertas++;
       }
     });
+    s.conversionRate = s.total > 0 ? (s.fechados / s.total) * 100 : 0;
+    s.avgTimeHours = s.total > 0 ? totalHours / s.total : 0;
     return s;
   }, [leads]);
 
@@ -86,5 +97,5 @@ export function useActivateLeads() {
     }
   }, []);
 
-  return { leads, stats, users, isLoading, updateStatus, refetch: fetchLeads };
+  return { leads, stats, users, origens, isLoading, updateStatus, refetch: fetchLeads };
 }

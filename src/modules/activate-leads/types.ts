@@ -37,6 +37,8 @@ export interface ActivateLeadStats {
   fechados: number;
   semPossibilidade: number;
   alertas: number;
+  conversionRate: number;
+  avgTimeHours: number;
 }
 
 export interface ActivateUser {

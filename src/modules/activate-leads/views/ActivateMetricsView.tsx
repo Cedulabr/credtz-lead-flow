@@ -1,7 +1,10 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActivateLead, ActivateLeadStats, ACTIVATE_STATUS_CONFIG } from "../types";
-import { BarChart3, TrendingUp, Users, Target, XCircle } from "lucide-react";
+import { BarChart3, TrendingUp, Users, Target, XCircle, AlertTriangle, Sparkles, Clock } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface ActivateMetricsViewProps {
   leads: ActivateLead[];
@@ -9,11 +12,6 @@ interface ActivateMetricsViewProps {
 }
 
 export function ActivateMetricsView({ leads, stats }: ActivateMetricsViewProps) {
-  const conversionRate = useMemo(() => {
-    if (stats.total === 0) return "0.0";
-    return ((stats.fechados / stats.total) * 100).toFixed(1);
-  }, [stats]);
-
   const lossRate = useMemo(() => {
     if (stats.total === 0) return "0.0";
     return ((stats.semPossibilidade / stats.total) * 100).toFixed(1);
@@ -21,13 +19,10 @@ export function ActivateMetricsView({ leads, stats }: ActivateMetricsViewProps) 
 
   const statusDistribution = useMemo(() => {
     const dist: Record<string, number> = {};
-    leads.forEach(l => {
-      dist[l.status] = (dist[l.status] || 0) + 1;
-    });
+    leads.forEach(l => { dist[l.status] = (dist[l.status] || 0) + 1; });
     return Object.entries(dist)
       .map(([status, count]) => ({
-        status,
-        count,
+        status, count,
         label: ACTIVATE_STATUS_CONFIG[status]?.label || status,
         color: ACTIVATE_STATUS_CONFIG[status]?.dotColor || 'bg-gray-400',
         percentage: stats.total > 0 ? ((count / stats.total) * 100).toFixed(1) : '0',
@@ -48,76 +43,78 @@ export function ActivateMetricsView({ leads, stats }: ActivateMetricsViewProps) 
       .sort((a, b) => b.total - a.total);
   }, [leads]);
 
+  const overdueLeads = useMemo(() => {
+    const now = new Date();
+    return leads.filter(l => {
+      if (l.status !== "novo") return false;
+      const hoursOld = (now.getTime() - new Date(l.created_at).getTime()) / (1000 * 60 * 60);
+      return hoursOld >= 48;
+    });
+  }, [leads]);
+
+  const kpiCards = [
+    { label: "Total de Leads", value: stats.total, color: "border-l-blue-500", iconBg: "bg-blue-100", iconColor: "text-blue-600", icon: BarChart3 },
+    { label: "Novos", value: stats.novos, color: "border-l-sky-500", iconBg: "bg-sky-100", iconColor: "text-sky-600", icon: Sparkles },
+    { label: "Em Andamento", value: stats.emAndamento, color: "border-l-indigo-500", iconBg: "bg-indigo-100", iconColor: "text-indigo-600", icon: TrendingUp },
+    { label: "Fechados", value: stats.fechados, color: "border-l-emerald-500", iconBg: "bg-emerald-100", iconColor: "text-emerald-600", icon: Target },
+    { label: "Taxa Conversão", value: `${stats.conversionRate.toFixed(1)}%`, color: "border-l-violet-500", iconBg: "bg-violet-100", iconColor: "text-violet-600", icon: TrendingUp },
+    { label: "Alertas 48h", value: stats.alertas, color: "border-l-red-500", iconBg: "bg-red-100", iconColor: "text-red-600", icon: AlertTriangle, pulse: stats.alertas > 0 },
+  ];
+
   return (
     <div className="space-y-6 p-4">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <BarChart3 className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.total}</p>
-                <p className="text-xs text-muted-foreground">Total de Leads</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-emerald-500/10">
-                <Target className="h-5 w-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{conversionRate}%</p>
-                <p className="text-xs text-muted-foreground">Taxa de Conversão</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-rose-500/10">
-                <XCircle className="h-5 w-5 text-rose-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{lossRate}%</p>
-                <p className="text-xs text-muted-foreground">Taxa de Perda</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-500/10">
-                <TrendingUp className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.emAndamento}</p>
-                <p className="text-xs text-muted-foreground">Em Andamento</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-amber-500/10">
-                <Users className="h-5 w-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.alertas}</p>
-                <p className="text-xs text-muted-foreground">Alertas</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {kpiCards.map((kpi) => {
+          const Icon = kpi.icon;
+          return (
+            <Card key={kpi.label} className={cn("border-l-4", kpi.color)}>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className={cn("p-2 rounded-xl", kpi.iconBg, kpi.pulse && "animate-pulse")}>
+                  <Icon className={cn("h-5 w-5", kpi.iconColor)} />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{kpi.value}</p>
+                  <p className="text-xs text-muted-foreground">{kpi.label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
+
+      {/* Alertas 48h */}
+      {overdueLeads.length > 0 && (
+        <Card className="border-l-4 border-l-red-500 bg-red-50/50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2 text-red-700">
+              <AlertTriangle className="h-5 w-5" />
+              Leads com mais de 48h sem tratamento ({overdueLeads.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {overdueLeads.slice(0, 10).map(lead => (
+                <div key={lead.id} className="flex items-center gap-4 p-2 bg-background rounded border border-red-200">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{lead.nome}</p>
+                    <p className="text-xs text-muted-foreground">{lead.telefone}</p>
+                  </div>
+                  <div className="text-xs text-red-600 flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatDistanceToNow(new Date(lead.created_at), { locale: ptBR, addSuffix: true })}
+                  </div>
+                </div>
+              ))}
+              {overdueLeads.length > 10 && (
+                <p className="text-xs text-muted-foreground text-center">
+                  e mais {overdueLeads.length - 10} leads...
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Status Distribution */}
       <Card>
@@ -140,6 +137,32 @@ export function ActivateMetricsView({ leads, stats }: ActivateMetricsViewProps) 
           </div>
         </CardContent>
       </Card>
+
+      {/* Taxa de Perda */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="border-l-4 border-l-rose-500">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-rose-100">
+              <XCircle className="h-5 w-5 text-rose-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{lossRate}%</p>
+              <p className="text-xs text-muted-foreground">Taxa de Perda</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-amber-500">
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-100">
+              <Clock className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{stats.avgTimeHours.toFixed(0)}h</p>
+              <p className="text-xs text-muted-foreground">Tempo Médio na Base</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* User Breakdown */}
       <Card>

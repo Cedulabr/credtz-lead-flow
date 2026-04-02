@@ -14,7 +14,7 @@ export function ActivateLeadsModule() {
   const { profile } = useAuth();
   const [activeView, setActiveView] = useState<"list" | "pipeline" | "metrics" | "simulations">("list");
   const { overdueLeads } = useActivateOverdueLeads();
-  const { leads, stats, users, isLoading, updateStatus, refetch } = useActivateLeads();
+  const { leads, stats, users, origens, isLoading, updateStatus, refetch } = useActivateLeads();
 
   const viewButtons = (
     <div className="flex items-center gap-2 border-b pb-2 px-4 md:px-6 pt-4">
@@ -49,6 +49,8 @@ export function ActivateLeadsModule() {
           <ActivatePipelineView
             leads={leads}
             users={users}
+            stats={stats}
+            origens={origens}
             isLoading={isLoading}
             onLeadSelect={(lead) => {/* TODO: open detail */}}
             onStatusChange={(lead, newStatus) => updateStatus(lead, newStatus)}
