@@ -8,7 +8,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { Settings2, Filter, Users, TrendingUp, AlertTriangle, BarChart3, Target, XCircle, Sparkles } from "lucide-react";
+import { Settings2, Filter, Users, TrendingUp, AlertTriangle, BarChart3, Target, XCircle, Sparkles, CalendarCheck } from "lucide-react";
 
 interface ActivatePipelineViewProps {
   leads: ActivateLead[];
