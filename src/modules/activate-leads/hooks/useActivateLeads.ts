@@ -45,6 +45,14 @@ export function useActivateLeads() {
     fetchUsers();
   }, [fetchLeads, fetchUsers]);
 
+  // Retry after auth completes if no leads loaded
+  useEffect(() => {
+    if (profile?.id && leads.length === 0 && !isLoading) {
+      console.log('[useActivateLeads] Auth ready, retrying fetch...');
+      fetchLeads();
+    }
+  }, [profile?.id]);
+
   const origens = useMemo(() => {
     const set = new Set<string>();
     leads.forEach(l => { if (l.origem) set.add(l.origem); });
