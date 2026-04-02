@@ -999,6 +999,22 @@ export function LeadDetailDrawer({
           </SheetContent>
         </Sheet>
         {whatsAppDialog}
+        {showTreatmentDialog && lead && (
+          <TreatmentLogDialog
+            isOpen={showTreatmentDialog}
+            onClose={() => { setShowTreatmentDialog(false); setPendingNewStatus(""); }}
+            leadId={lead.id}
+            leadName={lead.name}
+            newStatus={pendingNewStatus}
+            onConfirm={async () => {
+              setIsProcessing(true);
+              await onStatusChange(lead.id, pendingNewStatus);
+              setIsProcessing(false);
+              setShowTreatmentDialog(false);
+              setPendingNewStatus("");
+            }}
+          />
+        )}
       </>
     );
   }
