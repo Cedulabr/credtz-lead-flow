@@ -3963,6 +3963,50 @@ export type Database = {
           },
         ]
       }
+      lead_treatment_log: {
+        Row: {
+          contact_date: string
+          created_at: string | null
+          follow_up_completed: boolean | null
+          follow_up_date: string | null
+          id: string
+          lead_id: string
+          notes: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          contact_date: string
+          created_at?: string | null
+          follow_up_completed?: boolean | null
+          follow_up_date?: string | null
+          id?: string
+          lead_id: string
+          notes?: string | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          contact_date?: string
+          created_at?: string | null
+          follow_up_completed?: boolean | null
+          follow_up_date?: string | null
+          id?: string
+          lead_id?: string
+          notes?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_treatment_log_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           assigned_to: string | null
@@ -3995,8 +4039,12 @@ export type Database = {
           stage: string | null
           status: string | null
           tag: string | null
+          treated_at: string | null
+          treatment_deadline: string | null
+          treatment_status: string | null
           updated_at: string | null
           valor_operacao: number | null
+          withdrawn_at: string | null
         }
         Insert: {
           assigned_to?: string | null
@@ -4029,8 +4077,12 @@ export type Database = {
           stage?: string | null
           status?: string | null
           tag?: string | null
+          treated_at?: string | null
+          treatment_deadline?: string | null
+          treatment_status?: string | null
           updated_at?: string | null
           valor_operacao?: number | null
+          withdrawn_at?: string | null
         }
         Update: {
           assigned_to?: string | null
@@ -4063,8 +4115,12 @@ export type Database = {
           stage?: string | null
           status?: string | null
           tag?: string | null
+          treated_at?: string | null
+          treatment_deadline?: string | null
+          treatment_status?: string | null
           updated_at?: string | null
           valor_operacao?: number | null
+          withdrawn_at?: string | null
         }
         Relationships: [
           {
@@ -7610,6 +7666,15 @@ export type Database = {
         Args: { p_job_id: string }
         Returns: undefined
       }
+      blacklist_lead_with_duration: {
+        Args: {
+          duration_days?: number
+          lead_cpf: string
+          lead_id_param: string
+          reason_param: string
+        }
+        Returns: undefined
+      }
       calculate_lead_priority: {
         Args: {
           lead_created_at: string
@@ -7824,6 +7889,20 @@ export type Database = {
       normalize_cpf: { Args: { input_cpf: string }; Returns: string }
       normalize_phone: { Args: { phone_input: string }; Returns: string }
       notify_critical_televendas: { Args: never; Returns: undefined }
+      preview_available_leads: {
+        Args: {
+          convenio_filter?: string
+          ddd_filter?: string[]
+          max_count?: number
+          tag_filter?: string[]
+        }
+        Returns: {
+          convenio: string
+          name: string
+          phone_masked: string
+          total_available: number
+        }[]
+      }
       process_expired_future_contacts: { Args: never; Returns: number }
       release_expired_blacklisted_leads: { Args: never; Returns: Json }
       remove_baseoff_duplicates: { Args: never; Returns: number }

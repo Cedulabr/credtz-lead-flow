@@ -13,6 +13,7 @@ import { StepTipoLead } from "./StepTipoLead";
 import { StepPerfil } from "./StepPerfil";
 import { StepQuantidade } from "./StepQuantidade";
 import { StepResumo } from "./StepResumo";
+import { StepConfirmacao } from "./StepConfirmacao";
 
 interface RequestLeadsWizardProps {
   isOpen: boolean;
@@ -30,7 +31,8 @@ const STEPS = [
   { id: 'tipo', title: 'Tipo', icon: '📋' },
   { id: 'perfil', title: 'Perfil', icon: '👤' },
   { id: 'quantidade', title: 'Quantidade', icon: '🔢' },
-  { id: 'resumo', title: 'Confirmar', icon: '✅' },
+  { id: 'resumo', title: 'Resumo', icon: '📝' },
+  { id: 'confirmacao', title: 'Confirmar', icon: '✅' },
 ];
 
 export function RequestLeadsWizard({
@@ -102,7 +104,8 @@ export function RequestLeadsWizard({
       case 0: return !!data.tipoLead;
       case 1: return true; // Perfil é opcional
       case 2: return data.quantidade > 0 && data.quantidade <= userCredits;
-      case 3: return data.quantidade <= userCredits;
+      case 3: return data.quantidade <= userCredits; // Resumo
+      case 4: return data.quantidade <= userCredits; // Confirmação
       default: return true;
     }
   }, [currentStep, data, userCredits]);
@@ -207,6 +210,12 @@ export function RequestLeadsWizard({
                 data={data} 
                 onUpdate={handleUpdate} 
                 onGoToStep={handleGoToStep}
+                userCredits={userCredits}
+              />
+            )}
+            {currentStep === 4 && (
+              <StepConfirmacao 
+                data={data}
                 userCredits={userCredits}
               />
             )}

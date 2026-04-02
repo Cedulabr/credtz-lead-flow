@@ -9,7 +9,9 @@ import { SimulationsDashboard } from "./views/SimulationsDashboard";
 import { LeadDetailDrawer } from "./components/LeadDetailDrawer";
 import { MobileActionBar } from "./components/MobileActionBar";
 import { RequestLeadsWizard } from "./components/RequestLeadsWizard";
+import { OverdueBlockBanner } from "./components/OverdueBlockBanner";
 import { useLeadsPremium } from "./hooks/useLeadsPremium";
+import { useOverdueLeads } from "./hooks/useOverdueLeads";
 import { Lead, LeadFilters, BANKS_LIST } from "./types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -64,6 +66,8 @@ export function LeadsPremiumModule() {
     requestLeads,
     canEditLead
   } = useLeadsPremium();
+
+  const { overdueLeads, isBlocked: isOverdueBlocked } = useOverdueLeads();
 
   // Fetch pending simulations count
   useEffect(() => {
@@ -245,6 +249,19 @@ export function LeadsPremiumModule() {
           </div>
         </div>
 
+        {/* Overdue Banner - Mobile */}
+        {overdueLeads.length > 0 && (
+          <div className="px-4 pt-2">
+            <OverdueBlockBanner 
+              overdueLeads={overdueLeads} 
+              onLeadClick={(id) => {
+                const lead = leads.find(l => l.id === id);
+                if (lead) handleLeadSelect(lead);
+              }}
+            />
+          </div>
+        )}
+
         {/* View Tabs - No Pipeline on mobile */}
         <div className="border-b px-4 py-2 flex gap-2 overflow-x-auto">
           <Button
@@ -410,12 +427,23 @@ export function LeadsPremiumModule() {
             </div>
             <p className="text-xs text-muted-foreground">créditos disponíveis</p>
           </div>
-          <Button onClick={() => setIsRequestModalOpen(true)} disabled={userCredits <= 0}>
+          <Button onClick={() => setIsRequestModalOpen(true)} disabled={userCredits <= 0 || isOverdueBlocked}>
             <Plus className="h-4 w-4 mr-2" />
-            Pedir Leads
+            {isOverdueBlocked ? 'Bloqueado' : 'Pedir Leads'}
           </Button>
         </div>
       </div>
+
+      {/* Overdue Banner - Desktop */}
+      {overdueLeads.length > 0 && (
+        <OverdueBlockBanner 
+          overdueLeads={overdueLeads} 
+          onLeadClick={(id) => {
+            const lead = leads.find(l => l.id === id);
+            if (lead) handleLeadSelect(lead);
+          }}
+        />
+      )}
 
       {/* Desktop Tabs */}
       <Tabs value={activeView} onValueChange={(v) => setActiveView(v as any)} className="w-full">

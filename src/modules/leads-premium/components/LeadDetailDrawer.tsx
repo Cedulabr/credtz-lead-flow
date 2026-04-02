@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { WhatsAppSendDialog, type WhatsAppSentInfo } from "@/components/WhatsAppSendDialog";
 import { Lead, UserProfile, PIPELINE_STAGES, HistoryEntry, REJECTION_REASONS, BANKS_LIST } from "../types";
+import { TreatmentLogDialog } from "./TreatmentLogDialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,8 @@ export function LeadDetailDrawer({
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showSimulationModal, setShowSimulationModal] = useState(false);
   const [showTypingModal, setShowTypingModal] = useState(false);
+  const [showTreatmentDialog, setShowTreatmentDialog] = useState(false);
+  const [pendingNewStatus, setPendingNewStatus] = useState("");
   const [rejectionForm, setRejectionForm] = useState({
     reason: "",
     offeredValue: "",
@@ -154,6 +157,13 @@ export function LeadDetailDrawer({
     if (newStatus === 'contato_futuro') {
       setFutureContactDate(format(addDays(new Date(), 7), 'yyyy-MM-dd'));
       setShowFutureContactModal(true);
+      return;
+    }
+
+    // Show treatment log dialog when moving from new_lead/autolead
+    if (lead.status === 'new_lead' || lead.status === 'autolead') {
+      setPendingNewStatus(newStatus);
+      setShowTreatmentDialog(true);
       return;
     }
 
@@ -989,6 +999,22 @@ export function LeadDetailDrawer({
           </SheetContent>
         </Sheet>
         {whatsAppDialog}
+        {showTreatmentDialog && lead && (
+          <TreatmentLogDialog
+            isOpen={showTreatmentDialog}
+            onClose={() => { setShowTreatmentDialog(false); setPendingNewStatus(""); }}
+            leadId={lead.id}
+            leadName={lead.name}
+            newStatus={pendingNewStatus}
+            onConfirm={async () => {
+              setIsProcessing(true);
+              await onStatusChange(lead.id, pendingNewStatus);
+              setIsProcessing(false);
+              setShowTreatmentDialog(false);
+              setPendingNewStatus("");
+            }}
+          />
+        )}
       </>
     );
   }
@@ -1001,6 +1027,22 @@ export function LeadDetailDrawer({
         </SheetContent>
       </Sheet>
       {whatsAppDialog}
+      {showTreatmentDialog && lead && (
+        <TreatmentLogDialog
+          isOpen={showTreatmentDialog}
+          onClose={() => { setShowTreatmentDialog(false); setPendingNewStatus(""); }}
+          leadId={lead.id}
+          leadName={lead.name}
+          newStatus={pendingNewStatus}
+          onConfirm={async () => {
+            setIsProcessing(true);
+            await onStatusChange(lead.id, pendingNewStatus);
+            setIsProcessing(false);
+            setShowTreatmentDialog(false);
+            setPendingNewStatus("");
+          }}
+        />
+      )}
     </>
   );
 }
