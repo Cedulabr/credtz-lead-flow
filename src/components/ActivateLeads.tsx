@@ -1939,6 +1939,16 @@ export const ActivateLeads = () => {
                             </div>
                           </div>
                         </TableCell>
+                        {/* Telefone */}
+                        <TableCell>
+                          <span className="text-sm font-mono">
+                            {lead.telefone.replace(/\D/g, '').length === 11
+                              ? lead.telefone.replace(/\D/g, '').replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3')
+                              : lead.telefone.replace(/\D/g, '').length === 10
+                                ? lead.telefone.replace(/\D/g, '').replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3')
+                                : lead.telefone}
+                          </span>
+                        </TableCell>
                         {/* CPF */}
                         <TableCell>
                           <div className="flex items-center gap-2">
