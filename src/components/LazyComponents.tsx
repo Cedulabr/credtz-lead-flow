@@ -10,7 +10,7 @@ export const SystemStatus = lazy(() => import('./SystemStatus').then(m => ({ def
 
 // Leads & Sales
 export const LeadsManagement = lazy(() => import('@/modules/leads-premium/LeadsPremiumModule').then(m => ({ default: m.LeadsPremiumModule })));
-export const ActivateLeads = lazy(() => import('./ActivateLeads').then(m => ({ default: m.ActivateLeads })));
+export const ActivateLeads = lazy(() => import('@/modules/activate-leads/ActivateLeadsModule').then(m => ({ default: m.ActivateLeadsModule })));
 export const IndicateClient = lazy(() => import('./IndicateClient').then(m => ({ default: m.IndicateClient })));
 export const LeadsIndicados = lazy(() => import('./LeadsIndicados'));
 export const SalesWizard = lazy(() => import('@/modules/sales-wizard/SalesWizard').then(m => ({ default: m.SalesWizard })));
