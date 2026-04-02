@@ -194,17 +194,42 @@ export function useLeadsPremium() {
       const currentHistory = lead.history ? 
         (typeof lead.history === 'string' ? JSON.parse(lead.history) : lead.history) : [];
 
-      const { error } = await supabase
-        .from('leads')
-        .update({
+      // For sem_interesse: use 60-day blacklist; for sem_possibilidade: 30-day
+      const blacklistStatuses = ['sem_interesse', 'sem_possibilidade', 'recusou_oferta'];
+      if (blacklistStatuses.includes(newStatus) && lead.cpf) {
+        const durationDays = newStatus === 'sem_interesse' ? 60 : 30;
+        await supabase.rpc('blacklist_lead_with_duration', {
+          lead_id_param: leadId,
+          lead_cpf: lead.cpf,
+          reason_param: newStatus,
+          duration_days: durationDays,
+        });
+        // Also update history
+        const { error: histError } = await supabase
+          .from('leads')
+          .update({
+            history: JSON.stringify([...currentHistory, historyEntry]),
+          })
+          .eq('id', leadId);
+        if (histError) throw histError;
+      } else {
+        const updateData: any = {
           status: newStatus,
           updated_at: new Date().toISOString(),
           history: JSON.stringify([...currentHistory, historyEntry]),
           ...additionalData
-        })
-        .eq('id', leadId);
-
-      if (error) throw error;
+        };
+        // Mark as treated when moving from new_lead
+        if (lead.status === 'new_lead' && newStatus !== 'new_lead') {
+          updateData.treated_at = new Date().toISOString();
+          updateData.treatment_status = 'treated';
+        }
+        const { error } = await supabase
+          .from('leads')
+          .update(updateData)
+          .eq('id', leadId);
+        if (error) throw error;
+      }
 
       if (newStatus === 'cliente_fechado') {
         await handleClienteFechado(lead);
