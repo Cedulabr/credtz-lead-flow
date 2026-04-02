@@ -4,18 +4,11 @@ import { FileDown } from "lucide-react";
 import jsPDF from "jspdf";
 import { Televenda, TelevendasFilters } from "../types";
 import { formatCurrency, formatDate } from "../utils";
+import type { TelevendasStats } from "../hooks/useTelevendasStats";
 
 interface ExportPDFButtonProps {
   filteredTelevendas: Televenda[];
-  filteredStats: {
-    total: number;
-    pagas: number;
-    ativas: number;
-    canceladas: number;
-    valorPago: number;
-    criticos: number;
-    alertas: number;
-  };
+  filteredStats: TelevendasStats;
   filters: TelevendasFilters;
   isGestorOrAdmin: boolean;
 }
