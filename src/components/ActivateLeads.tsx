@@ -1977,6 +1977,29 @@ export const ActivateLeads = () => {
                             </div>
                           </div>
                         </TableCell>
+                        {/* Última Atividade */}
+                        <TableCell>
+                          {(() => {
+                            const now = new Date();
+                            const updated = new Date(lead.updated_at);
+                            const diffMs = now.getTime() - updated.getTime();
+                            const diffMin = Math.floor(diffMs / 60000);
+                            let label = "agora mesmo";
+                            if (diffMin >= 60) {
+                              const h = Math.floor(diffMin / 60);
+                              const m = diffMin % 60;
+                              label = m > 0 ? `há ${h}h ${m}min` : `há ${h}h`;
+                            } else if (diffMin >= 1) {
+                              label = `há ${diffMin}min`;
+                            }
+                            return (
+                              <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+                                <Clock className="h-3 w-3" />
+                                <span>Tratado {label}</span>
+                              </div>
+                            );
+                          })()}
+                        </TableCell>
                         {/* Telefone */}
                         <TableCell>
                           <span className="text-sm font-mono">
