@@ -160,6 +160,13 @@ export function LeadDetailDrawer({
       return;
     }
 
+    // Show treatment log dialog when moving from new_lead/autolead
+    if (lead.status === 'new_lead' || lead.status === 'autolead') {
+      setPendingNewStatus(newStatus);
+      setShowTreatmentDialog(true);
+      return;
+    }
+
     setIsProcessing(true);
     await onStatusChange(lead.id, newStatus);
     setIsProcessing(false);
