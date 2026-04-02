@@ -64,7 +64,8 @@ import {
   Edit,
   Save,
   Send,
-  MoreVertical
+  MoreVertical,
+  CalendarCheck
 } from 'lucide-react';
 import {
   DropdownMenu,
