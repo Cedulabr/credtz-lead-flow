@@ -212,6 +212,12 @@ export function RequestLeadsWizard({
                 userCredits={userCredits}
               />
             )}
+            {currentStep === 4 && (
+              <StepConfirmacao 
+                data={data}
+                userCredits={userCredits}
+              />
+            )}
           </motion.div>
         </AnimatePresence>
       </ScrollArea>
