@@ -528,6 +528,14 @@ export const ActivateLeads = () => {
     fetchLeads();
   }, [fetchLeads]);
 
+  // Retry fetch after auth completes if no leads loaded
+  useEffect(() => {
+    if (user?.id && leads.length === 0 && !loading) {
+      console.log('[ActivateLeads] Auth ready, retrying fetchLeads...');
+      fetchLeads();
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     if (isAdmin || isGestor) {
       fetchAvailableUsers();
