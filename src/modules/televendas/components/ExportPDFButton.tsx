@@ -68,12 +68,12 @@ export function ExportPDFButton({ filteredTelevendas, filteredStats, filters, is
 
       // KPI Cards
       const kpis = [
-        { label: "Total", value: String(filteredStats.total), color: [59, 130, 246] },
-        { label: "Pagas", value: String(filteredStats.pagas), color: [34, 197, 94] },
-        { label: "Ativas", value: String(filteredStats.ativas), color: [234, 179, 8] },
-        { label: "Canceladas", value: String(filteredStats.canceladas), color: [239, 68, 68] },
-        { label: "Valor Pago", value: formatCurrency(filteredStats.valorPago), color: [16, 185, 129] },
+        { label: "Total", value: String(filteredStats.totalPropostas), color: [59, 130, 246] },
+        { label: "Pagas", value: String(filteredStats.paidCount), color: [34, 197, 94] },
+        { label: "Ativas", value: String(filteredStats.totalPropostasAtivas), color: [234, 179, 8] },
+        { label: "Valor Pago", value: formatCurrency(filteredStats.totalBrutoPago), color: [16, 185, 129] },
         { label: "Críticos", value: String(filteredStats.criticos), color: [220, 38, 38] },
+        { label: "Alertas", value: String(filteredStats.alertas), color: [245, 158, 11] },
       ];
 
       const cardW = (pageW - margin * 2 - 10) / 3;
