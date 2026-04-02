@@ -1,31 +1,34 @@
 
 
-## Corrigir Indicadores do Televendas para Refletir Filtros Aplicados
+## Adicionar botao Exportar PDF no modulo Gestao de Televendas
 
-### Problema
+### O que sera feito
 
-Os indicadores (DashboardCards, Pipeline Operacional, Producao do Mes) usam `centralStats` que e calculado sobre `televendas` (dados completos, sem filtro). Quando o usuario aplica filtros (produto, mes, usuario, status), a lista filtra corretamente mas os KPIs continuam mostrando os totais gerais.
+Botao "Exportar PDF" visivel apenas para gestor e admin no header do modulo. Ao clicar, gera um PDF com:
+- Titulo + periodo/filtros ativos
+- Resumo dos KPIs (total propostas, valor pago, pagas, ativas, criticos, alertas)
+- Tabela de propostas filtradas (nome, CPF, telefone, produto, banco, status, valor, data)
 
-### Solucao
+### Arquivos a criar/modificar
 
-**Arquivo unico**: `src/modules/televendas/TelevendasModule.tsx`
+**1. Criar `src/modules/televendas/components/ExportPDFButton.tsx`**
 
-1. **Criar `filteredStats`** — uma segunda chamada ao hook `useTelevendasStats` passando `filteredTelevendas` em vez de `televendas`:
-```
-const filteredStats = useTelevendasStats(filteredTelevendas, bankCalculationModel);
-```
+Componente com botao que usa `jsPDF` (ja instalado no projeto) para gerar o PDF:
+- Recebe `filteredTelevendas`, `filteredStats`, `filters`, `isGestorOrAdmin`
+- Renderiza apenas se `isGestorOrAdmin === true`
+- Gera PDF com header, KPIs em grid, e tabela de propostas
+- Usa formatacao pt-BR para datas e moedas
+- Nome do arquivo: `televendas_relatorio_DD-MM-YYYY.pdf`
 
-2. **Substituir `centralStats` por `filteredStats`** nos componentes visuais:
-   - `DashboardCards stats={filteredStats}`
-   - `BankingPipeline pipelineCounts={filteredStats.pipelineCounts}` + criticos/alertas
-   - `ProductionBar stats={filteredStats}`
-   - `StalledAlertBanner criticos/alertas`
+**2. Modificar `src/modules/televendas/TelevendasModule.tsx`**
 
-Isso faz com que todos os indicadores reflitam exatamente os mesmos dados que aparecem na listagem filtrada. O hook `useTelevendasStats` ja esta pronto e aceita qualquer array de `Televenda[]` — nao precisa de alteracao.
+- Importar `ExportPDFButton`
+- Adicionar o componente na area de botoes do header (linha ~629, junto ao Sync e FiltersDrawer), dentro do bloco `isGestorOrAdmin`
 
 ### Detalhes tecnicos
 
-- Linha 104: manter `centralStats` (pode ser util para referencia geral)
-- Adicionar logo abaixo: `const filteredStats = useTelevendasStats(filteredTelevendas, bankCalculationModel);`
-- Linhas 688-712: trocar todas as referencias de `centralStats` para `filteredStats`
+- `jsPDF` ja esta como dependencia do projeto (usado em `ExportButtons.tsx` do PerformanceReport)
+- O PDF tera formato retrato A4, fonte Helvetica, com cores neutras (azul escuro header, linhas alternadas cinza claro)
+- Paginacao automatica quando a lista exceder uma pagina
+- Rodape com data de geracao e numero de pagina
 
