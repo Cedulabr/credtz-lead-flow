@@ -1505,7 +1505,7 @@ export const ActivateLeads = () => {
   };
 
   const filteredLeads = useMemo(() => {
-    return leads.filter(lead => {
+    const result = leads.filter(lead => {
       const matchesSearch = 
         lead.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
         lead.telefone.includes(searchTerm) ||
