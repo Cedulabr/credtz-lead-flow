@@ -167,7 +167,7 @@ export const ACTIVATE_STATUS_CONFIG: Record<string, {
   },
 };
 
-export const PIPELINE_STATUSES = ['novo', 'em_andamento', 'segunda_tentativa', 'fechado', 'sem_possibilidade', 'contato_futuro'];
+export const PIPELINE_STATUSES = ['novo', 'em_andamento', 'fechado', 'sem_possibilidade'];
 
 export const PROOF_TYPES = [
   { value: 'whatsapp', label: 'WhatsApp', emoji: '💬' },
