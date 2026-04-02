@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
-import { ActivateLead, ActivateLeadStats, ACTIVATE_STATUS_CONFIG, PIPELINE_STATUSES, ActivateUser } from "../types";
+import { ActivateLead, ActivateUser, ACTIVATE_STATUS_CONFIG, PIPELINE_STATUSES } from "../types";
 import { ActivateLeadCard } from "../components/ActivateLeadCard";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { Settings2 } from "lucide-react";
 
 interface ActivatePipelineViewProps {
   leads: ActivateLead[];
@@ -20,6 +22,10 @@ export function ActivatePipelineView({ leads, users, isLoading, onLeadSelect, on
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [draggingLeadId, setDraggingLeadId] = useState<string | null>(null);
   const [filterUser, setFilterUser] = useState("all");
+  const [columns, setColumns] = useState<string[]>(PIPELINE_STATUSES);
+  const [showColumnEditor, setShowColumnEditor] = useState(false);
+
+  const allStatuses = Object.keys(ACTIVATE_STATUS_CONFIG);
 
   const filteredLeads = useMemo(() => {
     if (filterUser === "all") return leads;
@@ -28,14 +34,14 @@ export function ActivatePipelineView({ leads, users, isLoading, onLeadSelect, on
 
   const groupedLeads = useMemo(() => {
     const groups: Record<string, ActivateLead[]> = {};
-    PIPELINE_STATUSES.forEach(status => { groups[status] = []; });
+    columns.forEach(status => { groups[status] = []; });
     filteredLeads.forEach(lead => {
       if (groups[lead.status]) {
         groups[lead.status].push(lead);
       }
     });
     return groups;
-  }, [filteredLeads]);
+  }, [filteredLeads, columns]);
 
   const handleDragStart = (e: React.DragEvent, leadId: string) => {
     setDraggingLeadId(leadId);
@@ -62,6 +68,14 @@ export function ActivatePipelineView({ leads, users, isLoading, onLeadSelect, on
     }
   };
 
+  const addColumn = (status: string) => {
+    if (!columns.includes(status)) setColumns([...columns, status]);
+  };
+
+  const removeColumn = (status: string) => {
+    setColumns(columns.filter(c => c !== status));
+  };
+
   return (
     <div className="space-y-4">
       {/* Filters */}
@@ -77,7 +91,44 @@ export function ActivatePipelineView({ leads, users, isLoading, onLeadSelect, on
             ))}
           </SelectContent>
         </Select>
+
+        <Button variant="outline" size="sm" onClick={() => setShowColumnEditor(!showColumnEditor)}>
+          <Settings2 className="h-4 w-4 mr-1" />
+          Editar Funil
+        </Button>
       </div>
+
+      {/* Column Editor */}
+      {showColumnEditor && (
+        <div className="border rounded-lg p-4 bg-card space-y-3">
+          <p className="text-sm font-medium">Colunas ativas:</p>
+          <div className="flex flex-wrap gap-2">
+            {columns.map(status => {
+              const config = ACTIVATE_STATUS_CONFIG[status];
+              return (
+                <Badge key={status} variant="secondary" className="cursor-pointer gap-1" onClick={() => removeColumn(status)}>
+                  <span className={cn("h-2 w-2 rounded-full inline-block", config?.dotColor)} />
+                  {config?.label || status}
+                  <span className="text-destructive ml-1">×</span>
+                </Badge>
+              );
+            })}
+          </div>
+          <p className="text-sm font-medium mt-2">Adicionar coluna:</p>
+          <div className="flex flex-wrap gap-2">
+            {allStatuses.filter(s => !columns.includes(s)).map(status => {
+              const config = ACTIVATE_STATUS_CONFIG[status];
+              return (
+                <Badge key={status} variant="outline" className="cursor-pointer gap-1" onClick={() => addColumn(status)}>
+                  <span className={cn("h-2 w-2 rounded-full inline-block", config?.dotColor)} />
+                  {config?.label || status}
+                  <span className="text-primary ml-1">+</span>
+                </Badge>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Kanban Board */}
       <ScrollArea className="w-full">
@@ -85,7 +136,7 @@ export function ActivatePipelineView({ leads, users, isLoading, onLeadSelect, on
           "flex gap-4 pb-4",
           isMobile && "snap-x snap-mandatory"
         )}>
-          {PIPELINE_STATUSES.map(status => {
+          {columns.map(status => {
             const config = ACTIVATE_STATUS_CONFIG[status];
             const columnLeads = groupedLeads[status] || [];
             const isOver = dragOverColumn === status;

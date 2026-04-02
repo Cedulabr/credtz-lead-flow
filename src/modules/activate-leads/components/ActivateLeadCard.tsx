@@ -1,6 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Phone, User } from "lucide-react";
+import { Phone, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ActivateLead, ACTIVATE_STATUS_CONFIG } from "../types";
@@ -47,11 +47,26 @@ export function ActivateLeadCard({ lead, onClick, onDragStart, isDragging }: Act
           <span>{formatPhone(lead.telefone)}</span>
         </div>
 
-        {lead.origem && (
-          <Badge variant="outline" className="text-[10px] h-5">
-            {lead.origem}
-          </Badge>
+        {lead.cpf && (
+          <p className="text-[10px] text-muted-foreground font-mono">
+            CPF: {lead.cpf}
+          </p>
         )}
+
+        {lead.produto && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Package className="h-3 w-3" />
+            <span className="truncate">{lead.produto}</span>
+          </div>
+        )}
+
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {lead.origem && (
+            <Badge variant="outline" className="text-[10px] h-5">
+              {lead.origem}
+            </Badge>
+          )}
+        </div>
 
         <p className="text-[10px] text-muted-foreground">
           {formatDistanceToNow(new Date(lead.created_at), { addSuffix: true, locale: ptBR })}
