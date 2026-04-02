@@ -31,11 +31,7 @@ export function useActivateLeads() {
 
   const fetchUsers = useCallback(async () => {
     try {
-      let query = supabase.from("profiles").select("id, name, email");
-      if (profile?.company_id) {
-        query = query.eq("company_id", profile.company_id);
-      }
-      const { data } = await query;
+      const { data } = await supabase.from("profiles").select("id, name, email");
       setUsers((data as ActivateUser[]) || []);
     } catch (err) {
       console.error("Error fetching users:", err);
