@@ -2337,6 +2337,106 @@ export const ActivateLeads = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Manual Lead Creation Modal */}
+      <Dialog open={isManualLeadModalOpen} onOpenChange={setIsManualLeadModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-primary to-primary/80 flex items-center justify-center">
+                <UserPlus className="h-5 w-5 text-primary-foreground" />
+              </div>
+              Cadastrar Lead Manual
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Nome *</Label>
+              <Input
+                placeholder="Nome completo do lead"
+                value={manualLeadNome}
+                onChange={(e) => setManualLeadNome(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Telefone *</Label>
+              <Input
+                placeholder="(XX) XXXXX-XXXX"
+                value={manualLeadTelefone}
+                onChange={(e) => setManualLeadTelefone(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>CPF</Label>
+              <Input
+                placeholder="000.000.000-00"
+                value={manualLeadCpf}
+                onChange={(e) => setManualLeadCpf(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsManualLeadModalOpen(false);
+              setManualLeadNome('');
+              setManualLeadTelefone('');
+              setManualLeadCpf('');
+            }}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!manualLeadNome.trim() || !manualLeadTelefone.trim() || savingManualLead}
+              onClick={async () => {
+                if (!user?.id) return;
+                setSavingManualLead(true);
+                try {
+                  const phone = normalizePhone(manualLeadTelefone);
+                  
+                  const { data: existing } = await supabase
+                    .from('activate_leads')
+                    .select('id, nome')
+                    .eq('telefone', phone)
+                    .maybeSingle();
+
+                  if (existing) {
+                    toast({ title: '⚠️ Lead já existe', description: `O telefone já está cadastrado para: ${existing.nome}`, variant: 'destructive' });
+                    setSavingManualLead(false);
+                    return;
+                  }
+
+                  const cpfClean = manualLeadCpf.replace(/\D/g, '') || null;
+
+                  const { error } = await supabase.from('activate_leads').insert({
+                    nome: manualLeadNome.trim(),
+                    telefone: phone,
+                    cpf: cpfClean,
+                    origem: 'manual',
+                    status: 'novo',
+                    created_by: user.id,
+                    company_id: companyId || null,
+                  });
+
+                  if (error) throw error;
+
+                  toast({ title: '✅ Lead cadastrado', description: `${manualLeadNome.trim()} adicionado com sucesso.` });
+                  setIsManualLeadModalOpen(false);
+                  setManualLeadNome('');
+                  setManualLeadTelefone('');
+                  setManualLeadCpf('');
+                  fetchLeads();
+                } catch (err: any) {
+                  toast({ title: 'Erro ao cadastrar', description: err.message, variant: 'destructive' });
+                } finally {
+                  setSavingManualLead(false);
+                }
+              }}
+            >
+              {savingManualLead && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              ✅ Cadastrar Lead
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Status Modal */}
       <Dialog open={isStatusModalOpen} onOpenChange={setIsStatusModalOpen}>
         <DialogContent>
