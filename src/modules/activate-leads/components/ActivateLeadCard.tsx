@@ -1,6 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Phone, Package } from "lucide-react";
+import { Phone, Package, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ActivateLead, ACTIVATE_STATUS_CONFIG } from "../types";
@@ -11,9 +11,10 @@ interface ActivateLeadCardProps {
   onClick: (lead: ActivateLead) => void;
   onDragStart?: (e: React.DragEvent, leadId: string) => void;
   isDragging?: boolean;
+  showWorkedTime?: boolean;
 }
 
-export function ActivateLeadCard({ lead, onClick, onDragStart, isDragging }: ActivateLeadCardProps) {
+export function ActivateLeadCard({ lead, onClick, onDragStart, isDragging, showWorkedTime }: ActivateLeadCardProps) {
   const statusConfig = ACTIVATE_STATUS_CONFIG[lead.status];
 
   const formatPhone = (phone: string): string => {
@@ -21,6 +22,18 @@ export function ActivateLeadCard({ lead, onClick, onDragStart, isDragging }: Act
     if (digits.length === 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
     if (digits.length === 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
     return phone;
+  };
+
+  const getWorkedTimeLabel = () => {
+    const now = new Date();
+    const updated = new Date(lead.updated_at);
+    const diffMs = now.getTime() - updated.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return "agora mesmo";
+    if (diffMin < 60) return `há ${diffMin}min`;
+    const diffH = Math.floor(diffMin / 60);
+    const remMin = diffMin % 60;
+    return remMin > 0 ? `há ${diffH}h ${remMin}min` : `há ${diffH}h`;
   };
 
   return (
@@ -41,6 +54,13 @@ export function ActivateLeadCard({ lead, onClick, onDragStart, isDragging }: Act
             <p className="font-medium text-sm truncate">{lead.nome}</p>
           </div>
         </div>
+
+        {showWorkedTime && (
+          <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+            <Clock className="h-3 w-3" />
+            <span>Tratado {getWorkedTimeLabel()}</span>
+          </div>
+        )}
 
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Phone className="h-3 w-3" />
