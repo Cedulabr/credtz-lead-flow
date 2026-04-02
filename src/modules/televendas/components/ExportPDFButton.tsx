@@ -59,10 +59,10 @@ export function ExportPDFButton({ filteredTelevendas, filteredStats, filters, is
 
       // Active filters
       const activeFilters: string[] = [];
-      if (filters.selectedUser && filters.selectedUser !== "all") activeFilters.push(`Colaborador: ${filters.selectedUser}`);
-      if (filters.selectedProduct && filters.selectedProduct !== "all") activeFilters.push(`Produto: ${filters.selectedProduct}`);
-      if (filters.selectedMonth && filters.selectedMonth !== "all") activeFilters.push(`Mês: ${filters.selectedMonth}`);
-      if (filters.selectedStatus && filters.selectedStatus !== "all") activeFilters.push(`Status: ${filters.selectedStatus}`);
+      if (filters.userId && filters.userId !== "all") activeFilters.push(`Colaborador: ${filters.userId}`);
+      if (filters.product && filters.product !== "all") activeFilters.push(`Produto: ${filters.product}`);
+      if (filters.month && filters.month !== "all") activeFilters.push(`Mês: ${filters.month}`);
+      if (filters.status && filters.status !== "all") activeFilters.push(`Status: ${filters.status}`);
       if (filters.search) activeFilters.push(`Busca: ${filters.search}`);
 
       if (activeFilters.length > 0) {
