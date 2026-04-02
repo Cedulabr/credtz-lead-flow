@@ -104,7 +104,8 @@ export function RequestLeadsWizard({
       case 0: return !!data.tipoLead;
       case 1: return true; // Perfil é opcional
       case 2: return data.quantidade > 0 && data.quantidade <= userCredits;
-      case 3: return data.quantidade <= userCredits;
+      case 3: return data.quantidade <= userCredits; // Resumo
+      case 4: return data.quantidade <= userCredits; // Confirmação
       default: return true;
     }
   }, [currentStep, data, userCredits]);
