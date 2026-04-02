@@ -11,6 +11,7 @@ export function useActivateLeads() {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchLeads = useCallback(async () => {
+    if (!profile?.id) return; // Guard: don't fetch without auth
     try {
       setIsLoading(true);
       const query = supabase
@@ -20,6 +21,7 @@ export function useActivateLeads() {
 
       const { data, error } = await query;
       if (error) throw error;
+      console.log("[useActivateLeads] Fetched", data?.length, "leads");
       setLeads((data as ActivateLead[]) || []);
     } catch (err: any) {
       console.error("Error fetching activate leads:", err);
@@ -27,7 +29,7 @@ export function useActivateLeads() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [profile?.id]);
 
   const fetchUsers = useCallback(async () => {
     try {
