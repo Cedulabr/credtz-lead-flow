@@ -274,6 +274,13 @@ export const ActivateLeads = () => {
   const [userFilter, setUserFilter] = useState<string>('all');
   const [timeFilter, setTimeFilter] = useState<string>('all');
   const [filterWorkedToday, setFilterWorkedToday] = useState(false);
+
+  // Auto-refresh tick every 60s to update "Tratado há Xmin" labels
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
   const [currentPage, setCurrentPage] = useState(1);
   const [gestorId, setGestorId] = useState<string | null>(null);
   
