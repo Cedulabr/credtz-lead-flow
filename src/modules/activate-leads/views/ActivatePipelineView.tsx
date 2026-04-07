@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ActivateLead, ActivateLeadStats, ActivateUser, ACTIVATE_STATUS_CONFIG, PIPELINE_STATUSES } from "../types";
 import { ActivateLeadCard } from "../components/ActivateLeadCard";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,13 @@ export function ActivatePipelineView({ leads, users, stats, origens, isLoading, 
   const [columns, setColumns] = useState<string[]>(PIPELINE_STATUSES);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [filterWorkedToday, setFilterWorkedToday] = useState(false);
+
+  // Auto-refresh tick every 60s to update "Tratado há Xmin" labels
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const allStatuses = Object.keys(ACTIVATE_STATUS_CONFIG);
 
