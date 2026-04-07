@@ -1,34 +1,41 @@
 
 
-## Adicionar botao Exportar PDF no modulo Gestao de Televendas
+## Auto-refresh da minutagem no Activate Leads (Lista + Pipeline)
 
-### O que sera feito
+### Problema
 
-Botao "Exportar PDF" visivel apenas para gestor e admin no header do modulo. Ao clicar, gera um PDF com:
-- Titulo + periodo/filtros ativos
-- Resumo dos KPIs (total propostas, valor pago, pagas, ativas, criticos, alertas)
-- Tabela de propostas filtradas (nome, CPF, telefone, produto, banco, status, valor, data)
+A minutagem "Tratado há Xmin" ja existe no codigo (tanto na lista quanto nos cards do Kanban), mas o valor e calculado apenas no momento da renderizacao e nao atualiza automaticamente. Apos alguns minutos na tela, os tempos ficam desatualizados ate que o usuario force um reload.
 
-### Arquivos a criar/modificar
+### Solucao
 
-**1. Criar `src/modules/televendas/components/ExportPDFButton.tsx`**
+**1. Adicionar timer de 60s no `ActivatePipelineView.tsx`**
 
-Componente com botao que usa `jsPDF` (ja instalado no projeto) para gerar o PDF:
-- Recebe `filteredTelevendas`, `filteredStats`, `filters`, `isGestorOrAdmin`
-- Renderiza apenas se `isGestorOrAdmin === true`
-- Gera PDF com header, KPIs em grid, e tabela de propostas
-- Usa formatacao pt-BR para datas e moedas
-- Nome do arquivo: `televendas_relatorio_DD-MM-YYYY.pdf`
+Criar um state `tick` com `setInterval` de 60 segundos que forca re-render dos cards, atualizando automaticamente os tempos exibidos.
 
-**2. Modificar `src/modules/televendas/TelevendasModule.tsx`**
+```typescript
+const [tick, setTick] = useState(0);
+useEffect(() => {
+  const interval = setInterval(() => setTick(t => t + 1), 60000);
+  return () => clearInterval(interval);
+}, []);
+```
 
-- Importar `ExportPDFButton`
-- Adicionar o componente na area de botoes do header (linha ~629, junto ao Sync e FiltersDrawer), dentro do bloco `isGestorOrAdmin`
+**2. Adicionar timer de 60s no `ActivateLeads.tsx` (lista)**
 
-### Detalhes tecnicos
+Mesmo mecanismo na view de lista para que a coluna "Ultima Atividade" tambem atualize a cada minuto.
 
-- `jsPDF` ja esta como dependencia do projeto (usado em `ExportButtons.tsx` do PerformanceReport)
-- O PDF tera formato retrato A4, fonte Helvetica, com cores neutras (azul escuro header, linhas alternadas cinza claro)
-- Paginacao automatica quando a lista exceder uma pagina
-- Rodape com data de geracao e numero de pagina
+**3. Garantir visibilidade sempre**
+
+Verificar que a linha "Tratado ha Xmin" nos cards do Kanban e exibida incondicionalmente (sem depender de `showWorkedTime`) — ja esta assim no codigo atual.
+
+### Arquivos a modificar
+
+| Arquivo | Mudanca |
+|---|---|
+| `src/modules/activate-leads/views/ActivatePipelineView.tsx` | Adicionar `useState`/`setInterval` de 60s |
+| `src/components/ActivateLeads.tsx` | Adicionar `useState`/`setInterval` de 60s |
+
+### Resultado
+
+Os tempos "Tratado ha 5min", "Tratado ha 1h 23min" etc. atualizam automaticamente a cada minuto sem necessidade de reload, tanto na lista quanto no pipeline.
 
