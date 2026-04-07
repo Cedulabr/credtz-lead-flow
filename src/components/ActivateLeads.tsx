@@ -588,6 +588,11 @@ export const ActivateLeads = () => {
     setSelectedLeadIds(new Set());
   };
 
+  const selectFirstN = (n: number) => {
+    const ids = filteredLeads.slice(0, n).map(l => l.id);
+    setSelectedLeadIds(new Set(ids));
+  };
+
   const getSelectedLeads = () => {
     return leads.filter(l => selectedLeadIds.has(l.id));
   };
@@ -1857,6 +1862,48 @@ export const ActivateLeads = () => {
 
       {/* Bulk Actions */}
       <AnimatePresence>
+        {/* Quick select quantity buttons */}
+        {canAssignLead && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <Card className="border border-muted/50">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-sm font-medium text-muted-foreground">Selecionar quantidade:</span>
+                  {[5, 10, 15, 20, 50].map((n) => (
+                    <Button
+                      key={n}
+                      variant={selectedLeadIds.size === n ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => selectFirstN(n)}
+                      disabled={filteredLeads.length < 1}
+                      className="min-w-[48px] transition-all duration-200"
+                    >
+                      {n}
+                    </Button>
+                  ))}
+                  <Button
+                    variant={selectedLeadIds.size === filteredLeads.length && filteredLeads.length > 0 ? "default" : "outline"}
+                    size="sm"
+                    onClick={toggleSelectAll}
+                    disabled={filteredLeads.length < 1}
+                    className="transition-all duration-200"
+                  >
+                    Todos ({filteredLeads.length})
+                  </Button>
+                  {selectedLeadIds.size > 0 && (
+                    <Button variant="ghost" size="sm" onClick={clearSelection} className="text-destructive hover:text-destructive">
+                      ❌ Limpar
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
         {selectedLeadIds.size > 0 && canAssignLead && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
