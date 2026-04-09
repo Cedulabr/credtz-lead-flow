@@ -626,6 +626,86 @@ export type Database = {
           },
         ]
       }
+      ai_instance_config: {
+        Row: {
+          behavior_instructions: string | null
+          company_id: string
+          created_at: string
+          extended_config: Json | null
+          greeting_message: string | null
+          id: string
+          instance_id: string
+          is_enabled: boolean
+          product_description: string | null
+          updated_at: string
+        }
+        Insert: {
+          behavior_instructions?: string | null
+          company_id: string
+          created_at?: string
+          extended_config?: Json | null
+          greeting_message?: string | null
+          id?: string
+          instance_id: string
+          is_enabled?: boolean
+          product_description?: string | null
+          updated_at?: string
+        }
+        Update: {
+          behavior_instructions?: string | null
+          company_id?: string
+          created_at?: string
+          extended_config?: Json | null
+          greeting_message?: string | null
+          id?: string
+          instance_id?: string
+          is_enabled?: boolean
+          product_description?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_instance_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_providers: {
+        Row: {
+          api_key: string | null
+          created_at: string
+          default_model: string
+          id: string
+          is_active: boolean
+          name: string
+          provider_key: string
+          type: string
+        }
+        Insert: {
+          api_key?: string | null
+          created_at?: string
+          default_model: string
+          id?: string
+          is_active?: boolean
+          name: string
+          provider_key: string
+          type?: string
+        }
+        Update: {
+          api_key?: string | null
+          created_at?: string
+          default_model?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          provider_key?: string
+          type?: string
+        }
+        Relationships: []
+      }
       ai_settings: {
         Row: {
           ai_mode: string
@@ -2872,6 +2952,54 @@ export type Database = {
           },
         ]
       }
+      company_plans: {
+        Row: {
+          activated_at: string
+          company_id: string
+          credits_balance: number
+          expires_at: string | null
+          id: string
+          plan_id: string
+          status: string
+          subscription_active: boolean
+        }
+        Insert: {
+          activated_at?: string
+          company_id: string
+          credits_balance?: number
+          expires_at?: string | null
+          id?: string
+          plan_id: string
+          status?: string
+          subscription_active?: boolean
+        }
+        Update: {
+          activated_at?: string
+          company_id?: string
+          credits_balance?: number
+          expires_at?: string | null
+          id?: string
+          plan_id?: string
+          status?: string
+          subscription_active?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_plans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_plans_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_notifications: {
         Row: {
           created_at: string
@@ -3098,6 +3226,38 @@ export type Database = {
             columns: ["tag_id"]
             isOneToOne: false
             referencedRelation: "chat_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      copilot_config: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          is_enabled: boolean
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "copilot_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -4736,38 +4896,64 @@ export type Database = {
       plans: {
         Row: {
           ai_model: string | null
+          ai_provider_id: string | null
           created_at: string | null
+          credits_included: number | null
+          description: string | null
           features: Json | null
           id: string
           is_active: boolean | null
+          is_published: boolean
           max_agents: number | null
           max_instances: number | null
           name: string
+          price: number | null
           price_per_response: number | null
+          type: string
         }
         Insert: {
           ai_model?: string | null
+          ai_provider_id?: string | null
           created_at?: string | null
+          credits_included?: number | null
+          description?: string | null
           features?: Json | null
           id?: string
           is_active?: boolean | null
+          is_published?: boolean
           max_agents?: number | null
           max_instances?: number | null
           name: string
+          price?: number | null
           price_per_response?: number | null
+          type?: string
         }
         Update: {
           ai_model?: string | null
+          ai_provider_id?: string | null
           created_at?: string | null
+          credits_included?: number | null
+          description?: string | null
           features?: Json | null
           id?: string
           is_active?: boolean | null
+          is_published?: boolean
           max_agents?: number | null
           max_instances?: number | null
           name?: string
+          price?: number | null
           price_per_response?: number | null
+          type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "plans_ai_provider_id_fkey"
+            columns: ["ai_provider_id"]
+            isOneToOne: false
+            referencedRelation: "ai_providers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {
@@ -4816,6 +5002,7 @@ export type Database = {
           can_access_meu_numero: boolean | null
           can_access_meus_clientes: boolean | null
           can_access_minhas_comissoes: boolean | null
+          can_access_portflow: boolean | null
           can_access_premium_leads: boolean | null
           can_access_radar: boolean | null
           can_access_relatorio_desempenho: boolean | null
@@ -4862,6 +5049,7 @@ export type Database = {
           can_access_meu_numero?: boolean | null
           can_access_meus_clientes?: boolean | null
           can_access_minhas_comissoes?: boolean | null
+          can_access_portflow?: boolean | null
           can_access_premium_leads?: boolean | null
           can_access_radar?: boolean | null
           can_access_relatorio_desempenho?: boolean | null
@@ -4908,6 +5096,7 @@ export type Database = {
           can_access_meu_numero?: boolean | null
           can_access_meus_clientes?: boolean | null
           can_access_minhas_comissoes?: boolean | null
+          can_access_portflow?: boolean | null
           can_access_premium_leads?: boolean | null
           can_access_radar?: boolean | null
           can_access_relatorio_desempenho?: boolean | null
@@ -8178,6 +8367,7 @@ export type Database = {
           user_name: string
         }[]
       }
+      get_user_company_id: { Args: never; Returns: string }
       get_user_company_ids: { Args: { _user_id: string }; Returns: string[] }
       get_user_credits: { Args: { target_user_id?: string }; Returns: number }
       get_user_data_company_ids: {
@@ -8188,6 +8378,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: string
       }
+      get_user_role: { Args: never; Returns: string }
       get_user_sms_credits: {
         Args: { target_user_id?: string }
         Returns: number
