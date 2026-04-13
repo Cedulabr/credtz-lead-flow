@@ -78,6 +78,7 @@ export interface TelevendasFilters {
   product: string;
   bank: string;
   dateMode: DateMode;
+  companyId: string;
 }
 
 // ===========================================

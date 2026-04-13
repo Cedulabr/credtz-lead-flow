@@ -6279,6 +6279,186 @@ export type Database = {
           },
         ]
       }
+      team_conversation_members: {
+        Row: {
+          conversation_id: string
+          id: string
+          is_muted: boolean
+          is_pinned: boolean
+          joined_at: string
+          last_read_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          id?: string
+          is_muted?: boolean
+          is_pinned?: boolean
+          joined_at?: string
+          last_read_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          id?: string
+          is_muted?: boolean
+          is_pinned?: boolean
+          joined_at?: string
+          last_read_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_conversation_members_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "team_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_conversations: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          is_archived: boolean
+          name: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          name?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          name?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_conversations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_message_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          id: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji: string
+          id?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          id?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_message_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "team_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          file_name: string | null
+          id: string
+          media_type: string | null
+          media_url: string | null
+          message_type: string
+          reply_to_id: string | null
+          sender_id: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          file_name?: string | null
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+          message_type?: string
+          reply_to_id?: string | null
+          sender_id: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          file_name?: string | null
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+          message_type?: string
+          reply_to_id?: string | null
+          sender_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "team_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "team_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       televendas: {
         Row: {
           banco: string
@@ -7855,6 +8035,7 @@ export type Database = {
           entered_column_at: string | null
           id: string
           instance_id: string | null
+          is_pinned: boolean | null
           kanban_column_id: string | null
           last_message: string | null
           last_message_at: string | null
@@ -7875,6 +8056,7 @@ export type Database = {
           entered_column_at?: string | null
           id?: string
           instance_id?: string | null
+          is_pinned?: boolean | null
           kanban_column_id?: string | null
           last_message?: string | null
           last_message_at?: string | null
@@ -7895,6 +8077,7 @@ export type Database = {
           entered_column_at?: string | null
           id?: string
           instance_id?: string | null
+          is_pinned?: boolean | null
           kanban_column_id?: string | null
           last_message?: string | null
           last_message_at?: string | null
@@ -8414,6 +8597,10 @@ export type Database = {
       is_global_admin: { Args: { _user_id: string }; Returns: boolean }
       is_same_company_gestor: {
         Args: { _target_user_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_team_conversation_member: {
+        Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
       }
       is_tenant_gestor_or_above: {
