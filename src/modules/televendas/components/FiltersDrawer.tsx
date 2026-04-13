@@ -48,6 +48,7 @@ interface FiltersDrawerProps {
   isGestorOrAdmin: boolean;
   activeCount: number;
   availableBanks?: string[];
+  companies?: { id: string; name: string }[];
 }
 
 export const FiltersDrawer = ({
@@ -57,6 +58,7 @@ export const FiltersDrawer = ({
   isGestorOrAdmin,
   activeCount,
   availableBanks = [],
+  companies = [],
 }: FiltersDrawerProps) => {
   const updateFilter = <K extends keyof TelevendasFilters>(
     key: K,
@@ -75,6 +77,7 @@ export const FiltersDrawer = ({
       product: "all",
       bank: "all",
       dateMode: filters.dateMode,
+      companyId: "all",
     });
   };
 
@@ -301,6 +304,34 @@ export const FiltersDrawer = ({
               ))}
             </div>
           </div>
+
+          {/* Company filter (gestor/admin only) */}
+          {isGestorOrAdmin && companies.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-base font-semibold">
+                <Building2 className="h-4 w-4 text-primary" />
+                Empresa
+              </Label>
+              <Select
+                value={filters.companyId}
+                onValueChange={(value) => {
+                  onFiltersChange({ ...filters, companyId: value, userId: "all" });
+                }}
+              >
+                <SelectTrigger className="h-12 text-base rounded-xl">
+                  <SelectValue placeholder="Todas as empresas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as empresas</SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      🏢 {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* User filter (gestor/admin only) */}
           {isGestorOrAdmin && (

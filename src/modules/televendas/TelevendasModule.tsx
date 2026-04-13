@@ -73,7 +73,9 @@ export const TelevendasModule = () => {
     product: "all",
     bank: "all",
     dateMode: "criacao",
+    companyId: "all",
   });
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [origemFilter, setOrigemFilter] = useState<string>("all");
 
   // Detail modal state
@@ -126,15 +128,46 @@ export const TelevendasModule = () => {
     checkRole();
   }, [user?.id]);
 
-  // Fetch users
+  // Fetch companies
+  const fetchCompanies = useCallback(async () => {
+    try {
+      if (isAdmin) {
+        const { data } = await supabase.from("companies").select("id, name").eq("is_active", true).order("name");
+        setCompanies(data || []);
+      } else if (isGestor && userCompanyIds.length > 0) {
+        const { data } = await supabase.from("companies").select("id, name").in("id", userCompanyIds).eq("is_active", true).order("name");
+        setCompanies(data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching companies:", error);
+    }
+  }, [isAdmin, isGestor, userCompanyIds]);
+
+  // Fetch users (filtered by company when selected)
   const fetchUsers = useCallback(async () => {
     try {
-      const { data } = await supabase.from("profiles").select("id, name").order("name");
-      setUsers(data || []);
+      if (filters.companyId !== "all") {
+        // Get user IDs from selected company
+        const { data: ucData } = await supabase
+          .from("user_companies")
+          .select("user_id")
+          .eq("company_id", filters.companyId)
+          .eq("is_active", true);
+        const userIds = ucData?.map((u) => u.user_id) || [];
+        if (userIds.length > 0) {
+          const { data } = await supabase.from("profiles").select("id, name").in("id", userIds).order("name");
+          setUsers(data || []);
+        } else {
+          setUsers([]);
+        }
+      } else {
+        const { data } = await supabase.from("profiles").select("id, name").order("name");
+        setUsers(data || []);
+      }
     } catch (error) {
       console.error("Error fetching users:", error);
     }
-  }, []);
+  }, [filters.companyId]);
 
   // Fetch televendas
   const fetchTelevendas = useCallback(async () => {
@@ -172,6 +205,11 @@ export const TelevendasModule = () => {
         }
       }
 
+      // Company filter
+      if (filters.companyId !== "all") {
+        query = query.eq("company_id", filters.companyId);
+      }
+
       // User filter
       if (filters.userId !== "all") {
         query = query.eq("user_id", filters.userId);
@@ -203,8 +241,9 @@ export const TelevendasModule = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.id, isAdmin, isGestor, userCompanyIds, filters.period, filters.month, filters.userId, filters.dateMode, showActiveOnly, toast]);
+  }, [user?.id, isAdmin, isGestor, userCompanyIds, filters.period, filters.month, filters.userId, filters.companyId, filters.dateMode, showActiveOnly, toast]);
 
+  useEffect(() => { fetchCompanies(); }, [fetchCompanies]);
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => { fetchTelevendas(); }, [fetchTelevendas]);
 
@@ -317,7 +356,7 @@ export const TelevendasModule = () => {
   const activeFiltersCount = [
     filters.search, filters.status !== "all", filters.userId !== "all",
     filters.period !== "all", filters.product !== "all", filters.bank !== "all",
-    filters.dateMode !== "criacao"
+    filters.dateMode !== "criacao", filters.companyId !== "all"
   ].filter(Boolean).length;
 
   // Status change handler - opens modal for confirmation
@@ -654,6 +693,7 @@ export const TelevendasModule = () => {
             isGestorOrAdmin={isGestorOrAdmin}
             activeCount={activeFiltersCount}
             availableBanks={availableBanks}
+            companies={companies}
           />
           <Button 
             variant="outline" 
