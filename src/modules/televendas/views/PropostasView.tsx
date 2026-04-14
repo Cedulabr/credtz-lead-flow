@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Inbox, Eye, RefreshCw } from "lucide-react";
+import { Inbox, Eye, RefreshCw, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -289,6 +289,16 @@ export const PropostasView = ({
                     <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full">
                       👤 {tv.user.name}
                     </span>
+                  </div>
+                )}
+
+                {/* Observação preview */}
+                {tv.observacao && (
+                  <div className="flex items-start gap-1.5 mt-1.5">
+                    <FileText className="h-3 w-3 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <p className="text-[11px] text-muted-foreground italic line-clamp-2">
+                      {tv.observacao}
+                    </p>
                   </div>
                 )}
               </motion.div>
