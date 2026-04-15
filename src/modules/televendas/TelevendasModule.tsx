@@ -356,7 +356,7 @@ export const TelevendasModule = () => {
   const activeFiltersCount = [
     filters.search, filters.status !== "all", filters.userId !== "all",
     filters.period !== "all", filters.product !== "all", filters.bank !== "all",
-    filters.dateMode !== "criacao", filters.companyId !== "all"
+    filters.dateMode !== "criacao", filters.companyId !== "all", filters.month !== "all"
   ].filter(Boolean).length;
 
   // Status change handler - opens modal for confirmation
