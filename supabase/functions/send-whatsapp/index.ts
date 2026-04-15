@@ -6,14 +6,22 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const TICKETZ_URL = "https://chat.easyn.digital:443/backend/api/messages/send";
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const EVOLUTION_API_URL = Deno.env.get("EVOLUTION_API_URL") || "https://evocloud.werkonnect.com";
+    const EVOLUTION_API_KEY = Deno.env.get("EVOLUTION_API_KEY");
+
+    if (!EVOLUTION_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "EVOLUTION_API_KEY not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "No authorization header" }), {
@@ -41,44 +49,46 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { apiToken, number, message, mediaBase64, mediaName, clientName, testMode, instanceId, sourceModule } = body;
+    const { apiToken: instanceName, number, message, mediaBase64, mediaName, clientName, testMode, instanceId, sourceModule } = body;
 
-    if (!apiToken) {
+    if (!instanceName) {
       return new Response(
-        JSON.stringify({ error: "apiToken is required" }),
+        JSON.stringify({ error: "instanceName (apiToken) is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-
-    // Test mode: validate token by sending to a dummy number
+    // Test mode: check connection state via Evolution API
     if (testMode) {
       try {
-        const testResponse = await fetch(TICKETZ_URL, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            number: "5500000000000",
-            body: "Teste de conexão",
-            saveOnTicket: false,
-          }),
+        const stateResponse = await fetch(`${EVOLUTION_API_URL}/instance/connectionState/${instanceName}`, {
+          method: "GET",
+          headers: { "apikey": EVOLUTION_API_KEY },
         });
-        const testText = await testResponse.text();
-        console.log("Test mode response:", testResponse.status, testText);
-        
-        // 401/403 means invalid token; anything else (including 500 with dummy number) means token is accepted
-        if (testResponse.status === 401 || testResponse.status === 403) {
+        const stateText = await stateResponse.text();
+        console.log("Connection state response:", stateResponse.status, stateText);
+
+        if (!stateResponse.ok) {
           return new Response(
-            JSON.stringify({ success: false, testMode: true, error: "Token inválido ou sem permissão. Verifique o token na plataforma Easyn.", details: testText }),
-            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({ success: false, testMode: true, error: `Instância "${instanceName}" não encontrada ou erro na Evolution API.`, details: stateText }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        
+
+        let stateData;
+        try { stateData = JSON.parse(stateText); } catch { stateData = {}; }
+
+        const state = stateData?.instance?.state || stateData?.state;
+        const isConnected = state === "open";
+
         return new Response(
-          JSON.stringify({ success: true, testMode: true, status: testResponse.status }),
+          JSON.stringify({
+            success: isConnected,
+            testMode: true,
+            connected: isConnected,
+            state: state || "unknown",
+            error: isConnected ? null : `Instância "${instanceName}" está desconectada (estado: ${state || "unknown"}).`,
+          }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       } catch (e) {
@@ -103,72 +113,65 @@ Deno.serve(async (req) => {
       normalizedNumber = "55" + normalizedNumber;
     }
 
-    console.log(`Sending to: ${normalizedNumber}, type: ${mediaBase64 ? 'media' : 'text'}, message length: ${message?.length || 0}`);
-    console.log(`Request payload: number=${normalizedNumber}, hasMedia=${!!mediaBase64}, mediaName=${mediaName || 'none'}`);
+    console.log(`Sending to: ${normalizedNumber}, instance: ${instanceName}, type: ${mediaBase64 ? 'media' : 'text'}`);
 
-    let ticketzResponse: Response;
+    const evoHeaders = {
+      "apikey": EVOLUTION_API_KEY,
+      "Content-Type": "application/json",
+    };
+
+    let evoResponse: Response;
     let messageType = "text";
 
     if (mediaBase64 && mediaName) {
       messageType = "media";
-      const binaryStr = atob(mediaBase64);
-      const bytes = new Uint8Array(binaryStr.length);
-      for (let i = 0; i < binaryStr.length; i++) {
-        bytes[i] = binaryStr.charCodeAt(i);
-      }
 
-      // Detect MIME type from file extension
+      // Detect media type from extension
       const ext = (mediaName || '').split('.').pop()?.toLowerCase();
-      const mimeMap: Record<string, string> = {
-        pdf: 'application/pdf',
-        mp3: 'audio/mpeg',
-        ogg: 'audio/ogg',
-        wav: 'audio/wav',
-        m4a: 'audio/mp4',
-        opus: 'audio/opus',
-        webm: 'audio/webm',
-        png: 'image/png',
-        jpg: 'image/jpeg',
-        jpeg: 'image/jpeg',
+      const mediaTypeMap: Record<string, string> = {
+        pdf: 'document',
+        doc: 'document',
+        docx: 'document',
+        xls: 'document',
+        xlsx: 'document',
+        mp3: 'audio',
+        ogg: 'audio',
+        wav: 'audio',
+        m4a: 'audio',
+        opus: 'audio',
+        webm: 'audio',
+        png: 'image',
+        jpg: 'image',
+        jpeg: 'image',
+        gif: 'image',
+        mp4: 'video',
       };
-      const detectedMime = mimeMap[ext || ''] || 'application/octet-stream';
-      
-      // Use File instead of Blob for proper Content-Disposition in FormData
-      const file = new File([bytes], mediaName, { type: detectedMime });
-      console.log(`Media file created: name=${mediaName}, size=${file.size} bytes, mime=${detectedMime}, ext=${ext}`);
-
-      const formData = new FormData();
-      formData.append("number", normalizedNumber);
-      formData.append("medias", file);
-      formData.append("saveOnTicket", "true");
+      const mediatype = mediaTypeMap[ext || ''] || 'document';
 
       // If there's also a text message, send it first
       if (message) {
-        const textResp = await fetch(TICKETZ_URL, {
+        await fetch(`${EVOLUTION_API_URL}/message/sendText/${instanceName}`, {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiToken}`,
-            "Content-Type": "application/json",
-          },
+          headers: evoHeaders,
           body: JSON.stringify({
             number: normalizedNumber,
-            body: message,
-            saveOnTicket: true,
-            linkPreview: true,
+            text: message,
           }),
         });
-        const textResult = await textResp.text();
-        console.log("Text before media response:", textResp.status, textResult);
       }
 
-      ticketzResponse = await fetch(TICKETZ_URL, {
+      // Send media
+      evoResponse = await fetch(`${EVOLUTION_API_URL}/message/sendMedia/${instanceName}`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiToken}`,
-        },
-        body: formData,
+        headers: evoHeaders,
+        body: JSON.stringify({
+          number: normalizedNumber,
+          mediatype,
+          media: `data:application/octet-stream;base64,${mediaBase64}`,
+          fileName: mediaName,
+        }),
       });
-      console.log("Media send response status:", ticketzResponse.status);
+      console.log("Media send response status:", evoResponse.status);
     } else {
       if (!message) {
         return new Response(
@@ -177,32 +180,23 @@ Deno.serve(async (req) => {
         );
       }
 
-      ticketzResponse = await fetch(TICKETZ_URL, {
+      evoResponse = await fetch(`${EVOLUTION_API_URL}/message/sendText/${instanceName}`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiToken}`,
-          "Content-Type": "application/json",
-        },
+        headers: evoHeaders,
         body: JSON.stringify({
           number: normalizedNumber,
-          body: message,
-          saveOnTicket: true,
-          linkPreview: true,
+          text: message,
         }),
       });
     }
 
-    const responseText = await ticketzResponse.text();
-    console.log("Ticketz response:", ticketzResponse.status, responseText);
-    
-    let responseData;
-    try {
-      responseData = JSON.parse(responseText);
-    } catch {
-      responseData = { raw: responseText };
-    }
+    const responseText = await evoResponse.text();
+    console.log("Evolution response:", evoResponse.status, responseText);
 
-    const success = ticketzResponse.ok;
+    let responseData;
+    try { responseData = JSON.parse(responseText); } catch { responseData = { raw: responseText }; }
+
+    const success = evoResponse.ok;
 
     // Log message in database
     await supabase.from("whatsapp_messages").insert({
@@ -219,15 +213,9 @@ Deno.serve(async (req) => {
     });
 
     if (!success) {
-      console.error("Ticketz API error:", ticketzResponse.status, responseText);
-      let errorDetail: string;
-      if (responseData?.error === "ERR_INTERNAL_ERROR") {
-        errorDetail = `Este número (${normalizedNumber}) pode não ter WhatsApp ativo. Verifique o número e tente novamente.`;
-      } else {
-        errorDetail = responseData?.error || "Falha ao enviar mensagem";
-      }
+      console.error("Evolution API error:", evoResponse.status, responseText);
       return new Response(
-        JSON.stringify({ success: false, error: errorDetail, details: responseData, sentTo: normalizedNumber }),
+        JSON.stringify({ success: false, error: responseData?.error || responseData?.message || "Falha ao enviar mensagem", details: responseData, sentTo: normalizedNumber }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

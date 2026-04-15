@@ -6,16 +6,29 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const TICKETZ_URL = "https://chat.easyn.digital:443/backend/api/messages/send";
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const EVOLUTION_API_URL = Deno.env.get("EVOLUTION_API_URL") || "https://evocloud.werkonnect.com";
+  const EVOLUTION_API_KEY = Deno.env.get("EVOLUTION_API_KEY");
+
+  if (!EVOLUTION_API_KEY) {
+    return new Response(JSON.stringify({ error: "EVOLUTION_API_KEY not configured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseKey);
+
+  const evoHeaders = {
+    "apikey": EVOLUTION_API_KEY,
+    "Content-Type": "application/json",
+  };
 
   try {
     // 0. Transition scheduled jobs whose start time has arrived
@@ -68,16 +81,18 @@ Deno.serve(async (req) => {
         .update({ status: "sending" })
         .eq("id", msg.id);
 
+      // Get instance name (stored in api_token field)
       const { data: instance } = await supabase
         .from("whatsapp_instances")
         .select("api_token")
         .eq("id", msg.whatsapp_instance_id)
         .maybeSingle();
 
-      if (!instance?.api_token) {
+      const instanceName = instance?.api_token;
+      if (!instanceName) {
         await supabase
           .from("autolead_messages")
-          .update({ status: "failed", error_message: "Token não encontrado para instância" })
+          .update({ status: "failed", error_message: "Nome da instância não encontrado" })
           .eq("id", msg.id);
         failed++;
         continue;
@@ -87,17 +102,13 @@ Deno.serve(async (req) => {
       if (phone.length <= 11) phone = "55" + phone;
 
       try {
-        const response = await fetch(TICKETZ_URL, {
+        // Send text message via Evolution API
+        const response = await fetch(`${EVOLUTION_API_URL}/message/sendText/${instanceName}`, {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${instance.api_token}`,
-            "Content-Type": "application/json",
-          },
+          headers: evoHeaders,
           body: JSON.stringify({
             number: phone,
-            body: msg.message,
-            saveOnTicket: true,
-            linkPreview: true,
+            text: msg.message,
           }),
         });
 
@@ -128,20 +139,26 @@ Deno.serve(async (req) => {
                   .download(audioFile.file_path);
 
                 if (fileData) {
-                  const ext = audioFile.file_path.split('.').pop() || 'ogg';
-                  const mimeType = audioFile.mime_type || 'audio/ogg';
-                  const formData = new FormData();
-                  formData.append("number", phone);
-                  formData.append("body", "");
-                  formData.append("medias", new File([fileData], `audio.${ext}`, { type: mimeType }));
-                  formData.append("saveOnTicket", "true");
+                  // Convert to base64
+                  const arrayBuffer = await fileData.arrayBuffer();
+                  const uint8Array = new Uint8Array(arrayBuffer);
+                  let binaryStr = "";
+                  for (let i = 0; i < uint8Array.length; i++) {
+                    binaryStr += String.fromCharCode(uint8Array[i]);
+                  }
+                  const base64 = btoa(binaryStr);
 
-                  const audioResponse = await fetch(TICKETZ_URL, {
+                  const ext = audioFile.file_path.split('.').pop() || 'ogg';
+
+                  const audioResponse = await fetch(`${EVOLUTION_API_URL}/message/sendMedia/${instanceName}`, {
                     method: "POST",
-                    headers: {
-                      Authorization: `Bearer ${instance.api_token}`,
-                    },
-                    body: formData,
+                    headers: evoHeaders,
+                    body: JSON.stringify({
+                      number: phone,
+                      mediatype: "audio",
+                      media: `data:audio/${ext};base64,${base64}`,
+                      fileName: `audio.${ext}`,
+                    }),
                   });
 
                   const audioRespText = await audioResponse.text();
@@ -156,7 +173,7 @@ Deno.serve(async (req) => {
           let errorDetail = responseText;
           try {
             const parsed = JSON.parse(responseText);
-            errorDetail = parsed?.error || responseText;
+            errorDetail = parsed?.error || parsed?.message || responseText;
           } catch {}
 
           await supabase
