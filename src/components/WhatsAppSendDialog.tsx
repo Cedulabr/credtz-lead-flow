@@ -73,7 +73,7 @@ export function WhatsAppSendDialog({
       setSendAudio(false);
       setSelectedAudioId("");
       if (instances.length > 0 && !selectedInstanceId) {
-        const firstWithToken = instances.find(i => i.hasToken);
+        const firstWithToken = instances.find(i => i.isValid);
         if (firstWithToken) setSelectedInstanceId(firstWithToken.id);
       }
     }
@@ -179,7 +179,7 @@ export function WhatsAppSendDialog({
                   <SelectValue placeholder="Selecione a instância" />
                 </SelectTrigger>
                 <SelectContent>
-                  {instances.filter(i => i.hasToken).map(inst => (
+                  {instances.filter(i => i.isValid).map(inst => (
                     <SelectItem key={inst.id} value={inst.id}>
                       {inst.instance_name}
                       {inst.phone_number && ` (${inst.phone_number})`}
