@@ -333,8 +333,8 @@ export function WhatsAppConfig() {
   };
 
   const handleSave = async () => {
-    if (!user?.id || !formToken.trim()) {
-      toast.error("Informe o nome da instância Evolution");
+    if (!user?.id || !formName.trim()) {
+      toast.error("Informe o nome da instância");
       return;
     }
     setSaving(true);
@@ -359,7 +359,6 @@ export function WhatsAppConfig() {
 
       if (editingId) {
         const updateData: any = {
-          api_token: formToken,
           instance_name: formName || "Principal",
           phone_number: formPhone || null,
         };
@@ -380,7 +379,6 @@ export function WhatsAppConfig() {
           .insert({
             user_id: targetUserId,
             instance_name: formName || "Principal",
-            api_token: formToken,
             phone_number: formPhone || null,
             instance_status: "configured",
             company_id: finalCompanyId,
@@ -413,11 +411,11 @@ export function WhatsAppConfig() {
   };
 
   const handleTest = async (inst: Instance) => {
-    if (!inst.api_token) return;
+    if (!inst.instance_name) return;
     setTesting(inst.id);
     try {
       const { data, error } = await supabase.functions.invoke("send-whatsapp", {
-        body: { apiToken: inst.api_token, testMode: true },
+        body: { instanceName: inst.instance_name, testMode: true },
       });
       if (error) throw error;
       if (data?.success) {
@@ -471,22 +469,22 @@ export function WhatsAppConfig() {
     setRetrySending(true);
     try {
       if (retryAction === "send_now") {
-        // Get instance token
+        // Get instance name
         const { data: inst } = await (supabase as any)
           .from("whatsapp_instances")
-          .select("api_token")
+          .select("instance_name")
           .eq("id", editingScheduled.instance_id)
           .maybeSingle();
         
-        if (!inst?.api_token) {
-          toast.error("Token não encontrado para esta instância");
+        if (!inst?.instance_name) {
+          toast.error("Instância não encontrada");
           return;
         }
 
         // Send via edge function
         const { data, error } = await supabase.functions.invoke("send-whatsapp", {
           body: {
-            apiToken: inst.api_token,
+            instanceName: inst.instance_name,
             number: editPhone,
             message: editMessage,
             clientName: editingScheduled.client_name,
@@ -580,7 +578,7 @@ export function WhatsAppConfig() {
           </div>
           <div className="flex items-center gap-2 text-white/90 text-sm">
             <CheckCircle className="h-4 w-4" />
-            <span className="font-semibold">{instances.filter(i => i.api_token).length}</span> configuradas
+            <span className="font-semibold">{instances.filter(i => i.instance_name).length}</span> configuradas
           </div>
         </div>
       </div>
@@ -612,7 +610,7 @@ export function WhatsAppConfig() {
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold truncate">{inst.instance_name}</p>
-                      {inst.api_token && (
+                      {inst.instance_name && (
                         <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
                           Configurada
                         </Badge>
@@ -877,13 +875,6 @@ export function WhatsAppConfig() {
             <div>
               <Label>Número do WhatsApp</Label>
               <Input value={formPhone} onChange={(e) => setFormPhone(e.target.value)} placeholder="85 99999-9999" />
-            </div>
-            <div>
-              <Label>Nome da Instância (Evolution)</Label>
-              <Input value={formToken} onChange={(e) => setFormToken(e.target.value)} placeholder="Ex: instancia_vendas_01" />
-              <p className="text-xs text-muted-foreground mt-1">
-                Nome/ID da instância cadastrada na Evolution API (Easyn Flow). Ex: instancia_vendas_01
-              </p>
             </div>
           </div>
           <DialogFooter>
