@@ -1,26 +1,48 @@
-name: Docker Image CI
+name: CI/CD Deploy
 
 on:
   push:
     branches: ["main"]
-  pull_request:
-    branches: ["main"]
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 🔽 1. Baixa o código
+      # 📥 Clona o projeto
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 🔥 2. CORREÇÃO AUTOMÁTICA (ANTI-LOVABLE)
-      - name: Fix dependencies (Lovable safe)
+      # 🔥 Corrige dependências (anti-Lovable)
+      - name: Fix dependencies
         run: |
           rm -rf node_modules package-lock.json
           npm install
 
-      # ⚡ 3. Build da imagem Docker
+      # 🔐 Login no Docker Hub
+      - name: Login Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      # 🏗️ Build da imagem
       - name: Build Docker image
-        run: docker build . --file Dockerfile --tag my-image-name:latest
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/credtz-app:latest .
+
+      # 🚀 Push da imagem
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/credtz-app:latest
+
+      # 🔥 Deploy na VPS via SSH
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            docker pull ${{ secrets.DOCKER_USERNAME }}/credtz-app:latest
+            docker stop credtz-app || true
+            docker rm credtz-app || true
+            docker run -d \
+              --name credtz-app \
+              -p 80:80 \
+              ${{ secrets.DOCKER_USERNAME }}/credtz-app:latest
