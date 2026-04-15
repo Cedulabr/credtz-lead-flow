@@ -3050,6 +3050,8 @@ export type Database = {
           name: string | null
           notes: string | null
           phone: string | null
+          profile_pic_updated_at: string | null
+          profile_pic_url: string | null
           source: string | null
           tags: string[] | null
         }
@@ -3061,6 +3063,8 @@ export type Database = {
           name?: string | null
           notes?: string | null
           phone?: string | null
+          profile_pic_updated_at?: string | null
+          profile_pic_url?: string | null
           source?: string | null
           tags?: string[] | null
         }
@@ -3072,6 +3076,8 @@ export type Database = {
           name?: string | null
           notes?: string | null
           phone?: string | null
+          profile_pic_updated_at?: string | null
+          profile_pic_url?: string | null
           source?: string | null
           tags?: string[] | null
         }
