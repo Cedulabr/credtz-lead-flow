@@ -334,7 +334,7 @@ export function WhatsAppConfig() {
 
   const handleSave = async () => {
     if (!user?.id || !formToken.trim()) {
-      toast.error("Informe o token de acesso");
+      toast.error("Informe o nome da instância Evolution");
       return;
     }
     setSaving(true);
