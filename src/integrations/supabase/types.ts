@@ -3357,6 +3357,35 @@ export type Database = {
         }
         Relationships: []
       }
+      departments: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "departments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       education_content: {
         Row: {
           ativo: boolean | null
@@ -8032,6 +8061,7 @@ export type Database = {
           contact_name: string | null
           contact_phone: string
           created_at: string
+          department_id: string | null
           entered_column_at: string | null
           id: string
           instance_id: string | null
@@ -8053,6 +8083,7 @@ export type Database = {
           contact_name?: string | null
           contact_phone: string
           created_at?: string
+          department_id?: string | null
           entered_column_at?: string | null
           id?: string
           instance_id?: string | null
@@ -8074,6 +8105,7 @@ export type Database = {
           contact_name?: string | null
           contact_phone?: string
           created_at?: string
+          department_id?: string | null
           entered_column_at?: string | null
           id?: string
           instance_id?: string | null
@@ -8088,6 +8120,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversations_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "whatsapp_conversations_instance_id_fkey"
             columns: ["instance_id"]
