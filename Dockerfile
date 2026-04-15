@@ -8,13 +8,13 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production && npm cache clean --force
+RUN npm install && npm cache clean --force
 
 # Development stage
 FROM base AS dev
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm install
 COPY . .
 EXPOSE 8080
 CMD ["npm", "run", "dev"]
@@ -23,7 +23,7 @@ CMD ["npm", "run", "dev"]
 FROM base AS builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm install
 
 COPY . .
 
@@ -44,26 +44,21 @@ RUN npm run build
 # Production stage with Nginx
 FROM nginx:alpine AS production
 
-# Install curl for health checks
 RUN apk add --no-cache curl
 
-# Copy custom nginx configuration
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Set proper permissions
 RUN chown -R nginx:nginx /usr/share/nginx/html \
     && chown -R nginx:nginx /var/cache/nginx \
     && chown -R nginx:nginx /var/log/nginx \
     && chown -R nginx:nginx /etc/nginx/conf.d
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:80/ || exit 1
 
 EXPOSE 80
 
-# Use nginx user
 USER nginx
 
 CMD ["nginx", "-g", "daemon off;"]
