@@ -334,7 +334,7 @@ export function WhatsAppConfig() {
 
   const handleSave = async () => {
     if (!user?.id || !formToken.trim()) {
-      toast.error("Informe o token de acesso");
+      toast.error("Informe o nome da instância Evolution");
       return;
     }
     setSaving(true);
@@ -565,7 +565,7 @@ export function WhatsAppConfig() {
                 ? "Gerencie todas as instâncias do sistema"
                 : role === "gestor"
                 ? "Gerencie as instâncias da sua empresa"
-                : "Gerencie suas instâncias via API Ticketz"}
+                : "Gerencie suas instâncias via Evolution API"}
             </p>
           </div>
           <Button onClick={openNewForm} className="gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white">
@@ -879,10 +879,10 @@ export function WhatsAppConfig() {
               <Input value={formPhone} onChange={(e) => setFormPhone(e.target.value)} placeholder="85 99999-9999" />
             </div>
             <div>
-              <Label>Token de Acesso (Easyn)</Label>
-              <Input value={formToken} onChange={(e) => setFormToken(e.target.value)} placeholder="Cole o token configurado na conexão Easyn" type="password" />
+              <Label>Nome da Instância (Evolution)</Label>
+              <Input value={formToken} onChange={(e) => setFormToken(e.target.value)} placeholder="Ex: instancia_vendas_01" />
               <p className="text-xs text-muted-foreground mt-1">
-                Token cadastrado na conexão do chat Easyn. Acesse Conexões &gt; Editar &gt; copie o token.
+                Nome/ID da instância cadastrada na Evolution API (Easyn Flow). Ex: instancia_vendas_01
               </p>
             </div>
           </div>

@@ -6,19 +6,33 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const TICKETZ_URL = "https://chat.easyn.digital:443/backend/api/messages/send";
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const EVOLUTION_API_URL = Deno.env.get("EVOLUTION_API_URL") || "https://evocloud.werkonnect.com";
+    const EVOLUTION_API_KEY = Deno.env.get("EVOLUTION_API_KEY");
+
+    if (!EVOLUTION_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "EVOLUTION_API_KEY not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    const evoHeaders = {
+      "apikey": EVOLUTION_API_KEY,
+      "Content-Type": "application/json",
+    };
+
     // Fetch pending scheduled messages that are due
+    // api_token now stores the Evolution instance name
     const { data: pendingMessages, error: fetchError } = await supabase
       .from("whatsapp_scheduled_messages")
       .select("*, whatsapp_instances(api_token)")
@@ -45,73 +59,69 @@ Deno.serve(async (req) => {
     let failed = 0;
 
     for (const msg of pendingMessages) {
-      const apiToken = msg.whatsapp_instances?.api_token;
-      if (!apiToken) {
+      const instanceName = msg.whatsapp_instances?.api_token;
+      if (!instanceName) {
         await supabase
           .from("whatsapp_scheduled_messages")
-          .update({ status: "failed", error_message: "Token da instância não encontrado" })
+          .update({ status: "failed", error_message: "Nome da instância não encontrado" })
           .eq("id", msg.id);
         failed++;
         continue;
       }
 
+      // Normalize phone
+      let phone = msg.phone.replace(/\D/g, "");
+      if (phone.length <= 11) phone = "55" + phone;
+
       try {
-        let ticketzResponse: Response;
         let messageType = "text";
+        let evoResponse: Response;
 
         if (msg.media_base64 && msg.media_name) {
           messageType = "media";
-          const binaryStr = atob(msg.media_base64);
-          const bytes = new Uint8Array(binaryStr.length);
-          for (let i = 0; i < binaryStr.length; i++) {
-            bytes[i] = binaryStr.charCodeAt(i);
-          }
 
           // Send text first if present
           if (msg.message) {
-            await fetch(TICKETZ_URL, {
+            await fetch(`${EVOLUTION_API_URL}/message/sendText/${instanceName}`, {
               method: "POST",
-              headers: {
-                Authorization: `Bearer ${apiToken}`,
-                "Content-Type": "application/json",
-              },
+              headers: evoHeaders,
               body: JSON.stringify({
-                number: msg.phone,
-                body: msg.message,
-                saveOnTicket: true,
-                linkPreview: true,
+                number: phone,
+                text: msg.message,
               }),
             });
           }
 
-          const formData = new FormData();
-          formData.append("number", msg.phone);
-          formData.append("saveOnTicket", "true");
-          const blob = new Blob([bytes], { type: "application/pdf" });
-          formData.append("medias", blob, msg.media_name);
+          // Detect media type
+          const ext = (msg.media_name || '').split('.').pop()?.toLowerCase();
+          const mediaTypeMap: Record<string, string> = {
+            pdf: 'document', mp3: 'audio', ogg: 'audio', wav: 'audio',
+            png: 'image', jpg: 'image', jpeg: 'image',
+          };
+          const mediatype = mediaTypeMap[ext || ''] || 'document';
 
-          ticketzResponse = await fetch(TICKETZ_URL, {
+          evoResponse = await fetch(`${EVOLUTION_API_URL}/message/sendMedia/${instanceName}`, {
             method: "POST",
-            headers: { Authorization: `Bearer ${apiToken}` },
-            body: formData,
+            headers: evoHeaders,
+            body: JSON.stringify({
+              number: phone,
+              mediatype,
+              media: `data:application/octet-stream;base64,${msg.media_base64}`,
+              fileName: msg.media_name,
+            }),
           });
         } else {
-          ticketzResponse = await fetch(TICKETZ_URL, {
+          evoResponse = await fetch(`${EVOLUTION_API_URL}/message/sendText/${instanceName}`, {
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${apiToken}`,
-              "Content-Type": "application/json",
-            },
+            headers: evoHeaders,
             body: JSON.stringify({
-              number: msg.phone,
-              body: msg.message,
-              saveOnTicket: true,
-              linkPreview: true,
+              number: phone,
+              text: msg.message,
             }),
           });
         }
 
-        const success = ticketzResponse.ok;
+        const success = evoResponse.ok;
 
         // Update scheduled message status
         await supabase
@@ -119,14 +129,14 @@ Deno.serve(async (req) => {
           .update({
             status: success ? "sent" : "failed",
             sent_at: success ? new Date().toISOString() : null,
-            error_message: success ? null : `HTTP ${ticketzResponse.status}`,
+            error_message: success ? null : `HTTP ${evoResponse.status}`,
           })
           .eq("id", msg.id);
 
         // Log in whatsapp_messages
         await supabase.from("whatsapp_messages").insert({
           user_id: msg.user_id,
-          phone: msg.phone,
+          phone,
           message: msg.message || `[Media: ${msg.media_name}]`,
           status: success ? "sent" : "failed",
           sent_at: success ? new Date().toISOString() : null,
