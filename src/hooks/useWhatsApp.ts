@@ -7,7 +7,7 @@ export interface WhatsAppInstance {
   id: string;
   instance_name: string;
   phone_number: string | null;
-  hasToken: boolean;
+  isValid: boolean;
 }
 
 export function useWhatsApp() {
@@ -20,7 +20,6 @@ export function useWhatsApp() {
     if (!user?.id) { setLoadingInstances(false); return; }
     setLoadingInstances(true);
     try {
-      // Determine user role
       const isAdmin = profile?.role === 'admin';
       let isGestor = false;
       let myCompanyId: string | null = null;
@@ -40,26 +39,23 @@ export function useWhatsApp() {
         }
       }
 
-      // Fetch user's own instances
       const { data: userInstances } = await (supabase as any)
         .from("whatsapp_instances")
-        .select("id, instance_name, phone_number, api_token")
+        .select("id, instance_name, phone_number")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
-      // For gestor/admin: also fetch company-level instances
       let companyInstances: any[] = [];
       if ((isAdmin || isGestor) && myCompanyId) {
         const { data } = await (supabase as any)
           .from("whatsapp_instances")
-          .select("id, instance_name, phone_number, api_token")
+          .select("id, instance_name, phone_number")
           .eq("company_id", myCompanyId)
-          .not("api_token", "is", null)
+          .not("instance_name", "is", null)
           .order("created_at", { ascending: false });
         companyInstances = data || [];
       }
 
-      // Merge, dedup by id
       const allRaw = [...(userInstances || []), ...companyInstances];
       const seen = new Set<string>();
       const merged: WhatsAppInstance[] = [];
@@ -70,7 +66,7 @@ export function useWhatsApp() {
             id: inst.id,
             instance_name: inst.instance_name || "Instância",
             phone_number: inst.phone_number || null,
-            hasToken: !!inst.api_token,
+            isValid: !!inst.instance_name,
           });
         }
       }
@@ -84,30 +80,19 @@ export function useWhatsApp() {
 
   useEffect(() => { fetchInstances(); }, [fetchInstances]);
 
-  const getTokenForInstance = useCallback(async (instanceId: string): Promise<string | null> => {
-    const { data } = await (supabase as any)
-      .from("whatsapp_instances")
-      .select("api_token")
-      .eq("id", instanceId)
-      .maybeSingle();
-    return data?.api_token || null;
-  }, []);
-
   const sendTextMessage = useCallback(async (number: string, body: string, clientName?: string, instanceId?: string, sourceModule?: string) => {
-    const targetId = instanceId || instances.find(i => i.hasToken)?.id;
-    if (!targetId) {
+    const targetInst = instanceId
+      ? instances.find(i => i.id === instanceId && i.isValid)
+      : instances.find(i => i.isValid);
+
+    if (!targetInst) {
       toast.error("Nenhuma instância WhatsApp configurada.");
-      return false;
-    }
-    const token = await getTokenForInstance(targetId);
-    if (!token) {
-      toast.error("Token não encontrado para esta instância.");
       return false;
     }
     setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("send-whatsapp", {
-        body: { apiToken: token, number, message: body, clientName, instanceId: targetId, sourceModule },
+        body: { instanceName: targetInst.instance_name, number, message: body, clientName, instanceId: targetInst.id, sourceModule },
       });
       if (error) throw error;
       if (data?.success) {
@@ -123,23 +108,21 @@ export function useWhatsApp() {
     } finally {
       setSending(false);
     }
-  }, [instances, getTokenForInstance]);
+  }, [instances]);
 
   const sendMediaMessage = useCallback(async (number: string, mediaBase64: string, mediaName: string, message?: string, clientName?: string, instanceId?: string, sourceModule?: string) => {
-    const targetId = instanceId || instances.find(i => i.hasToken)?.id;
-    if (!targetId) {
+    const targetInst = instanceId
+      ? instances.find(i => i.id === instanceId && i.isValid)
+      : instances.find(i => i.isValid);
+
+    if (!targetInst) {
       toast.error("Nenhuma instância WhatsApp configurada.");
-      return false;
-    }
-    const token = await getTokenForInstance(targetId);
-    if (!token) {
-      toast.error("Token não encontrado para esta instância.");
       return false;
     }
     setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("send-whatsapp", {
-        body: { apiToken: token, number, message, mediaBase64, mediaName, clientName, instanceId: targetId, sourceModule },
+        body: { instanceName: targetInst.instance_name, number, message, mediaBase64, mediaName, clientName, instanceId: targetInst.id, sourceModule },
       });
       if (error) throw error;
       if (data?.success) {
@@ -155,7 +138,7 @@ export function useWhatsApp() {
     } finally {
       setSending(false);
     }
-  }, [instances, getTokenForInstance]);
+  }, [instances]);
 
   const scheduleMessage = useCallback(async (
     instanceId: string,
@@ -192,7 +175,7 @@ export function useWhatsApp() {
 
   return {
     instances,
-    hasInstances: instances.some(i => i.hasToken),
+    hasInstances: instances.some(i => i.isValid),
     loadingInstances,
     sending,
     sendTextMessage,
