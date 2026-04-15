@@ -83,6 +83,7 @@ export function WhatsAppConfig() {
   const [formCompanyId, setFormCompanyId] = useState("");
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, "success" | "error">>({});
   const [syncing, setSyncing] = useState(false);
 
   const handleSyncInstances = async () => {
