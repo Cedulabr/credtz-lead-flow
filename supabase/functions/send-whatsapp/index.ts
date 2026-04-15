@@ -49,11 +49,14 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { apiToken: instanceName, number, message, mediaBase64, mediaName, clientName, testMode, instanceId, sourceModule } = body;
+    const { instanceName: directInstanceName, apiToken, number, message, mediaBase64, mediaName, clientName, testMode, instanceId, sourceModule } = body;
+
+    // Prefer instanceName; fall back to apiToken for backward compatibility
+    const instanceName = directInstanceName || apiToken;
 
     if (!instanceName) {
       return new Response(
-        JSON.stringify({ error: "instanceName (apiToken) is required" }),
+        JSON.stringify({ error: "instanceName is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -81,14 +81,14 @@ Deno.serve(async (req) => {
         .update({ status: "sending" })
         .eq("id", msg.id);
 
-      // Get instance name (stored in api_token field)
+      // Get instance name from whatsapp_instances
       const { data: instance } = await supabase
         .from("whatsapp_instances")
-        .select("api_token")
+        .select("instance_name")
         .eq("id", msg.whatsapp_instance_id)
         .maybeSingle();
 
-      const instanceName = instance?.api_token;
+      const instanceName = instance?.instance_name;
       if (!instanceName) {
         await supabase
           .from("autolead_messages")

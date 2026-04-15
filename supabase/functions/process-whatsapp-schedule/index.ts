@@ -32,10 +32,9 @@ Deno.serve(async (req) => {
     };
 
     // Fetch pending scheduled messages that are due
-    // api_token now stores the Evolution instance name
     const { data: pendingMessages, error: fetchError } = await supabase
       .from("whatsapp_scheduled_messages")
-      .select("*, whatsapp_instances(api_token)")
+      .select("*, whatsapp_instances(instance_name)")
       .eq("status", "pending")
       .lte("scheduled_at", new Date().toISOString())
       .limit(50);
@@ -59,7 +58,7 @@ Deno.serve(async (req) => {
     let failed = 0;
 
     for (const msg of pendingMessages) {
-      const instanceName = msg.whatsapp_instances?.api_token;
+      const instanceName = msg.whatsapp_instances?.instance_name;
       if (!instanceName) {
         await supabase
           .from("whatsapp_scheduled_messages")

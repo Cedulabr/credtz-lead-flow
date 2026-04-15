@@ -64,7 +64,7 @@ export function AutoLeadWizard({ open, onClose, credits, onConfirm }: AutoLeadWi
   const [scheduleTime, setScheduleTime] = useState('08:30');
 
   const totalSteps = 7;
-  const connectedInstances = instances.filter(i => i.hasToken);
+  const connectedInstances = instances.filter(i => i.isValid);
   const extraDdds = ALL_DDDS.filter(d => !FEATURED_DDDS.includes(d));
 
   // Fetch available tags with error handling
