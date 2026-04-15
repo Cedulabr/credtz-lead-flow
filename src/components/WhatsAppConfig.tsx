@@ -578,9 +578,15 @@ export function WhatsAppConfig() {
                 : "Gerencie suas instâncias via Evolution API"}
             </p>
           </div>
-          <Button onClick={openNewForm} className="gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white">
-            <Plus className="h-4 w-4" /> Nova Instância
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleSyncInstances} disabled={syncing} className="gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white">
+              {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Sincronizar com EasynFlow
+            </Button>
+            <Button onClick={openNewForm} className="gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white">
+              <Plus className="h-4 w-4" /> Nova Instância
+            </Button>
+          </div>
         </div>
         {/* Stats bar */}
         <div className="relative mt-4 flex gap-6">
