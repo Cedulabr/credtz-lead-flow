@@ -84,6 +84,26 @@ export function WhatsAppConfig() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, "success" | "error">>({});
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSyncInstances = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-whatsapp-instances");
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(`Sincronização concluída: ${data.updated} atualizadas, ${data.created} novas, ${data.disconnected} desconectadas`);
+        fetchInstances();
+      } else {
+        toast.error(data?.error || "Erro ao sincronizar");
+      }
+    } catch (e: any) {
+      console.error("Sync error:", e);
+      toast.error("Erro ao sincronizar com EasynFlow");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // Detect user role
   useEffect(() => {
@@ -578,9 +598,15 @@ export function WhatsAppConfig() {
                 : "Gerencie suas instâncias via Evolution API"}
             </p>
           </div>
-          <Button onClick={openNewForm} className="gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white">
-            <Plus className="h-4 w-4" /> Nova Instância
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleSyncInstances} disabled={syncing} className="gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white">
+              {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Sincronizar com EasynFlow
+            </Button>
+            <Button onClick={openNewForm} className="gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white">
+              <Plus className="h-4 w-4" /> Nova Instância
+            </Button>
+          </div>
         </div>
         {/* Stats bar */}
         <div className="relative mt-4 flex gap-6">

@@ -36,6 +36,9 @@ verify_jwt = false
 [functions.process-whatsapp-schedule]
 verify_jwt = false
 
+[functions.sync-whatsapp-instances]
+verify_jwt = false
+
 [functions.brdid-api]
 verify_jwt = false
 
