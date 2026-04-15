@@ -2,17 +2,25 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
-
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
+      # 🔽 1. Baixa o código
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 🔥 2. CORREÇÃO AUTOMÁTICA (ANTI-LOVABLE)
+      - name: Fix dependencies (Lovable safe)
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
+
+      # ⚡ 3. Build da imagem Docker
+      - name: Build Docker image
+        run: docker build . --file Dockerfile --tag my-image-name:latest
