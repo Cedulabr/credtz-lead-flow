@@ -418,17 +418,29 @@ export function WhatsAppConfig() {
         body: { instanceName: inst.instance_name, testMode: true },
       });
       if (error) throw error;
-      if (data?.success) {
-        setTestResults(prev => ({ ...prev, [inst.id]: "success" }));
-        toast.success("Conexão funcionando!");
+      const isConnected = data?.success;
+      const newStatus = isConnected ? "connected" : "disconnected";
+      setTestResults(prev => ({ ...prev, [inst.id]: isConnected ? "success" : "error" }));
+      // Persist status in DB
+      await (supabase as any)
+        .from("whatsapp_instances")
+        .update({ instance_status: newStatus })
+        .eq("id", inst.id);
+      if (isConnected) {
+        toast.success("✅ Instância conectada");
       } else {
-        setTestResults(prev => ({ ...prev, [inst.id]: "error" }));
-        toast.error(data?.error || "Erro de conexão");
+        toast.error("❌ Instância desconectada");
       }
+      fetchInstances();
     } catch (e: any) {
       console.error("Test error:", e);
       setTestResults(prev => ({ ...prev, [inst.id]: "error" }));
-      toast.error("Não foi possível conectar à API");
+      await (supabase as any)
+        .from("whatsapp_instances")
+        .update({ instance_status: "disconnected" })
+        .eq("id", inst.id);
+      toast.error("❌ Instância desconectada");
+      fetchInstances();
     } finally {
       setTesting(null);
     }
@@ -635,19 +647,23 @@ export function WhatsAppConfig() {
                       </div>
                     )}
                   </div>
-                  {testResults[inst.id] === "success" && (
+                  {(inst.instance_status === "connected" || testResults[inst.id] === "success") && testResults[inst.id] !== "error" ? (
                     <Badge className="bg-green-100 text-green-700 border-green-200 gap-1">
-                      <CheckCircle className="h-3 w-3" /> OK
+                      <CheckCircle className="h-3 w-3" /> Conectado
                     </Badge>
-                  )}
-                  {testResults[inst.id] === "error" && (
+                  ) : (inst.instance_status === "disconnected" || testResults[inst.id] === "error") ? (
                     <Badge variant="destructive" className="gap-1">
-                      <XCircle className="h-3 w-3" /> Erro
+                      <XCircle className="h-3 w-3" /> Desconectado
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="gap-1 text-muted-foreground">
+                      <Clock className="h-3 w-3" /> Não verificado
                     </Badge>
                   )}
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="outline" size="sm" onClick={() => handleTest(inst)} disabled={testing === inst.id} title="Testar conexão">
-                      {testing === inst.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" onClick={() => handleTest(inst)} disabled={testing === inst.id} title="Verificar Status" className="gap-1">
+                      {testing === inst.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                      <span className="hidden sm:inline text-xs">Verificar Status</span>
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => openEditForm(inst)} title="Editar">
                       <Edit className="h-4 w-4" />
