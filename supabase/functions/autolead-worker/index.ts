@@ -11,7 +11,8 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const EVOLUTION_API_URL = Deno.env.get("EVOLUTION_API_URL") || "https://evocloud.werkonnect.com";
+  let EVOLUTION_API_URL = Deno.env.get("EVOLUTION_API_URL") || "https://evocloud.werkonnect.com";
+  if (EVOLUTION_API_URL && !EVOLUTION_API_URL.startsWith("http")) EVOLUTION_API_URL = "https://" + EVOLUTION_API_URL;
   const EVOLUTION_API_KEY = Deno.env.get("EVOLUTION_API_KEY");
 
   if (!EVOLUTION_API_KEY) {
