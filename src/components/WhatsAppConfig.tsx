@@ -83,7 +83,26 @@ export function WhatsAppConfig() {
   const [formCompanyId, setFormCompanyId] = useState("");
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<string | null>(null);
-  const [testResults, setTestResults] = useState<Record<string, "success" | "error">>({});
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSyncInstances = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-whatsapp-instances");
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(`Sincronização concluída: ${data.updated} atualizadas, ${data.created} novas, ${data.disconnected} desconectadas`);
+        fetchInstances();
+      } else {
+        toast.error(data?.error || "Erro ao sincronizar");
+      }
+    } catch (e: any) {
+      console.error("Sync error:", e);
+      toast.error("Erro ao sincronizar com EasynFlow");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // Detect user role
   useEffect(() => {
