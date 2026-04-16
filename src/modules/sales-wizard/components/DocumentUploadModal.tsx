@@ -15,6 +15,7 @@ interface DocumentUploadModalProps {
   clientName: string;
   clientCpf: string;
   onComplete?: () => void;
+  requiredMode?: boolean;
 }
 
 interface FileUpload {
@@ -29,6 +30,7 @@ export function DocumentUploadModal({
   clientName,
   clientCpf,
   onComplete,
+  requiredMode = false,
 }: DocumentUploadModalProps) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -43,6 +45,9 @@ export function DocumentUploadModal({
     (!rgFrente.file || rgFrente.uploaded) && 
     (!rgVerso.file || rgVerso.uploaded) && 
     (!extrato.file || extrato.uploaded);
+
+  // In required mode, RG (frente) and Extrato must be selected
+  const requiredDocsMet = !requiredMode || (!!rgFrente.file && !!extrato.file);
 
   const handleFileSelect = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -244,15 +249,25 @@ export function DocumentUploadModal({
             Anexar Documentação
           </DialogTitle>
           <DialogDescription>
-            Deseja anexar documentos do cliente <strong>{clientName}</strong>?
-            <br />
-            <span className="text-xs">Todos os campos são opcionais.</span>
+            {requiredMode ? (
+              <>
+                Anexe os documentos obrigatórios do cliente <strong>{clientName}</strong>.
+                <br />
+                <span className="text-xs text-destructive font-medium">RG e Extrato Consignado são obrigatórios para Agibank.</span>
+              </>
+            ) : (
+              <>
+                Deseja anexar documentos do cliente <strong>{clientName}</strong>?
+                <br />
+                <span className="text-xs">Todos os campos são opcionais.</span>
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 py-4">
           <FileUploadCard
-            label="RG (Frente)"
+            label={requiredMode ? "RG (Frente) *" : "RG (Frente)"}
             icon={User}
             state={rgFrente}
             setter={setRgFrente}
@@ -268,7 +283,7 @@ export function DocumentUploadModal({
           />
           
           <FileUploadCard
-            label="Extrato Consignado"
+            label={requiredMode ? "Extrato Consignado *" : "Extrato Consignado"}
             icon={CreditCard}
             state={extrato}
             setter={setExtrato}
@@ -277,18 +292,20 @@ export function DocumentUploadModal({
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button
-            variant="outline"
-            onClick={handleSkip}
-            disabled={isUploading}
-            className="w-full sm:w-auto"
-          >
-            Pular
-          </Button>
+          {!requiredMode && (
+            <Button
+              variant="outline"
+              onClick={handleSkip}
+              disabled={isUploading}
+              className="w-full sm:w-auto"
+            >
+              Pular
+            </Button>
+          )}
           
           <Button
             onClick={handleUploadAll}
-            disabled={isUploading}
+            disabled={isUploading || (requiredMode && !requiredDocsMet)}
             className="w-full sm:w-auto gap-2"
           >
             {isUploading ? (

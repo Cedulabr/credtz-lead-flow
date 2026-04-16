@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowRightLeft, Building2, HelpCircle, Wallet, ArrowRight, DollarSign } from "lucide-react";
+import { ArrowRightLeft, Building2, HelpCircle, Wallet, ArrowRight, DollarSign, Lock } from "lucide-react";
 import { WizardStepProps } from "../types";
 import { StepHeader } from "./StepHeader";
 import { FieldHint } from "./FieldHint";
@@ -23,19 +23,26 @@ export function PortabilidadeStep({ data, onUpdate, onValidChange, moduloOrigem 
       )
     : banks;
 
+  const isAgibankProponente = (data.banco_proponente || "").toUpperCase().includes("AGIBANK");
+  const isPortFlowModule = moduloOrigem === 'portflow';
+
   useEffect(() => {
-    // Validação: Credora Original, Parcela Atual, Saldo Devedor e Proponente são obrigatórios
+    // Block if Agibank selected as proponente (unless PortFlow module)
+    if (isAgibankProponente && !isPortFlowModule) {
+      onValidChange(false);
+      return;
+    }
+
     const hasCredora = Boolean(data.credora_original && data.credora_original.trim());
     const hasParcelaAtual = Boolean(data.parcela_atual && data.parcela_atual > 0);
     const hasSaldoDevedor = Boolean(data.saldo_devedor_atual && data.saldo_devedor_atual > 0);
     const hasProponente = Boolean(data.banco_proponente);
     
-    // Não pode ser o mesmo banco
     const bancosDiferentes = !data.credora_original || !data.banco_proponente || 
       data.credora_original.toLowerCase() !== data.banco_proponente.toLowerCase();
     
     onValidChange(hasCredora && hasParcelaAtual && hasSaldoDevedor && hasProponente && bancosDiferentes);
-  }, [data.credora_original, data.parcela_atual, data.saldo_devedor_atual, data.banco_proponente, onValidChange]);
+  }, [data.credora_original, data.parcela_atual, data.saldo_devedor_atual, data.banco_proponente, isAgibankProponente, isPortFlowModule, onValidChange]);
 
   const isSameBank = data.credora_original && data.banco_proponente && 
     data.credora_original.toLowerCase() === data.banco_proponente.toLowerCase();
@@ -270,8 +277,39 @@ export function PortabilidadeStep({ data, onUpdate, onValidChange, moduloOrigem 
         </div>
       </TooltipProvider>
 
+      {/* Agibank Block Overlay */}
+      {isAgibankProponente && !isPortFlowModule && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <Card className="border-2 border-destructive/50 bg-destructive/5">
+            <CardContent className="py-8 flex flex-col items-center text-center gap-4">
+              <div className="p-4 rounded-full bg-destructive/10">
+                <Lock className="h-8 w-8 text-destructive" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-destructive">Módulo PortFlow Necessário</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Para portabilidade com Agibank, adquira o módulo <strong>PortFlow</strong>.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdate({ banco_proponente: undefined, banco: undefined });
+                }}
+                className="px-6 py-2 rounded-lg border border-muted-foreground/30 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                ← Voltar e escolher outro banco
+              </button>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Resumo Visual */}
-      {data.credora_original && data.banco_proponente && data.parcela_atual && (
+      {data.credora_original && data.banco_proponente && data.parcela_atual && !isAgibankProponente && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}

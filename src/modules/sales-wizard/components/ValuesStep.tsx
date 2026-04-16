@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, Building2 } from "lucide-react";
+import { DollarSign, Building2, Lock } from "lucide-react";
 import { WizardStepProps, PRODUCT_OPTIONS } from "../types";
 import { StepHeader } from "./StepHeader";
 import { FieldHint } from "./FieldHint";
@@ -14,14 +14,19 @@ export function ValuesStep({ data, onUpdate, onValidChange }: WizardStepProps) {
   
   const selectedProduct = PRODUCT_OPTIONS.find(p => p.value === data.tipo_operacao);
   const requiresSaldoDevedor = selectedProduct?.requiresSaldoDevedor || false;
+  const isAgibankPortabilidade = data.tipo_operacao === "Portabilidade" && (data.banco || "").toUpperCase().includes("AGIBANK");
 
   useEffect(() => {
+    if (isAgibankPortabilidade) {
+      onValidChange(false);
+      return;
+    }
     const hasBank = Boolean(data.banco);
     const hasParcela = Boolean(data.parcela && data.parcela > 0);
     const hasSaldoIfRequired = !requiresSaldoDevedor || Boolean(data.saldo_devedor && data.saldo_devedor > 0);
     
     onValidChange(hasBank && hasParcela && hasSaldoIfRequired);
-  }, [data.banco, data.parcela, data.saldo_devedor, requiresSaldoDevedor, onValidChange]);
+  }, [data.banco, data.parcela, data.saldo_devedor, requiresSaldoDevedor, isAgibankPortabilidade, onValidChange]);
 
   return (
     <div className="space-y-6">
@@ -119,7 +124,33 @@ export function ValuesStep({ data, onUpdate, onValidChange }: WizardStepProps) {
         </div>
       </motion.div>
 
-      {data.banco && data.parcela && (!requiresSaldoDevedor || data.saldo_devedor) && (
+      {/* Agibank Portabilidade Block */}
+      {isAgibankPortabilidade && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="rounded-xl border-2 border-destructive/50 bg-destructive/5 p-6 flex flex-col items-center text-center gap-4"
+        >
+          <div className="p-4 rounded-full bg-destructive/10">
+            <Lock className="h-8 w-8 text-destructive" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-destructive">Módulo PortFlow Necessário</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Para portabilidade com Agibank, adquira o módulo <strong>PortFlow</strong>.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onUpdate({ banco: undefined })}
+            className="px-6 py-2 rounded-lg border border-muted-foreground/30 text-sm font-medium hover:bg-muted transition-colors"
+          >
+            ← Voltar e escolher outro banco
+          </button>
+        </motion.div>
+      )}
+
+      {data.banco && data.parcela && (!requiresSaldoDevedor || data.saldo_devedor) && !isAgibankPortabilidade && (
         <FieldHint type="success">
           ✅ Valores preenchidos! Vamos revisar tudo na próxima etapa.
         </FieldHint>

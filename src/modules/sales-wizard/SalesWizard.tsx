@@ -48,6 +48,7 @@ export function SalesWizard({ moduloOrigem = "televendas" }: SalesWizardProps) {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [isAgibankFlow, setIsAgibankFlow] = useState(false);
   const [showSmsNotify, setShowSmsNotify] = useState(false);
   const [showWhatsAppNotify, setShowWhatsAppNotify] = useState(false);
   const [savedTelevendasId, setSavedTelevendasId] = useState<string | null>(null);
@@ -93,8 +94,19 @@ export function SalesWizard({ moduloOrigem = "televendas" }: SalesWizardProps) {
       toast({ title: "Erro", description: "Você precisa estar logado", variant: "destructive" });
       return;
     }
-    // Save client data and show status dialog
     setSavedClientData({ name: wizardData.nome || "", cpf: wizardData.cpf || "", phone: wizardData.telefone || "" });
+
+    // Check if Agibank flow (non-portabilidade)
+    const bancoSelecionado = isPortabilidade ? wizardData.banco_proponente : wizardData.banco;
+    const isAgibank = (bancoSelecionado || "").toUpperCase().includes("AGIBANK");
+
+    if (isAgibank && !isPortabilidade) {
+      // Skip status dialog, auto-set solicitar_digitacao, mark as Agibank flow
+      setIsAgibankFlow(true);
+      handleStatusSelected("solicitar_digitacao");
+      return;
+    }
+
     setShowStatusDialog(true);
   };
 
@@ -302,10 +314,11 @@ export function SalesWizard({ moduloOrigem = "televendas" }: SalesWizardProps) {
       {savedClientData && (
         <DocumentUploadModal
           open={showDocumentModal}
-          onOpenChange={setShowDocumentModal}
+          onOpenChange={isAgibankFlow ? () => {} : setShowDocumentModal}
           clientName={savedClientData.name}
           clientCpf={savedClientData.cpf}
           onComplete={handleDocumentModalComplete}
+          requiredMode={isAgibankFlow}
         />
       )}
     </div>
