@@ -86,6 +86,7 @@ const TIME_FILTER_OPTIONS = [
   { value: 'month', label: 'Último mês', emoji: '🗓️' },
 ];
 import { cn } from '@/lib/utils';
+import { ResponsibleBadge } from '@/modules/activate-leads/components/ResponsibleBadge';
 
 interface ActivateLead {
   id: string;
