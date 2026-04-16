@@ -2042,7 +2042,7 @@ export const ActivateLeads = () => {
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-primary/20 to-primary/10 flex items-center justify-center">
                               <User className="h-5 w-5 text-primary" />
                             </div>
-                            <div>
+                            <div className="min-w-0">
                               <span className="font-semibold text-base block">{lead.nome}</span>
                               <div className={cn(
                                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border mt-1",
@@ -2053,9 +2053,28 @@ export const ActivateLeads = () => {
                                 <span>{statusConfig.emoji}</span>
                                 {statusConfig.label}
                               </div>
+                              {(isAdmin || isGestor) && (
+                                <div className="mt-1 md:hidden">
+                                  <ResponsibleBadge
+                                    userId={lead.assigned_to}
+                                    userName={assignedUser?.name}
+                                    currentUserId={user?.id}
+                                    size="xs"
+                                  />
+                                </div>
+                              )}
                             </div>
                           </div>
                         </TableCell>
+                        {(isAdmin || isGestor) && (
+                          <TableCell className="hidden md:table-cell">
+                            <ResponsibleBadge
+                              userId={lead.assigned_to}
+                              userName={assignedUser?.name}
+                              currentUserId={user?.id}
+                            />
+                          </TableCell>
+                        )}
                         {/* Última Atividade */}
                         <TableCell>
                           {(() => {
