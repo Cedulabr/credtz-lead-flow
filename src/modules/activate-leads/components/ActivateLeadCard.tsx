@@ -50,11 +50,17 @@ export function ActivateLeadCard({ lead, assignedUser, onClick, onDragStart, isD
       onDragStart={(e) => onDragStart?.(e, lead.id)}
     >
       <div className="space-y-2">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className={cn("h-2 w-2 rounded-full flex-shrink-0", statusConfig?.dotColor || "bg-gray-400")} />
             <p className="font-medium text-sm truncate">{lead.nome}</p>
           </div>
+          <ResponsibleBadge
+            userId={lead.assigned_to}
+            userName={assignedUser?.name}
+            size="xs"
+            className="shrink-0"
+          />
         </div>
 
         <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
