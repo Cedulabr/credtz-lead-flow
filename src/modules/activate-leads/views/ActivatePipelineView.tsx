@@ -254,6 +254,7 @@ export function ActivatePipelineView({ leads, users, stats, origens, isLoading, 
                       <ActivateLeadCard
                         key={lead.id}
                         lead={lead}
+                        assignedUser={users.find(u => u.id === lead.assigned_to)}
                         onClick={onLeadSelect}
                         onDragStart={handleDragStart}
                         isDragging={draggingLeadId === lead.id}
