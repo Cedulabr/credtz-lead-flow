@@ -3,18 +3,20 @@ import { ptBR } from "date-fns/locale";
 import { Phone, Package, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { ActivateLead, ACTIVATE_STATUS_CONFIG } from "../types";
+import { ActivateLead, ACTIVATE_STATUS_CONFIG, ActivateUser } from "../types";
+import { ResponsibleBadge } from "./ResponsibleBadge";
 import { cn } from "@/lib/utils";
 
 interface ActivateLeadCardProps {
   lead: ActivateLead;
+  assignedUser?: ActivateUser;
   onClick: (lead: ActivateLead) => void;
   onDragStart?: (e: React.DragEvent, leadId: string) => void;
   isDragging?: boolean;
   showWorkedTime?: boolean;
 }
 
-export function ActivateLeadCard({ lead, onClick, onDragStart, isDragging, showWorkedTime }: ActivateLeadCardProps) {
+export function ActivateLeadCard({ lead, assignedUser, onClick, onDragStart, isDragging, showWorkedTime }: ActivateLeadCardProps) {
   const statusConfig = ACTIVATE_STATUS_CONFIG[lead.status];
 
   const formatPhone = (phone: string): string => {
@@ -48,11 +50,17 @@ export function ActivateLeadCard({ lead, onClick, onDragStart, isDragging, showW
       onDragStart={(e) => onDragStart?.(e, lead.id)}
     >
       <div className="space-y-2">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className={cn("h-2 w-2 rounded-full flex-shrink-0", statusConfig?.dotColor || "bg-gray-400")} />
             <p className="font-medium text-sm truncate">{lead.nome}</p>
           </div>
+          <ResponsibleBadge
+            userId={lead.assigned_to}
+            userName={assignedUser?.name}
+            size="xs"
+            className="shrink-0"
+          />
         </div>
 
         <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">

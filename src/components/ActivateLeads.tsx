@@ -86,6 +86,7 @@ const TIME_FILTER_OPTIONS = [
   { value: 'month', label: 'Último mês', emoji: '🗓️' },
 ];
 import { cn } from '@/lib/utils';
+import { ResponsibleBadge } from '@/modules/activate-leads/components/ResponsibleBadge';
 
 interface ActivateLead {
   id: string;
@@ -1828,23 +1829,37 @@ export const ActivateLeads = () => {
                   </SelectContent>
                 </Select>
 
-                {(isAdmin || isGestor) && (
-                  <Select value={userFilter} onValueChange={setUserFilter}>
-                    <SelectTrigger className="w-full md:w-48 border-2 focus:border-primary transition-all duration-300">
-                      <User className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="Usuário" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">👥 Todos</SelectItem>
-                      <SelectItem value="unassigned">🆓 Não atribuídos</SelectItem>
-                      {availableUsers.map(u => (
-                        <SelectItem key={u.id} value={u.id}>
-                          👤 {u.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+                {(isAdmin || isGestor) && (() => {
+                  const userCounts = leads.reduce<Record<string, number>>((acc, l) => {
+                    const k = l.assigned_to || "__unassigned__";
+                    acc[k] = (acc[k] || 0) + 1;
+                    return acc;
+                  }, {});
+                  const isActive = userFilter !== 'all';
+                  return (
+                    <Select value={userFilter} onValueChange={setUserFilter}>
+                      <SelectTrigger className={cn(
+                        "w-full md:w-56 border-2 transition-all duration-300",
+                        isActive ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "focus:border-primary"
+                      )}>
+                        <User className={cn("h-4 w-4 mr-2", isActive && "text-primary")} />
+                        <SelectValue placeholder="Usuário" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-80">
+                        <SelectItem value="all">👥 Todos ({leads.length})</SelectItem>
+                        <SelectItem value="unassigned">🆓 Não atribuídos ({userCounts["__unassigned__"] || 0})</SelectItem>
+                        {availableUsers
+                          .slice()
+                          .sort((a, b) => (userCounts[b.id] || 0) - (userCounts[a.id] || 0))
+                          .map(u => (
+                            <SelectItem key={u.id} value={u.id}>
+                              👤 {u.name} ({userCounts[u.id] || 0})
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  );
+                })()}
 
                 <Button
                   variant={filterWorkedToday ? "default" : "outline"}
@@ -1964,6 +1979,9 @@ export const ActivateLeads = () => {
                     </TableHead>
                   )}
                   <TableHead className="font-bold text-base">👤 Nome</TableHead>
+                  {(isAdmin || isGestor) && (
+                    <TableHead className="font-bold text-base">👤 Responsável</TableHead>
+                  )}
                   <TableHead className="font-bold text-base">🕐 Última Atividade</TableHead>
                   <TableHead className="font-bold text-base">📞 Telefone</TableHead>
                   <TableHead className="font-bold text-base">🆔 CPF</TableHead>
@@ -1975,7 +1993,7 @@ export const ActivateLeads = () => {
               <TableBody>
                 {paginatedLeads.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canAssignLead ? 8 : 7} className="h-40">
+                    <TableCell colSpan={(canAssignLead ? 8 : 7) + ((isAdmin || isGestor) ? 1 : 0)} className="h-40">
                       <motion.div 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -2025,7 +2043,7 @@ export const ActivateLeads = () => {
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-primary/20 to-primary/10 flex items-center justify-center">
                               <User className="h-5 w-5 text-primary" />
                             </div>
-                            <div>
+                            <div className="min-w-0">
                               <span className="font-semibold text-base block">{lead.nome}</span>
                               <div className={cn(
                                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border mt-1",
@@ -2036,9 +2054,28 @@ export const ActivateLeads = () => {
                                 <span>{statusConfig.emoji}</span>
                                 {statusConfig.label}
                               </div>
+                              {(isAdmin || isGestor) && (
+                                <div className="mt-1 md:hidden">
+                                  <ResponsibleBadge
+                                    userId={lead.assigned_to}
+                                    userName={assignedUser?.name}
+                                    currentUserId={user?.id}
+                                    size="xs"
+                                  />
+                                </div>
+                              )}
                             </div>
                           </div>
                         </TableCell>
+                        {(isAdmin || isGestor) && (
+                          <TableCell className="hidden md:table-cell">
+                            <ResponsibleBadge
+                              userId={lead.assigned_to}
+                              userName={assignedUser?.name}
+                              currentUserId={user?.id}
+                            />
+                          </TableCell>
+                        )}
                         {/* Última Atividade */}
                         <TableCell>
                           {(() => {

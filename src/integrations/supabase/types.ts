@@ -3558,6 +3558,66 @@ export type Database = {
           },
         ]
       }
+      follow_up_queue: {
+        Row: {
+          company_id: string | null
+          contact_name: string | null
+          conversation_id: string | null
+          created_at: string | null
+          id: string
+          instance_id: string | null
+          note: string | null
+          phone_number: string | null
+          reason: string | null
+          scheduled_at: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          contact_name?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          id?: string
+          instance_id?: string | null
+          note?: string | null
+          phone_number?: string | null
+          reason?: string | null
+          scheduled_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          contact_name?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          id?: string
+          instance_id?: string | null
+          note?: string | null
+          phone_number?: string | null
+          reason?: string | null
+          scheduled_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_queue_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_queue_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form_submissions: {
         Row: {
           client_id: number | null
@@ -8063,16 +8123,23 @@ export type Database = {
           ai_summary: string | null
           assigned_to: string | null
           avatar_url: string | null
+          closed_at: string | null
+          closed_by: string | null
           contact_jid: string | null
           contact_name: string | null
           contact_phone: string
           created_at: string
           department_id: string | null
           entered_column_at: string | null
+          follow_up_note: string | null
+          follow_up_scheduled_at: string | null
+          follow_up_status: string | null
           id: string
           instance_id: string | null
           is_pinned: boolean | null
           kanban_column_id: string | null
+          last_agent_message_at: string | null
+          last_customer_message_at: string | null
           last_message: string | null
           last_message_at: string | null
           last_message_type: string | null
@@ -8081,21 +8148,29 @@ export type Database = {
           unread_count: number
           updated_at: string
           user_id: string
+          waiting_since: string | null
         }
         Insert: {
           ai_summary?: string | null
           assigned_to?: string | null
           avatar_url?: string | null
+          closed_at?: string | null
+          closed_by?: string | null
           contact_jid?: string | null
           contact_name?: string | null
           contact_phone: string
           created_at?: string
           department_id?: string | null
           entered_column_at?: string | null
+          follow_up_note?: string | null
+          follow_up_scheduled_at?: string | null
+          follow_up_status?: string | null
           id?: string
           instance_id?: string | null
           is_pinned?: boolean | null
           kanban_column_id?: string | null
+          last_agent_message_at?: string | null
+          last_customer_message_at?: string | null
           last_message?: string | null
           last_message_at?: string | null
           last_message_type?: string | null
@@ -8104,21 +8179,29 @@ export type Database = {
           unread_count?: number
           updated_at?: string
           user_id: string
+          waiting_since?: string | null
         }
         Update: {
           ai_summary?: string | null
           assigned_to?: string | null
           avatar_url?: string | null
+          closed_at?: string | null
+          closed_by?: string | null
           contact_jid?: string | null
           contact_name?: string | null
           contact_phone?: string
           created_at?: string
           department_id?: string | null
           entered_column_at?: string | null
+          follow_up_note?: string | null
+          follow_up_scheduled_at?: string | null
+          follow_up_status?: string | null
           id?: string
           instance_id?: string | null
           is_pinned?: boolean | null
           kanban_column_id?: string | null
+          last_agent_message_at?: string | null
+          last_customer_message_at?: string | null
           last_message?: string | null
           last_message_at?: string | null
           last_message_type?: string | null
@@ -8127,6 +8210,7 @@ export type Database = {
           unread_count?: number
           updated_at?: string
           user_id?: string
+          waiting_since?: string | null
         }
         Relationships: [
           {
