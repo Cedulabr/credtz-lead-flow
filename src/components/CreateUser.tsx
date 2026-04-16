@@ -229,23 +229,63 @@ export function CreateUser() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="company_id">Empresa</Label>
-              <Select
-                value={formData.company_id || "none"}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, company_id: value === "none" ? "" : value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a empresa" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sem empresa</SelectItem>
-                  {companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="company_id">Empresa</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs gap-1"
+                  onClick={() => setShowNewCompany((v) => !v)}
+                >
+                  <Plus className="h-3 w-3" />
+                  {showNewCompany ? "Cancelar" : "Nova empresa"}
+                </Button>
+              </div>
+              {showNewCompany ? (
+                <div className="space-y-2 rounded-md border border-border p-2">
+                  <Input
+                    placeholder="Nome da empresa *"
+                    value={newCompanyName}
+                    onChange={(e) => setNewCompanyName(e.target.value)}
+                  />
+                  <Input
+                    placeholder="CNPJ (opcional)"
+                    value={newCompanyCnpj}
+                    onChange={(e) => setNewCompanyCnpj(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="w-full"
+                    onClick={handleCreateCompany}
+                    disabled={creatingCompany}
+                  >
+                    {creatingCompany ? (
+                      <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Criando...</>
+                    ) : (
+                      <><Plus className="h-3 w-3 mr-1" /> Criar e selecionar</>
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <Select
+                  value={formData.company_id || "none"}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, company_id: value === "none" ? "" : value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem empresa</SelectItem>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div>
               <Label htmlFor="level">Nível</Label>
