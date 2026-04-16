@@ -74,7 +74,30 @@ serve(async (req: Request) => {
       throw new Error(createErr?.message || "Failed to create user");
     }
 
-    // Upsert profile with new columns
+    // Default restrictive permissions: only Televendas, Gestão Televendas, Digitação and PortFlow enabled
+    const ALL_PERMISSIONS = [
+      "can_access_premium_leads", "can_access_indicar", "can_access_gerador_propostas",
+      "can_access_activate_leads", "can_access_baseoff_consulta", "can_access_meus_clientes",
+      "can_access_televendas", "can_access_gestao_televendas", "can_access_digitacao",
+      "can_access_financas", "can_access_documentos", "can_access_alertas",
+      "can_access_tabela_comissoes", "can_access_minhas_comissoes", "can_access_relatorio_desempenho",
+      "can_access_colaborativo", "can_access_controle_ponto", "can_access_meu_numero",
+      "can_access_sms", "can_access_whatsapp", "can_access_radar", "can_access_autolead",
+      "can_access_audios", "can_access_portflow",
+    ];
+    const ENABLED_BY_DEFAULT = new Set([
+      "can_access_televendas",
+      "can_access_gestao_televendas",
+      "can_access_digitacao",
+      "can_access_portflow",
+    ]);
+    const permissionDefaults: Record<string, boolean> = {};
+    // Admins keep everything enabled; partners get the restricted defaults
+    for (const key of ALL_PERMISSIONS) {
+      permissionDefaults[key] = payload.role === "admin" ? true : ENABLED_BY_DEFAULT.has(key);
+    }
+
+    // Upsert profile with new columns + default permissions
     const { error: profileErr } = await adminClient
       .from("profiles")
       .upsert({
@@ -87,6 +110,7 @@ serve(async (req: Request) => {
         pix_key: payload.pix_key,
         cpf: payload.cpf,
         phone: payload.phone,
+        ...permissionDefaults,
       });
 
     if (profileErr) throw new Error(profileErr.message);

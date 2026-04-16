@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { UserPlus, KeyRound, Crown, User } from "lucide-react";
+import { UserPlus, KeyRound, Crown, User, Plus, Loader2 } from "lucide-react";
 
 interface CreateUserForm {
   name: string;
@@ -31,6 +31,10 @@ export function CreateUser() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [showNewCompany, setShowNewCompany] = useState(false);
+  const [newCompanyName, setNewCompanyName] = useState("");
+  const [newCompanyCnpj, setNewCompanyCnpj] = useState("");
+  const [creatingCompany, setCreatingCompany] = useState(false);
   const [formData, setFormData] = useState<CreateUserForm>({
     name: "",
     email: "",
@@ -118,6 +122,32 @@ export function CreateUser() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCreateCompany = async () => {
+    if (!newCompanyName.trim()) {
+      toast({ title: "Nome obrigatório", description: "Informe o nome da empresa.", variant: "destructive" });
+      return;
+    }
+    setCreatingCompany(true);
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .insert({ name: newCompanyName.trim(), cnpj: newCompanyCnpj.trim() || null, is_active: true })
+        .select('id, name')
+        .single();
+      if (error) throw error;
+      setCompanies(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      setFormData(prev => ({ ...prev, company_id: data.id }));
+      setNewCompanyName("");
+      setNewCompanyCnpj("");
+      setShowNewCompany(false);
+      toast({ title: "Empresa criada!", description: `${data.name} foi cadastrada e selecionada.` });
+    } catch (err: any) {
+      toast({ title: "Erro ao criar empresa", description: err.message, variant: "destructive" });
+    } finally {
+      setCreatingCompany(false);
     }
   };
 
