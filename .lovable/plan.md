@@ -1,38 +1,49 @@
 
 
-## Correção do "Verificar Status" + Sincronização Automática com Evolution API
+## Fluxo especial para Agibank Easyn no Televendas
 
-### Problema raiz identificado
+### Resumo
+Duas regras especiais quando o banco selecionado contém "AGIBANK":
 
-O `EVOLUTION_API_URL` está salvo como `evocloud.werkonnect.com` **sem o protocolo `https://`**. Isso causa `TypeError: Invalid URL` em todas as chamadas `fetch()` da Edge Function — por isso o EasynFlow mostra "conectado" mas o CRM sempre retorna "desconectado".
+1. **Portabilidade + Agibank = Bloqueio**: Se o produto é "Portabilidade" e o usuário seleciona Agibank como banco proponente, travar o wizard com mensagem "Adquira o módulo PortFlow" e botão para voltar.
+
+2. **Outros produtos + Agibank = Documentação obrigatória**: Ao finalizar venda com Agibank (não-portabilidade), pular o `InitialStatusDialog`, auto-definir status como `solicitar_digitacao`, e abrir `DocumentUploadModal` com RG e Extrato **obrigatórios** (sem botão "Pular").
 
 ### Alterações
 
-**1. Edge Function `send-whatsapp/index.ts` — corrigir URL**
-- Normalizar o `EVOLUTION_API_URL` adicionando `https://` caso não tenha protocolo:
-```typescript
-let evoUrl = Deno.env.get("EVOLUTION_API_URL") || "https://evocloud.werkonnect.com";
-if (!evoUrl.startsWith("http")) evoUrl = "https://" + evoUrl;
+**1. `PortabilidadeStep.tsx` — Bloqueio Portabilidade + Agibank**
+- Quando `banco_proponente` contém "AGIBANK", exibir overlay/card de bloqueio: ícone 🔒, mensagem "Para portabilidade Agibank, adquira o módulo PortFlow", botão "Voltar e escolher outro banco" que limpa `banco_proponente`
+- Invalidar o step (`onValidChange(false)`) enquanto Agibank estiver selecionado
+
+**2. `ValuesStep.tsx` — Bloqueio Portabilidade + Agibank (no select)**
+- Na ValuesStep (para Refinanciamento), quando banco contém "AGIBANK" e `tipo_operacao === "Portabilidade"`, mesmo bloqueio (segurança extra, embora Portabilidade use PortabilidadeStep)
+
+**3. `SalesWizard.tsx` — Fluxo Agibank sem status dialog**
+- No `handleComplete`: verificar se o banco selecionado contém "AGIBANK"
+  - Se sim: pular `setShowStatusDialog(true)`, chamar diretamente `handleStatusSelected("solicitar_digitacao")` passando flag `isAgibank = true`
+- Passar prop `requiredMode` ao `DocumentUploadModal` quando Agibank, tornando RG e Extrato obrigatórios
+
+**4. `DocumentUploadModal.tsx` — Modo obrigatório**
+- Nova prop `requiredMode?: boolean` (default false)
+- Quando `requiredMode = true`:
+  - Texto muda de "opcionais" para "obrigatórios"
+  - Botão "Pular" fica oculto
+  - Botão "Enviar" fica desabilitado até que RG (frente) e Extrato estejam selecionados
+  - Labels mostram asterisco vermelho de obrigatoriedade
+
+### Fluxo resultante
+
+```text
+Agibank + NÃO-Portabilidade:
+  Cliente → Produto → Valores (banco=Agibank) → Confirmar
+  → [Pula status dialog, auto "solicitar_digitacao"]
+  → [DocumentUpload OBRIGATÓRIO: RG + Extrato]
+  → Sucesso
+
+Agibank + Portabilidade:
+  Cliente → Produto(Portabilidade) → PortabilidadeStep
+  → Seleciona Agibank como proponente
+  → 🔒 BLOQUEIO: "Adquira o módulo PortFlow"
+  → Botão "Voltar" limpa seleção
 ```
-- Aplicar a mesma correção em `autolead-worker` e `process-whatsapp-schedule`
-
-**2. Nova Edge Function `sync-whatsapp-instances/index.ts`**
-- Consulta `GET {EVOLUTION_API_URL}/instance/fetchInstances` com a API Key global
-- Para cada instância retornada pela Evolution API:
-  - Verifica se já existe no banco por `instance_name`
-  - Se existe: atualiza `instance_status` (open → connected, caso contrário → disconnected)
-  - Se não existe: insere novo registro
-- Retorna resumo: quantas atualizadas, quantas novas, quantas desconectadas
-
-**3. Frontend `WhatsAppConfig.tsx` — botão "Sincronizar com EasynFlow"**
-- Adicionar botão com ícone `RefreshCw` ao lado do botão "Nova Instância"
-- Ao clicar, chama a Edge Function `sync-whatsapp-instances`
-- Exibe toast com resultado e recarrega a lista
-- Loading state enquanto sincroniza
-
-**4. Redeploy das 3 Edge Functions existentes** com a correção de URL
-
-### Resultado esperado
-- "Verificar Status" passa a funcionar corretamente (URL válida)
-- Botão "Sincronizar" importa/atualiza status de todas as instâncias da Evolution de uma vez
 
