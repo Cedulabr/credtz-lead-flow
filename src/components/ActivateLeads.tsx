@@ -1828,23 +1828,37 @@ export const ActivateLeads = () => {
                   </SelectContent>
                 </Select>
 
-                {(isAdmin || isGestor) && (
-                  <Select value={userFilter} onValueChange={setUserFilter}>
-                    <SelectTrigger className="w-full md:w-48 border-2 focus:border-primary transition-all duration-300">
-                      <User className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="Usuário" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">👥 Todos</SelectItem>
-                      <SelectItem value="unassigned">🆓 Não atribuídos</SelectItem>
-                      {availableUsers.map(u => (
-                        <SelectItem key={u.id} value={u.id}>
-                          👤 {u.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+                {(isAdmin || isGestor) && (() => {
+                  const userCounts = leads.reduce<Record<string, number>>((acc, l) => {
+                    const k = l.assigned_to || "__unassigned__";
+                    acc[k] = (acc[k] || 0) + 1;
+                    return acc;
+                  }, {});
+                  const isActive = userFilter !== 'all';
+                  return (
+                    <Select value={userFilter} onValueChange={setUserFilter}>
+                      <SelectTrigger className={cn(
+                        "w-full md:w-56 border-2 transition-all duration-300",
+                        isActive ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "focus:border-primary"
+                      )}>
+                        <User className={cn("h-4 w-4 mr-2", isActive && "text-primary")} />
+                        <SelectValue placeholder="Usuário" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-80">
+                        <SelectItem value="all">👥 Todos ({leads.length})</SelectItem>
+                        <SelectItem value="unassigned">🆓 Não atribuídos ({userCounts["__unassigned__"] || 0})</SelectItem>
+                        {availableUsers
+                          .slice()
+                          .sort((a, b) => (userCounts[b.id] || 0) - (userCounts[a.id] || 0))
+                          .map(u => (
+                            <SelectItem key={u.id} value={u.id}>
+                              👤 {u.name} ({userCounts[u.id] || 0})
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  );
+                })()}
 
                 <Button
                   variant={filterWorkedToday ? "default" : "outline"}
