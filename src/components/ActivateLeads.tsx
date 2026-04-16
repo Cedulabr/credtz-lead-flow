@@ -1978,6 +1978,9 @@ export const ActivateLeads = () => {
                     </TableHead>
                   )}
                   <TableHead className="font-bold text-base">👤 Nome</TableHead>
+                  {(isAdmin || isGestor) && (
+                    <TableHead className="font-bold text-base">👤 Responsável</TableHead>
+                  )}
                   <TableHead className="font-bold text-base">🕐 Última Atividade</TableHead>
                   <TableHead className="font-bold text-base">📞 Telefone</TableHead>
                   <TableHead className="font-bold text-base">🆔 CPF</TableHead>
