@@ -3363,6 +3363,92 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_reports: {
+        Row: {
+          ai_summary: string | null
+          best_approaches: Json | null
+          best_counter_arguments: Json | null
+          best_scripts: Json | null
+          better_offer_opportunities: Json | null
+          company_id: string | null
+          conversations_closed: number | null
+          created_at: string | null
+          follow_up_bucket_a: number | null
+          follow_up_bucket_b: number | null
+          generated_at: string | null
+          id: string
+          improvement_suggestions: Json | null
+          instance_breakdown: Json | null
+          likely_to_close: Json | null
+          report_date: string
+          seller_breakdown: Json | null
+          team_quality_score: number | null
+          top_performer_agent_id: string | null
+          top_performer_reason: string | null
+          total_conversations: number | null
+          total_messages: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          ai_summary?: string | null
+          best_approaches?: Json | null
+          best_counter_arguments?: Json | null
+          best_scripts?: Json | null
+          better_offer_opportunities?: Json | null
+          company_id?: string | null
+          conversations_closed?: number | null
+          created_at?: string | null
+          follow_up_bucket_a?: number | null
+          follow_up_bucket_b?: number | null
+          generated_at?: string | null
+          id?: string
+          improvement_suggestions?: Json | null
+          instance_breakdown?: Json | null
+          likely_to_close?: Json | null
+          report_date: string
+          seller_breakdown?: Json | null
+          team_quality_score?: number | null
+          top_performer_agent_id?: string | null
+          top_performer_reason?: string | null
+          total_conversations?: number | null
+          total_messages?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          ai_summary?: string | null
+          best_approaches?: Json | null
+          best_counter_arguments?: Json | null
+          best_scripts?: Json | null
+          better_offer_opportunities?: Json | null
+          company_id?: string | null
+          conversations_closed?: number | null
+          created_at?: string | null
+          follow_up_bucket_a?: number | null
+          follow_up_bucket_b?: number | null
+          generated_at?: string | null
+          id?: string
+          improvement_suggestions?: Json | null
+          instance_breakdown?: Json | null
+          likely_to_close?: Json | null
+          report_date?: string
+          seller_breakdown?: Json | null
+          team_quality_score?: number | null
+          top_performer_agent_id?: string | null
+          top_performer_reason?: string | null
+          total_conversations?: number | null
+          total_messages?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_reports_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       departments: {
         Row: {
           company_id: string
@@ -3558,14 +3644,75 @@ export type Database = {
           },
         ]
       }
+      follow_up_ai_queue: {
+        Row: {
+          attempts: number
+          company_id: string | null
+          conversation_id: string
+          created_at: string
+          created_by: string | null
+          error: string | null
+          follow_up_id: string
+          id: string
+          instance_id: string
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          company_id?: string | null
+          conversation_id: string
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          follow_up_id: string
+          id?: string
+          instance_id: string
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          company_id?: string | null
+          conversation_id?: string
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          follow_up_id?: string
+          id?: string
+          instance_id?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_ai_queue_follow_up_id_fkey"
+            columns: ["follow_up_id"]
+            isOneToOne: false
+            referencedRelation: "follow_up_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       follow_up_queue: {
         Row: {
+          action_taken: string | null
+          bucket: string | null
           company_id: string | null
           contact_name: string | null
           conversation_id: string | null
           created_at: string | null
+          hours_waiting: number | null
           id: string
           instance_id: string | null
+          last_message_direction: string | null
+          last_message_preview: string | null
           note: string | null
           phone_number: string | null
           reason: string | null
@@ -3574,12 +3721,17 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          action_taken?: string | null
+          bucket?: string | null
           company_id?: string | null
           contact_name?: string | null
           conversation_id?: string | null
           created_at?: string | null
+          hours_waiting?: number | null
           id?: string
           instance_id?: string | null
+          last_message_direction?: string | null
+          last_message_preview?: string | null
           note?: string | null
           phone_number?: string | null
           reason?: string | null
@@ -3588,12 +3740,17 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          action_taken?: string | null
+          bucket?: string | null
           company_id?: string | null
           contact_name?: string | null
           conversation_id?: string | null
           created_at?: string | null
+          hours_waiting?: number | null
           id?: string
           instance_id?: string | null
+          last_message_direction?: string | null
+          last_message_preview?: string | null
           note?: string | null
           phone_number?: string | null
           reason?: string | null
@@ -8131,6 +8288,8 @@ export type Database = {
           created_at: string
           department_id: string | null
           entered_column_at: string | null
+          follow_up_action: string | null
+          follow_up_bucket: string | null
           follow_up_note: string | null
           follow_up_scheduled_at: string | null
           follow_up_status: string | null
@@ -8162,6 +8321,8 @@ export type Database = {
           created_at?: string
           department_id?: string | null
           entered_column_at?: string | null
+          follow_up_action?: string | null
+          follow_up_bucket?: string | null
           follow_up_note?: string | null
           follow_up_scheduled_at?: string | null
           follow_up_status?: string | null
@@ -8193,6 +8354,8 @@ export type Database = {
           created_at?: string
           department_id?: string | null
           entered_column_at?: string | null
+          follow_up_action?: string | null
+          follow_up_bucket?: string | null
           follow_up_note?: string | null
           follow_up_scheduled_at?: string | null
           follow_up_status?: string | null
