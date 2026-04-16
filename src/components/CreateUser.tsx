@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { UserPlus, KeyRound, Crown, User } from "lucide-react";
+import { UserPlus, KeyRound, Crown, User, Plus, Loader2 } from "lucide-react";
 
 interface CreateUserForm {
   name: string;
@@ -31,6 +31,10 @@ export function CreateUser() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [showNewCompany, setShowNewCompany] = useState(false);
+  const [newCompanyName, setNewCompanyName] = useState("");
+  const [newCompanyCnpj, setNewCompanyCnpj] = useState("");
+  const [creatingCompany, setCreatingCompany] = useState(false);
   const [formData, setFormData] = useState<CreateUserForm>({
     name: "",
     email: "",
@@ -121,6 +125,32 @@ export function CreateUser() {
     }
   };
 
+  const handleCreateCompany = async () => {
+    if (!newCompanyName.trim()) {
+      toast({ title: "Nome obrigatório", description: "Informe o nome da empresa.", variant: "destructive" });
+      return;
+    }
+    setCreatingCompany(true);
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .insert({ name: newCompanyName.trim(), cnpj: newCompanyCnpj.trim() || null, is_active: true })
+        .select('id, name')
+        .single();
+      if (error) throw error;
+      setCompanies(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      setFormData(prev => ({ ...prev, company_id: data.id }));
+      setNewCompanyName("");
+      setNewCompanyCnpj("");
+      setShowNewCompany(false);
+      toast({ title: "Empresa criada!", description: `${data.name} foi cadastrada e selecionada.` });
+    } catch (err: any) {
+      toast({ title: "Erro ao criar empresa", description: err.message, variant: "destructive" });
+    } finally {
+      setCreatingCompany(false);
+    }
+  };
+
   const generateRandomPassword = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
     let password = '';
@@ -199,23 +229,63 @@ export function CreateUser() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="company_id">Empresa</Label>
-              <Select
-                value={formData.company_id || "none"}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, company_id: value === "none" ? "" : value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a empresa" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sem empresa</SelectItem>
-                  {companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="company_id">Empresa</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs gap-1"
+                  onClick={() => setShowNewCompany((v) => !v)}
+                >
+                  <Plus className="h-3 w-3" />
+                  {showNewCompany ? "Cancelar" : "Nova empresa"}
+                </Button>
+              </div>
+              {showNewCompany ? (
+                <div className="space-y-2 rounded-md border border-border p-2">
+                  <Input
+                    placeholder="Nome da empresa *"
+                    value={newCompanyName}
+                    onChange={(e) => setNewCompanyName(e.target.value)}
+                  />
+                  <Input
+                    placeholder="CNPJ (opcional)"
+                    value={newCompanyCnpj}
+                    onChange={(e) => setNewCompanyCnpj(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="w-full"
+                    onClick={handleCreateCompany}
+                    disabled={creatingCompany}
+                  >
+                    {creatingCompany ? (
+                      <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Criando...</>
+                    ) : (
+                      <><Plus className="h-3 w-3 mr-1" /> Criar e selecionar</>
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <Select
+                  value={formData.company_id || "none"}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, company_id: value === "none" ? "" : value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem empresa</SelectItem>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div>
               <Label htmlFor="level">Nível</Label>
