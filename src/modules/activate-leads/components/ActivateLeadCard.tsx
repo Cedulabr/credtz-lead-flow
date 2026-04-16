@@ -3,18 +3,20 @@ import { ptBR } from "date-fns/locale";
 import { Phone, Package, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { ActivateLead, ACTIVATE_STATUS_CONFIG } from "../types";
+import { ActivateLead, ACTIVATE_STATUS_CONFIG, ActivateUser } from "../types";
+import { ResponsibleBadge } from "./ResponsibleBadge";
 import { cn } from "@/lib/utils";
 
 interface ActivateLeadCardProps {
   lead: ActivateLead;
+  assignedUser?: ActivateUser;
   onClick: (lead: ActivateLead) => void;
   onDragStart?: (e: React.DragEvent, leadId: string) => void;
   isDragging?: boolean;
   showWorkedTime?: boolean;
 }
 
-export function ActivateLeadCard({ lead, onClick, onDragStart, isDragging, showWorkedTime }: ActivateLeadCardProps) {
+export function ActivateLeadCard({ lead, assignedUser, onClick, onDragStart, isDragging, showWorkedTime }: ActivateLeadCardProps) {
   const statusConfig = ACTIVATE_STATUS_CONFIG[lead.status];
 
   const formatPhone = (phone: string): string => {
