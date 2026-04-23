@@ -20,6 +20,14 @@ export const LABEL_COLORS = [
   { id: "gray", className: "bg-gray-500" },
 ];
 
+export type NotesSection =
+  | { kind: "notes" }
+  | { kind: "reminders" }
+  | { kind: "label"; labelId: string }
+  | { kind: "folder"; folderId: string }
+  | { kind: "archive" }
+  | { kind: "trash" };
+
 export interface NoteFolder {
   id: string;
   company_id: string;
@@ -28,6 +36,21 @@ export interface NoteFolder {
   order_index: number;
   created_by: string | null;
   created_at: string;
+}
+
+export interface NoteLabel {
+  id: string;
+  company_id: string;
+  name: string;
+  color: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface ChecklistItemInline {
+  id: string;
+  text: string;
+  checked: boolean;
 }
 
 export interface Note {
@@ -41,6 +64,11 @@ export interface Note {
   pinned: boolean;
   reminder_at: string | null;
   linked_contact_id: string | null;
+  archived: boolean;
+  trashed_at: string | null;
+  cover_image: string | null;
+  checklist_mode: boolean;
+  order_index: number;
   created_by: string | null;
   created_at: string;
   updated_at: string;
