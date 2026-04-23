@@ -24,7 +24,7 @@ export function QuickCaptureFab() {
     const contentJson = content
       ? { type: "doc", content: content.split("\n").map((line) => ({ type: "paragraph", content: line ? [{ type: "text", text: line }] : [] })) }
       : [];
-    const { error } = await supabase.from("notes").insert({
+    const { error } = await (supabase.from("notes") as any).insert({
       title: title || "Sem título",
       content: contentJson as any,
       tags: tagsArr,

@@ -27,7 +27,7 @@ export function useFolders() {
   const ensureDefaults = useCallback(async () => {
     const { count } = await supabase.from("note_folders").select("id", { count: "exact", head: true });
     if ((count ?? 0) === 0) {
-      await supabase.from("note_folders").insert(
+      await (supabase.from("note_folders") as any).insert(
         DEFAULT_FOLDERS.map((name, i) => ({ name, order_index: i, parent_id: null }))
       );
     }
@@ -41,8 +41,7 @@ export function useFolders() {
   }, [ensureDefaults, fetchFolders]);
 
   const createFolder = async (name: string, parent_id: string | null = null) => {
-    const { data, error } = await supabase
-      .from("note_folders")
+    const { data, error } = await (supabase.from("note_folders") as any)
       .insert({ name, parent_id, order_index: folders.length })
       .select()
       .single();
@@ -146,9 +145,9 @@ export function useBoards() {
     if ((count ?? 0) === 0) {
       const defaults = ["Tarefas da Semana", "Pipeline de Projetos"];
       for (const name of defaults) {
-        const { data: b } = await supabase.from("boards").insert({ name, color: "blue", icon: "Trello" }).select().single();
+        const { data: b } = await (supabase.from("boards") as any).insert({ name, color: "blue", icon: "Trello" }).select().single();
         if (b) {
-          await supabase.from("board_columns").insert(
+          await (supabase.from("board_columns") as any).insert(
             DEFAULT_BOARD_COLUMNS.map((c) => ({ ...c, board_id: b.id, company_id: (b as any).company_id }))
           );
         }
@@ -164,10 +163,9 @@ export function useBoards() {
   }, [ensureDefaults, fetchBoards]);
 
   const createBoard = async (name: string, description?: string, color = "blue") => {
-    const { data, error } = await supabase.from("boards").insert({ name, description, color, icon: "Trello" }).select().single();
+    const { data, error } = await (supabase.from("boards") as any).insert({ name, description, color, icon: "Trello" }).select().single();
     if (!error && data) {
-      // create default columns
-      await supabase.from("board_columns").insert(
+      await (supabase.from("board_columns") as any).insert(
         DEFAULT_BOARD_COLUMNS.map((c) => ({ ...c, board_id: data.id, company_id: (data as any).company_id }))
       );
       setBoards((prev) => [data as Board, ...prev]);
@@ -380,7 +378,7 @@ export function useCardDetail(cardId: string | null) {
     if (!cardId) return;
     const userId = (await supabase.auth.getUser()).data.user?.id;
     if (!userId) return;
-    const { data } = await supabase.from("card_comments").insert({ card_id: cardId, user_id: userId, content }).select().single();
+    const { data } = await (supabase.from("card_comments") as any).insert({ card_id: cardId, user_id: userId, content }).select().single();
     if (data) setComments((prev) => [data as CardComment, ...prev]);
   };
 
