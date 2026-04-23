@@ -239,6 +239,42 @@ export const PropostasView = ({
                           🔔 Aguardando Aprovação
                         </span>
                       )}
+                      {tv.status === "proposta_cancelada" && isGestorOrAdmin && onReactivate && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 gap-1 text-[10px] border-green-500 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Undo2 className="h-3 w-3" />
+                              Reativar Proposta
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Reativar proposta?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                A proposta de <strong>{tv.nome}</strong> voltará para o pipeline ativo
+                                (Em Andamento) e sairá do filtro de canceladas.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onReactivate(tv);
+                                }}
+                              >
+                                Reativar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </div>
 
                     {/* Row 3: Details */}
