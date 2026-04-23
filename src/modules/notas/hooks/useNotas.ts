@@ -65,16 +65,38 @@ export function useFolders() {
 }
 
 // ── NOTES ───────────────────────────────────────────────────────────
-export function useNotes(folderId: string | null, search: string) {
+export function useNotes(section: NotesSection, search: string, labelFilter?: { noteIds: string[] | null }) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchNotes = useCallback(async () => {
     setLoading(true);
     let q = supabase.from("notes").select("*").order("pinned", { ascending: false }).order("updated_at", { ascending: false });
-    if (folderId) q = q.eq("folder_id", folderId);
+
+    // Section filtering
+    if (section.kind === "trash") {
+      q = q.not("trashed_at", "is", null);
+    } else {
+      q = q.is("trashed_at", null);
+      if (section.kind === "archive") {
+        q = q.eq("archived", true);
+      } else if (section.kind === "reminders") {
+        q = q.eq("archived", false).not("reminder_at", "is", null);
+      } else if (section.kind === "folder") {
+        q = q.eq("archived", false).eq("folder_id", section.folderId);
+      } else {
+        q = q.eq("archived", false);
+      }
+    }
+
     const { data } = await q;
     let result = (data as Note[]) ?? [];
+
+    if (section.kind === "label" && labelFilter?.noteIds) {
+      const set = new Set(labelFilter.noteIds);
+      result = result.filter((n) => set.has(n.id));
+    }
+
     if (search.trim()) {
       const s = search.toLowerCase();
       result = result.filter(
@@ -86,7 +108,7 @@ export function useNotes(folderId: string | null, search: string) {
     }
     setNotes(result);
     setLoading(false);
-  }, [folderId, search]);
+  }, [section, search, labelFilter?.noteIds]);
 
   useEffect(() => {
     fetchNotes();
@@ -98,10 +120,11 @@ export function useNotes(folderId: string | null, search: string) {
       content: partial.content ?? [],
       tags: partial.tags ?? [],
       color: partial.color ?? "white",
-      folder_id: partial.folder_id ?? folderId,
+      folder_id: partial.folder_id ?? (section.kind === "folder" ? section.folderId : null),
       pinned: partial.pinned ?? false,
       reminder_at: partial.reminder_at ?? null,
       linked_contact_id: partial.linked_contact_id ?? null,
+      checklist_mode: partial.checklist_mode ?? false,
       created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
     };
     const { data, error } = await supabase.from("notes").insert(insertPayload).select().single();
@@ -116,6 +139,21 @@ export function useNotes(folderId: string | null, search: string) {
     await supabase.from("notes").update(patch as any).eq("id", id);
   };
 
+  const archiveNote = async (id: string, archived = true) => {
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+    await supabase.from("notes").update({ archived } as any).eq("id", id);
+  };
+
+  const trashNote = async (id: string) => {
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+    await supabase.from("notes").update({ trashed_at: new Date().toISOString() } as any).eq("id", id);
+  };
+
+  const restoreNote = async (id: string) => {
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+    await supabase.from("notes").update({ trashed_at: null, archived: false } as any).eq("id", id);
+  };
+
   const deleteNote = async (id: string) => {
     setNotes((prev) => prev.filter((n) => n.id !== id));
     await supabase.from("notes").delete().eq("id", id);
@@ -126,7 +164,7 @@ export function useNotes(folderId: string | null, search: string) {
     return createNote({ ...rest, title: (note.title ?? "Sem título") + " (cópia)" });
   };
 
-  return { notes, loading, fetchNotes, createNote, updateNote, deleteNote, duplicateNote };
+  return { notes, loading, fetchNotes, createNote, updateNote, archiveNote, trashNote, restoreNote, deleteNote, duplicateNote };
 }
 
 // ── BOARDS ──────────────────────────────────────────────────────────
