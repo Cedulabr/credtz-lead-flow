@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Phone, 
   MessageSquare, 
@@ -28,10 +29,11 @@ import {
   Copy,
   Check,
   CheckCircle2,
-  Edit
+  Edit,
+  Send
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Televenda, StatusHistoryItem, STATUS_CONFIG, EditHistoryItem } from "../types";
+import { Televenda, StatusHistoryItem, STATUS_CONFIG, EditHistoryItem, ObservacaoItem } from "../types";
 import { formatCPF, formatCurrency, formatPhone, formatDate, formatTimeAgo } from "../utils";
 import { StatusBadge } from "./StatusBadge";
 import { StatusPropostaEditor } from "./StatusPropostaEditor";
