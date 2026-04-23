@@ -68,6 +68,7 @@ export const PERMISSION_MODULES = [
   { key: "can_access_autolead", label: "AutoLead", description: "Disparo automático de leads", category: "leads", defaultValue: true },
   { key: "can_access_audios", label: "Áudios", description: "Gerenciar e enviar áudios via WhatsApp", category: "comunicacao", defaultValue: true },
   { key: "can_access_portflow", label: "PortFlow", description: "Cadastrar propostas de portabilidade e alta idade", category: "comercial", defaultValue: true },
+  { key: "can_access_notas", label: "Notas & Workspace", description: "Hub de produtividade: notas, quadros Kanban e tarefas", category: "sistema", defaultValue: true },
 ] as const;
 
 export const PERMISSION_CATEGORIES = [

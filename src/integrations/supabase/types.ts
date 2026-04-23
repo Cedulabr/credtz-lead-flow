@@ -1911,6 +1911,80 @@ export type Database = {
         }
         Relationships: []
       }
+      board_columns: {
+        Row: {
+          board_id: string
+          color: string | null
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          order_index: number
+        }
+        Insert: {
+          board_id: string
+          color?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          order_index?: number
+        }
+        Update: {
+          board_id?: string
+          color?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          order_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "board_columns_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      boards: {
+        Row: {
+          color: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       business_hours: {
         Row: {
           away_message: string | null
@@ -1949,6 +2023,201 @@ export type Database = {
           },
         ]
       }
+      card_activity: {
+        Row: {
+          action: string
+          card_id: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          card_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          card_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_activity_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_comments: {
+        Row: {
+          card_id: string
+          company_id: string
+          content: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          card_id: string
+          company_id: string
+          content: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          card_id?: string
+          company_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_comments_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_labels: {
+        Row: {
+          board_id: string
+          color: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          board_id: string
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Update: {
+          board_id?: string
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_labels_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cards: {
+        Row: {
+          assignee_id: string | null
+          board_id: string
+          column_id: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: Json | null
+          due_date: string | null
+          id: string
+          linked_contact_id: string | null
+          order_index: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          board_id: string
+          column_id: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: Json | null
+          due_date?: string | null
+          id?: string
+          linked_contact_id?: string | null
+          order_index?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string | null
+          board_id?: string
+          column_id?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: Json | null
+          due_date?: string | null
+          id?: string
+          linked_contact_id?: string | null
+          order_index?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cards_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_column_id_fkey"
+            columns: ["column_id"]
+            isOneToOne: false
+            referencedRelation: "board_columns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cards_labels: {
+        Row: {
+          card_id: string
+          label_id: string
+        }
+        Insert: {
+          card_id: string
+          label_id: string
+        }
+        Update: {
+          card_id?: string
+          label_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cards_labels_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_labels_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "card_labels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_tags: {
         Row: {
           color: string
@@ -1977,6 +2246,73 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_items: {
+        Row: {
+          checked: boolean
+          checklist_id: string
+          created_at: string
+          id: string
+          order_index: number
+          text: string
+        }
+        Insert: {
+          checked?: boolean
+          checklist_id: string
+          created_at?: string
+          id?: string
+          order_index?: number
+          text: string
+        }
+        Update: {
+          checked?: boolean
+          checklist_id?: string
+          created_at?: string
+          id?: string
+          order_index?: number
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_items_checklist_id_fkey"
+            columns: ["checklist_id"]
+            isOneToOne: false
+            referencedRelation: "checklists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklists: {
+        Row: {
+          card_id: string
+          created_at: string
+          id: string
+          order_index: number
+          title: string
+        }
+        Insert: {
+          card_id: string
+          created_at?: string
+          id?: string
+          order_index?: number
+          title?: string
+        }
+        Update: {
+          card_id?: string
+          created_at?: string
+          id?: string
+          order_index?: number
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklists_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
             referencedColumns: ["id"]
           },
         ]
@@ -5008,6 +5344,103 @@ export type Database = {
           },
         ]
       }
+      note_folders: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          order_index: number
+          parent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          order_index?: number
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          order_index?: number
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_folders_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "note_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notes: {
+        Row: {
+          color: string
+          company_id: string
+          content: Json
+          created_at: string
+          created_by: string | null
+          folder_id: string | null
+          id: string
+          linked_contact_id: string | null
+          pinned: boolean
+          reminder_at: string | null
+          tags: string[]
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          company_id: string
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          folder_id?: string | null
+          id?: string
+          linked_contact_id?: string | null
+          pinned?: boolean
+          reminder_at?: string | null
+          tags?: string[]
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          company_id?: string
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          folder_id?: string | null
+          id?: string
+          linked_contact_id?: string | null
+          pinned?: boolean
+          reminder_at?: string | null
+          tags?: string[]
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notes_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "note_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_receipts: {
         Row: {
           company_id: string
@@ -5257,6 +5690,7 @@ export type Database = {
           can_access_meu_numero: boolean | null
           can_access_meus_clientes: boolean | null
           can_access_minhas_comissoes: boolean | null
+          can_access_notas: boolean
           can_access_portflow: boolean | null
           can_access_premium_leads: boolean | null
           can_access_radar: boolean | null
@@ -5304,6 +5738,7 @@ export type Database = {
           can_access_meu_numero?: boolean | null
           can_access_meus_clientes?: boolean | null
           can_access_minhas_comissoes?: boolean | null
+          can_access_notas?: boolean
           can_access_portflow?: boolean | null
           can_access_premium_leads?: boolean | null
           can_access_radar?: boolean | null
@@ -5351,6 +5786,7 @@ export type Database = {
           can_access_meu_numero?: boolean | null
           can_access_meus_clientes?: boolean | null
           can_access_minhas_comissoes?: boolean | null
+          can_access_notas?: boolean
           can_access_portflow?: boolean | null
           can_access_premium_leads?: boolean | null
           can_access_radar?: boolean | null

@@ -70,6 +70,9 @@ export const PortFlowModule = lazy(() => import('@/modules/portflow/PortFlowModu
 // Voicer
 export const VoicerModule = lazy(() => import('@/modules/voicer/VoicerModule').then(m => ({ default: m.VoicerModule })));
 
+// Notas & Workspace
+export const NotasModule = lazy(() => import('@/modules/notas/NotasModule').then(m => ({ default: m.NotasModule })));
+
 // Base OFF legacy
 export const BaseOff = lazy(() => import('./BaseOff').then(m => ({ default: m.BaseOff })));
 export const BaseOffModern = lazy(() => import('./BaseOffModern').then(m => ({ default: m.BaseOffModern })));
@@ -192,3 +195,4 @@ export const LazyDigitacaoModule = withLazyLoading(DigitacaoModule, FormSkeleton
 export const LazyAudiosModule = withLazyLoading(AudiosModule, FormSkeleton);
 export const LazyPortFlowModule = withLazyLoading(PortFlowModule, FormSkeleton);
 export const LazyVoicerModule = withLazyLoading(VoicerModule, FormSkeleton);
+export const LazyNotasModule = withLazyLoading(NotasModule, DashboardSkeleton);
