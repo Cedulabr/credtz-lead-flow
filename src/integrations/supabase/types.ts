@@ -5192,6 +5192,7 @@ export type Database = {
       }
       leads_database: {
         Row: {
+          ade: string | null
           banco: string | null
           convenio: string
           cpf: string | null
@@ -5199,20 +5200,33 @@ export type Database = {
           cpf_added_by: string | null
           created_at: string
           data_nascimento: string | null
+          deferimento: string | null
           id: string
           idade: number | null
           is_available: boolean
+          margem_disponivel: number | null
+          margem_total: number | null
+          matricula: string | null
           name: string
+          origem_base: string | null
           parcela: number | null
           parcelas_em_aberto: number | null
           parcelas_pagas: number | null
           phone: string
           phone2: string | null
+          quitacao: string | null
+          servico_consignataria: string | null
+          servico_servidor: string | null
+          situacao: string | null
           tag: string | null
           tipo_beneficio: string | null
+          tipo_servico_servidor: string | null
+          ultima_parcela: string | null
+          ultimo_desconto: string | null
           updated_at: string
         }
         Insert: {
+          ade?: string | null
           banco?: string | null
           convenio: string
           cpf?: string | null
@@ -5220,20 +5234,33 @@ export type Database = {
           cpf_added_by?: string | null
           created_at?: string
           data_nascimento?: string | null
+          deferimento?: string | null
           id?: string
           idade?: number | null
           is_available?: boolean
+          margem_disponivel?: number | null
+          margem_total?: number | null
+          matricula?: string | null
           name: string
+          origem_base?: string | null
           parcela?: number | null
           parcelas_em_aberto?: number | null
           parcelas_pagas?: number | null
           phone: string
           phone2?: string | null
+          quitacao?: string | null
+          servico_consignataria?: string | null
+          servico_servidor?: string | null
+          situacao?: string | null
           tag?: string | null
           tipo_beneficio?: string | null
+          tipo_servico_servidor?: string | null
+          ultima_parcela?: string | null
+          ultimo_desconto?: string | null
           updated_at?: string
         }
         Update: {
+          ade?: string | null
           banco?: string | null
           convenio?: string
           cpf?: string | null
@@ -5241,17 +5268,29 @@ export type Database = {
           cpf_added_by?: string | null
           created_at?: string
           data_nascimento?: string | null
+          deferimento?: string | null
           id?: string
           idade?: number | null
           is_available?: boolean
+          margem_disponivel?: number | null
+          margem_total?: number | null
+          matricula?: string | null
           name?: string
+          origem_base?: string | null
           parcela?: number | null
           parcelas_em_aberto?: number | null
           parcelas_pagas?: number | null
           phone?: string
           phone2?: string | null
+          quitacao?: string | null
+          servico_consignataria?: string | null
+          servico_servidor?: string | null
+          situacao?: string | null
           tag?: string | null
           tipo_beneficio?: string | null
+          tipo_servico_servidor?: string | null
+          ultima_parcela?: string | null
+          ultimo_desconto?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -9308,6 +9347,13 @@ export type Database = {
       }
       extract_phone_from_text: { Args: { input_text: string }; Returns: string }
       get_activate_leads_quality_stats: { Args: never; Returns: Json }
+      get_available_bancos: {
+        Args: never
+        Returns: {
+          available_count: number
+          banco: string
+        }[]
+      }
       get_available_banks: {
         Args: never
         Returns: {
@@ -9502,6 +9548,9 @@ export type Database = {
           convenio_filter?: string
           ddd_filter?: string[]
           leads_requested?: number
+          margem_min?: number
+          parcela_max?: number
+          parcela_min?: number
           produto_filter?: string
           tag_filter?: string[]
         }
@@ -9510,7 +9559,9 @@ export type Database = {
           convenio: string
           cpf: string
           id: string
+          margem_disponivel: number
           name: string
+          parcela: number
           phone: string
           phone2: string
           tag: string
