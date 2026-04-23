@@ -590,6 +590,47 @@ export const TelevendasModule = () => {
   const handleApproveCancellation = (tv: Televenda) => handleStatusChange(tv, "proposta_cancelada");
   const handleRejectCancellation = (tv: Televenda) => handleStatusChange(tv, "devolvido");
 
+  // Reactivate a cancelled proposal (gestor/admin only) — optimistic update
+  const handleReactivate = async (tv: Televenda) => {
+    const previousStatus = tv.status;
+    // Optimistic update
+    setTelevendas((prev) =>
+      prev.map((t) =>
+        t.id === tv.id
+          ? { ...t, status: "em_andamento", status_bancario: "em_analise", data_cancelamento: null }
+          : t
+      )
+    );
+    try {
+      const { error } = await supabase
+        .from("televendas")
+        .update({
+          status: "em_andamento",
+          status_bancario: "em_analise",
+          status_updated_at: new Date().toISOString(),
+          status_updated_by: user?.id,
+          data_cancelamento: null,
+        } as any)
+        .eq("id", tv.id);
+      if (error) throw error;
+
+      await supabase.from("televendas_status_history").insert({
+        televendas_id: tv.id,
+        from_status: previousStatus,
+        to_status: "em_andamento",
+        changed_by: user?.id,
+        reason: "Reativação manual",
+      });
+
+      sonnerToast.success("Proposta reativada com sucesso.");
+    } catch (error) {
+      console.error("Reactivate error:", error);
+      // Rollback
+      setTelevendas((prev) => prev.map((t) => (t.id === tv.id ? { ...t, status: previousStatus } : t)));
+      sonnerToast.error("Erro ao reativar proposta");
+    }
+  };
+
   // Bulk approve cancellations — chunked Promise.all
   const handleBulkApproveCancellation = async (items: Televenda[]) => {
     try {
