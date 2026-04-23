@@ -845,6 +845,7 @@ export const TelevendasModule = () => {
                   isGestorOrAdmin={isGestorOrAdmin}
                   onRefresh={fetchTelevendas}
                   users={users}
+                  onReactivate={handleReactivate}
                 />
               </motion.div>
             )}
