@@ -1,32 +1,83 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, NotebookPen } from "lucide-react";
+import {
+  Search,
+  NotebookPen,
+  Bell,
+  Archive,
+  Trash2,
+  Lightbulb,
+  Tag,
+  Folder,
+  PanelLeft,
+  Menu as MenuIcon,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { FolderTree } from "../components/FolderTree";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { NoteCard } from "../components/NoteCard";
 import { NoteEditor } from "../components/NoteEditor";
+import { KeepSidebar } from "../components/KeepSidebar";
+import { InlineNoteCreator } from "../components/InlineNoteCreator";
+import { LabelManagerDialog } from "../components/LabelManagerDialog";
 import { useFolders, useNotes } from "../hooks/useNotas";
-import type { Note } from "../types";
+import { useLabels } from "../hooks/useLabels";
+import type { Note, NotesSection } from "../types";
+import { cn } from "@/lib/utils";
+
+const sectionMeta = (s: NotesSection, labelName?: string, folderName?: string) => {
+  switch (s.kind) {
+    case "notes":
+      return { title: "Notas", icon: Lightbulb, empty: { icon: Lightbulb, msg: "Suas notas aparecerão aqui" } };
+    case "reminders":
+      return { title: "Lembretes", icon: Bell, empty: { icon: Bell, msg: "Notas com lembretes aparecerão aqui" } };
+    case "label":
+      return { title: labelName ?? "Marcador", icon: Tag, empty: { icon: Tag, msg: "Nenhuma nota com este marcador" } };
+    case "folder":
+      return { title: folderName ?? "Pasta", icon: Folder, empty: { icon: Folder, msg: "Esta pasta está vazia" } };
+    case "archive":
+      return { title: "Arquivo", icon: Archive, empty: { icon: Archive, msg: "Notas arquivadas aparecerão aqui" } };
+    case "trash":
+      return { title: "Lixeira", icon: Trash2, empty: { icon: Trash2, msg: "Sem notas na lixeira" } };
+  }
+};
 
 export function NotesView() {
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [section, setSection] = useState<NotesSection>({ kind: "notes" });
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [labelManagerOpen, setLabelManagerOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
     return () => clearTimeout(t);
   }, [search]);
 
-  const { folders, createFolder, renameFolder, deleteFolder } = useFolders();
-  const { notes, fetchNotes, createNote, updateNote, deleteNote, duplicateNote } = useNotes(selectedFolder, debounced);
+  const { folders, createFolder } = useFolders();
+  const { labels, noteLabels: noteLabelsMap, createLabel, renameLabel, deleteLabel, toggleNoteLabel, fetchAll: refetchLabels } =
+    useLabels();
 
-  // Counts per folder
-  const [allNotes, setAllNotes] = useState<Note[]>([]);
-  useEffect(() => {
-    if (selectedFolder === null && !debounced) setAllNotes(notes);
-  }, [notes, selectedFolder, debounced]);
+  const labelFilter = useMemo(() => {
+    if (section.kind !== "label") return undefined;
+    const noteIds = Object.entries(noteLabelsMap)
+      .filter(([, ids]) => ids.includes(section.labelId))
+      .map(([nid]) => nid);
+    return { noteIds };
+  }, [section, noteLabelsMap]);
+
+  const {
+    notes,
+    fetchNotes,
+    createNote,
+    updateNote,
+    archiveNote,
+    trashNote,
+    restoreNote,
+    deleteNote,
+    duplicateNote,
+  } = useNotes(section, debounced, labelFilter);
 
   useEffect(() => {
     const handler = () => fetchNotes();
@@ -34,109 +85,145 @@ export function NotesView() {
     return () => window.removeEventListener("notas:refresh", handler);
   }, [fetchNotes]);
 
-  const noteCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    allNotes.forEach((n) => {
-      if (n.folder_id) counts[n.folder_id] = (counts[n.folder_id] ?? 0) + 1;
-    });
-    return counts;
-  }, [allNotes]);
+  const meta = sectionMeta(
+    section,
+    section.kind === "label" ? labels.find((l) => l.id === section.labelId)?.name : undefined,
+    section.kind === "folder" ? folders.find((f) => f.id === section.folderId)?.name : undefined
+  );
 
   const pinned = notes.filter((n) => n.pinned);
   const unpinned = notes.filter((n) => !n.pinned);
 
-  const handleCreateBlank = async () => {
-    const note = await createNote({ folder_id: selectedFolder, title: "Nova nota", content: [] });
-    if (note) setEditingNote(note);
-  };
+  const renderCard = (n: Note) => (
+    <NoteCard
+      key={n.id}
+      note={n}
+      labels={labels}
+      noteLabelIds={noteLabelsMap[n.id] ?? []}
+      onClick={() => setEditingNote(n)}
+      onPin={() => updateNote(n.id, { pinned: !n.pinned })}
+      onDelete={() => trashNote(n.id)}
+      onDuplicate={() => duplicateNote(n)}
+      onArchive={() => archiveNote(n.id, !n.archived)}
+      onRestore={() => restoreNote(n.id)}
+      onPermanentDelete={() => deleteNote(n.id)}
+      inTrash={section.kind === "trash"}
+      inArchive={section.kind === "archive"}
+    />
+  );
+
+  const sidebar = (
+    <KeepSidebar
+      section={section}
+      onChange={(s) => {
+        setSection(s);
+        setMobileSidebarOpen(false);
+      }}
+      folders={folders}
+      labels={labels}
+      onManageLabels={() => setLabelManagerOpen(true)}
+      onCreateFolder={async () => {
+        const name = prompt("Nome da pasta:");
+        if (name?.trim()) await createFolder(name.trim(), null);
+      }}
+      collapsed={sidebarCollapsed}
+    />
+  );
 
   return (
-    <div className="flex h-full">
-      {/* Left panel */}
-      <aside className="hidden md:flex w-64 border-r flex-col bg-muted/20">
-        <div className="p-2 border-b">
-          <div className="relative">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+    <div className="flex h-full bg-background">
+      {/* Desktop sidebar */}
+      <aside
+        className={cn(
+          "hidden md:flex border-r flex-col transition-all",
+          sidebarCollapsed ? "w-14" : "w-64"
+        )}
+      >
+        {sidebar}
+      </aside>
+
+      {/* Mobile sidebar */}
+      <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+        <SheetContent side="left" className="w-64 p-0">
+          {sidebar}
+        </SheetContent>
+      </Sheet>
+
+      <main className="flex-1 overflow-auto flex flex-col min-w-0">
+        {/* Top bar */}
+        <div className="sticky top-0 bg-background/90 backdrop-blur border-b px-3 md:px-4 py-2 flex items-center gap-2 z-10">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="md:hidden"
+            onClick={() => setMobileSidebarOpen(true)}
+          >
+            <MenuIcon className="h-5 w-5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="hidden md:inline-flex"
+            onClick={() => setSidebarCollapsed((p) => !p)}
+            title="Recolher menu"
+          >
+            <PanelLeft className="h-4 w-4" />
+          </Button>
+
+          <div className="flex items-center gap-2 mr-2">
+            <meta.icon className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-medium">{meta.title}</h2>
+          </div>
+
+          <div className="relative flex-1 max-w-md ml-auto">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar notas..."
+              placeholder="Pesquisar..."
               className="pl-8 h-9"
             />
           </div>
         </div>
-        <FolderTree
-          folders={folders}
-          selectedId={selectedFolder}
-          onSelect={setSelectedFolder}
-          onCreate={createFolder}
-          onRename={renameFolder}
-          onDelete={deleteFolder}
-          noteCounts={noteCounts}
-          totalCount={allNotes.length}
-        />
-      </aside>
 
-      {/* Center grid */}
-      <main className="flex-1 overflow-auto">
-        <div className="sticky top-0 bg-background/80 backdrop-blur border-b px-4 py-2 flex items-center justify-between gap-2 z-10">
-          <div className="md:hidden flex-1">
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar notas..."
-              className="h-9"
-            />
-          </div>
-          <Button onClick={handleCreateBlank} size="sm" className="gap-1">
-            <Plus className="h-4 w-4" /> Nova nota
-          </Button>
-        </div>
+        {/* Content */}
+        <div className="p-4 flex-1">
+          {section.kind === "trash" && (
+            <div className="max-w-2xl mx-auto mb-4 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+              Os itens são excluídos definitivamente após 30 dias.
+            </div>
+          )}
 
-        <div className="p-4">
+          {/* Inline creator (only on Notes) */}
+          {section.kind === "notes" && (
+            <div className="mb-6">
+              <InlineNoteCreator onCreate={createNote} />
+            </div>
+          )}
+
           {notes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <NotebookPen className="h-12 w-12 text-muted-foreground mb-3" />
-              <h3 className="font-medium mb-1">Nenhuma nota ainda</h3>
-              <p className="text-sm text-muted-foreground mb-4">Comece criando sua primeira anotação.</p>
-              <Button onClick={handleCreateBlank}>
-                <Plus className="h-4 w-4 mr-1" /> Criar nota
-              </Button>
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <meta.empty.icon className="h-20 w-20 text-muted-foreground/30 mb-3" />
+              <p className="text-sm text-muted-foreground">{meta.empty.msg}</p>
             </div>
           ) : (
             <>
-              {pinned.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">📌 Fixadas</h4>
+              {pinned.length > 0 && section.kind === "notes" && (
+                <div className="mb-6">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2 tracking-wide">FIXADAS</h4>
                   <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-3">
-                    {pinned.map((n) => (
-                      <NoteCard
-                        key={n.id}
-                        note={n}
-                        onClick={() => setEditingNote(n)}
-                        onPin={() => updateNote(n.id, { pinned: !n.pinned })}
-                        onDelete={() => deleteNote(n.id)}
-                        onDuplicate={() => duplicateNote(n)}
-                      />
-                    ))}
+                    {pinned.map(renderCard)}
                   </div>
                 </div>
               )}
 
               {unpinned.length > 0 && (
                 <div>
-                  {pinned.length > 0 && <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Outras</h4>}
+                  {pinned.length > 0 && section.kind === "notes" && (
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2 tracking-wide">OUTRAS</h4>
+                  )}
                   <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-3">
-                    {unpinned.map((n) => (
-                      <NoteCard
-                        key={n.id}
-                        note={n}
-                        onClick={() => setEditingNote(n)}
-                        onPin={() => updateNote(n.id, { pinned: !n.pinned })}
-                        onDelete={() => deleteNote(n.id)}
-                        onDuplicate={() => duplicateNote(n)}
-                      />
-                    ))}
+                    {(section.kind === "notes" ? unpinned : notes).map(renderCard)}
                   </div>
                 </div>
               )}
@@ -151,8 +238,23 @@ export function NotesView() {
         onClose={() => {
           setEditingNote(null);
           fetchNotes();
+          refetchLabels();
         }}
         onUpdate={updateNote}
+        labels={labels}
+        noteLabelIds={editingNote ? noteLabelsMap[editingNote.id] ?? [] : []}
+        onToggleLabel={(labelId) => editingNote && toggleNoteLabel(editingNote.id, labelId)}
+        onArchive={editingNote ? () => { archiveNote(editingNote.id, !editingNote.archived); setEditingNote(null); } : undefined}
+        onTrash={editingNote ? () => { trashNote(editingNote.id); setEditingNote(null); } : undefined}
+      />
+
+      <LabelManagerDialog
+        open={labelManagerOpen}
+        onClose={() => setLabelManagerOpen(false)}
+        labels={labels}
+        onCreate={createLabel}
+        onRename={renameLabel}
+        onDelete={deleteLabel}
       />
     </div>
   );
