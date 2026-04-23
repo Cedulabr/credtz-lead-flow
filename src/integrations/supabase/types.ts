@@ -6961,6 +6961,38 @@ export type Database = {
           },
         ]
       }
+      televendas_observacoes: {
+        Row: {
+          created_at: string
+          id: string
+          observacao: string
+          televendas_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          observacao: string
+          televendas_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          observacao?: string
+          televendas_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "televendas_observacoes_televendas_id_fkey"
+            columns: ["televendas_id"]
+            isOneToOne: false
+            referencedRelation: "televendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       televendas_portability_reminders: {
         Row: {
           id: string

@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Inbox, Eye, RefreshCw, FileText } from "lucide-react";
+import { Inbox, Eye, RefreshCw, FileText, Undo2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -13,6 +13,17 @@ import { SyncIndicator } from "../components/SyncIndicator";
 import { PriorityBadge, calcDiasParado, getPriorityFromDays } from "../components/PriorityBadge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface User {
   id: string;
@@ -32,6 +43,7 @@ interface PropostasViewProps {
   isGestorOrAdmin: boolean;
   onRefresh?: () => void;
   users?: User[];
+  onReactivate?: (tv: Televenda) => Promise<void>;
 }
 
 const OPERATION_BADGE: Record<string, { emoji: string; color: string }> = {
@@ -56,6 +68,7 @@ export const PropostasView = ({
   isGestorOrAdmin,
   onRefresh,
   users = [],
+  onReactivate,
 }: PropostasViewProps) => {
   const { user } = useAuth();
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -225,6 +238,42 @@ export const PropostasView = ({
                         <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-700 border border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700 animate-pulse">
                           🔔 Aguardando Aprovação
                         </span>
+                      )}
+                      {tv.status === "proposta_cancelada" && isGestorOrAdmin && onReactivate && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 gap-1 text-[10px] border-green-500 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Undo2 className="h-3 w-3" />
+                              Reativar Proposta
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Reativar proposta?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                A proposta de <strong>{tv.nome}</strong> voltará para o pipeline ativo
+                                (Em Andamento) e sairá do filtro de canceladas.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onReactivate(tv);
+                                }}
+                              >
+                                Reativar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
                     </div>
 

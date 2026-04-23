@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Phone, 
   MessageSquare, 
@@ -28,10 +29,11 @@ import {
   Copy,
   Check,
   CheckCircle2,
-  Edit
+  Edit,
+  Send
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Televenda, StatusHistoryItem, STATUS_CONFIG, EditHistoryItem } from "../types";
+import { Televenda, StatusHistoryItem, STATUS_CONFIG, EditHistoryItem, ObservacaoItem } from "../types";
 import { formatCPF, formatCurrency, formatPhone, formatDate, formatTimeAgo } from "../utils";
 import { StatusBadge } from "./StatusBadge";
 import { StatusPropostaEditor } from "./StatusPropostaEditor";
@@ -51,6 +53,10 @@ export const DetailModal = ({ open, onOpenChange, televenda: initialTelevenda, i
   const [televenda, setTelevenda] = useState<Televenda | null>(initialTelevenda);
   const [history, setHistory] = useState<StatusHistoryItem[]>([]);
   const [editHistory, setEditHistory] = useState<EditHistoryItem[]>([]);
+  const [observations, setObservations] = useState<ObservacaoItem[]>([]);
+  const [newObservation, setNewObservation] = useState("");
+  const [savingObservation, setSavingObservation] = useState(false);
+  const [loadingObservations, setLoadingObservations] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingEditHistory, setLoadingEditHistory] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -80,12 +86,110 @@ export const DetailModal = ({ open, onOpenChange, televenda: initialTelevenda, i
 
   useEffect(() => {
     if (open && initialTelevenda) {
-      setTelevenda(initialTelevenda); // Set initial state immediately
-      fetchTelevendaDetails(); // Then fetch fresh data
+      setTelevenda(initialTelevenda);
+      fetchTelevendaDetails();
       fetchHistory();
       fetchEditHistory();
+      fetchObservations();
     }
   }, [open, initialTelevenda?.id]);
+
+  const fetchObservations = async () => {
+    if (!initialTelevenda?.id) return;
+    setLoadingObservations(true);
+    try {
+      const { data, error } = await supabase
+        .from("televendas_observacoes" as any)
+        .select("*")
+        .eq("televendas_id", initialTelevenda.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+
+      const rows = (data as any[]) || [];
+      if (rows.length > 0) {
+        const userIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))];
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, name")
+          .in("id", userIds);
+        const profilesMap = new Map((profiles || []).map((p) => [p.id, p.name]));
+        setObservations(
+          rows.map((r) => ({
+            id: r.id,
+            televendas_id: r.televendas_id,
+            user_id: r.user_id,
+            observacao: r.observacao,
+            created_at: r.created_at,
+            user_name: profilesMap.get(r.user_id) || "Usuário",
+          }))
+        );
+      } else {
+        setObservations([]);
+      }
+    } catch (error) {
+      console.error("Error fetching observations:", error);
+    } finally {
+      setLoadingObservations(false);
+    }
+  };
+
+  const handleAddObservation = async () => {
+    const text = newObservation.trim();
+    if (!text || !initialTelevenda?.id || !user?.id) return;
+
+    const tempId = `temp-${Date.now()}`;
+    const optimistic: ObservacaoItem = {
+      id: tempId,
+      televendas_id: initialTelevenda.id,
+      user_id: user.id,
+      observacao: text,
+      created_at: new Date().toISOString(),
+      user_name: "Você",
+    };
+
+    setSavingObservation(true);
+    setObservations((prev) => [optimistic, ...prev]);
+    setNewObservation("");
+
+    try {
+      const { data, error } = await supabase
+        .from("televendas_observacoes" as any)
+        .insert({
+          televendas_id: initialTelevenda.id,
+          user_id: user.id,
+          observacao: text,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+
+      // Replace optimistic with real record
+      const real = data as any;
+      setObservations((prev) =>
+        prev.map((o) =>
+          o.id === tempId
+            ? {
+                id: real.id,
+                televendas_id: real.televendas_id,
+                user_id: real.user_id,
+                observacao: real.observacao,
+                created_at: real.created_at,
+                user_name: optimistic.user_name,
+              }
+            : o
+        )
+      );
+      toast.success("Observação adicionada.");
+    } catch (error) {
+      console.error("Error adding observation:", error);
+      // Rollback
+      setObservations((prev) => prev.filter((o) => o.id !== tempId));
+      setNewObservation(text);
+      toast.error("Erro ao adicionar observação");
+    } finally {
+      setSavingObservation(false);
+    }
+  };
 
   const fetchHistory = async () => {
     if (!initialTelevenda?.id) return;
@@ -466,21 +570,85 @@ export const DetailModal = ({ open, onOpenChange, televenda: initialTelevenda, i
               </div>
             </div>
 
-            {/* Observation */}
-            {televenda.observacao && (
-              <>
-                <Separator />
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    OBSERVAÇÕES
-                  </h3>
-                  <div className="p-4 rounded-xl bg-muted/30 text-sm">
-                    {televenda.observacao}
-                  </div>
+            {/* Observations — chronological list + form */}
+            <Separator />
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                📝 OBSERVAÇÕES
+                {observations.length > 0 && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    ({observations.length})
+                  </span>
+                )}
+              </h3>
+
+              {/* Legacy single observation field */}
+              {televenda.observacao && (
+                <div className="mb-3 p-3 rounded-lg bg-muted/20 border border-dashed border-border/60">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                    Observação inicial
+                  </p>
+                  <p className="text-sm">{televenda.observacao}</p>
                 </div>
-              </>
-            )}
+              )}
+
+              {/* List */}
+              <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                {loadingObservations ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                  </div>
+                ) : observations.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4 italic">
+                    Nenhuma observação ainda. Adicione a primeira abaixo.
+                  </p>
+                ) : (
+                  observations.map((obs) => (
+                    <motion.div
+                      key={obs.id}
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-3 rounded-lg bg-muted/30 border border-border/40"
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-xs font-medium flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          {obs.user_name}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {formatTimeAgo(obs.created_at)}
+                        </span>
+                      </div>
+                      <p className="text-sm whitespace-pre-wrap">{obs.observacao}</p>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+
+              {/* Add observation form */}
+              <div className="mt-3 space-y-2">
+                <Textarea
+                  placeholder="Adicione uma nova observação..."
+                  value={newObservation}
+                  onChange={(e) => setNewObservation(e.target.value)}
+                  className="min-h-[70px] text-sm"
+                  disabled={savingObservation}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={handleAddObservation}
+                    disabled={savingObservation || !newObservation.trim()}
+                    className="gap-1.5"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    {savingObservation ? "Adicionando..." : "Adicionar observação"}
+                  </Button>
+                </div>
+              </div>
+            </div>
 
             <Separator />
 
