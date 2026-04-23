@@ -43,6 +43,7 @@ interface PropostasViewProps {
   isGestorOrAdmin: boolean;
   onRefresh?: () => void;
   users?: User[];
+  onReactivate?: (tv: Televenda) => Promise<void>;
 }
 
 const OPERATION_BADGE: Record<string, { emoji: string; color: string }> = {
