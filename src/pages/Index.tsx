@@ -43,6 +43,7 @@ import {
   LazyAudiosModule,
   LazyPortFlowModule,
   LazyVoicerModule,
+  LazyNotasModule,
 } from "@/components/LazyComponents";
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -148,6 +149,10 @@ const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMes
     permission: 'can_access_voicer',
     blockedMessage: 'Acesso ao Easyn Voicer bloqueado pelo administrador',
   },
+  notas: {
+    permission: 'can_access_notas',
+    blockedMessage: 'Acesso ao módulo Notas & Workspace bloqueado pelo administrador',
+  },
 };
 
 // ── Main Component ────────────────────────────────────────────────────
@@ -203,6 +208,7 @@ const Index = () => {
     audios: <LazyAudiosModule />,
     portflow: <div className="p-4"><LazyPortFlowModule /></div>,
     voicer: <LazyVoicerModule />,
+    notas: <LazyNotasModule />,
   }), [setActiveTab]);
 
   // ── Render active tab ──────────────────────────────────────────────
