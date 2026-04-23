@@ -2877,6 +2877,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          ai_follow_up_enabled: boolean
           business_days: string[] | null
           business_hours_end: string | null
           business_hours_start: string | null
@@ -2899,6 +2900,7 @@ export type Database = {
           whatsapp_number: string | null
         }
         Insert: {
+          ai_follow_up_enabled?: boolean
           business_days?: string[] | null
           business_hours_end?: string | null
           business_hours_start?: string | null
@@ -2921,6 +2923,7 @@ export type Database = {
           whatsapp_number?: string | null
         }
         Update: {
+          ai_follow_up_enabled?: boolean
           business_days?: string[] | null
           business_hours_end?: string | null
           business_hours_start?: string | null
