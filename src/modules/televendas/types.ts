@@ -268,6 +268,15 @@ export const MOTIVO_PENDENCIA_OPTIONS = [
   { value: "outros", label: "Outros" },
 ] as const;
 
+export interface ObservacaoItem {
+  id: string;
+  televendas_id: string;
+  user_id: string;
+  observacao: string;
+  created_at: string;
+  user_name?: string;
+}
+
 export interface StatusPropostaHistoryItem {
   id: string;
   televendas_id: string;
