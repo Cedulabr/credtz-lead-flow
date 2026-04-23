@@ -68,6 +68,7 @@ export const PropostasView = ({
   isGestorOrAdmin,
   onRefresh,
   users = [],
+  onReactivate,
 }: PropostasViewProps) => {
   const { user } = useAuth();
   const [syncingId, setSyncingId] = useState<string | null>(null);
