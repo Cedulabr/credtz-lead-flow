@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Note, NoteFolder, Board, BoardColumn, Card, CardLabel, Checklist, ChecklistItem, CardComment, CardActivity } from "../types";
+import type { Note, NoteFolder, Board, BoardColumn, Card, CardLabel, Checklist, ChecklistItem, CardComment, CardActivity, NotesSection } from "../types";
 
 const DEFAULT_FOLDERS = ["Pessoal", "Reuniões", "Clientes", "Ideias"];
 const DEFAULT_BOARD_COLUMNS = [
