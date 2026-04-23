@@ -86,12 +86,110 @@ export const DetailModal = ({ open, onOpenChange, televenda: initialTelevenda, i
 
   useEffect(() => {
     if (open && initialTelevenda) {
-      setTelevenda(initialTelevenda); // Set initial state immediately
-      fetchTelevendaDetails(); // Then fetch fresh data
+      setTelevenda(initialTelevenda);
+      fetchTelevendaDetails();
       fetchHistory();
       fetchEditHistory();
+      fetchObservations();
     }
   }, [open, initialTelevenda?.id]);
+
+  const fetchObservations = async () => {
+    if (!initialTelevenda?.id) return;
+    setLoadingObservations(true);
+    try {
+      const { data, error } = await supabase
+        .from("televendas_observacoes" as any)
+        .select("*")
+        .eq("televendas_id", initialTelevenda.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+
+      const rows = (data as any[]) || [];
+      if (rows.length > 0) {
+        const userIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))];
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, name")
+          .in("id", userIds);
+        const profilesMap = new Map((profiles || []).map((p) => [p.id, p.name]));
+        setObservations(
+          rows.map((r) => ({
+            id: r.id,
+            televendas_id: r.televendas_id,
+            user_id: r.user_id,
+            observacao: r.observacao,
+            created_at: r.created_at,
+            user_name: profilesMap.get(r.user_id) || "Usuário",
+          }))
+        );
+      } else {
+        setObservations([]);
+      }
+    } catch (error) {
+      console.error("Error fetching observations:", error);
+    } finally {
+      setLoadingObservations(false);
+    }
+  };
+
+  const handleAddObservation = async () => {
+    const text = newObservation.trim();
+    if (!text || !initialTelevenda?.id || !user?.id) return;
+
+    const tempId = `temp-${Date.now()}`;
+    const optimistic: ObservacaoItem = {
+      id: tempId,
+      televendas_id: initialTelevenda.id,
+      user_id: user.id,
+      observacao: text,
+      created_at: new Date().toISOString(),
+      user_name: "Você",
+    };
+
+    setSavingObservation(true);
+    setObservations((prev) => [optimistic, ...prev]);
+    setNewObservation("");
+
+    try {
+      const { data, error } = await supabase
+        .from("televendas_observacoes" as any)
+        .insert({
+          televendas_id: initialTelevenda.id,
+          user_id: user.id,
+          observacao: text,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+
+      // Replace optimistic with real record
+      const real = data as any;
+      setObservations((prev) =>
+        prev.map((o) =>
+          o.id === tempId
+            ? {
+                id: real.id,
+                televendas_id: real.televendas_id,
+                user_id: real.user_id,
+                observacao: real.observacao,
+                created_at: real.created_at,
+                user_name: optimistic.user_name,
+              }
+            : o
+        )
+      );
+      toast.success("Observação adicionada.");
+    } catch (error) {
+      console.error("Error adding observation:", error);
+      // Rollback
+      setObservations((prev) => prev.filter((o) => o.id !== tempId));
+      setNewObservation(text);
+      toast.error("Erro ao adicionar observação");
+    } finally {
+      setSavingObservation(false);
+    }
+  };
 
   const fetchHistory = async () => {
     if (!initialTelevenda?.id) return;
