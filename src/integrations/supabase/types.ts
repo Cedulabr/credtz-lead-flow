@@ -5385,50 +5385,92 @@ export type Database = {
           },
         ]
       }
-      notes: {
+      note_labels: {
         Row: {
           color: string
           company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      notes: {
+        Row: {
+          archived: boolean
+          checklist_mode: boolean
+          color: string
+          company_id: string
           content: Json
+          cover_image: string | null
           created_at: string
           created_by: string | null
           folder_id: string | null
           id: string
           linked_contact_id: string | null
+          order_index: number
           pinned: boolean
           reminder_at: string | null
           tags: string[]
           title: string | null
+          trashed_at: string | null
           updated_at: string
         }
         Insert: {
+          archived?: boolean
+          checklist_mode?: boolean
           color?: string
           company_id: string
           content?: Json
+          cover_image?: string | null
           created_at?: string
           created_by?: string | null
           folder_id?: string | null
           id?: string
           linked_contact_id?: string | null
+          order_index?: number
           pinned?: boolean
           reminder_at?: string | null
           tags?: string[]
           title?: string | null
+          trashed_at?: string | null
           updated_at?: string
         }
         Update: {
+          archived?: boolean
+          checklist_mode?: boolean
           color?: string
           company_id?: string
           content?: Json
+          cover_image?: string | null
           created_at?: string
           created_by?: string | null
           folder_id?: string | null
           id?: string
           linked_contact_id?: string | null
+          order_index?: number
           pinned?: boolean
           reminder_at?: string | null
           tags?: string[]
           title?: string | null
+          trashed_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -5437,6 +5479,36 @@ export type Database = {
             columns: ["folder_id"]
             isOneToOne: false
             referencedRelation: "note_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notes_labels: {
+        Row: {
+          label_id: string
+          note_id: string
+        }
+        Insert: {
+          label_id: string
+          note_id: string
+        }
+        Update: {
+          label_id?: string
+          note_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notes_labels_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "note_labels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_labels_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "notes"
             referencedColumns: ["id"]
           },
         ]
