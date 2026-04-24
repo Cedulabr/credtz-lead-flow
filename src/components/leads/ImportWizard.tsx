@@ -89,25 +89,48 @@ export function ImportWizard({ open, onOpenChange, onCompleted }: ImportWizardPr
 
   const submit = async () => {
     if (!parsed || !convenio) return;
-    setSubmitting(true); setProgress(10);
+    setSubmitting(true); setProgress(5);
     try {
-      const { data, error } = await supabase.functions.invoke('import-leads', {
-        body: {
-          convenio,
-          subtipo,
-          estado,
-          mapping,
-          rows: parsed.rows,
-          file_name: file?.name,
-          file_size_bytes: file?.size,
-        },
-      });
+      const CHUNK = 1000;
+      const total = parsed.rows.length;
+      const aggregate: any = { imported: 0, duplicates: 0, invalid: 0, cpfs_unique_added: 0, cpfs_existing_with_new_contract: 0, skipped_sample: [] };
+      let lastImportLogId: string | null = null;
+
+      for (let i = 0; i < total; i += CHUNK) {
+        const chunk = parsed.rows.slice(i, i + CHUNK);
+        const { data, error } = await supabase.functions.invoke('import-leads', {
+          body: {
+            convenio,
+            subtipo,
+            estado,
+            mapping,
+            rows: chunk,
+            file_name: file?.name,
+            file_size_bytes: file?.size,
+            chunk_index: Math.floor(i / CHUNK),
+            chunk_total: Math.ceil(total / CHUNK),
+          },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        aggregate.imported += data?.imported ?? 0;
+        aggregate.duplicates += data?.duplicates ?? 0;
+        aggregate.invalid += data?.invalid ?? 0;
+        aggregate.cpfs_unique_added += data?.cpfs_unique_added ?? 0;
+        aggregate.cpfs_existing_with_new_contract += data?.cpfs_existing_with_new_contract ?? 0;
+        if (Array.isArray(data?.skipped_sample) && aggregate.skipped_sample.length < 50) {
+          aggregate.skipped_sample.push(...data.skipped_sample.slice(0, 50 - aggregate.skipped_sample.length));
+        }
+        lastImportLogId = data?.import_log_id ?? lastImportLogId;
+        setProgress(Math.min(95, Math.round(((i + chunk.length) / total) * 95)));
+      }
+
       setProgress(100);
-      if (error) throw error;
-      setResult(data);
+      setResult({ ...aggregate, import_log_id: lastImportLogId });
       onCompleted?.();
     } catch (e: any) {
-      toast({ title: 'Falha na importação', description: e?.message ?? '', variant: 'destructive' });
+      console.error('import submit error', e);
+      toast({ title: 'Falha na importação', description: e?.message ?? 'Erro desconhecido', variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
