@@ -296,7 +296,8 @@ export function LeadsDatabase() {
               {totalCount} leads na base • Mostrando {filteredLeads.length} de {leads.length}
             </CardDescription>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
+            <LeadsBulkActions onChanged={fetchLeads} />
             <Button variant="outline" size="sm" onClick={fetchLeads} disabled={isLoading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               Atualizar
