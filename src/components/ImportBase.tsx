@@ -40,7 +40,27 @@ interface ParsedLead {
   tag?: string;
   valid: boolean;
   error?: string;
+
+  // Campos extras (Base Governo)
+  matricula?: string;
+  banco?: string;
+  margem_disponivel?: string;
+  margem_total?: string;
+  situacao?: string;
+  ade?: string;
+  servico_servidor?: string;
+  tipo_servico_servidor?: string;
+  servico_consignataria?: string;
+  parcela?: string;
+  parcelas_em_aberto?: string;
+  parcelas_pagas?: string;
+  deferimento?: string;
+  quitacao?: string;
+  ultimo_desconto?: string;
+  ultima_parcela?: string;
 }
+
+type BaseFormat = 'padrao' | 'governo';
 
 interface ImportResult {
   success: boolean;
@@ -65,6 +85,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [file, setFile] = useState<File | null>(null);
+  const [baseFormat, setBaseFormat] = useState<BaseFormat>('padrao');
   const [fileHash, setFileHash] = useState<string | null>(null);
   const [parsedLeads, setParsedLeads] = useState<ParsedLead[]>([]);
   const [isLoading, setIsLoading] = useState(false);
