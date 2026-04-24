@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { StepProps, AvailableOption, FEATURED_DDDS } from "./types";
+import { StepProps, AvailableOption, FEATURED_DDDS, UF_LIST, UF_TO_DDDS } from "./types";
 
 export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps) {
   const [convenios, setConvenios] = useState<AvailableOption[]>([]);
@@ -19,7 +19,17 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
   const [bancos, setBancos] = useState<AvailableOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAllDDDs, setShowAllDDDs] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Para servidor/governo, filtros avançados ficam expandidos por padrão
+  const isServidorOuGoverno = data.tipoLead === 'servidor' || data.tipoLead === 'governo';
+  const [showAdvanced, setShowAdvanced] = useState(isServidorOuGoverno);
+  const showUfSelector = data.tipoLead === 'servidor';
+
+  const handleUfChange = useCallback((uf: string) => {
+    const newUf = uf === "all" ? null : uf;
+    const dddsForUf = newUf ? (UF_TO_DDDS[newUf] || []) : [];
+    onUpdate({ uf: newUf, ddds: dddsForUf });
+  }, [onUpdate]);
 
   // Carregar opções disponíveis - apenas uma vez
   useEffect(() => {
