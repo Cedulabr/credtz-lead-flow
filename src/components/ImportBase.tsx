@@ -771,7 +771,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   };
 
   const downloadTemplate = () => {
-    const template = 'Nome,Telefone 1,Telefone 2,Convênio,Tag\nJoão Silva (INSS),11999998888,11988887776,INSS,Tomador\nMaria Santos (SIAPE),21988887777,,SIAPE,Com margem para empréstimo\nCarlos Lima (INSS),71977776666,71966665555,INSS,Redução de parcela\nAna Souza (SIAPE),61955554444,,SIAPE,Servidor federal';
+    const template = '# Convenio sera definido no momento da importacao - nao inclua coluna Convenio\nNome,Telefone 1,Telefone 2,CPF,Tag\nJoão Silva,11999998888,11988887776,12345678901,Tomador\nMaria Santos,21988887777,,,Com margem para emprestimo\nCarlos Lima,71977776666,71966665555,98765432100,Reducao de parcela\nAna Souza,61955554444,,,Servidor federal';
     const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
