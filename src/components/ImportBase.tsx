@@ -513,7 +513,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
           error = 'CPF inválido';
         }
 
-        leads.push({ nome, convenio, telefone, telefone2: telefone2 || undefined, cpf: cpf || undefined, tag: tag || undefined, valid, error });
+        leads.push({ nome, convenio, telefone, telefone2: telefone2 || undefined, cpf: cpfNormalized || undefined, tag: tag || undefined, valid, error });
       }
 
       setParsedLeads(leads);
