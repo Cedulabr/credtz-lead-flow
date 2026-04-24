@@ -240,6 +240,11 @@ export function LeadsPremiumModule() {
   // Calculate active filters count
   const [activeFiltersCount] = useState(0);
 
+  // Early-return: ImportBase em tela cheia (admin)
+  if (showImportBase && isAdmin) {
+    return <ImportBase onBack={() => setShowImportBase(false)} />;
+  }
+
   if (isMobile) {
     return (
       <div className="flex flex-col h-[calc(100vh-4rem)] bg-background pb-16">
