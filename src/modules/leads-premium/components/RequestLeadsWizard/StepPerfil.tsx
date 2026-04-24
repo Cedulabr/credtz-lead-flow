@@ -188,7 +188,7 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
           value={data.convenio || "all"} 
           onValueChange={(v) => onUpdate({ convenio: v === "all" ? null : v })}
         >
-          <SelectTrigger className="h-11 bg-background">
+          <SelectTrigger className="h-10 bg-background">
             <SelectValue placeholder="Todos os convênios" />
           </SelectTrigger>
           <SelectContent className="bg-popover border shadow-lg z-[100]">
@@ -371,7 +371,7 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
                   value={data.banco || "all"}
                   onValueChange={(v) => onUpdate({ banco: v === "all" ? null : v })}
                 >
-                  <SelectTrigger className="h-11 bg-background">
+                  <SelectTrigger className="h-10 bg-background">
                     <SelectValue placeholder="Todos os bancos" />
                   </SelectTrigger>
                   <SelectContent className="bg-popover border shadow-lg z-[100] max-h-72">
@@ -431,7 +431,7 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
                     const v = e.target.value.trim();
                     onUpdate({ margemMin: v === "" ? null : Number(v) });
                   }}
-                  className="h-11"
+                  className="h-10"
                 />
               </div>
 
