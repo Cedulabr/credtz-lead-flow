@@ -556,18 +556,44 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         setCurrentBatch(batchIndex + 1);
         const batch = batches[batchIndex];
         
-        const leadsData = batch.map(lead => ({
-          nome: lead.nome,
-          cpf: lead.cpf || '',
-          convenio: lead.convenio,
-          telefone: lead.telefone,
-          telefone2: lead.telefone2 || null,
-          tag: lead.tag || null
-        }));
+        let data: any, error: any;
 
-        const { data, error } = await supabase.rpc('import_leads_from_csv', {
-          leads_data: leadsData
-        });
+        if (baseFormat === 'governo') {
+          const leadsData = batch.map(lead => ({
+            nome: lead.nome,
+            cpf: lead.cpf || '',
+            convenio: lead.convenio || 'GOVERNO BA',
+            telefone: lead.telefone || '',
+            matricula: lead.matricula || '',
+            banco: lead.banco || '',
+            situacao: lead.situacao || '',
+            ade: lead.ade || '',
+            servico_servidor: lead.servico_servidor || '',
+            tipo_servico_servidor: lead.tipo_servico_servidor || '',
+            servico_consignataria: lead.servico_consignataria || '',
+            margem_disponivel: lead.margem_disponivel || '',
+            margem_total: lead.margem_total || '',
+            parcela: lead.parcela || '',
+            parcelas_em_aberto: lead.parcelas_em_aberto || '',
+            parcelas_pagas: lead.parcelas_pagas || '',
+            deferimento: lead.deferimento || '',
+            quitacao: lead.quitacao || '',
+            ultimo_desconto: lead.ultimo_desconto || '',
+            ultima_parcela: lead.ultima_parcela || '',
+            origem_base: 'governo_ba',
+          }));
+          ({ data, error } = await (supabase as any).rpc('import_leads_governo', { leads_data: leadsData }));
+        } else {
+          const leadsData = batch.map(lead => ({
+            nome: lead.nome,
+            cpf: lead.cpf || '',
+            convenio: lead.convenio,
+            telefone: lead.telefone,
+            telefone2: lead.telefone2 || null,
+            tag: lead.tag || null,
+          }));
+          ({ data, error } = await supabase.rpc('import_leads_from_csv', { leads_data: leadsData }));
+        }
 
         if (error) throw error;
 
