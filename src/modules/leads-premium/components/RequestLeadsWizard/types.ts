@@ -1,22 +1,28 @@
+export type TipoLead = 'inss' | 'siape' | 'servidor' | 'clt';
+
 export interface LeadRequestData {
-  // Etapa 1: Tipo de lead
-  tipoLead: string | null;
-  
-  // Etapa 2: Perfil do cliente
-  convenio: string | null;
-  uf: string | null;
+  // Etapa 1: Tipo de convênio
+  tipoLead: TipoLead | null;
+
+  // Etapa 2: Perfil
+  uf: string | null;          // obrigatório para servidor
   ddds: string[];
   tags: string[];
+  requireTelefone: boolean | null; // null = não perguntado
 
-  // Etapa 2b: Filtros avançados (Governo / Servidor)
+  // Filtros de contrato (servidor)
   banco: string | null;
   parcelaMin: number | null;
   parcelaMax: number | null;
   margemMin: number | null;
-  
+  parcelasPagasMin: number | null;
+
   // Etapa 3: Quantidade e prioridade
   quantidade: number;
   prioridade: 'recentes' | 'antigos' | 'aleatorio';
+
+  // Compatibilidade com hook (derivado de tipoLead)
+  convenio: string | null;
 }
 
 export interface AvailableOption {
@@ -32,16 +38,18 @@ export interface StepProps {
 
 export const INITIAL_DATA: LeadRequestData = {
   tipoLead: null,
-  convenio: null,
   uf: null,
   ddds: [],
   tags: [],
+  requireTelefone: null,
   banco: null,
   parcelaMin: null,
   parcelaMax: null,
   margemMin: null,
+  parcelasPagasMin: null,
   quantidade: 10,
-  prioridade: 'recentes'
+  prioridade: 'recentes',
+  convenio: null,
 };
 
 // Mapa UF → DDDs (cobertura nacional)
@@ -77,12 +85,41 @@ export const UF_TO_DDDS: Record<string, string[]> = {
 
 export const UF_LIST = Object.keys(UF_TO_DDDS).sort();
 
-export const TIPOS_LEAD = [
-  { id: 'inss', label: 'INSS', description: 'Aposentados e pensionistas INSS', icon: '👴' },
-  { id: 'servidor', label: 'Servidor Público', description: 'Servidores federais, estaduais e municipais', icon: '🏛️' },
-  { id: 'fgts', label: 'FGTS', description: 'Leads com saldo FGTS disponível', icon: '💰' },
-  { id: 'siape', label: 'SIAPE', description: 'Servidores públicos federais', icon: '📋' },
-  { id: 'todos', label: 'Todos', description: 'Sem filtro por tipo', icon: '📊' },
+export const UF_NOMES: Record<string, string> = {
+  AC: 'Acre',
+  AL: 'Alagoas',
+  AM: 'Amazonas',
+  AP: 'Amapá',
+  BA: 'Bahia',
+  CE: 'Ceará',
+  DF: 'Distrito Federal',
+  ES: 'Espírito Santo',
+  GO: 'Goiás',
+  MA: 'Maranhão',
+  MG: 'Minas Gerais',
+  MS: 'Mato Grosso do Sul',
+  MT: 'Mato Grosso',
+  PA: 'Pará',
+  PB: 'Paraíba',
+  PE: 'Pernambuco',
+  PI: 'Piauí',
+  PR: 'Paraná',
+  RJ: 'Rio de Janeiro',
+  RN: 'Rio Grande do Norte',
+  RO: 'Rondônia',
+  RR: 'Roraima',
+  RS: 'Rio Grande do Sul',
+  SC: 'Santa Catarina',
+  SE: 'Sergipe',
+  SP: 'São Paulo',
+  TO: 'Tocantins',
+};
+
+export const TIPOS_LEAD: { id: TipoLead; label: string; description: string; icon: string }[] = [
+  { id: 'inss',     label: 'INSS',             description: 'Aposentados e pensionistas INSS', icon: '💛' },
+  { id: 'siape',    label: 'SIAPE',            description: 'Servidores federais (folha federal)', icon: '🔵' },
+  { id: 'servidor', label: 'Servidor Público', description: 'Estadual e municipal — escolha o estado', icon: '🏛️' },
+  { id: 'clt',      label: 'CLT / Privado',    description: 'Trabalhadores com carteira assinada', icon: '📋' },
 ];
 
 export const FEATURED_DDDS = ['11', '21', '31', '71', '41', '51', '61', '81', '85', '27'];
@@ -92,3 +129,14 @@ export const PRIORIDADES = [
   { id: 'antigos', label: 'Mais Antigos', description: 'Leads há mais tempo sem contato' },
   { id: 'aleatorio', label: 'Aleatório', description: 'Distribuição aleatória' },
 ];
+
+// Mapeia tipoLead → convenio_filter para o RPC
+export function tipoLeadToConvenio(tipo: TipoLead | null): string | null {
+  switch (tipo) {
+    case 'inss': return 'INSS';
+    case 'siape': return 'SIAPE';
+    case 'servidor': return 'GOVERNO BA';
+    case 'clt': return 'CLT';
+    default: return null;
+  }
+}

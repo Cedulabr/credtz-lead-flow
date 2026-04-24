@@ -6,25 +6,40 @@ import { StepProps, TIPOS_LEAD } from "./types";
 
 export const StepTipoLead = memo(function StepTipoLead({ data, onUpdate }: StepProps) {
   return (
-    <div className="space-y-3">
-      <div className="text-center mb-3">
-        <h3 className="text-base font-semibold">Qual tipo de lead você procura?</h3>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Selecione a categoria principal dos leads
+    <div className="space-y-4">
+      <div className="text-center">
+        <h3 className="text-base font-semibold">Qual convênio você quer trabalhar?</h3>
+        <p className="text-xs text-muted-foreground mt-1">
+          Selecione o convênio principal dos leads
         </p>
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid gap-2.5">
         {TIPOS_LEAD.map((tipo, index) => {
           const isSelected = data.tipoLead === tipo.id;
-          
+
           return (
             <motion.button
               key={tipo.id}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.04 }}
-              onClick={() => onUpdate({ tipoLead: tipo.id })}
+              onClick={() => {
+                // Ao trocar de tipo, limpa filtros incompatíveis para evitar lixo de estado
+                if (tipo.id === 'servidor') {
+                  onUpdate({ tipoLead: tipo.id, ddds: [], tags: [], requireTelefone: null });
+                } else {
+                  onUpdate({
+                    tipoLead: tipo.id,
+                    uf: null,
+                    banco: null,
+                    parcelaMin: null,
+                    parcelaMax: null,
+                    margemMin: null,
+                    parcelasPagasMin: null,
+                  });
+                }
+              }}
               className={cn(
                 "relative flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left",
                 "hover:border-primary/50 hover:bg-primary/5",
