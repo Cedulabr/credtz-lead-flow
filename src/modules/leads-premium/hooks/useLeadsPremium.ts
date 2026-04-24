@@ -314,12 +314,15 @@ export function useLeadsPremium() {
       const { data, error } = await supabase
         .rpc('request_leads_with_credits', {
           convenio_filter: options.convenio || null,
-          banco_filter: null,
+          banco_filter: (options as any).banco || null,
           produto_filter: null,
           leads_requested: options.count,
           ddd_filter: options.ddds?.length ? options.ddds : null,
-          tag_filter: options.tags?.length ? options.tags : null
-        });
+          tag_filter: options.tags?.length ? options.tags : null,
+          parcela_min: (options as any).parcelaMin ?? null,
+          parcela_max: (options as any).parcelaMax ?? null,
+          margem_min: (options as any).margemMin ?? null,
+        } as any);
 
       if (error) throw error;
 

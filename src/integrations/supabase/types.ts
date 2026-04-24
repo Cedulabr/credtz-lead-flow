@@ -9472,6 +9472,7 @@ export type Database = {
             Returns: boolean
           }
       import_leads_from_csv: { Args: { leads_data: Json }; Returns: Json }
+      import_leads_governo: { Args: { leads_data: Json }; Returns: Json }
       increment_unread: { Args: { conv_id: string }; Returns: undefined }
       is_company_gestor: {
         Args: { _company_id: string; _user_id: string }
