@@ -11,7 +11,24 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+
+const CONVENIO_OPTIONS = [
+  { value: 'INSS', label: 'INSS' },
+  { value: 'SIAPE', label: 'SIAPE' },
+  { value: 'GOVERNO BA', label: 'Servidor Público (Governo BA)' },
+  { value: 'FGTS', label: 'FGTS' },
+  { value: 'BOLSA FAMILIA', label: 'Bolsa Família' },
+  { value: 'CLT', label: 'CLT' },
+  { value: 'OUTRO', label: 'Outro' },
+];
+
+const normalizeCPF = (raw: any): string | null => {
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  if (!digits || digits.length > 11) return null;
+  return digits.padStart(11, '0');
+};
 import { ImportHistory } from "@/components/ImportHistory";
 import { LeadsDatabase } from "@/components/LeadsDatabase";
 import { DuplicateFileAlert } from "@/components/ui/duplicate-file-alert";
@@ -86,6 +103,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   
   const [file, setFile] = useState<File | null>(null);
   const [baseFormat, setBaseFormat] = useState<BaseFormat>('padrao');
+  const [selectedConvenio, setSelectedConvenio] = useState<string>('');
   const [fileHash, setFileHash] = useState<string | null>(null);
   const [parsedLeads, setParsedLeads] = useState<ParsedLead[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -102,9 +120,21 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   // Check if user is admin
   const isAdmin = profile?.role === 'admin';
 
+  const effectiveConvenio = baseFormat === 'governo' ? 'GOVERNO BA' : selectedConvenio;
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
+
+    if (!effectiveConvenio) {
+      toast({
+        title: "Selecione o convênio",
+        description: "Escolha o convênio destes leads antes de selecionar o arquivo.",
+        variant: "destructive",
+      });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     const extension = selectedFile.name.toLowerCase();
     if (!extension.endsWith('.csv') && !extension.endsWith('.xlsx') && !extension.endsWith('.xls')) {
@@ -235,17 +265,17 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       const leads: ParsedLead[] = [];
       for (let i = 1; i < lines.length; i++) {
         const v = parseCSVLine(lines[i]);
-        const cpf = (v[cpfI] || '').replace(/\D/g, '');
+        const cpf = normalizeCPF(v[cpfI]);
         const nome = (v[nomeI] || '').trim();
 
         let valid = true;
         let error = '';
         if (!nome) { valid = false; error = 'Servidor vazio'; }
-        else if (cpf.length !== 11) { valid = false; error = 'CPF inválido'; }
+        else if (!cpf) { valid = false; error = 'CPF inválido'; }
 
         leads.push({
           nome,
-          cpf,
+          cpf: cpf || '',
           telefone: '',
           convenio: 'GOVERNO BA',
           matricula: matriculaI > -1 ? (v[matriculaI] || '').trim() : '',
@@ -322,16 +352,15 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       const headers = parseCSVLine(headerLine);
       
       const nomeIndex = headers.findIndex(h => h.includes('nome'));
-      const convenioIndex = headers.findIndex(h => h.includes('convenio') || h.includes('convênio'));
       const telefoneIndex = headers.findIndex(h => h.includes('telefone 1') || h.includes('telefone1') || (h.includes('telefone') && !h.includes('2')));
       const telefone2Index = headers.findIndex(h => h.includes('telefone 2') || h.includes('telefone2'));
       const cpfIndex = headers.findIndex(h => h.includes('cpf'));
       const tagIndex = headers.findIndex(h => h.includes('tag') || h.includes('perfil') || h.includes('classificação') || h.includes('classificacao'));
 
-      if (nomeIndex === -1 || convenioIndex === -1 || telefoneIndex === -1) {
+      if (nomeIndex === -1 || telefoneIndex === -1) {
         toast({
           title: "Colunas obrigatórias não encontradas",
-          description: "O arquivo deve conter as colunas: Nome, Convênio, Telefone 1 (Telefone 2, CPF e Tag são opcionais)",
+          description: "O arquivo deve conter as colunas: Nome, Telefone 1 (Telefone 2, CPF e Tag são opcionais). O Convênio é definido no seletor acima.",
           variant: "destructive",
         });
         setIsParsing(false);
@@ -344,10 +373,11 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         const values = parseCSVLine(lines[i]);
         
         const nome = values[nomeIndex]?.trim() || '';
-        const convenio = values[convenioIndex]?.trim() || '';
+        const convenio = effectiveConvenio;
         const telefone = values[telefoneIndex]?.replace(/\D/g, '') || '';
         const telefone2 = telefone2Index !== -1 ? values[telefone2Index]?.replace(/\D/g, '') || '' : '';
-        const cpf = cpfIndex !== -1 ? values[cpfIndex]?.replace(/\D/g, '') || '' : '';
+        const cpfRaw = cpfIndex !== -1 ? values[cpfIndex] : '';
+        const cpfNormalized = cpfIndex !== -1 && cpfRaw ? normalizeCPF(cpfRaw) : null;
         const tag = tagIndex !== -1 ? values[tagIndex]?.trim() || '' : '';
 
         let valid = true;
@@ -356,18 +386,18 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         if (!nome) {
           valid = false;
           error = 'Nome vazio';
-        } else if (!convenio) {
-          valid = false;
-          error = 'Convênio vazio';
         } else if (!telefone || telefone.length < 10) {
           valid = false;
           error = 'Telefone 1 inválido';
         } else if (telefone2 && telefone2.length < 10) {
           valid = false;
           error = 'Telefone 2 inválido';
+        } else if (cpfIndex !== -1 && cpfRaw && !cpfNormalized) {
+          valid = false;
+          error = 'CPF inválido';
         }
 
-        leads.push({ nome, convenio, telefone, telefone2: telefone2 || undefined, cpf: cpf || undefined, tag: tag || undefined, valid, error });
+        leads.push({ nome, convenio, telefone, telefone2: telefone2 || undefined, cpf: cpfNormalized || undefined, tag: tag || undefined, valid, error });
       }
 
       setParsedLeads(leads);
@@ -438,16 +468,15 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       const headers = (data[0] as string[]).map(h => String(h || '').toLowerCase().trim());
       
       const nomeIndex = headers.findIndex(h => h.includes('nome'));
-      const convenioIndex = headers.findIndex(h => h.includes('convenio') || h.includes('convênio'));
       const telefoneIndex = headers.findIndex(h => h.includes('telefone 1') || h.includes('telefone1') || (h.includes('telefone') && !h.includes('2')));
       const telefone2Index = headers.findIndex(h => h.includes('telefone 2') || h.includes('telefone2'));
       const cpfIndex = headers.findIndex(h => h.includes('cpf'));
       const tagIndex = headers.findIndex(h => h.includes('tag') || h.includes('perfil') || h.includes('classificação') || h.includes('classificacao'));
 
-      if (nomeIndex === -1 || convenioIndex === -1 || telefoneIndex === -1) {
+      if (nomeIndex === -1 || telefoneIndex === -1) {
         toast({
           title: "Colunas obrigatórias não encontradas",
-          description: "O arquivo deve conter as colunas: Nome, Convênio, Telefone 1 (Telefone 2, CPF e Tag são opcionais)",
+          description: "O arquivo deve conter as colunas: Nome, Telefone 1 (Telefone 2, CPF e Tag são opcionais). O Convênio é definido no seletor acima.",
           variant: "destructive",
         });
         setIsParsing(false);
@@ -460,10 +489,11 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         const row = data[i] as string[];
         
         const nome = String(row[nomeIndex] || '').trim();
-        const convenio = String(row[convenioIndex] || '').trim();
+        const convenio = effectiveConvenio;
         const telefone = String(row[telefoneIndex] || '').replace(/\D/g, '');
         const telefone2 = telefone2Index !== -1 ? String(row[telefone2Index] || '').replace(/\D/g, '') : '';
-        const cpf = cpfIndex !== -1 ? String(row[cpfIndex] || '').replace(/\D/g, '') : '';
+        const cpfRaw = cpfIndex !== -1 ? String(row[cpfIndex] || '') : '';
+        const cpfNormalized = cpfIndex !== -1 && cpfRaw ? normalizeCPF(cpfRaw) : null;
         const tag = tagIndex !== -1 ? String(row[tagIndex] || '').trim() : '';
 
         let valid = true;
@@ -472,18 +502,18 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         if (!nome) {
           valid = false;
           error = 'Nome vazio';
-        } else if (!convenio) {
-          valid = false;
-          error = 'Convênio vazio';
         } else if (!telefone || telefone.length < 10) {
           valid = false;
           error = 'Telefone 1 inválido';
         } else if (telefone2 && telefone2.length < 10) {
           valid = false;
           error = 'Telefone 2 inválido';
+        } else if (cpfIndex !== -1 && cpfRaw && !cpfNormalized) {
+          valid = false;
+          error = 'CPF inválido';
         }
 
-        leads.push({ nome, convenio, telefone, telefone2: telefone2 || undefined, cpf: cpf || undefined, tag: tag || undefined, valid, error });
+        leads.push({ nome, convenio, telefone, telefone2: telefone2 || undefined, cpf: cpfNormalized || undefined, tag: tag || undefined, valid, error });
       }
 
       setParsedLeads(leads);
@@ -741,7 +771,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   };
 
   const downloadTemplate = () => {
-    const template = 'Nome,Telefone 1,Telefone 2,Convênio,Tag\nJoão Silva (INSS),11999998888,11988887776,INSS,Tomador\nMaria Santos (SIAPE),21988887777,,SIAPE,Com margem para empréstimo\nCarlos Lima (INSS),71977776666,71966665555,INSS,Redução de parcela\nAna Souza (SIAPE),61955554444,,SIAPE,Servidor federal';
+    const template = '# Convenio sera definido no momento da importacao - nao inclua coluna Convenio\nNome,Telefone 1,Telefone 2,CPF,Tag\nJoão Silva,11999998888,11988887776,12345678901,Tomador\nMaria Santos,21988887777,,,Com margem para emprestimo\nCarlos Lima,71977776666,71966665555,98765432100,Reducao de parcela\nAna Souza,61955554444,,,Servidor federal';
     const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -812,6 +842,35 @@ export function ImportBase({ onBack }: ImportBaseProps) {
 
         <TabsContent value="import" className="space-y-6 mt-6">
 
+      {/* Seletor de Convênio */}
+      <Card className="border-0 shadow-sm">
+        <CardContent className="pt-6 space-y-2">
+          <Label className="text-sm font-medium">Convênio destes leads <span className="text-destructive">*</span></Label>
+          <Select
+            value={effectiveConvenio}
+            onValueChange={(v) => setSelectedConvenio(v)}
+            disabled={baseFormat === 'governo'}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o convênio antes de escolher o arquivo" />
+            </SelectTrigger>
+            <SelectContent>
+              {CONVENIO_OPTIONS.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {effectiveConvenio && (
+            <p className="text-xs text-muted-foreground">
+              Todos os leads deste arquivo serão importados como <strong>{CONVENIO_OPTIONS.find(o => o.value === effectiveConvenio)?.label || effectiveConvenio}</strong>. CPFs com menos de 11 dígitos serão completados com zeros à esquerda automaticamente.
+            </p>
+          )}
+          {baseFormat === 'governo' && (
+            <p className="text-xs text-muted-foreground">O formato Governo BA já define o convênio automaticamente.</p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Seletor de tipo de base */}
       <Card className="border-0 shadow-sm">
         <CardContent className="pt-6">
@@ -861,7 +920,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                 <li>• <strong>Nome</strong> - Nome completo do lead (obrigatório)</li>
                 <li>• <strong>Telefone 1</strong> - 10 ou 11 dígitos (obrigatório)</li>
                 <li>• <strong>Telefone 2</strong> - 10 ou 11 dígitos (opcional)</li>
-                <li>• <strong>Convênio</strong> - Ex: INSS, SIAPE, etc (obrigatório)</li>
+                <li>• <strong>Convênio</strong> - <em>definido no seletor acima, não inclua na planilha</em></li>
                 <li>• <strong>CPF</strong> - 11 dígitos (opcional)</li>
               </ul>
             </div>
@@ -890,7 +949,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                 </p>
               </div>
               <div className="flex flex-col items-center gap-2">
-                <Label htmlFor="file-upload" className="cursor-pointer">
+                <Label htmlFor="file-upload" className={effectiveConvenio ? "cursor-pointer" : "cursor-not-allowed"}>
                   <Input
                     id="file-upload"
                     ref={fileInputRef}
@@ -898,9 +957,9 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                     accept=".csv,.xlsx,.xls"
                     className="hidden"
                     onChange={handleFileChange}
-                    disabled={isParsing}
+                    disabled={isParsing || !effectiveConvenio}
                   />
-                  <Button asChild disabled={isParsing}>
+                  <Button asChild disabled={isParsing || !effectiveConvenio}>
                     <span>
                       {isParsing ? (
                         <>
@@ -916,6 +975,9 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                     </span>
                   </Button>
                 </Label>
+                {!effectiveConvenio && (
+                  <p className="text-xs text-destructive">Selecione o convênio acima primeiro.</p>
+                )}
               </div>
             </div>
           </CardContent>
