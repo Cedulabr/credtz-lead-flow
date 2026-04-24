@@ -842,6 +842,35 @@ export function ImportBase({ onBack }: ImportBaseProps) {
 
         <TabsContent value="import" className="space-y-6 mt-6">
 
+      {/* Seletor de Convênio */}
+      <Card className="border-0 shadow-sm">
+        <CardContent className="pt-6 space-y-2">
+          <Label className="text-sm font-medium">Convênio destes leads <span className="text-destructive">*</span></Label>
+          <Select
+            value={effectiveConvenio}
+            onValueChange={(v) => setSelectedConvenio(v)}
+            disabled={baseFormat === 'governo'}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o convênio antes de escolher o arquivo" />
+            </SelectTrigger>
+            <SelectContent>
+              {CONVENIO_OPTIONS.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {effectiveConvenio && (
+            <p className="text-xs text-muted-foreground">
+              Todos os leads deste arquivo serão importados como <strong>{CONVENIO_OPTIONS.find(o => o.value === effectiveConvenio)?.label || effectiveConvenio}</strong>. CPFs com menos de 11 dígitos serão completados com zeros à esquerda automaticamente.
+            </p>
+          )}
+          {baseFormat === 'governo' && (
+            <p className="text-xs text-muted-foreground">O formato Governo BA já define o convênio automaticamente.</p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Seletor de tipo de base */}
       <Card className="border-0 shadow-sm">
         <CardContent className="pt-6">
