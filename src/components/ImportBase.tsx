@@ -277,21 +277,22 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       const cpfI         = findCol(['cpf'], [['cpf']]);
       const nomeI        = findCol(['servidor', 'nome'], [['servidor']]);
       const matriculaI   = findCol(['matricula'], [['matricula']]);
-      const tipoServI    = findCol(['tipo servico (servidor)'], [['tipo', 'servico', 'servidor']]);
+      const tipoServI    = findCol(['tipo servico (servidor)', 'tipo'], [['tipo', 'servico'], ['tipo']]);
       const servServI    = findCol(['servico (servidor)'], [['servico', 'servidor']]);
-      const margemDispI  = findCol(['margem disponivel (r$)', 'margem disponivel'], [['margem', 'disponivel']]);
+      const margemDispI  = findCol(['margem livre', 'margem disponivel (r$)', 'margem disponivel'], [['margem', 'livre'], ['margem', 'disponivel']]);
       const margemTotalI = findCol(['margem total (r$)', 'margem total'], [['margem', 'total']]);
-      const bancoI       = findCol(['consignataria'], [['consignataria']]); // banco
+      const bancoI       = findCol(['consignataria', 'banco'], [['consignataria'], ['banco']]); // banco
       const situacaoI    = findCol(['situacao'], [['situacao']]);
       const adeI         = findCol(['ade'], []);
       const servConsigI  = findCol(['servico (consignataria)'], [['servico', 'consignataria']]);
-      const prestI       = findCol(['prestacoes'], [['prestaco'], ['prazo']]);          // prazo original
-      const pagasI       = findCol(['pagas'], [['pagas']]);                              // parcelas pagas
-      const valorI       = findCol(['valor'], [['valor', 'parcela']]);                   // valor da parcela
+      const prestI       = findCol(['total de parcela', 'prestacoes', 'total parcelas'], [['total', 'parcela'], ['prestaco'], ['prazo']]); // prazo original
+      const pagasI       = findCol(['parcelas pagas', 'pagas'], [['parcela', 'paga'], ['pagas']]); // parcelas pagas
+      const valorI       = findCol(['valor parcela', 'valor da parcela', 'valor'], [['valor', 'parcela'], ['valor']]); // valor da parcela
       const deferI       = findCol(['deferimento'], [['deferimento']]);
       const quitI        = findCol(['quitacao'], [['quitacao']]);
       const ultDescI     = findCol(['ultimo desconto'], [['ultimo', 'desconto']]);
       const ultParcI     = findCol(['ultima parcela'], [['ultima', 'parcela']]);
+      const convenioI    = findCol(['convenio'], [['convenio']]);
 
       // Debug: log do mapeamento detectado
       console.log('[Governo CSV] Headers:', headers);
