@@ -9337,6 +9337,17 @@ export type Database = {
       }
       count_baseoff_duplicates: { Args: never; Returns: number }
       count_leads_database_duplicates: { Args: never; Returns: number }
+      count_leads_with_phone: {
+        Args: {
+          convenio_filter?: string
+          ddd_filter?: string[]
+          tag_filter?: string[]
+        }
+        Returns: {
+          total: number
+          with_phone: number
+        }[]
+      }
       create_admin_profile: {
         Args: { user_email: string; user_name?: string }
         Returns: string

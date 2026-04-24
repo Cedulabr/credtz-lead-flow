@@ -293,6 +293,8 @@ export function useLeadsPremium() {
     parcelaMin?: number | null;
     parcelaMax?: number | null;
     margemMin?: number | null;
+    parcelasPagasMin?: number | null;
+    requireTelefone?: boolean | null;
   }): Promise<boolean> => {
     if (!user) return false;
 
@@ -318,22 +320,31 @@ export function useLeadsPremium() {
       const { data, error } = await supabase
         .rpc('request_leads_with_credits', {
           convenio_filter: options.convenio || null,
-          banco_filter: (options as any).banco || null,
+          banco_filter: options.banco || null,
           produto_filter: null,
           leads_requested: options.count,
           ddd_filter: options.ddds?.length ? options.ddds : null,
           tag_filter: options.tags?.length ? options.tags : null,
-          parcela_min: (options as any).parcelaMin ?? null,
-          parcela_max: (options as any).parcelaMax ?? null,
-          margem_min: (options as any).margemMin ?? null,
+          parcela_min: options.parcelaMin ?? null,
+          parcela_max: options.parcelaMax ?? null,
+          margem_min: options.margemMin ?? null,
         } as any);
 
       if (error) throw error;
 
-      if (data?.length > 0) {
+      // Filtro client-side: leads com telefone (se solicitado)
+      let filtered = data || [];
+      if (options.requireTelefone === true) {
+        filtered = filtered.filter((l: any) => {
+          const digits = String(l.phone || '').replace(/\D/g, '');
+          return digits.length >= 10;
+        });
+      }
+
+      if (filtered?.length > 0) {
         const requestedAt = new Date().toISOString();
         const deadlineDate = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-        const leadsToInsert = data.map((lead: any) => ({
+        const leadsToInsert = filtered.map((lead: any) => ({
           name: lead.name,
           cpf: lead.cpf ?? '',
           phone: lead.phone,
@@ -363,7 +374,7 @@ export function useLeadsPremium() {
 
         toast({
           title: "Leads solicitados!",
-          description: `${data.length} leads adicionados.`,
+          description: `${filtered.length} leads adicionados.`,
         });
 
         fetchLeads();

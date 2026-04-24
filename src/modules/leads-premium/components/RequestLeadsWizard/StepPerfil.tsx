@@ -1,456 +1,149 @@
-import { memo, useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, Building2, Tag, ChevronDown, ChevronUp, Check, Loader2, Landmark, Wallet, Banknote } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+import { memo, useState, useEffect, useCallback, useRef } from "react";
+import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { StepProps, AvailableOption, FEATURED_DDDS, UF_LIST, UF_TO_DDDS } from "./types";
+import { StepProps, tipoLeadToConvenio, UF_TO_DDDS } from "./types";
+import { TagsField } from "./fields/TagsField";
+import { DDDField } from "./fields/DDDField";
+import { EstadoField } from "./fields/EstadoField";
+import { ContractFiltersSection } from "./fields/ContractFiltersSection";
+import { PhoneAlertBanner } from "./fields/PhoneAlertBanner";
 
-export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps) {
-  const [convenios, setConvenios] = useState<AvailableOption[]>([]);
-  const [ddds, setDdds] = useState<AvailableOption[]>([]);
-  const [tags, setTags] = useState<AvailableOption[]>([]);
-  const [bancos, setBancos] = useState<AvailableOption[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showAllDDDs, setShowAllDDDs] = useState(false);
+interface StepPerfilProps extends StepProps {
+  /** Sinalizado pelo wrapper quando o usuário clicou Próximo. Retorna se pode avançar. */
+  registerCanAdvance?: (fn: () => Promise<boolean>) => void;
+}
 
-  // Para servidor/governo, filtros avançados ficam expandidos por padrão
-  const isServidorOuGoverno = data.tipoLead === 'servidor' || data.tipoLead === 'governo';
-  const [showAdvanced, setShowAdvanced] = useState(isServidorOuGoverno);
-  const showUfSelector = data.tipoLead === 'servidor';
+export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCanAdvance }: StepPerfilProps) {
+  const [estadoError, setEstadoError] = useState<string | null>(null);
+  const [phoneCheck, setPhoneCheck] = useState<{ total: number; with_phone: number } | null>(null);
+  const [phoneLoading, setPhoneLoading] = useState(false);
 
-  const handleUfChange = useCallback((uf: string) => {
-    const newUf = uf === "all" ? null : uf;
-    const dddsForUf = newUf ? (UF_TO_DDDS[newUf] || []) : [];
-    onUpdate({ uf: newUf, ddds: dddsForUf });
-  }, [onUpdate]);
+  // Refs para acessar o último estado dentro do callback registrado
+  const dataRef = useRef(data);
+  dataRef.current = data;
 
-  // Carregar opções disponíveis - apenas uma vez
+  const isServidor = data.tipoLead === 'servidor';
+  const usesPhoneAlert = data.tipoLead === 'inss' || data.tipoLead === 'siape' || data.tipoLead === 'clt';
+
+  // Reset banner quando filtros relevantes mudam
   useEffect(() => {
-    let mounted = true;
-    
-    const loadOptions = async () => {
-      try {
-        // Carregar em paralelo
-        const [convenioRes, dddRes, tagRes, bancoRes] = await Promise.all([
-          supabase
-            .from('leads_database')
-            .select('convenio')
-            .eq('is_available', true)
-            .not('convenio', 'is', null),
-          supabase.rpc('get_available_ddds'),
-          supabase.rpc('get_available_tags'),
-          (supabase as any).rpc('get_available_bancos'),
-        ]);
+    setPhoneCheck(null);
+  }, [data.tipoLead, data.ddds, data.tags]);
 
-        if (!mounted) return;
-
-        // Processar convênios
-        if (convenioRes.data) {
-          const grouped = convenioRes.data.reduce((acc: Record<string, number>, item) => {
-            if (item.convenio) {
-              acc[item.convenio] = (acc[item.convenio] || 0) + 1;
-            }
-            return acc;
-          }, {});
-          setConvenios(
-            Object.entries(grouped)
-              .map(([value, count]) => ({ value, count }))
-              .sort((a, b) => b.count - a.count)
-          );
-        }
-
-        // Processar DDDs
-        if (dddRes.data) {
-          setDdds(dddRes.data.map((d: any) => ({ 
-            value: d.ddd, 
-            count: Number(d.available_count) 
-          })));
-        }
-
-        // Processar Tags
-        if (tagRes.data) {
-          setTags(tagRes.data.map((t: any) => ({ 
-            value: t.tag, 
-            count: Number(t.available_count) 
-          })));
-        }
-
-        // Processar Bancos
-        if (bancoRes?.data) {
-          setBancos(bancoRes.data.map((b: any) => ({
-            value: b.banco,
-            count: Number(b.available_count),
-          })));
-        }
-      } catch (error) {
-        console.error('Erro ao carregar opções:', error);
-      } finally {
-        if (mounted) setIsLoading(false);
-      }
-    };
-
-    loadOptions();
-    return () => { mounted = false; };
+  const runPhoneCheck = useCallback(async (): Promise<{ total: number; with_phone: number } | null> => {
+    const d = dataRef.current;
+    setPhoneLoading(true);
+    try {
+      const { data: res, error } = await supabase.rpc('count_leads_with_phone', {
+        convenio_filter: tipoLeadToConvenio(d.tipoLead),
+        ddd_filter: d.ddds.length ? d.ddds : null,
+        tag_filter: d.tags.length ? d.tags : null,
+      });
+      if (error) throw error;
+      const row = (res || [])[0] || { total: 0, with_phone: 0 };
+      const result = { total: Number(row.total), with_phone: Number(row.with_phone) };
+      setPhoneCheck(result);
+      return result;
+    } catch (e) {
+      console.error('count_leads_with_phone failed', e);
+      return null;
+    } finally {
+      setPhoneLoading(false);
+    }
   }, []);
 
-  const toggleDDD = useCallback((ddd: string) => {
-    const newDdds = data.ddds.includes(ddd)
-      ? data.ddds.filter(d => d !== ddd)
-      : [...data.ddds, ddd];
-    onUpdate({ ddds: newDdds });
-  }, [data.ddds, onUpdate]);
+  // Registra a lógica de validação ao avançar
+  useEffect(() => {
+    if (!registerCanAdvance) return;
 
-  const toggleTag = useCallback((tag: string) => {
-    const newTags = data.tags.includes(tag)
-      ? data.tags.filter(t => t !== tag)
-      : [...data.tags, tag];
-    onUpdate({ tags: newTags });
-  }, [data.tags, onUpdate]);
+    registerCanAdvance(async () => {
+      const d = dataRef.current;
 
-  // Separar DDDs em destaque dos outros
-  const featuredDDDs = FEATURED_DDDS
-    .map(ddd => ddds.find(d => d.value === ddd))
-    .filter((d): d is AvailableOption => d !== undefined);
-  
-  const otherDDDs = ddds.filter(d => !FEATURED_DDDS.includes(d.value));
+      // Servidor Público: estado é obrigatório
+      if (d.tipoLead === 'servidor') {
+        if (!d.uf) {
+          setEstadoError('Selecione o estado para continuar');
+          return false;
+        }
+        setEstadoError(null);
+        // Garantir que ddds derivados estejam aplicados (auto-região pelo estado)
+        const auto = UF_TO_DDDS[d.uf] || [];
+        if (auto.length && d.ddds.join(',') !== auto.join(',')) {
+          onUpdate({ ddds: auto });
+        }
+        return true;
+      }
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Carregando opções disponíveis...</p>
-      </div>
-    );
-  }
+      // INSS/SIAPE/CLT: alerta de telefone
+      if (usesPhoneAlert) {
+        // Se já respondeu nesse ciclo, deixa avançar
+        if (d.requireTelefone !== null) return true;
+
+        // Se já checou e não tem leads com telefone, avança direto
+        if (phoneCheck) {
+          if (phoneCheck.with_phone === 0) {
+            onUpdate({ requireTelefone: false });
+            return true;
+          }
+          // tem telefone mas usuário ainda não escolheu → bloqueia
+          return false;
+        }
+
+        const r = await runPhoneCheck();
+        if (!r || r.with_phone === 0) {
+          onUpdate({ requireTelefone: false });
+          return true;
+        }
+        // banner aparece e usuário precisa escolher
+        return false;
+      }
+
+      return true;
+    });
+  }, [registerCanAdvance, runPhoneCheck, phoneCheck, usesPhoneAlert, onUpdate]);
 
   return (
     <div className="space-y-4">
-      <div className="text-center mb-2">
+      <div className="text-center">
         <h3 className="text-base font-semibold">Defina o perfil desejado</h3>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Todos os filtros são opcionais
+        <p className="text-xs text-muted-foreground mt-1">
+          {isServidor ? 'O estado é obrigatório' : 'Todos os filtros são opcionais'}
         </p>
       </div>
 
-      {/* Estado (UF) — apenas para Servidor Público */}
-      {showUfSelector && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-2"
-        >
-          <Label className="text-sm font-medium flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            Estado (UF)
-            <span className="text-xs text-muted-foreground font-normal">
-              auto-seleciona DDDs da região
-            </span>
-          </Label>
-          <Select value={data.uf || "all"} onValueChange={handleUfChange}>
-            <SelectTrigger className="h-10 bg-background">
-              <SelectValue placeholder="Todos os estados" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover border shadow-lg z-[100] max-h-72">
-              <SelectItem value="all">Todos os estados</SelectItem>
-              {UF_LIST.map((uf) => (
-                <SelectItem key={uf} value={uf}>
-                  <span className="flex items-center justify-between w-full gap-4">
-                    <span>{uf}</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {UF_TO_DDDS[uf].length} DDDs
-                    </Badge>
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* Banner de telefone (apenas após query, INSS/SIAPE/CLT) */}
+      {usesPhoneAlert && (phoneLoading || (phoneCheck && phoneCheck.with_phone > 0 && data.requireTelefone === null)) && (
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+          <PhoneAlertBanner
+            withPhone={phoneCheck?.with_phone || 0}
+            total={phoneCheck?.total || 0}
+            isLoading={phoneLoading}
+            onChoose={(req) => onUpdate({ requireTelefone: req })}
+          />
         </motion.div>
       )}
 
-      {/* Convênio */}
-      <motion.div 
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-2"
-      >
-        <Label className="text-sm font-medium flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-muted-foreground" />
-          Convênio
-        </Label>
-        <Select 
-          value={data.convenio || "all"} 
-          onValueChange={(v) => onUpdate({ convenio: v === "all" ? null : v })}
-        >
-          <SelectTrigger className="h-10 bg-background">
-            <SelectValue placeholder="Todos os convênios" />
-          </SelectTrigger>
-          <SelectContent className="bg-popover border shadow-lg z-[100]">
-            <SelectItem value="all">Todos os convênios</SelectItem>
-            {convenios.map((c) => (
-              <SelectItem key={c.value} value={c.value}>
-                <span className="flex items-center justify-between w-full gap-4">
-                  <span>{c.value}</span>
-                  <Badge variant="secondary" className="text-xs">{c.count}</Badge>
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </motion.div>
-
-      {/* DDDs */}
-      {ddds.length > 0 && (
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="space-y-3"
-        >
-          <Label className="text-sm font-medium flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            Região (DDD)
-            {data.ddds.length > 0 && (
-              <Badge variant="default" className="ml-2 text-xs">
-                {data.ddds.length} selecionado{data.ddds.length > 1 ? 's' : ''}
-              </Badge>
-            )}
-          </Label>
-          
-          {/* Featured DDDs */}
-          <div className="grid grid-cols-5 gap-2">
-            {featuredDDDs.map((d) => {
-              const isSelected = data.ddds.includes(d.value);
-              return (
-                <button
-                  key={d.value}
-                  onClick={() => toggleDDD(d.value)}
-                  className={cn(
-                    "relative flex flex-col items-center justify-center p-2.5 rounded-lg border-2 transition-all",
-                    "hover:border-primary/50 hover:bg-primary/5",
-                    isSelected
-                      ? "border-primary bg-primary/10"
-                      : "border-border bg-background"
-                  )}
-                >
-                  <span className="text-lg font-bold">{d.value}</span>
-                  <span className="text-[10px] text-muted-foreground">{d.count}</span>
-                  {isSelected && (
-                    <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary flex items-center justify-center">
-                      <Check className="h-2.5 w-2.5 text-primary-foreground" />
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Other DDDs */}
-          {otherDDDs.length > 0 && (
-            <div className="space-y-2">
-              <button 
-                onClick={() => setShowAllDDDs(!showAllDDDs)}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showAllDDDs ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                <span>{showAllDDDs ? 'Ocultar' : 'Ver mais'} DDDs ({otherDDDs.length})</span>
-              </button>
-              
-              <AnimatePresence>
-                {showAllDDDs && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                  >
-                    <ScrollArea className="h-28 rounded-lg border p-2">
-                      <div className="flex flex-wrap gap-1.5">
-                        {otherDDDs.map((d) => (
-                          <Badge
-                            key={d.value}
-                            variant={data.ddds.includes(d.value) ? "default" : "outline"}
-                            className="cursor-pointer transition-all text-xs py-1 px-2"
-                            onClick={() => toggleDDD(d.value)}
-                          >
-                            {d.value}
-                            <span className="ml-1 opacity-60">({d.count})</span>
-                          </Badge>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
-
-          {data.ddds.length > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => onUpdate({ ddds: [] })}
-              className="text-xs h-7"
-            >
-              Limpar seleção
-            </Button>
-          )}
-        </motion.div>
+      {isServidor ? (
+        <>
+          <EstadoField
+            value={data.uf}
+            onChange={(uf) => {
+              setEstadoError(null);
+              onUpdate({
+                uf,
+                ddds: uf ? (UF_TO_DDDS[uf] || []) : [],
+              });
+            }}
+            error={estadoError}
+          />
+          <ContractFiltersSection data={data} onUpdate={onUpdate} defaultExpanded />
+        </>
+      ) : (
+        <>
+          <TagsField selected={data.tags} onChange={(tags) => onUpdate({ tags })} />
+          <DDDField selected={data.ddds} onChange={(ddds) => onUpdate({ ddds })} />
+        </>
       )}
-
-      {/* Tags */}
-      {tags.length > 0 && (
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="space-y-2"
-        >
-          <Label className="text-sm font-medium flex items-center gap-2">
-            <Tag className="h-4 w-4 text-muted-foreground" />
-            Tags
-            <span className="text-xs text-muted-foreground font-normal">(opcional)</span>
-          </Label>
-          <ScrollArea className="h-20 rounded-lg border p-2">
-            <div className="flex flex-wrap gap-1.5">
-              {tags.map((t) => (
-                <Badge
-                  key={t.value}
-                  variant={data.tags.includes(t.value) ? "default" : "outline"}
-                  className="cursor-pointer transition-all text-xs"
-                  onClick={() => toggleTag(t.value)}
-                >
-                  {t.value}
-                  <span className="ml-1 opacity-60">({t.count})</span>
-                </Badge>
-              ))}
-            </div>
-          </ScrollArea>
-        </motion.div>
-      )}
-
-      {/* Filtros avançados (Banco / Parcela / Margem) */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="space-y-3 pt-2 border-t"
-      >
-        <button
-          type="button"
-          onClick={() => setShowAdvanced(s => !s)}
-          className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          Filtros avançados (banco, parcela, margem)
-          {(data.banco || data.parcelaMin || data.parcelaMax || data.margemMin) && (
-            <Badge variant="default" className="ml-1 text-xs">ativos</Badge>
-          )}
-        </button>
-
-        <AnimatePresence>
-          {showAdvanced && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="space-y-4 overflow-hidden"
-            >
-              {/* Banco / Consignatária */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  <Landmark className="h-4 w-4 text-muted-foreground" />
-                  Banco / Consignatária
-                </Label>
-                <Select
-                  value={data.banco || "all"}
-                  onValueChange={(v) => onUpdate({ banco: v === "all" ? null : v })}
-                >
-                  <SelectTrigger className="h-10 bg-background">
-                    <SelectValue placeholder="Todos os bancos" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border shadow-lg z-[100] max-h-72">
-                    <SelectItem value="all">Todos os bancos</SelectItem>
-                    {bancos.map((b) => (
-                      <SelectItem key={b.value} value={b.value}>
-                        <span className="flex items-center justify-between w-full gap-4">
-                          <span>{b.value}</span>
-                          <Badge variant="secondary" className="text-xs">{b.count}</Badge>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Faixa de parcela */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-2">
-                    <Wallet className="h-4 w-4 text-muted-foreground" />
-                    Faixa de parcela (R$)
-                  </span>
-                  <span className="text-xs text-muted-foreground font-normal">
-                    {data.parcelaMin ?? 0} → {data.parcelaMax ?? 5000}
-                  </span>
-                </Label>
-                <Slider
-                  min={0}
-                  max={5000}
-                  step={50}
-                  value={[data.parcelaMin ?? 0, data.parcelaMax ?? 5000]}
-                  onValueChange={([min, max]) =>
-                    onUpdate({
-                      parcelaMin: min > 0 ? min : null,
-                      parcelaMax: max < 5000 ? max : null,
-                    })
-                  }
-                  className="py-2"
-                />
-              </div>
-
-              {/* Margem mínima */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  <Banknote className="h-4 w-4 text-muted-foreground" />
-                  Margem disponível mínima (R$)
-                </Label>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step={50}
-                  placeholder="Ex.: 200"
-                  value={data.margemMin ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value.trim();
-                    onUpdate({ margemMin: v === "" ? null : Number(v) });
-                  }}
-                  className="h-10"
-                />
-              </div>
-
-              {(data.banco || data.parcelaMin || data.parcelaMax || data.margemMin) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    onUpdate({ banco: null, parcelaMin: null, parcelaMax: null, margemMin: null })
-                  }
-                  className="text-xs h-7"
-                >
-                  Limpar filtros avançados
-                </Button>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
     </div>
   );
 });
