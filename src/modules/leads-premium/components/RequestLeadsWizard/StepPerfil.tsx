@@ -29,7 +29,7 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCan
   // Reset banner quando filtros relevantes mudam
   useEffect(() => {
     setPhoneCheck(null);
-  }, [data.tipoLead, data.ddds, data.tags]);
+  }, [data.tipoLead, data.ddds, data.tags, data.uf]);
 
   const runPhoneCheck = useCallback(async (): Promise<{ total: number; with_phone: number } | null> => {
     const d = dataRef.current;
