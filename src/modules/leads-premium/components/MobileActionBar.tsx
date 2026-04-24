@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Calculator, Users, Filter, CreditCard } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Plus, Calculator, Filter, CreditCard, Upload } from "lucide-react";
 
 interface MobileActionBarProps {
   userCredits: number;
@@ -10,6 +9,8 @@ interface MobileActionBarProps {
   onOpenSimulations: () => void;
   activeFiltersCount: number;
   pendingSimulations: number;
+  isAdmin?: boolean;
+  onOpenImport?: () => void;
 }
 
 export function MobileActionBar({
@@ -18,7 +19,9 @@ export function MobileActionBar({
   onOpenFilters,
   onOpenSimulations,
   activeFiltersCount,
-  pendingSimulations
+  pendingSimulations,
+  isAdmin = false,
+  onOpenImport
 }: MobileActionBarProps) {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t shadow-lg safe-area-inset-bottom">
@@ -65,6 +68,19 @@ export function MobileActionBar({
               </Badge>
             )}
           </Button>
+
+          {/* Import (admin only) */}
+          {isAdmin && onOpenImport && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenImport}
+              className="h-10 px-3"
+              title="Importar Leads"
+            >
+              <Upload className="h-4 w-4" />
+            </Button>
+          )}
 
           {/* Main Action - Request Leads */}
           <Button
