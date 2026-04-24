@@ -459,6 +459,18 @@ export function LeadsDatabase() {
                           </Badge>
                         )}
                       </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {lead.margem_disponivel != null ? `R$ ${Number(lead.margem_disponivel).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {lead.margem_atualizada_em ? (
+                          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                            {formatDate(lead.margem_atualizada_em)}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {formatDate(lead.created_at)}
                       </TableCell>
