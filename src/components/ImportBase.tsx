@@ -139,10 +139,148 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   const processFile = async (selectedFile: File) => {
     setFile(selectedFile);
     const extension = selectedFile.name.toLowerCase();
+    if (baseFormat === 'governo') {
+      await parseGovernoCSV(selectedFile);
+      return;
+    }
     if (extension.endsWith('.csv')) {
       await parseCSV(selectedFile);
     } else {
       await parseXLSX(selectedFile);
+    }
+  };
+
+  // ===== Base Governo =====
+
+  const decodeBytes = async (f: File): Promise<string> => {
+    const buf = await f.arrayBuffer();
+    const utf = new TextDecoder('utf-8').decode(buf);
+    if (utf.includes('Ã') || utf.includes('Â')) {
+      return new TextDecoder('windows-1252').decode(buf);
+    }
+    return utf;
+  };
+
+  const parseBRNumber = (raw: string): string => {
+    if (!raw) return '';
+    const clean = String(raw).trim().replace(/\s/g, '').replace(/R\$/gi, '');
+    if (!clean) return '';
+    // 1.234,56 -> 1234.56  |  1234.56 -> 1234.56
+    if (clean.includes(',')) {
+      return clean.replace(/\./g, '').replace(',', '.');
+    }
+    return clean;
+  };
+
+  const parseBRDate = (raw: string): string => {
+    if (!raw) return '';
+    const s = String(raw).trim();
+    const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+    const iso = s.match(/^\d{4}-\d{2}-\d{2}/);
+    if (iso) return iso[0];
+    return '';
+  };
+
+  const normalizeHeader = (h: string) =>
+    h.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const parseGovernoCSV = async (f: File) => {
+    setIsParsing(true);
+    try {
+      const text = await decodeBytes(f);
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) {
+        toast({ title: "Arquivo vazio", description: "Sem dados para importar", variant: "destructive" });
+        setIsParsing(false);
+        return;
+      }
+      const headers = parseCSVLine(lines[0]).map(normalizeHeader);
+
+      const idx = (...needles: string[]) =>
+        headers.findIndex(h => needles.every(n => h.includes(n)));
+
+      const cpfI = idx('cpf');
+      const nomeI = idx('servidor');
+      const matriculaI = idx('matricula');
+      const tipoServI = idx('tipo', 'servico', 'servidor');
+      const servServI = headers.findIndex(h => h === 'servico (servidor)' || (h.includes('servico') && h.includes('servidor') && !h.includes('tipo')));
+      const margemDispI = idx('margem', 'disponivel');
+      const margemTotalI = idx('margem', 'total');
+      const bancoI = idx('consignataria');
+      const situacaoI = idx('situacao');
+      const adeI = idx('ade');
+      const servConsigI = headers.findIndex(h => h.includes('servico') && h.includes('consignataria'));
+      const prestI = idx('prestacoes');
+      const pagasI = headers.findIndex(h => h === 'pagas' || h.endsWith(' pagas'));
+      const valorI = headers.findIndex(h => h === 'valor');
+      const deferI = idx('deferimento');
+      const quitI = idx('quitacao');
+      const ultDescI = idx('ultimo', 'desconto');
+      const ultParcI = idx('ultima', 'parcela');
+
+      if (cpfI === -1 || nomeI === -1) {
+        toast({
+          title: "Cabeçalho inválido",
+          description: "Esperado o formato Governo: CPF, Servidor, Matrícula, Consignatária, Valor, Margem Disponível...",
+          variant: "destructive",
+        });
+        setIsParsing(false);
+        return;
+      }
+
+      const leads: ParsedLead[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const v = parseCSVLine(lines[i]);
+        const cpf = (v[cpfI] || '').replace(/\D/g, '');
+        const nome = (v[nomeI] || '').trim();
+
+        let valid = true;
+        let error = '';
+        if (!nome) { valid = false; error = 'Servidor vazio'; }
+        else if (cpf.length !== 11) { valid = false; error = 'CPF inválido'; }
+
+        leads.push({
+          nome,
+          cpf,
+          telefone: '',
+          convenio: 'GOVERNO BA',
+          matricula: matriculaI > -1 ? (v[matriculaI] || '').trim() : '',
+          banco: bancoI > -1 ? (v[bancoI] || '').trim() : '',
+          situacao: situacaoI > -1 ? (v[situacaoI] || '').trim() : '',
+          ade: adeI > -1 ? (v[adeI] || '').trim() : '',
+          servico_servidor: servServI > -1 ? (v[servServI] || '').trim() : '',
+          tipo_servico_servidor: tipoServI > -1 ? (v[tipoServI] || '').trim() : '',
+          servico_consignataria: servConsigI > -1 ? (v[servConsigI] || '').trim() : '',
+          margem_disponivel: margemDispI > -1 ? parseBRNumber(v[margemDispI]) : '',
+          margem_total: margemTotalI > -1 ? parseBRNumber(v[margemTotalI]) : '',
+          parcela: valorI > -1 ? parseBRNumber(v[valorI]) : '',
+          parcelas_em_aberto: prestI > -1 ? (v[prestI] || '').replace(/\D/g, '') : '',
+          parcelas_pagas: pagasI > -1 ? (v[pagasI] || '').replace(/\D/g, '') : '',
+          deferimento: deferI > -1 ? parseBRDate(v[deferI]) : '',
+          quitacao: quitI > -1 ? parseBRDate(v[quitI]) : '',
+          ultimo_desconto: ultDescI > -1 ? parseBRDate(v[ultDescI]) : '',
+          ultima_parcela: ultParcI > -1 ? parseBRDate(v[ultParcI]) : '',
+          valid,
+          error,
+        });
+      }
+
+      setParsedLeads(leads);
+      setShowPreview(true);
+      const validCount = leads.filter(l => l.valid).length;
+      toast({
+        title: "Arquivo Governo processado",
+        description: `${validCount} registros válidos de ${leads.length}`,
+      });
+    } catch (e) {
+      console.error('parseGovernoCSV error', e);
+      toast({ title: "Erro ao processar", description: "Falha ao ler base de governo", variant: "destructive" });
+    } finally {
+      setIsParsing(false);
     }
   };
 
