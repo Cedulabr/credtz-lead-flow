@@ -24,6 +24,10 @@ interface RequestLeadsWizardProps {
     count: number;
     ddds?: string[];
     tags?: string[];
+    banco?: string | null;
+    parcelaMin?: number | null;
+    parcelaMax?: number | null;
+    margemMin?: number | null;
   }) => Promise<boolean>;
 }
 
@@ -80,6 +84,10 @@ export function RequestLeadsWizard({
         count: data.quantidade,
         ddds: data.ddds.length > 0 ? data.ddds : undefined,
         tags: data.tags.length > 0 ? data.tags : undefined,
+        banco: data.banco,
+        parcelaMin: data.parcelaMin,
+        parcelaMax: data.parcelaMax,
+        margemMin: data.margemMin,
       });
 
       if (success) {
