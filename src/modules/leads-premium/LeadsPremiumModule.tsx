@@ -23,7 +23,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { LayoutGrid, List, BarChart3, Calculator, Plus, CreditCard, Filter, CalendarDays } from "lucide-react";
+import { LayoutGrid, List, BarChart3, Calculator, Plus, CreditCard, Filter, CalendarDays, Upload } from "lucide-react";
+import { ImportBase } from "@/components/ImportBase";
 import { addDays, format } from "date-fns";
 
 export function LeadsPremiumModule() {
@@ -36,6 +37,9 @@ export function LeadsPremiumModule() {
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [pendingSimulationsCount, setPendingSimulationsCount] = useState(0);
+  const [showImportBase, setShowImportBase] = useState(false);
+
+  const isAdmin = profile?.role === 'admin';
 
   // Inline Simulation Modal
   const [showSimulationModal, setShowSimulationModal] = useState(false);
@@ -249,6 +253,17 @@ export function LeadsPremiumModule() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowImportBase(true)}
+                  className="h-9"
+                >
+                  <Upload className="h-4 w-4 mr-1" />
+                  Importar
+                </Button>
+              )}
               {pendingSimulationsCount > 0 && (
                 <Badge variant="destructive" className="animate-pulse">
                   {pendingSimulationsCount} simulações
@@ -372,6 +387,8 @@ export function LeadsPremiumModule() {
           onOpenSimulations={() => setActiveView("simulations")}
           activeFiltersCount={activeFiltersCount}
           pendingSimulations={pendingSimulationsCount}
+          isAdmin={isAdmin}
+          onOpenImport={() => setShowImportBase(true)}
         />
 
         {/* Lead Detail Drawer */}
@@ -440,6 +457,12 @@ export function LeadsPremiumModule() {
             <Plus className="h-4 w-4 mr-2" />
             {isOverdueBlocked ? 'Bloqueado' : 'Pedir Leads'}
           </Button>
+          {isAdmin && (
+            <Button variant="outline" onClick={() => setShowImportBase(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Importar Leads
+            </Button>
+          )}
         </div>
       </div>
 

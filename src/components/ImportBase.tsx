@@ -741,7 +741,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   };
 
   const downloadTemplate = () => {
-    const template = 'Nome,Telefone 1,Telefone 2,Convênio,Tag\nJoão Silva,11999998888,11988887776,INSS,Tomador\nMaria Santos,21988887777,,SIAPE,Com margem para empréstimo\nCarlos Lima,71977776666,71966665555,INSS,Redução de parcela';
+    const template = 'Nome,Telefone 1,Telefone 2,Convênio,Tag\nJoão Silva (INSS),11999998888,11988887776,INSS,Tomador\nMaria Santos (SIAPE),21988887777,,SIAPE,Com margem para empréstimo\nCarlos Lima (INSS),71977776666,71966665555,INSS,Redução de parcela\nAna Souza (SIAPE),61955554444,,SIAPE,Servidor federal';
     const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -822,16 +822,16 @@ export function ImportBase({ onBack }: ImportBaseProps) {
               onClick={() => { setBaseFormat('padrao'); setShowPreview(false); setParsedLeads([]); setFile(null); if (fileInputRef.current) fileInputRef.current.value=''; }}
               className={`text-left p-4 rounded-lg border-2 transition-all ${baseFormat === 'padrao' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}
             >
-              <div className="font-semibold text-sm">📞 Padrão (Nome / Convênio / Telefone)</div>
-              <div className="text-xs text-muted-foreground mt-1">Base tradicional para prospecção por telefone</div>
+              <div className="font-semibold text-sm">📞 Padrão (INSS / SIAPE / Convênios)</div>
+              <div className="text-xs text-muted-foreground mt-1">Nome, Telefone e Convênio (INSS, SIAPE ou qualquer outro). Ideal para prospecção por telefone.</div>
             </button>
             <button
               type="button"
               onClick={() => { setBaseFormat('governo'); setShowPreview(false); setParsedLeads([]); setFile(null); if (fileInputRef.current) fileInputRef.current.value=''; }}
               className={`text-left p-4 rounded-lg border-2 transition-all ${baseFormat === 'governo' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}
             >
-              <div className="font-semibold text-sm">🏛️ Governo (servidor público)</div>
-              <div className="text-xs text-muted-foreground mt-1">CPF, Servidor, Matrícula, Consignatária, Margem, Valor...</div>
+              <div className="font-semibold text-sm">🏛️ Governo BA (servidor público)</div>
+              <div className="text-xs text-muted-foreground mt-1">CPF, Servidor, Matrícula, Banco, Margem Disponível, Valor de Parcela, ADE...</div>
             </button>
           </div>
         </CardContent>
