@@ -402,6 +402,8 @@ export function LeadsDatabase() {
                     <TableHead>CPF</TableHead>
                     <TableHead>Tag</TableHead>
                     <TableHead>Disponível</TableHead>
+                    <TableHead>Margem</TableHead>
+                    <TableHead>Margem atualizada em</TableHead>
                     <TableHead>Importado em</TableHead>
                   </TableRow>
                 </TableHeader>
