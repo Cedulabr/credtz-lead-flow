@@ -154,7 +154,7 @@ export function RequestLeadsWizard({
                 >
                   <motion.div
                     className={cn(
-                      "h-10 w-10 rounded-full flex items-center justify-center text-lg transition-all",
+                      "h-8 w-8 rounded-full flex items-center justify-center text-sm transition-all",
                       isCompleted && "bg-primary text-primary-foreground",
                       isCurrent && "bg-primary/20 ring-2 ring-primary ring-offset-2 ring-offset-background",
                       !isCompleted && !isCurrent && "bg-muted text-muted-foreground"
@@ -162,7 +162,7 @@ export function RequestLeadsWizard({
                     animate={isCurrent ? { scale: [1, 1.05, 1] } : {}}
                     transition={{ duration: 0.3 }}
                   >
-                    {isCompleted ? <Check className="h-5 w-5" /> : step.icon}
+                    {isCompleted ? <Check className="h-4 w-4" /> : step.icon}
                   </motion.div>
                   <span className={cn(
                     "text-[10px] font-medium hidden sm:block",
@@ -174,7 +174,7 @@ export function RequestLeadsWizard({
                 
                 {index < STEPS.length - 1 && (
                   <div className={cn(
-                    "h-0.5 w-6 sm:w-10 mx-1",
+                    "h-0.5 w-3 sm:w-8 mx-0.5",
                     index < currentStep ? "bg-primary" : "bg-muted"
                   )} />
                 )}
@@ -192,7 +192,7 @@ export function RequestLeadsWizard({
       </div>
 
       {/* Step Content */}
-      <ScrollArea className="flex-1 px-1">
+      <ScrollArea className="flex-1 min-h-0 px-1">
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={currentStep}
@@ -232,7 +232,7 @@ export function RequestLeadsWizard({
       </ScrollArea>
 
       {/* Navigation */}
-      <div className="flex-shrink-0 pt-4 border-t flex gap-3">
+      <div className="flex-shrink-0 sticky bottom-0 bg-background pt-3 border-t flex gap-3">
         <Button
           type="button"
           variant="outline"
@@ -288,7 +288,7 @@ export function RequestLeadsWizard({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-6">
+      <DialogContent className="max-w-lg h-[90vh] max-h-[90vh] flex flex-col p-6">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />

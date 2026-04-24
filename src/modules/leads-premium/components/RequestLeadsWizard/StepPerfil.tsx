@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { StepProps, AvailableOption, FEATURED_DDDS } from "./types";
+import { StepProps, AvailableOption, FEATURED_DDDS, UF_LIST, UF_TO_DDDS } from "./types";
 
 export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps) {
   const [convenios, setConvenios] = useState<AvailableOption[]>([]);
@@ -19,7 +19,17 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
   const [bancos, setBancos] = useState<AvailableOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAllDDDs, setShowAllDDDs] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Para servidor/governo, filtros avançados ficam expandidos por padrão
+  const isServidorOuGoverno = data.tipoLead === 'servidor' || data.tipoLead === 'governo';
+  const [showAdvanced, setShowAdvanced] = useState(isServidorOuGoverno);
+  const showUfSelector = data.tipoLead === 'servidor';
+
+  const handleUfChange = useCallback((uf: string) => {
+    const newUf = uf === "all" ? null : uf;
+    const dddsForUf = newUf ? (UF_TO_DDDS[newUf] || []) : [];
+    onUpdate({ uf: newUf, ddds: dddsForUf });
+  }, [onUpdate]);
 
   // Carregar opções disponíveis - apenas uma vez
   useEffect(() => {
@@ -121,13 +131,48 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
   }
 
   return (
-    <div className="space-y-6">
-      <div className="text-center mb-4">
-        <h3 className="text-lg font-semibold">Defina o perfil desejado</h3>
-        <p className="text-sm text-muted-foreground mt-1">
+    <div className="space-y-4">
+      <div className="text-center mb-2">
+        <h3 className="text-base font-semibold">Defina o perfil desejado</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">
           Todos os filtros são opcionais
         </p>
       </div>
+
+      {/* Estado (UF) — apenas para Servidor Público */}
+      {showUfSelector && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-2"
+        >
+          <Label className="text-sm font-medium flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+            Estado (UF)
+            <span className="text-xs text-muted-foreground font-normal">
+              auto-seleciona DDDs da região
+            </span>
+          </Label>
+          <Select value={data.uf || "all"} onValueChange={handleUfChange}>
+            <SelectTrigger className="h-10 bg-background">
+              <SelectValue placeholder="Todos os estados" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border shadow-lg z-[100] max-h-72">
+              <SelectItem value="all">Todos os estados</SelectItem>
+              {UF_LIST.map((uf) => (
+                <SelectItem key={uf} value={uf}>
+                  <span className="flex items-center justify-between w-full gap-4">
+                    <span>{uf}</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {UF_TO_DDDS[uf].length} DDDs
+                    </Badge>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </motion.div>
+      )}
 
       {/* Convênio */}
       <motion.div 
@@ -143,7 +188,7 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
           value={data.convenio || "all"} 
           onValueChange={(v) => onUpdate({ convenio: v === "all" ? null : v })}
         >
-          <SelectTrigger className="h-11 bg-background">
+          <SelectTrigger className="h-10 bg-background">
             <SelectValue placeholder="Todos os convênios" />
           </SelectTrigger>
           <SelectContent className="bg-popover border shadow-lg z-[100]">
@@ -326,7 +371,7 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
                   value={data.banco || "all"}
                   onValueChange={(v) => onUpdate({ banco: v === "all" ? null : v })}
                 >
-                  <SelectTrigger className="h-11 bg-background">
+                  <SelectTrigger className="h-10 bg-background">
                     <SelectValue placeholder="Todos os bancos" />
                   </SelectTrigger>
                   <SelectContent className="bg-popover border shadow-lg z-[100] max-h-72">
@@ -386,7 +431,7 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
                     const v = e.target.value.trim();
                     onUpdate({ margemMin: v === "" ? null : Number(v) });
                   }}
-                  className="h-11"
+                  className="h-10"
                 />
               </div>
 
