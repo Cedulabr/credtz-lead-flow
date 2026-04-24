@@ -633,6 +633,32 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       let totalInvalid = 0;
       const allDuplicateDetails: ImportResult['duplicate_details'] = [];
       
+      // Cria o log de importação ANTES de processar para vincular cada lead a ele
+      let preImportCompanyId: string | null = null;
+      const { data: preUserCompany } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user!.id)
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+      if (preUserCompany?.company_id) preImportCompanyId = preUserCompany.company_id;
+
+      const { data: preLog } = await supabase.from('import_logs').insert({
+        module: 'leads_database',
+        file_name: file?.name || 'unknown.csv',
+        file_hash: fileHash,
+        file_size_bytes: file?.size || 0,
+        total_records: parsedLeads.length,
+        success_count: 0,
+        error_count: 0,
+        duplicate_count: 0,
+        status: 'processing',
+        imported_by: user!.id,
+        company_id: preImportCompanyId,
+      }).select('id').single();
+      const importLogId: string | null = preLog?.id || null;
+
       for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
         setCurrentBatch(batchIndex + 1);
         const batch = batches[batchIndex];
@@ -663,7 +689,11 @@ export function ImportBase({ onBack }: ImportBaseProps) {
             ultima_parcela: lead.ultima_parcela || '',
             origem_base: 'governo_ba',
           }));
-          ({ data, error } = await (supabase as any).rpc('import_leads_governo', { leads_data: leadsData }));
+          ({ data, error } = await (supabase as any).rpc('import_leads_governo', {
+            leads_data: leadsData,
+            p_mode: importMode,
+            p_import_log_id: importLogId,
+          }));
         } else {
           const leadsData = batch.map(lead => ({
             nome: lead.nome,
@@ -678,22 +708,25 @@ export function ImportBase({ onBack }: ImportBaseProps) {
 
         if (error) throw error;
 
-        const batchResult = data as unknown as ImportResult;
-        totalImported += batchResult.imported;
-        totalDuplicates += batchResult.duplicates;
+        const batchResult = data as any;
+        totalImported += batchResult.imported || 0;
+        totalDuplicates += batchResult.duplicates || 0;
         totalInvalid += batchResult.invalid || 0;
+        // No modo margin_only contamos updates como "duplicates" para exibir progresso
+        if (importMode === 'margin_only') {
+          totalDuplicates += batchResult.updated_margin || 0;
+        }
         
         if (batchResult.duplicate_details) {
           allDuplicateDetails.push(...batchResult.duplicate_details);
         }
         
-        // Update progress
         const progress = Math.round(((batchIndex + 1) / batches.length) * 100);
         setImportProgress(progress);
       }
       
       const result: ImportResult = {
-        success: totalImported > 0,
+        success: totalImported > 0 || totalDuplicates > 0,
         imported: totalImported,
         duplicates: totalDuplicates,
         invalid: totalInvalid,
