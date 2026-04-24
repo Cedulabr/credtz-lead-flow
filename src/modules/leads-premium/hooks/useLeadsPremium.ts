@@ -194,15 +194,17 @@ export function useLeadsPremium() {
       const currentHistory = lead.history ? 
         (typeof lead.history === 'string' ? JSON.parse(lead.history) : lead.history) : [];
 
-      // For sem_interesse: use 60-day blacklist; for sem_possibilidade: 30-day
-      const blacklistStatuses = ['sem_interesse', 'sem_possibilidade', 'recusou_oferta'];
+      // Blacklist uniforme de 30 dias para todos os status de descarte
+      const blacklistStatuses = [
+        'sem_interesse', 'sem_possibilidade', 'recusou_oferta',
+        'nao_e_cliente', 'sem_retorno', 'nao_e_whatsapp'
+      ];
       if (blacklistStatuses.includes(newStatus) && lead.cpf) {
-        const durationDays = newStatus === 'sem_interesse' ? 60 : 30;
         await supabase.rpc('blacklist_lead_with_duration', {
           lead_id_param: leadId,
           lead_cpf: lead.cpf,
           reason_param: newStatus,
-          duration_days: durationDays,
+          duration_days: 30,
         });
         // Also update history
         const { error: histError } = await supabase

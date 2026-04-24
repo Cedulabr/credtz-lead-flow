@@ -23,12 +23,13 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCan
   dataRef.current = data;
 
   const isServidor = data.tipoLead === 'servidor';
-  const usesPhoneAlert = data.tipoLead === 'inss' || data.tipoLead === 'siape' || data.tipoLead === 'clt';
+  // Aviso de telefone vale para todos os convênios (inclui Servidor)
+  const usesPhoneAlert = !!data.tipoLead;
 
   // Reset banner quando filtros relevantes mudam
   useEffect(() => {
     setPhoneCheck(null);
-  }, [data.tipoLead, data.ddds, data.tags]);
+  }, [data.tipoLead, data.ddds, data.tags, data.uf]);
 
   const runPhoneCheck = useCallback(async (): Promise<{ total: number; with_phone: number } | null> => {
     const d = dataRef.current;
@@ -59,7 +60,7 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCan
     registerCanAdvance(async () => {
       const d = dataRef.current;
 
-      // Servidor Público: estado é obrigatório
+      // Servidor Público: estado é obrigatório (mas continua para o check de telefone)
       if (d.tipoLead === 'servidor') {
         if (!d.uf) {
           setEstadoError('Selecione o estado para continuar');
@@ -71,7 +72,6 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCan
         if (auto.length && d.ddds.join(',') !== auto.join(',')) {
           onUpdate({ ddds: auto });
         }
-        return true;
       }
 
       // INSS/SIAPE/CLT: alerta de telefone

@@ -230,27 +230,45 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       }
       const headers = parseCSVLine(lines[0]).map(normalizeHeader);
 
-      const idx = (...needles: string[]) =>
-        headers.findIndex(h => needles.every(n => h.includes(n)));
+      // Busca exata por nome normalizado, com fallbacks por substring
+      const findCol = (exact: string[], contains: string[][] = []): number => {
+        for (const e of exact) {
+          const i = headers.indexOf(e);
+          if (i !== -1) return i;
+        }
+        for (const needles of contains) {
+          const i = headers.findIndex(h => needles.every(n => h.includes(n)));
+          if (i !== -1) return i;
+        }
+        return -1;
+      };
 
-      const cpfI = idx('cpf');
-      const nomeI = idx('servidor');
-      const matriculaI = idx('matricula');
-      const tipoServI = idx('tipo', 'servico', 'servidor');
-      const servServI = headers.findIndex(h => h === 'servico (servidor)' || (h.includes('servico') && h.includes('servidor') && !h.includes('tipo')));
-      const margemDispI = idx('margem', 'disponivel');
-      const margemTotalI = idx('margem', 'total');
-      const bancoI = idx('consignataria');
-      const situacaoI = idx('situacao');
-      const adeI = idx('ade');
-      const servConsigI = headers.findIndex(h => h.includes('servico') && h.includes('consignataria'));
-      const prestI = idx('prestacoes');
-      const pagasI = headers.findIndex(h => h === 'pagas' || h.endsWith(' pagas'));
-      const valorI = headers.findIndex(h => h === 'valor');
-      const deferI = idx('deferimento');
-      const quitI = idx('quitacao');
-      const ultDescI = idx('ultimo', 'desconto');
-      const ultParcI = idx('ultima', 'parcela');
+      const cpfI         = findCol(['cpf'], [['cpf']]);
+      const nomeI        = findCol(['servidor', 'nome'], [['servidor']]);
+      const matriculaI   = findCol(['matricula'], [['matricula']]);
+      const tipoServI    = findCol(['tipo servico (servidor)'], [['tipo', 'servico', 'servidor']]);
+      const servServI    = findCol(['servico (servidor)'], [['servico', 'servidor']]);
+      const margemDispI  = findCol(['margem disponivel (r$)', 'margem disponivel'], [['margem', 'disponivel']]);
+      const margemTotalI = findCol(['margem total (r$)', 'margem total'], [['margem', 'total']]);
+      const bancoI       = findCol(['consignataria'], [['consignataria']]); // banco
+      const situacaoI    = findCol(['situacao'], [['situacao']]);
+      const adeI         = findCol(['ade'], []);
+      const servConsigI  = findCol(['servico (consignataria)'], [['servico', 'consignataria']]);
+      const prestI       = findCol(['prestacoes'], [['prestaco'], ['prazo']]);          // prazo original
+      const pagasI       = findCol(['pagas'], [['pagas']]);                              // parcelas pagas
+      const valorI       = findCol(['valor'], [['valor', 'parcela']]);                   // valor da parcela
+      const deferI       = findCol(['deferimento'], [['deferimento']]);
+      const quitI        = findCol(['quitacao'], [['quitacao']]);
+      const ultDescI     = findCol(['ultimo desconto'], [['ultimo', 'desconto']]);
+      const ultParcI     = findCol(['ultima parcela'], [['ultima', 'parcela']]);
+
+      // Debug: log do mapeamento detectado
+      console.log('[Governo CSV] Headers:', headers);
+      console.log('[Governo CSV] Mapping:', {
+        cpf: cpfI, nome: nomeI, matricula: matriculaI, banco: bancoI, ade: adeI,
+        prestacoes: prestI, pagas: pagasI, valor: valorI,
+        margemDisp: margemDispI, margemTotal: margemTotalI,
+      });
 
       if (cpfI === -1 || nomeI === -1) {
         toast({
