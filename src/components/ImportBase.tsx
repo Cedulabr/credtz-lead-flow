@@ -265,17 +265,17 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       const leads: ParsedLead[] = [];
       for (let i = 1; i < lines.length; i++) {
         const v = parseCSVLine(lines[i]);
-        const cpf = (v[cpfI] || '').replace(/\D/g, '');
+        const cpf = normalizeCPF(v[cpfI]);
         const nome = (v[nomeI] || '').trim();
 
         let valid = true;
         let error = '';
         if (!nome) { valid = false; error = 'Servidor vazio'; }
-        else if (cpf.length !== 11) { valid = false; error = 'CPF inválido'; }
+        else if (!cpf) { valid = false; error = 'CPF inválido'; }
 
         leads.push({
           nome,
-          cpf,
+          cpf: cpf || '',
           telefone: '',
           convenio: 'GOVERNO BA',
           matricula: matriculaI > -1 ? (v[matriculaI] || '').trim() : '',
