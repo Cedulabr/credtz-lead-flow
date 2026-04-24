@@ -11,7 +11,24 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+
+const CONVENIO_OPTIONS = [
+  { value: 'INSS', label: 'INSS' },
+  { value: 'SIAPE', label: 'SIAPE' },
+  { value: 'GOVERNO BA', label: 'Servidor Público (Governo BA)' },
+  { value: 'FGTS', label: 'FGTS' },
+  { value: 'BOLSA FAMILIA', label: 'Bolsa Família' },
+  { value: 'CLT', label: 'CLT' },
+  { value: 'OUTRO', label: 'Outro' },
+];
+
+const normalizeCPF = (raw: any): string | null => {
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  if (!digits || digits.length > 11) return null;
+  return digits.padStart(11, '0');
+};
 import { ImportHistory } from "@/components/ImportHistory";
 import { LeadsDatabase } from "@/components/LeadsDatabase";
 import { DuplicateFileAlert } from "@/components/ui/duplicate-file-alert";
