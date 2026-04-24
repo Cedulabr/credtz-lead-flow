@@ -1,141 +1,89 @@
+## Plano — Atualização de margem, varredura e apagar importação em lote (Leads Premium)
 
+Hoje, ao reimportar a base de Governo, a função `import_leads_governo` já evita duplicar pela chave (CPF + matrícula + banco + ADE) e atualiza margem. O que falta:
 
-## Correções no Leads Premium — Governo BA, banco/parcelas, telefone e blacklist 30 dias
-
-### Diagnóstico (com base no estado atual do banco e código)
-
-1. **Sistema entrega lead de outro produto ao pedir Governo:** o wizard envia `convenio_filter = 'GOVERNO BA'` corretamente, mas o usuário está selecionando "Servidor Público" sem perceber que `tipoLead='servidor'` no front mapeia para o convênio. Confirmado no banco: existem **184 084 leads INSS, 3 165 SIAPE e apenas 14 GOVERNO BA**. Como a etapa 2 do servidor ainda permite seguir mesmo sem UF e o `request_leads_with_credits` cai em fallback `convenio_filter=NULL`, ele entrega leads de qualquer convênio. Precisa **forçar `convenio='GOVERNO BA'`** quando `tipoLead='servidor'` e UF=BA.
-
-2. **Banco/Consignatária não aparece para Governo:** todos os 14 leads de Governo importados têm `banco = NULL`. Olhando o parser `parseGovernoCSV` (linha 243): `const bancoI = idx('consignataria');`. O `idx` usa `headers.every(needle ⊂ h)` — funciona. Mas no **arquivo real** o cabeçalho vem com cedilha/acento corrompido (`ConsignatÃ¡ria`) e a função `normalizeHeader` precisa remover diacríticos antes do match. Provavelmente está removendo, mas a coluna **"Convênio"** extra na planilha quebrou a indexação porque `parseCSVLine` não lida com a última coluna acentuada. **Mais crítico:** o ADE veio para a coluna banco no preview (ex.: `BANCO - BRASIL [360]` está em `ade`, e `banco=NULL`). O mapeamento dos índices está deslocado.
-
-3. **Parcelas pagas / prazo original (Prestações):** confirmado pelo banco — `parcelas_pagas=15017` (lixo, deveria ser ~15) e `parcela=120` (deveria ser valor R$). O parser está pegando colunas erradas. A coluna **"Prestações"** não está sendo mapeada para `parcelas_em_aberto` (prazo original) e **"Pagas"** está pegando outra coluna numérica.
-
-4. **Aviso "leads com telefone" para Governo:** hoje só dispara para INSS/SIAPE/CLT. O usuário pede que **também dispare para Governo**.
-
-5. **Blacklist de 30 dias:** já existe a tabela `leads_blacklist` (criada em `20251229193056`) e `add_lead_to_blacklist`/`blacklist_lead_with_duration`. Mas:
-   - A função `request_leads_with_credits` **NÃO consulta `leads_blacklist`** — só checa `leads_distribution` (que tem expiração de **10 anos**, ou seja, eterna). Resultado: leads recusados por outro usuário podem ser entregues novamente; e o mesmo lead "trabalhado e devolvido" nunca volta para ninguém.
-   - Precisamos que `leads_distribution.expires_at` seja **30 dias** (não 10 anos) e que a função respeite ambas tabelas.
+1. **Registrar quando a margem foi atualizada** e mostrar essa data na UI.
+2. **Modo "Atualizar margens"**: na reimportação, atualizar APENAS margem, situação e parcelas pagas — nunca criar lead novo nem alterar telefone/banco/ADE.
+3. **Botão de varredura de duplicatas** na aba "Gerenciar Base".
+4. **Apagar importação em lote** (por data ou por log de importação), também na aba "Gerenciar Base".
+5. Aceitar as colunas exatas que o usuário citou: `CPF, Servidor, Matrícula, Tipo, Margem Livre, Margem Total, Banco, Situação, ADE, Total de Parcela, Parcelas Pagas, Valor Parcela, Deferimento, Último Desconto, Última Parcela, Convênio`.
 
 ---
 
-### Mudanças
+### 1. Banco de dados (migração)
 
-#### A. Correção do parser `parseGovernoCSV` em `src/components/ImportBase.tsx`
+**Tabela `leads_database`** — adicionar colunas:
+- `margem_atualizada_em timestamptz` — data/hora da última atualização da margem.
+- `margem_anterior numeric` — valor anterior para histórico simples.
+- `import_log_id uuid` — vincula cada lead ao log de importação que o criou (para apagar em lote).
 
-Reescrever os índices das colunas baseando-se **exatamente** no cabeçalho fornecido pelo usuário:
+**Tabela nova `leads_margem_history`** (opcional, mas barato): `id, lead_id, margem_disponivel, margem_total, fonte (import_log_id), criado_em`. Permite ver o histórico de quando margem mudou.
 
-```
-CPF | Servidor | Matrícula | Tipo Serviço (Servidor) | Serviço (Servidor) |
-Margem Disponível (R$) | Margem Total (R$) | Consignatária | Situação | ADE |
-Serviço (Consignatária) | Prestações | Pagas | Valor | Deferimento |
-Quitação | Ultimo Desconto | Ultima Parcela | Convênio
-```
+**Função `import_leads_governo`** — aceitar parâmetro extra `p_mode text` (`'full'` padrão ou `'margin_only'`) e `p_import_log_id uuid`:
+- `full`: comportamento atual (insere novos + atualiza existentes), mas agora grava `margem_atualizada_em = now()` apenas quando o valor de margem mudou e insere linha em `leads_margem_history`.
+- `margin_only`: NUNCA insere novos. Para cada CPF+matrícula+banco+ADE existente, atualiza somente `margem_disponivel`, `margem_total`, `situacao`, `parcelas_pagas`, `parcelas_em_aberto`, `ultimo_desconto`, `ultima_parcela`, `margem_atualizada_em`. Retorna contadores `updated`, `not_found`.
 
-Mapeamento corrigido:
-- `banco` ← coluna **Consignatária** (índice 7)
-- `prazo_original` (`parcelas_em_aberto`) ← **Prestações** (índice 11) — prazo total do contrato
-- `parcelas_pagas` ← **Pagas** (índice 12)
-- `parcela` ← **Valor** (índice 13)
-- `ade` ← **ADE** (índice 9) — não confundir com banco
-- Ignorar a coluna **Convênio** do CSV (já é "GOVERNO BA" pelo formato).
+**Aceitar novos nomes de coluna**: a função continua recebendo JSON; o mapeamento de nomes é feito no front (parser CSV). Aceita `Margem Livre` como alias de `Margem Disponível`, `Total de Parcela` como alias de `Prestações`.
 
-Substituir os `findIndex` heurísticos por uma função `findColumn(headers, candidates[])` que tenta múltiplas variações normalizadas. Adicionar sanitização extra para cabeçalhos com encoding quebrado (Latin-1 vs UTF-8). Logar no console o mapeamento detectado para debug.
+**Função nova `delete_leads_by_import_log(p_log_id uuid)`** — apaga em lote os leads vinculados àquele log (apenas admin, via SECURITY DEFINER + checagem de role). Apaga também entradas relacionadas em `leads_distribution`, `leads_blacklist` para liberar a base.
 
-Renomear o display: "Prazo original do contrato" no preview e no resumo do wizard, em vez de "Parcelas em aberto".
+**Função nova `delete_leads_by_date(p_date date, p_origem text default null)`** — apaga leads importados naquele dia (`created_at::date = p_date`), opcionalmente filtrando por `origem_base` (ex.: `governo_ba`).
 
-#### B. Reimportar dados do Governo BA já existentes (corrigir os 14 leads)
-
-Como apenas 14 registros estão com dados errados, criar uma migration que **DELETE FROM leads_database WHERE convenio='GOVERNO BA' AND banco IS NULL** para limpar os registros corrompidos. Usuário reimporta o CSV depois do parser corrigido.
-
-#### C. Forçar convênio quando tipoLead = 'servidor' (Governo)
-
-Em `src/modules/leads-premium/components/RequestLeadsWizard/index.tsx` (handler `handleConfirm`) ou no hook `requestLeads`, garantir o mapeamento explícito:
-```ts
-const convenioFilter =
-  data.tipoLead === 'inss'    ? 'INSS' :
-  data.tipoLead === 'siape'   ? 'SIAPE' :
-  data.tipoLead === 'servidor'? 'GOVERNO BA' :   // hoje só BA disponível
-  data.tipoLead === 'clt'     ? 'CLT' :
-  null;
-```
-Hoje o wizard envia `data.convenio` que pode estar nulo, caindo no fallback que entrega qualquer convênio.
-
-#### D. Aviso "leads com telefone" também para Governo
-
-Em `StepPerfil.tsx`, ampliar a condição que dispara `count_leads_with_phone` para incluir `'servidor'`. Em `count_leads_with_phone` (RPC já existe) o `convenio_filter` será `'GOVERNO BA'`. O banner `PhoneAlertBanner` aparece igual: **"Encontramos X leads do convênio GOVERNO BA com telefone. Deseja priorizar?"**
-
-#### E. Blacklist de 30 dias respeitada na entrega de leads
-
-**Migration SQL:**
-
-1. Alterar default de `leads_distribution.expires_at` para **`now() + interval '30 days'`** (em vez de 10 anos).
-2. **Backfill** dos registros existentes com `expires_at > now() + interval '60 days'` para `now() + interval '30 days'` — opcional, marcar como "expira em 30 dias a partir de agora" para limpar a base.
-3. Recriar `request_leads_with_credits` adicionando dois filtros adicionais no SELECT:
-   ```sql
-   -- excluir leads na blacklist ativa (qualquer usuário, qualquer motivo)
-   AND NOT EXISTS (
-     SELECT 1 FROM public.leads_blacklist lb
-     WHERE lb.cpf = ld.cpf
-       AND lb.expires_at > now()
-   )
-   -- excluir leads em distribuição ativa (qualquer usuário)
-   AND NOT EXISTS (
-     SELECT 1 FROM public.leads_distribution dist
-     WHERE dist.lead_id = ld.id
-       AND dist.expires_at > now()
-   )
-   ```
-   Trocar a inserção em `leads_distribution` para usar `now() + interval '30 days'` no `expires_at`.
-
-4. Ao adicionar lead na blacklist (já existe `add_lead_to_blacklist`), garantir `duration_days=30` por padrão e usar nas transições para `recusou_oferta`, `sem_interesse`, `sem_possibilidade`, `nao_e_cliente`, `sem_retorno`, `nao_e_whatsapp`. Atualizar `useLeadsPremium.ts` linha 197-200 para incluir todos esses status com 30 dias de blacklist (preserva 60 dias só para `sem_interesse` se preferir, mas o usuário pediu **30 dias uniformes**).
-
-#### F. Mensagem clara ao usuário quando não há leads
-
-Se o `request_leads_with_credits` retornar 0, mostrar toast: **"Não há leads do convênio {Governo BA / INSS / SIAPE} disponíveis com os filtros atuais. Os leads podem estar em blacklist temporária ou já distribuídos."**
+**Função nova `scan_duplicates_leads_database()`** — retorna grupos de duplicatas (mesmo CPF + matrícula + banco + ADE, ou mesmo CPF + telefone) com `keep_id` (o mais antigo) e `remove_ids[]`. Função companion `merge_duplicates_leads_database(group jsonb)` faz a remoção. Reutiliza padrão já existente em outros módulos (mem://features/automated-duplicate-scanning-v2).
 
 ---
 
-### Arquivos editados
+### 2. Frontend — `src/components/ImportBase.tsx`
 
-- `src/components/ImportBase.tsx` — parser `parseGovernoCSV` corrigido, mapeamento por nome de coluna fixo, label "Prazo original"
-- `src/modules/leads-premium/components/RequestLeadsWizard/index.tsx` — força `convenioFilter` baseado em `tipoLead`
-- `src/modules/leads-premium/components/RequestLeadsWizard/StepPerfil.tsx` — banner de telefone também para `servidor`
-- `src/modules/leads-premium/components/RequestLeadsWizard/StepResumo.tsx` — mostrar "Prazo original" quando aplicável
-- `src/modules/leads-premium/hooks/useLeadsPremium.ts` — blacklist 30 dias para todos os status de descarte; passar `convenioFilter` correto
-- `src/modules/leads-premium/components/RequestLeadsWizard/fields/ContractFiltersSection.tsx` — adicionar input "Prazo original mínimo" (opcional, espelha `parcelas_em_aberto`)
+**Novo seletor "Modo de importação"** quando `baseFormat === 'governo'`:
+- ⬤ **Importação completa** — insere novos e atualiza tudo (atual).
+- ⬤ **Atualizar apenas margem** — não cria novos leads, só atualiza margem/situação/parcelas pagas dos que já existem. Banner explicativo: "Use esta opção para refrescar a base do Governo BA sem mexer nos contatos já cadastrados."
 
-### Migration Supabase
+**Parser `parseGovernoCSV`** — adicionar aliases:
+- "Margem Livre" → `margem_disponivel`
+- "Tipo" (sozinho) → `tipo_servico_servidor`
+- "Banco" (sozinho) → fallback de `Consignatária`
+- "Total de Parcela" → `parcelas_em_aberto` (prazo original)
+- "Convênio" (coluna na planilha) → sobrescreve o convênio padrão "GOVERNO BA" linha a linha (caso o arquivo misture convênios, usa o valor da linha; senão "GOVERNO BA").
 
-```sql
--- 1. Limpar registros Governo BA corrompidos (banco NULL, parcelas inválidas)
-DELETE FROM public.leads_database
-WHERE convenio = 'GOVERNO BA' AND (banco IS NULL OR parcelas_pagas > 600);
+Passar `p_mode` e `p_import_log_id` na chamada da RPC. Após importação, mostrar contadores adequados ("X leads tiveram margem atualizada hoje").
 
--- 2. Alterar default de expires_at para 30 dias
-ALTER TABLE public.leads_distribution
-  ALTER COLUMN expires_at SET DEFAULT (now() + interval '30 days');
+---
 
--- 3. Recriar request_leads_with_credits respeitando blacklist + distribution 30d
-CREATE OR REPLACE FUNCTION public.request_leads_with_credits(
-  convenio_filter text DEFAULT NULL,
-  banco_filter text DEFAULT NULL,
-  produto_filter text DEFAULT NULL,
-  leads_requested integer DEFAULT 10,
-  ddd_filter text[] DEFAULT NULL,
-  tag_filter text[] DEFAULT NULL,
-  parcela_min numeric DEFAULT NULL,
-  parcela_max numeric DEFAULT NULL,
-  margem_min numeric DEFAULT NULL
-) RETURNS TABLE(...) ...
--- adiciona filtro NOT EXISTS leads_blacklist (expires_at > now())
--- altera leads_distribution.expires_at insert para now() + interval '30 days'
+### 3. Frontend — `src/components/LeadsDatabase.tsx` (aba Gerenciar Base)
+
+**Nova coluna na tabela**: "Margem atualizada em" exibindo `margem_atualizada_em` formatado em pt-BR. Para Governo BA, também coluna "Margem disponível" com badge verde se atualizada nos últimos 7 dias.
+
+**Novos filtros**:
+- Filtro existente "Data de importação" — manter.
+- Novo filtro "Origem" (`governo_ba`, `inss`, `siape`, `clt`, etc.) baseado em `origem_base` / `convenio`.
+
+**Novo bloco de ações em lote** (apenas admin), no topo da aba:
+
+```
+[ 🔄 Varredura de duplicatas ]   [ 🗑️ Apagar importação… ]
 ```
 
-### Resultado esperado
+- **Varredura de duplicatas** → abre modal que chama `scan_duplicates_leads_database`, mostra lista de grupos (CPF, nome, qtde duplicatas, qual será mantido), com botões "Mesclar todos" e "Mesclar selecionados". Após confirmação, chama `merge_duplicates_leads_database` e atualiza a tabela.
+- **Apagar importação** → abre modal com:
+  - Aba "Por log de importação": lista os últimos imports de `import_logs` (módulo `leads_database`) com data, arquivo, qtde de leads importados; botão "Apagar tudo deste lote".
+  - Aba "Por data": date picker; mostra contagem prevista (`SELECT count WHERE created_at::date = X`); botão "Apagar tudo desta data".
+  - Confirmação dupla obrigatória com texto "APAGAR" digitado.
 
-- Importar a planilha de Governo BA novamente: bancos (Consignatária), parcelas pagas, prazo original (Prestações) e valor de parcela aparecem corretamente.
-- Pedir leads de "Servidor Público" entrega **somente** GOVERNO BA, nunca INSS/SIAPE.
-- Banner "leads com telefone" também aparece para Governo.
-- Filtro de Banco no wizard mostra os bancos reais dos leads de Governo (BRADESCO, BMG, etc.).
-- Blacklist de 30 dias: leads recusados por qualquer usuário ficam ocultos por 30 dias para todos. Após 30 dias, voltam ao pool. Leads em distribuição ativa (não trabalhados ainda) ficam ocultos por 30 dias após a entrega — depois retornam ao pool se não foram trabalhados.
+---
 
+### 4. Detalhes técnicos importantes
+
+- Toda alteração de margem grava timestamp **somente quando o valor muda** (evita poluir o campo a cada reimport idêntico).
+- Modo "Atualizar apenas margem" continua respeitando RLS: só admin executa imports.
+- Apagar em lote nunca apaga histórico (`leads_history`, `propostas`) — apenas `leads_database` + reservas ativas em `leads_distribution` + entradas órfãs em `leads_blacklist`. Avisar o usuário antes.
+- A varredura de duplicatas não toca leads que já foram trabalhados (têm registros em `leads_history` ou `propostas`); para esses, mostra alerta "Lead com histórico — revisar manualmente".
+
+---
+
+### Resumo do que o usuário verá
+
+- Pode reimportar a planilha e escolher "Atualizar apenas margem" — Maria Lúcia continua única, mas agora aparece "Margem atualizada em 28/04/2026 14:32".
+- Botão "Varredura de duplicatas" na aba Gerenciar Base.
+- Botão "Apagar importação…" para remover lotes inteiros por data ou por arquivo importado.
+- Parser aceita as colunas exatas listadas (CPF, Servidor, Matrícula, Tipo, Margem Livre, Margem Total, Banco, Situação, ADE, Total de Parcela, Parcelas Pagas, Valor Parcela, Deferimento, Último Desconto, Última Parcela, Convênio).
