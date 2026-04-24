@@ -289,6 +289,10 @@ export function useLeadsPremium() {
     count: number;
     ddds?: string[];
     tags?: string[];
+    banco?: string | null;
+    parcelaMin?: number | null;
+    parcelaMax?: number | null;
+    margemMin?: number | null;
   }): Promise<boolean> => {
     if (!user) return false;
 
