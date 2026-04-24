@@ -60,7 +60,7 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCan
     registerCanAdvance(async () => {
       const d = dataRef.current;
 
-      // Servidor Público: estado é obrigatório
+      // Servidor Público: estado é obrigatório (mas continua para o check de telefone)
       if (d.tipoLead === 'servidor') {
         if (!d.uf) {
           setEstadoError('Selecione o estado para continuar');
@@ -72,7 +72,6 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCan
         if (auto.length && d.ddds.join(',') !== auto.join(',')) {
           onUpdate({ ddds: auto });
         }
-        return true;
       }
 
       // INSS/SIAPE/CLT: alerta de telefone
