@@ -23,7 +23,8 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCan
   dataRef.current = data;
 
   const isServidor = data.tipoLead === 'servidor';
-  const usesPhoneAlert = data.tipoLead === 'inss' || data.tipoLead === 'siape' || data.tipoLead === 'clt';
+  // Aviso de telefone vale para todos os convênios (inclui Servidor)
+  const usesPhoneAlert = !!data.tipoLead;
 
   // Reset banner quando filtros relevantes mudam
   useEffect(() => {
