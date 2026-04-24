@@ -1,9 +1,11 @@
 import { memo, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, Building2, Tag, ChevronDown, ChevronUp, Check, Loader2 } from "lucide-react";
+import { MapPin, Building2, Tag, ChevronDown, ChevronUp, Check, Loader2, Landmark, Wallet, Banknote } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
