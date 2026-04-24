@@ -117,6 +117,9 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   const [showDuplicateAlert, setShowDuplicateAlert] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
+  // Modo de importação para Governo BA: 'full' (cria + atualiza) ou 'margin_only' (só atualiza margem)
+  const [importMode, setImportMode] = useState<'full' | 'margin_only'>('full');
+
   // Check if user is admin
   const isAdmin = profile?.role === 'admin';
 
@@ -274,21 +277,22 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       const cpfI         = findCol(['cpf'], [['cpf']]);
       const nomeI        = findCol(['servidor', 'nome'], [['servidor']]);
       const matriculaI   = findCol(['matricula'], [['matricula']]);
-      const tipoServI    = findCol(['tipo servico (servidor)'], [['tipo', 'servico', 'servidor']]);
+      const tipoServI    = findCol(['tipo servico (servidor)', 'tipo'], [['tipo', 'servico'], ['tipo']]);
       const servServI    = findCol(['servico (servidor)'], [['servico', 'servidor']]);
-      const margemDispI  = findCol(['margem disponivel (r$)', 'margem disponivel'], [['margem', 'disponivel']]);
+      const margemDispI  = findCol(['margem livre', 'margem disponivel (r$)', 'margem disponivel'], [['margem', 'livre'], ['margem', 'disponivel']]);
       const margemTotalI = findCol(['margem total (r$)', 'margem total'], [['margem', 'total']]);
-      const bancoI       = findCol(['consignataria'], [['consignataria']]); // banco
+      const bancoI       = findCol(['consignataria', 'banco'], [['consignataria'], ['banco']]); // banco
       const situacaoI    = findCol(['situacao'], [['situacao']]);
       const adeI         = findCol(['ade'], []);
       const servConsigI  = findCol(['servico (consignataria)'], [['servico', 'consignataria']]);
-      const prestI       = findCol(['prestacoes'], [['prestaco'], ['prazo']]);          // prazo original
-      const pagasI       = findCol(['pagas'], [['pagas']]);                              // parcelas pagas
-      const valorI       = findCol(['valor'], [['valor', 'parcela']]);                   // valor da parcela
+      const prestI       = findCol(['total de parcela', 'prestacoes', 'total parcelas'], [['total', 'parcela'], ['prestaco'], ['prazo']]); // prazo original
+      const pagasI       = findCol(['parcelas pagas', 'pagas'], [['parcela', 'paga'], ['pagas']]); // parcelas pagas
+      const valorI       = findCol(['valor parcela', 'valor da parcela', 'valor'], [['valor', 'parcela'], ['valor']]); // valor da parcela
       const deferI       = findCol(['deferimento'], [['deferimento']]);
       const quitI        = findCol(['quitacao'], [['quitacao']]);
       const ultDescI     = findCol(['ultimo desconto'], [['ultimo', 'desconto']]);
       const ultParcI     = findCol(['ultima parcela'], [['ultima', 'parcela']]);
+      const convenioI    = findCol(['convenio'], [['convenio']]);
 
       // Debug: log do mapeamento detectado
       console.log('[Governo CSV] Headers:', headers);
@@ -319,11 +323,12 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         if (!nome) { valid = false; error = 'Servidor vazio'; }
         else if (!cpf) { valid = false; error = 'CPF inválido'; }
 
+        const convenioRow = convenioI > -1 ? (v[convenioI] || '').trim().toUpperCase() : '';
         leads.push({
           nome,
           cpf: cpf || '',
           telefone: '',
-          convenio: 'GOVERNO BA',
+          convenio: convenioRow || 'GOVERNO BA',
           matricula: matriculaI > -1 ? (v[matriculaI] || '').trim() : '',
           banco: bancoI > -1 ? (v[bancoI] || '').trim() : '',
           situacao: situacaoI > -1 ? (v[situacaoI] || '').trim() : '',
@@ -628,6 +633,32 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       let totalInvalid = 0;
       const allDuplicateDetails: ImportResult['duplicate_details'] = [];
       
+      // Cria o log de importação ANTES de processar para vincular cada lead a ele
+      let preImportCompanyId: string | null = null;
+      const { data: preUserCompany } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user!.id)
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+      if (preUserCompany?.company_id) preImportCompanyId = preUserCompany.company_id;
+
+      const { data: preLog } = await supabase.from('import_logs').insert({
+        module: 'leads_database',
+        file_name: file?.name || 'unknown.csv',
+        file_hash: fileHash,
+        file_size_bytes: file?.size || 0,
+        total_records: parsedLeads.length,
+        success_count: 0,
+        error_count: 0,
+        duplicate_count: 0,
+        status: 'processing',
+        imported_by: user!.id,
+        company_id: preImportCompanyId,
+      }).select('id').single();
+      const importLogId: string | null = preLog?.id || null;
+
       for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
         setCurrentBatch(batchIndex + 1);
         const batch = batches[batchIndex];
@@ -658,7 +689,11 @@ export function ImportBase({ onBack }: ImportBaseProps) {
             ultima_parcela: lead.ultima_parcela || '',
             origem_base: 'governo_ba',
           }));
-          ({ data, error } = await (supabase as any).rpc('import_leads_governo', { leads_data: leadsData }));
+          ({ data, error } = await (supabase as any).rpc('import_leads_governo', {
+            leads_data: leadsData,
+            p_mode: importMode,
+            p_import_log_id: importLogId,
+          }));
         } else {
           const leadsData = batch.map(lead => ({
             nome: lead.nome,
@@ -673,22 +708,25 @@ export function ImportBase({ onBack }: ImportBaseProps) {
 
         if (error) throw error;
 
-        const batchResult = data as unknown as ImportResult;
-        totalImported += batchResult.imported;
-        totalDuplicates += batchResult.duplicates;
+        const batchResult = data as any;
+        totalImported += batchResult.imported || 0;
+        totalDuplicates += batchResult.duplicates || 0;
         totalInvalid += batchResult.invalid || 0;
+        // No modo margin_only contamos updates como "duplicates" para exibir progresso
+        if (importMode === 'margin_only') {
+          totalDuplicates += batchResult.updated_margin || 0;
+        }
         
         if (batchResult.duplicate_details) {
           allDuplicateDetails.push(...batchResult.duplicate_details);
         }
         
-        // Update progress
         const progress = Math.round(((batchIndex + 1) / batches.length) * 100);
         setImportProgress(progress);
       }
       
       const result: ImportResult = {
-        success: totalImported > 0,
+        success: totalImported > 0 || totalDuplicates > 0,
         imported: totalImported,
         duplicates: totalDuplicates,
         invalid: totalInvalid,
@@ -698,52 +736,22 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       setImportResult(result);
       setShowResultDialog(true);
 
-      // Registrar log de importação - buscar company_id correto (UUID)
-      let companyId: string | null = null;
-      
-      // 1. Tentar buscar da tabela user_companies
-      const { data: userCompany } = await supabase
-        .from('user_companies')
-        .select('company_id')
-        .eq('user_id', user!.id)
-        .eq('is_active', true)
-        .limit(1)
-        .single();
-
-      if (userCompany?.company_id) {
-        companyId = userCompany.company_id;
-      } else if (profile?.company) {
-        // 2. Fallback: buscar pelo nome da empresa
-        const { data: company } = await supabase
-          .from('companies')
-          .select('id')
-          .ilike('name', profile.company)
-          .limit(1)
-          .single();
-        
-        companyId = company?.id || null;
+      // Atualiza o log de importação criado antes do processamento
+      if (importLogId) {
+        await supabase.from('import_logs').update({
+          success_count: result.imported,
+          error_count: result.invalid || 0,
+          duplicate_count: result.duplicates,
+          status: 'completed',
+        }).eq('id', importLogId);
       }
-      
-      const { data: importLogData } = await supabase.from('import_logs').insert({
-        module: 'leads_database',
-        file_name: file?.name || 'unknown.csv',
-        file_hash: fileHash,
-        file_size_bytes: file?.size || 0,
-        total_records: parsedLeads.length,
-        success_count: result.imported,
-        error_count: result.invalid || 0,
-        duplicate_count: result.duplicates,
-        status: 'completed',
-        imported_by: user!.id,
-        company_id: companyId,
-      }).select('id').single();
 
       // Executa varredura automática de duplicatas após importação (Leads Premium)
-      if (result.imported > 0) {
+      if (result.imported > 0 && importLogId) {
         try {
           const { data: scanResult } = await supabase.rpc('trigger_duplicate_scan_after_import', {
             p_module: 'leads',
-            p_import_log_id: importLogData?.id || null
+            p_import_log_id: importLogId,
           });
           console.log('Auto-scan de duplicatas executado (leads):', scanResult);
         } catch (scanError) {
@@ -753,12 +761,14 @@ export function ImportBase({ onBack }: ImportBaseProps) {
 
       toast({
         title: "Importação concluída",
-        description: `${result.imported} leads importados, ${result.duplicates} duplicados`,
-        variant: result.imported > 0 ? "default" : "destructive",
+        description: importMode === 'margin_only'
+          ? `${result.duplicates} leads tiveram a margem atualizada`
+          : `${result.imported} leads importados, ${result.duplicates} atualizados`,
+        variant: result.imported > 0 || result.duplicates > 0 ? "default" : "destructive",
       });
 
       // Reset state after successful import
-      if (result.imported > 0) {
+      if (result.imported > 0 || result.duplicates > 0) {
         setFile(null);
         setParsedLeads([]);
         setShowPreview(false);
@@ -942,7 +952,41 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         </CardContent>
       </Card>
 
-      {/* Instructions Card */}
+      {/* Modo de importação (somente Governo BA) */}
+      {baseFormat === 'governo' && (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="pt-6">
+            <Label className="text-sm font-medium mb-2 block">Modo de importação</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setImportMode('full')}
+                className={`text-left p-4 rounded-lg border-2 transition-all ${importMode === 'full' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}
+              >
+                <div className="font-semibold text-sm">📥 Importação completa</div>
+                <div className="text-xs text-muted-foreground mt-1">Cria leads novos e atualiza os existentes (margem, situação, parcelas...).</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportMode('margin_only')}
+                className={`text-left p-4 rounded-lg border-2 transition-all ${importMode === 'margin_only' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}
+              >
+                <div className="font-semibold text-sm">🔄 Atualizar apenas margem</div>
+                <div className="text-xs text-muted-foreground mt-1">Não cria novos leads. Apenas atualiza margem, situação e parcelas pagas dos clientes já existentes. Registra a data da atualização.</div>
+              </button>
+            </div>
+            {importMode === 'margin_only' && (
+              <Alert className="mt-3">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Modo "Atualizar apenas margem"</AlertTitle>
+                <AlertDescription>
+                  Use esta opção quando você só quer refrescar a margem dos clientes do Governo BA já cadastrados — sem mexer nos contatos, banco ou ADE existentes.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
       <Card className="border-0 shadow-lg bg-gradient-to-r from-primary/5 to-transparent">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

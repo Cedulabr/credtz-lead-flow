@@ -25,6 +25,8 @@ import {
   Save
 } from "lucide-react";
 
+import { LeadsBulkActions } from "@/components/LeadsBulkActions";
+
 interface Lead {
   id: string;
   name: string;
@@ -36,6 +38,9 @@ interface Lead {
   created_at: string;
   cpf_added_by: string | null;
   cpf_added_at: string | null;
+  margem_disponivel: number | null;
+  margem_atualizada_em: string | null;
+  origem_base: string | null;
 }
 
 export function LeadsDatabase() {
@@ -100,7 +105,7 @@ export function LeadsDatabase() {
       // Fetch leads with limit for performance
       const { data, error } = await supabase
         .from('leads_database')
-        .select('id, name, phone, convenio, cpf, tag, is_available, created_at, cpf_added_by, cpf_added_at')
+        .select('id, name, phone, convenio, cpf, tag, is_available, created_at, cpf_added_by, cpf_added_at, margem_disponivel, margem_atualizada_em, origem_base')
         .order('created_at', { ascending: false })
         .limit(1000);
 
@@ -291,7 +296,8 @@ export function LeadsDatabase() {
               {totalCount} leads na base • Mostrando {filteredLeads.length} de {leads.length}
             </CardDescription>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
+            <LeadsBulkActions onChanged={fetchLeads} />
             <Button variant="outline" size="sm" onClick={fetchLeads} disabled={isLoading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               Atualizar
@@ -396,6 +402,8 @@ export function LeadsDatabase() {
                     <TableHead>CPF</TableHead>
                     <TableHead>Tag</TableHead>
                     <TableHead>Disponível</TableHead>
+                    <TableHead>Margem</TableHead>
+                    <TableHead>Margem atualizada em</TableHead>
                     <TableHead>Importado em</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -449,6 +457,18 @@ export function LeadsDatabase() {
                           <Badge variant="outline" className="bg-muted text-muted-foreground">
                             Não
                           </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {lead.margem_disponivel != null ? `R$ ${Number(lead.margem_disponivel).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {lead.margem_atualizada_em ? (
+                          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                            {formatDate(lead.margem_atualizada_em)}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">

@@ -5203,7 +5203,10 @@ export type Database = {
           deferimento: string | null
           id: string
           idade: number | null
+          import_log_id: string | null
           is_available: boolean
+          margem_anterior: number | null
+          margem_atualizada_em: string | null
           margem_disponivel: number | null
           margem_total: number | null
           matricula: string | null
@@ -5237,7 +5240,10 @@ export type Database = {
           deferimento?: string | null
           id?: string
           idade?: number | null
+          import_log_id?: string | null
           is_available?: boolean
+          margem_anterior?: number | null
+          margem_atualizada_em?: string | null
           margem_disponivel?: number | null
           margem_total?: number | null
           matricula?: string | null
@@ -5271,7 +5277,10 @@ export type Database = {
           deferimento?: string | null
           id?: string
           idade?: number | null
+          import_log_id?: string | null
           is_available?: boolean
+          margem_anterior?: number | null
+          margem_atualizada_em?: string | null
           margem_disponivel?: number | null
           margem_total?: number | null
           matricula?: string | null
@@ -5379,6 +5388,44 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads_margem_history: {
+        Row: {
+          created_at: string
+          id: string
+          import_log_id: string | null
+          lead_id: string
+          margem_disponivel: number | null
+          margem_disponivel_anterior: number | null
+          margem_total: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          import_log_id?: string | null
+          lead_id: string
+          margem_disponivel?: number | null
+          margem_disponivel_anterior?: number | null
+          margem_total?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          import_log_id?: string | null
+          lead_id?: string
+          margem_disponivel?: number | null
+          margem_disponivel_anterior?: number | null
+          margem_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_margem_history_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads_database"
             referencedColumns: ["id"]
           },
         ]
@@ -9352,6 +9399,11 @@ export type Database = {
         Args: { user_email: string; user_name?: string }
         Returns: string
       }
+      delete_leads_by_date: {
+        Args: { p_date: string; p_origem?: string }
+        Returns: Json
+      }
+      delete_leads_by_import_log: { Args: { p_log_id: string }; Returns: Json }
       detect_suspicious_activity: {
         Args: { time_window_minutes?: number; user_id_param: string }
         Returns: Json
@@ -9483,7 +9535,16 @@ export type Database = {
             Returns: boolean
           }
       import_leads_from_csv: { Args: { leads_data: Json }; Returns: Json }
-      import_leads_governo: { Args: { leads_data: Json }; Returns: Json }
+      import_leads_governo:
+        | { Args: { leads_data: Json }; Returns: Json }
+        | {
+            Args: {
+              leads_data: Json
+              p_import_log_id?: string
+              p_mode?: string
+            }
+            Returns: Json
+          }
       increment_unread: { Args: { conv_id: string }; Returns: undefined }
       is_company_gestor: {
         Args: { _company_id: string; _user_id: string }
@@ -9514,6 +9575,10 @@ export type Database = {
           performed_by_user: string
           remove_lead_id: string
         }
+        Returns: Json
+      }
+      merge_duplicates_leads_database: {
+        Args: { remove_ids: string[] }
         Returns: Json
       }
       normalize_cpf: { Args: { input_cpf: string }; Returns: string }
@@ -9588,6 +9653,7 @@ export type Database = {
           total_scanned: number
         }[]
       }
+      scan_duplicates_leads_database: { Args: never; Returns: Json }
       search_baseoff_clients: {
         Args: {
           search_limit?: number
