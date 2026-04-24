@@ -23,7 +23,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { LayoutGrid, List, BarChart3, Calculator, Plus, CreditCard, Filter, CalendarDays } from "lucide-react";
+import { LayoutGrid, List, BarChart3, Calculator, Plus, CreditCard, Filter, CalendarDays, Upload } from "lucide-react";
+import { ImportBase } from "@/components/ImportBase";
 import { addDays, format } from "date-fns";
 
 export function LeadsPremiumModule() {
@@ -36,6 +37,9 @@ export function LeadsPremiumModule() {
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [pendingSimulationsCount, setPendingSimulationsCount] = useState(0);
+  const [showImportBase, setShowImportBase] = useState(false);
+
+  const isAdmin = profile?.role === 'admin';
 
   // Inline Simulation Modal
   const [showSimulationModal, setShowSimulationModal] = useState(false);
