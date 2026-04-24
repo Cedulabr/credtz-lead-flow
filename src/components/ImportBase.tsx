@@ -103,6 +103,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   
   const [file, setFile] = useState<File | null>(null);
   const [baseFormat, setBaseFormat] = useState<BaseFormat>('padrao');
+  const [selectedConvenio, setSelectedConvenio] = useState<string>('');
   const [fileHash, setFileHash] = useState<string | null>(null);
   const [parsedLeads, setParsedLeads] = useState<ParsedLead[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -119,9 +120,21 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   // Check if user is admin
   const isAdmin = profile?.role === 'admin';
 
+  const effectiveConvenio = baseFormat === 'governo' ? 'GOVERNO BA' : selectedConvenio;
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
+
+    if (!effectiveConvenio) {
+      toast({
+        title: "Selecione o convênio",
+        description: "Escolha o convênio destes leads antes de selecionar o arquivo.",
+        variant: "destructive",
+      });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     const extension = selectedFile.name.toLowerCase();
     if (!extension.endsWith('.csv') && !extension.endsWith('.xlsx') && !extension.endsWith('.xls')) {
