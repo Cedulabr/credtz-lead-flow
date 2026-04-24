@@ -1,9 +1,11 @@
 import { memo, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, Building2, Tag, ChevronDown, ChevronUp, Check, Loader2 } from "lucide-react";
+import { MapPin, Building2, Tag, ChevronDown, ChevronUp, Check, Loader2, Landmark, Wallet, Banknote } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -14,8 +16,10 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
   const [convenios, setConvenios] = useState<AvailableOption[]>([]);
   const [ddds, setDdds] = useState<AvailableOption[]>([]);
   const [tags, setTags] = useState<AvailableOption[]>([]);
+  const [bancos, setBancos] = useState<AvailableOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAllDDDs, setShowAllDDDs] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Carregar opções disponíveis - apenas uma vez
   useEffect(() => {
@@ -24,14 +28,15 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
     const loadOptions = async () => {
       try {
         // Carregar em paralelo
-        const [convenioRes, dddRes, tagRes] = await Promise.all([
+        const [convenioRes, dddRes, tagRes, bancoRes] = await Promise.all([
           supabase
             .from('leads_database')
             .select('convenio')
             .eq('is_available', true)
             .not('convenio', 'is', null),
           supabase.rpc('get_available_ddds'),
-          supabase.rpc('get_available_tags')
+          supabase.rpc('get_available_tags'),
+          (supabase as any).rpc('get_available_bancos'),
         ]);
 
         if (!mounted) return;
@@ -64,6 +69,14 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
           setTags(tagRes.data.map((t: any) => ({ 
             value: t.tag, 
             count: Number(t.available_count) 
+          })));
+        }
+
+        // Processar Bancos
+        if (bancoRes?.data) {
+          setBancos(bancoRes.data.map((b: any) => ({
+            value: b.banco,
+            count: Number(b.available_count),
           })));
         }
       } catch (error) {
@@ -275,6 +288,124 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
           </ScrollArea>
         </motion.div>
       )}
+
+      {/* Filtros avançados (Banco / Parcela / Margem) */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="space-y-3 pt-2 border-t"
+      >
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(s => !s)}
+          className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          Filtros avançados (banco, parcela, margem)
+          {(data.banco || data.parcelaMin || data.parcelaMax || data.margemMin) && (
+            <Badge variant="default" className="ml-1 text-xs">ativos</Badge>
+          )}
+        </button>
+
+        <AnimatePresence>
+          {showAdvanced && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="space-y-4 overflow-hidden"
+            >
+              {/* Banco / Consignatária */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <Landmark className="h-4 w-4 text-muted-foreground" />
+                  Banco / Consignatária
+                </Label>
+                <Select
+                  value={data.banco || "all"}
+                  onValueChange={(v) => onUpdate({ banco: v === "all" ? null : v })}
+                >
+                  <SelectTrigger className="h-11 bg-background">
+                    <SelectValue placeholder="Todos os bancos" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border shadow-lg z-[100] max-h-72">
+                    <SelectItem value="all">Todos os bancos</SelectItem>
+                    {bancos.map((b) => (
+                      <SelectItem key={b.value} value={b.value}>
+                        <span className="flex items-center justify-between w-full gap-4">
+                          <span>{b.value}</span>
+                          <Badge variant="secondary" className="text-xs">{b.count}</Badge>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Faixa de parcela */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Wallet className="h-4 w-4 text-muted-foreground" />
+                    Faixa de parcela (R$)
+                  </span>
+                  <span className="text-xs text-muted-foreground font-normal">
+                    {data.parcelaMin ?? 0} → {data.parcelaMax ?? 5000}
+                  </span>
+                </Label>
+                <Slider
+                  min={0}
+                  max={5000}
+                  step={50}
+                  value={[data.parcelaMin ?? 0, data.parcelaMax ?? 5000]}
+                  onValueChange={([min, max]) =>
+                    onUpdate({
+                      parcelaMin: min > 0 ? min : null,
+                      parcelaMax: max < 5000 ? max : null,
+                    })
+                  }
+                  className="py-2"
+                />
+              </div>
+
+              {/* Margem mínima */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <Banknote className="h-4 w-4 text-muted-foreground" />
+                  Margem disponível mínima (R$)
+                </Label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step={50}
+                  placeholder="Ex.: 200"
+                  value={data.margemMin ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value.trim();
+                    onUpdate({ margemMin: v === "" ? null : Number(v) });
+                  }}
+                  className="h-11"
+                />
+              </div>
+
+              {(data.banco || data.parcelaMin || data.parcelaMax || data.margemMin) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    onUpdate({ banco: null, parcelaMin: null, parcelaMax: null, margemMin: null })
+                  }
+                  className="text-xs h-7"
+                >
+                  Limpar filtros avançados
+                </Button>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
     </div>
   );
 });

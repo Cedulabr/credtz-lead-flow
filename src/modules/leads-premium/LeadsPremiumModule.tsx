@@ -103,7 +103,16 @@ export function LeadsPremiumModule() {
     return success;
   };
 
-  const handleRequestLeads = async (options: { convenio?: string; count: number; ddds?: string[]; tags?: string[] }) => {
+  const handleRequestLeads = async (options: {
+    convenio?: string;
+    count: number;
+    ddds?: string[];
+    tags?: string[];
+    banco?: string | null;
+    parcelaMin?: number | null;
+    parcelaMax?: number | null;
+    margemMin?: number | null;
+  }) => {
     const success = await requestLeads(options);
     if (success) {
       setIsRequestModalOpen(false);

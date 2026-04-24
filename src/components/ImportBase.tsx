@@ -40,7 +40,27 @@ interface ParsedLead {
   tag?: string;
   valid: boolean;
   error?: string;
+
+  // Campos extras (Base Governo)
+  matricula?: string;
+  banco?: string;
+  margem_disponivel?: string;
+  margem_total?: string;
+  situacao?: string;
+  ade?: string;
+  servico_servidor?: string;
+  tipo_servico_servidor?: string;
+  servico_consignataria?: string;
+  parcela?: string;
+  parcelas_em_aberto?: string;
+  parcelas_pagas?: string;
+  deferimento?: string;
+  quitacao?: string;
+  ultimo_desconto?: string;
+  ultima_parcela?: string;
 }
+
+type BaseFormat = 'padrao' | 'governo';
 
 interface ImportResult {
   success: boolean;
@@ -65,6 +85,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [file, setFile] = useState<File | null>(null);
+  const [baseFormat, setBaseFormat] = useState<BaseFormat>('padrao');
   const [fileHash, setFileHash] = useState<string | null>(null);
   const [parsedLeads, setParsedLeads] = useState<ParsedLead[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -118,10 +139,148 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   const processFile = async (selectedFile: File) => {
     setFile(selectedFile);
     const extension = selectedFile.name.toLowerCase();
+    if (baseFormat === 'governo') {
+      await parseGovernoCSV(selectedFile);
+      return;
+    }
     if (extension.endsWith('.csv')) {
       await parseCSV(selectedFile);
     } else {
       await parseXLSX(selectedFile);
+    }
+  };
+
+  // ===== Base Governo =====
+
+  const decodeBytes = async (f: File): Promise<string> => {
+    const buf = await f.arrayBuffer();
+    const utf = new TextDecoder('utf-8').decode(buf);
+    if (utf.includes('Ã') || utf.includes('Â')) {
+      return new TextDecoder('windows-1252').decode(buf);
+    }
+    return utf;
+  };
+
+  const parseBRNumber = (raw: string): string => {
+    if (!raw) return '';
+    const clean = String(raw).trim().replace(/\s/g, '').replace(/R\$/gi, '');
+    if (!clean) return '';
+    // 1.234,56 -> 1234.56  |  1234.56 -> 1234.56
+    if (clean.includes(',')) {
+      return clean.replace(/\./g, '').replace(',', '.');
+    }
+    return clean;
+  };
+
+  const parseBRDate = (raw: string): string => {
+    if (!raw) return '';
+    const s = String(raw).trim();
+    const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+    const iso = s.match(/^\d{4}-\d{2}-\d{2}/);
+    if (iso) return iso[0];
+    return '';
+  };
+
+  const normalizeHeader = (h: string) =>
+    h.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const parseGovernoCSV = async (f: File) => {
+    setIsParsing(true);
+    try {
+      const text = await decodeBytes(f);
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) {
+        toast({ title: "Arquivo vazio", description: "Sem dados para importar", variant: "destructive" });
+        setIsParsing(false);
+        return;
+      }
+      const headers = parseCSVLine(lines[0]).map(normalizeHeader);
+
+      const idx = (...needles: string[]) =>
+        headers.findIndex(h => needles.every(n => h.includes(n)));
+
+      const cpfI = idx('cpf');
+      const nomeI = idx('servidor');
+      const matriculaI = idx('matricula');
+      const tipoServI = idx('tipo', 'servico', 'servidor');
+      const servServI = headers.findIndex(h => h === 'servico (servidor)' || (h.includes('servico') && h.includes('servidor') && !h.includes('tipo')));
+      const margemDispI = idx('margem', 'disponivel');
+      const margemTotalI = idx('margem', 'total');
+      const bancoI = idx('consignataria');
+      const situacaoI = idx('situacao');
+      const adeI = idx('ade');
+      const servConsigI = headers.findIndex(h => h.includes('servico') && h.includes('consignataria'));
+      const prestI = idx('prestacoes');
+      const pagasI = headers.findIndex(h => h === 'pagas' || h.endsWith(' pagas'));
+      const valorI = headers.findIndex(h => h === 'valor');
+      const deferI = idx('deferimento');
+      const quitI = idx('quitacao');
+      const ultDescI = idx('ultimo', 'desconto');
+      const ultParcI = idx('ultima', 'parcela');
+
+      if (cpfI === -1 || nomeI === -1) {
+        toast({
+          title: "Cabeçalho inválido",
+          description: "Esperado o formato Governo: CPF, Servidor, Matrícula, Consignatária, Valor, Margem Disponível...",
+          variant: "destructive",
+        });
+        setIsParsing(false);
+        return;
+      }
+
+      const leads: ParsedLead[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const v = parseCSVLine(lines[i]);
+        const cpf = (v[cpfI] || '').replace(/\D/g, '');
+        const nome = (v[nomeI] || '').trim();
+
+        let valid = true;
+        let error = '';
+        if (!nome) { valid = false; error = 'Servidor vazio'; }
+        else if (cpf.length !== 11) { valid = false; error = 'CPF inválido'; }
+
+        leads.push({
+          nome,
+          cpf,
+          telefone: '',
+          convenio: 'GOVERNO BA',
+          matricula: matriculaI > -1 ? (v[matriculaI] || '').trim() : '',
+          banco: bancoI > -1 ? (v[bancoI] || '').trim() : '',
+          situacao: situacaoI > -1 ? (v[situacaoI] || '').trim() : '',
+          ade: adeI > -1 ? (v[adeI] || '').trim() : '',
+          servico_servidor: servServI > -1 ? (v[servServI] || '').trim() : '',
+          tipo_servico_servidor: tipoServI > -1 ? (v[tipoServI] || '').trim() : '',
+          servico_consignataria: servConsigI > -1 ? (v[servConsigI] || '').trim() : '',
+          margem_disponivel: margemDispI > -1 ? parseBRNumber(v[margemDispI]) : '',
+          margem_total: margemTotalI > -1 ? parseBRNumber(v[margemTotalI]) : '',
+          parcela: valorI > -1 ? parseBRNumber(v[valorI]) : '',
+          parcelas_em_aberto: prestI > -1 ? (v[prestI] || '').replace(/\D/g, '') : '',
+          parcelas_pagas: pagasI > -1 ? (v[pagasI] || '').replace(/\D/g, '') : '',
+          deferimento: deferI > -1 ? parseBRDate(v[deferI]) : '',
+          quitacao: quitI > -1 ? parseBRDate(v[quitI]) : '',
+          ultimo_desconto: ultDescI > -1 ? parseBRDate(v[ultDescI]) : '',
+          ultima_parcela: ultParcI > -1 ? parseBRDate(v[ultParcI]) : '',
+          valid,
+          error,
+        });
+      }
+
+      setParsedLeads(leads);
+      setShowPreview(true);
+      const validCount = leads.filter(l => l.valid).length;
+      toast({
+        title: "Arquivo Governo processado",
+        description: `${validCount} registros válidos de ${leads.length}`,
+      });
+    } catch (e) {
+      console.error('parseGovernoCSV error', e);
+      toast({ title: "Erro ao processar", description: "Falha ao ler base de governo", variant: "destructive" });
+    } finally {
+      setIsParsing(false);
     }
   };
 
@@ -397,18 +556,44 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         setCurrentBatch(batchIndex + 1);
         const batch = batches[batchIndex];
         
-        const leadsData = batch.map(lead => ({
-          nome: lead.nome,
-          cpf: lead.cpf || '',
-          convenio: lead.convenio,
-          telefone: lead.telefone,
-          telefone2: lead.telefone2 || null,
-          tag: lead.tag || null
-        }));
+        let data: any, error: any;
 
-        const { data, error } = await supabase.rpc('import_leads_from_csv', {
-          leads_data: leadsData
-        });
+        if (baseFormat === 'governo') {
+          const leadsData = batch.map(lead => ({
+            nome: lead.nome,
+            cpf: lead.cpf || '',
+            convenio: lead.convenio || 'GOVERNO BA',
+            telefone: lead.telefone || '',
+            matricula: lead.matricula || '',
+            banco: lead.banco || '',
+            situacao: lead.situacao || '',
+            ade: lead.ade || '',
+            servico_servidor: lead.servico_servidor || '',
+            tipo_servico_servidor: lead.tipo_servico_servidor || '',
+            servico_consignataria: lead.servico_consignataria || '',
+            margem_disponivel: lead.margem_disponivel || '',
+            margem_total: lead.margem_total || '',
+            parcela: lead.parcela || '',
+            parcelas_em_aberto: lead.parcelas_em_aberto || '',
+            parcelas_pagas: lead.parcelas_pagas || '',
+            deferimento: lead.deferimento || '',
+            quitacao: lead.quitacao || '',
+            ultimo_desconto: lead.ultimo_desconto || '',
+            ultima_parcela: lead.ultima_parcela || '',
+            origem_base: 'governo_ba',
+          }));
+          ({ data, error } = await (supabase as any).rpc('import_leads_governo', { leads_data: leadsData }));
+        } else {
+          const leadsData = batch.map(lead => ({
+            nome: lead.nome,
+            cpf: lead.cpf || '',
+            convenio: lead.convenio,
+            telefone: lead.telefone,
+            telefone2: lead.telefone2 || null,
+            tag: lead.tag || null,
+          }));
+          ({ data, error } = await supabase.rpc('import_leads_from_csv', { leads_data: leadsData }));
+        }
 
         if (error) throw error;
 
@@ -626,6 +811,31 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         </TabsList>
 
         <TabsContent value="import" className="space-y-6 mt-6">
+
+      {/* Seletor de tipo de base */}
+      <Card className="border-0 shadow-sm">
+        <CardContent className="pt-6">
+          <Label className="text-sm font-medium mb-2 block">Tipo de base a importar</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => { setBaseFormat('padrao'); setShowPreview(false); setParsedLeads([]); setFile(null); if (fileInputRef.current) fileInputRef.current.value=''; }}
+              className={`text-left p-4 rounded-lg border-2 transition-all ${baseFormat === 'padrao' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}
+            >
+              <div className="font-semibold text-sm">📞 Padrão (Nome / Convênio / Telefone)</div>
+              <div className="text-xs text-muted-foreground mt-1">Base tradicional para prospecção por telefone</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setBaseFormat('governo'); setShowPreview(false); setParsedLeads([]); setFile(null); if (fileInputRef.current) fileInputRef.current.value=''; }}
+              className={`text-left p-4 rounded-lg border-2 transition-all ${baseFormat === 'governo' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}
+            >
+              <div className="font-semibold text-sm">🏛️ Governo (servidor público)</div>
+              <div className="text-xs text-muted-foreground mt-1">CPF, Servidor, Matrícula, Consignatária, Margem, Valor...</div>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Instructions Card */}
       <Card className="border-0 shadow-lg bg-gradient-to-r from-primary/5 to-transparent">

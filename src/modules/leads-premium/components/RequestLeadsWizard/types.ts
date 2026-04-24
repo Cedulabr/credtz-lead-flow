@@ -6,6 +6,12 @@ export interface LeadRequestData {
   convenio: string | null;
   ddds: string[];
   tags: string[];
+
+  // Etapa 2b: Filtros avançados (Governo / Servidor)
+  banco: string | null;
+  parcelaMin: number | null;
+  parcelaMax: number | null;
+  margemMin: number | null;
   
   // Etapa 3: Quantidade e prioridade
   quantidade: number;
@@ -28,6 +34,10 @@ export const INITIAL_DATA: LeadRequestData = {
   convenio: null,
   ddds: [],
   tags: [],
+  banco: null,
+  parcelaMin: null,
+  parcelaMax: null,
+  margemMin: null,
   quantidade: 10,
   prioridade: 'recentes'
 };
