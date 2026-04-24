@@ -342,10 +342,9 @@ export function useLeadsPremium() {
       }
 
       if (filtered?.length > 0) {
-        const data = filtered;
         const requestedAt = new Date().toISOString();
         const deadlineDate = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-        const leadsToInsert = data.map((lead: any) => ({
+        const leadsToInsert = filtered.map((lead: any) => ({
           name: lead.name,
           cpf: lead.cpf ?? '',
           phone: lead.phone,
@@ -375,7 +374,7 @@ export function useLeadsPremium() {
 
         toast({
           title: "Leads solicitados!",
-          description: `${data.length} leads adicionados.`,
+          description: `${filtered.length} leads adicionados.`,
         });
 
         fetchLeads();
