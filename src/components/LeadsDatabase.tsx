@@ -25,6 +25,8 @@ import {
   Save
 } from "lucide-react";
 
+import { LeadsBulkActions } from "@/components/LeadsBulkActions";
+
 interface Lead {
   id: string;
   name: string;
@@ -36,6 +38,9 @@ interface Lead {
   created_at: string;
   cpf_added_by: string | null;
   cpf_added_at: string | null;
+  margem_disponivel: number | null;
+  margem_atualizada_em: string | null;
+  origem_base: string | null;
 }
 
 export function LeadsDatabase() {
