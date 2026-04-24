@@ -812,6 +812,31 @@ export function ImportBase({ onBack }: ImportBaseProps) {
 
         <TabsContent value="import" className="space-y-6 mt-6">
 
+      {/* Seletor de tipo de base */}
+      <Card className="border-0 shadow-sm">
+        <CardContent className="pt-6">
+          <Label className="text-sm font-medium mb-2 block">Tipo de base a importar</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => { setBaseFormat('padrao'); setShowPreview(false); setParsedLeads([]); setFile(null); if (fileInputRef.current) fileInputRef.current.value=''; }}
+              className={`text-left p-4 rounded-lg border-2 transition-all ${baseFormat === 'padrao' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}
+            >
+              <div className="font-semibold text-sm">📞 Padrão (Nome / Convênio / Telefone)</div>
+              <div className="text-xs text-muted-foreground mt-1">Base tradicional para prospecção por telefone</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setBaseFormat('governo'); setShowPreview(false); setParsedLeads([]); setFile(null); if (fileInputRef.current) fileInputRef.current.value=''; }}
+              className={`text-left p-4 rounded-lg border-2 transition-all ${baseFormat === 'governo' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}
+            >
+              <div className="font-semibold text-sm">🏛️ Governo (servidor público)</div>
+              <div className="text-xs text-muted-foreground mt-1">CPF, Servidor, Matrícula, Consignatária, Margem, Valor...</div>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Instructions Card */}
       <Card className="border-0 shadow-lg bg-gradient-to-r from-primary/5 to-transparent">
         <CardHeader>
