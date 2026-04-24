@@ -323,11 +323,12 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         if (!nome) { valid = false; error = 'Servidor vazio'; }
         else if (!cpf) { valid = false; error = 'CPF inválido'; }
 
+        const convenioRow = convenioI > -1 ? (v[convenioI] || '').trim().toUpperCase() : '';
         leads.push({
           nome,
           cpf: cpf || '',
           telefone: '',
-          convenio: 'GOVERNO BA',
+          convenio: convenioRow || 'GOVERNO BA',
           matricula: matriculaI > -1 ? (v[matriculaI] || '').trim() : '',
           banco: bancoI > -1 ? (v[bancoI] || '').trim() : '',
           situacao: situacaoI > -1 ? (v[situacaoI] || '').trim() : '',
