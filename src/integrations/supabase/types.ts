@@ -4458,50 +4458,68 @@ export type Database = {
       import_logs: {
         Row: {
           company_id: string | null
+          convenio: string | null
           created_at: string
           duplicate_count: number
           error_count: number
           error_details: Json | null
+          estado: string | null
+          fields_updated: Json | null
           file_hash: string | null
           file_name: string
           file_size_bytes: number | null
           id: string
           imported_by: string
           module: string
+          skipped_detail: Json | null
           status: string
+          subtipo: string | null
           success_count: number
+          tipo: string
           total_records: number
         }
         Insert: {
           company_id?: string | null
+          convenio?: string | null
           created_at?: string
           duplicate_count?: number
           error_count?: number
           error_details?: Json | null
+          estado?: string | null
+          fields_updated?: Json | null
           file_hash?: string | null
           file_name: string
           file_size_bytes?: number | null
           id?: string
           imported_by: string
           module: string
+          skipped_detail?: Json | null
           status?: string
+          subtipo?: string | null
           success_count?: number
+          tipo?: string
           total_records?: number
         }
         Update: {
           company_id?: string | null
+          convenio?: string | null
           created_at?: string
           duplicate_count?: number
           error_count?: number
           error_details?: Json | null
+          estado?: string | null
+          fields_updated?: Json | null
           file_hash?: string | null
           file_name?: string
           file_size_bytes?: number | null
           id?: string
           imported_by?: string
           module?: string
+          skipped_detail?: Json | null
           status?: string
+          subtipo?: string | null
           success_count?: number
+          tipo?: string
           total_records?: number
         }
         Relationships: [
@@ -5201,6 +5219,7 @@ export type Database = {
           created_at: string
           data_nascimento: string | null
           deferimento: string | null
+          estado: string | null
           id: string
           idade: number | null
           import_log_id: string | null
@@ -5221,6 +5240,7 @@ export type Database = {
           servico_consignataria: string | null
           servico_servidor: string | null
           situacao: string | null
+          subtipo: string | null
           tag: string | null
           tipo_beneficio: string | null
           tipo_servico_servidor: string | null
@@ -5238,6 +5258,7 @@ export type Database = {
           created_at?: string
           data_nascimento?: string | null
           deferimento?: string | null
+          estado?: string | null
           id?: string
           idade?: number | null
           import_log_id?: string | null
@@ -5258,6 +5279,7 @@ export type Database = {
           servico_consignataria?: string | null
           servico_servidor?: string | null
           situacao?: string | null
+          subtipo?: string | null
           tag?: string | null
           tipo_beneficio?: string | null
           tipo_servico_servidor?: string | null
@@ -5275,6 +5297,7 @@ export type Database = {
           created_at?: string
           data_nascimento?: string | null
           deferimento?: string | null
+          estado?: string | null
           id?: string
           idade?: number | null
           import_log_id?: string | null
@@ -5295,6 +5318,7 @@ export type Database = {
           servico_consignataria?: string | null
           servico_servidor?: string | null
           situacao?: string | null
+          subtipo?: string | null
           tag?: string | null
           tipo_beneficio?: string | null
           tipo_servico_servidor?: string | null
