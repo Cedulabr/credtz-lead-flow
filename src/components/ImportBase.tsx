@@ -768,7 +768,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       });
 
       // Reset state after successful import
-      if (result.imported > 0) {
+      if (result.imported > 0 || result.duplicates > 0) {
         setFile(null);
         setParsedLeads([]);
         setShowPreview(false);
