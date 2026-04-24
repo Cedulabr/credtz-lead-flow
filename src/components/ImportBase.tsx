@@ -184,11 +184,18 @@ export function ImportBase({ onBack }: ImportBaseProps) {
 
   const decodeBytes = async (f: File): Promise<string> => {
     const buf = await f.arrayBuffer();
-    const utf = new TextDecoder('utf-8').decode(buf);
-    if (utf.includes('Ã') || utf.includes('Â')) {
+    // Tenta UTF-8 estrito primeiro: se houver caracteres inválidos, cai pra Latin-1
+    try {
+      const utfStrict = new TextDecoder('utf-8', { fatal: true }).decode(buf);
+      // Se decodificou OK mas ainda contém marcadores típicos de mojibake, usa Latin-1
+      if (/Ã.|Â./.test(utfStrict)) {
+        return new TextDecoder('windows-1252').decode(buf);
+      }
+      return utfStrict;
+    } catch {
+      // UTF-8 falhou → arquivo é Latin-1/Win-1252
       return new TextDecoder('windows-1252').decode(buf);
     }
-    return utf;
   };
 
   const parseBRNumber = (raw: string): string => {
@@ -212,11 +219,32 @@ export function ImportBase({ onBack }: ImportBaseProps) {
     return '';
   };
 
-  const normalizeHeader = (h: string) =>
-    h.toLowerCase()
+  // Mapa de mojibake conhecido (UTF-8 lido como Latin-1 e re-encodado)
+  const MOJIBAKE_FIX: Array<[RegExp, string]> = [
+    [/a§a£/g, 'cao'],   // ção
+    [/a§aµes/g, 'coes'],// ções
+    [/a§a/g, 'ca'],     // ça
+    [/a§/g, 'c'],       // ç
+    [/a­/g, 'i'],       // í (a + soft hyphen)
+    [/a¡/g, 'a'],       // á
+    [/a©/g, 'e'],       // é
+    [/aª/g, 'e'],       // ê
+    [/a³/g, 'o'],       // ó
+    [/aµ/g, 'o'],       // õ
+    [/a¢/g, 'a'],       // â
+    [/aº/g, 'u'],       // ú
+  ];
+
+  const normalizeHeader = (h: string) => {
+    let s = h.toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/\s+/g, ' ')
       .trim();
+    // Limpa mojibake remanescente (ex.: arquivo gravado errado)
+    for (const [re, rep] of MOJIBAKE_FIX) s = s.replace(re, rep);
+    return s;
+  };
+
 
   const parseGovernoCSV = async (f: File) => {
     setIsParsing(true);
