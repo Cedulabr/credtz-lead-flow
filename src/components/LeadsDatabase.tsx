@@ -105,7 +105,7 @@ export function LeadsDatabase() {
       // Fetch leads with limit for performance
       const { data, error } = await supabase
         .from('leads_database')
-        .select('id, name, phone, convenio, cpf, tag, is_available, created_at, cpf_added_by, cpf_added_at')
+        .select('id, name, phone, convenio, cpf, tag, is_available, created_at, cpf_added_by, cpf_added_at, margem_disponivel, margem_atualizada_em, origem_base')
         .order('created_at', { ascending: false })
         .limit(1000);
 
