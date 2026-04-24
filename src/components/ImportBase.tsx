@@ -352,16 +352,15 @@ export function ImportBase({ onBack }: ImportBaseProps) {
       const headers = parseCSVLine(headerLine);
       
       const nomeIndex = headers.findIndex(h => h.includes('nome'));
-      const convenioIndex = headers.findIndex(h => h.includes('convenio') || h.includes('convênio'));
       const telefoneIndex = headers.findIndex(h => h.includes('telefone 1') || h.includes('telefone1') || (h.includes('telefone') && !h.includes('2')));
       const telefone2Index = headers.findIndex(h => h.includes('telefone 2') || h.includes('telefone2'));
       const cpfIndex = headers.findIndex(h => h.includes('cpf'));
       const tagIndex = headers.findIndex(h => h.includes('tag') || h.includes('perfil') || h.includes('classificação') || h.includes('classificacao'));
 
-      if (nomeIndex === -1 || convenioIndex === -1 || telefoneIndex === -1) {
+      if (nomeIndex === -1 || telefoneIndex === -1) {
         toast({
           title: "Colunas obrigatórias não encontradas",
-          description: "O arquivo deve conter as colunas: Nome, Convênio, Telefone 1 (Telefone 2, CPF e Tag são opcionais)",
+          description: "O arquivo deve conter as colunas: Nome, Telefone 1 (Telefone 2, CPF e Tag são opcionais). O Convênio é definido no seletor acima.",
           variant: "destructive",
         });
         setIsParsing(false);
@@ -374,10 +373,11 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         const values = parseCSVLine(lines[i]);
         
         const nome = values[nomeIndex]?.trim() || '';
-        const convenio = values[convenioIndex]?.trim() || '';
+        const convenio = effectiveConvenio;
         const telefone = values[telefoneIndex]?.replace(/\D/g, '') || '';
         const telefone2 = telefone2Index !== -1 ? values[telefone2Index]?.replace(/\D/g, '') || '' : '';
-        const cpf = cpfIndex !== -1 ? values[cpfIndex]?.replace(/\D/g, '') || '' : '';
+        const cpfRaw = cpfIndex !== -1 ? values[cpfIndex] : '';
+        const cpfNormalized = cpfIndex !== -1 && cpfRaw ? normalizeCPF(cpfRaw) : null;
         const tag = tagIndex !== -1 ? values[tagIndex]?.trim() || '' : '';
 
         let valid = true;
@@ -386,18 +386,18 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         if (!nome) {
           valid = false;
           error = 'Nome vazio';
-        } else if (!convenio) {
-          valid = false;
-          error = 'Convênio vazio';
         } else if (!telefone || telefone.length < 10) {
           valid = false;
           error = 'Telefone 1 inválido';
         } else if (telefone2 && telefone2.length < 10) {
           valid = false;
           error = 'Telefone 2 inválido';
+        } else if (cpfIndex !== -1 && cpfRaw && !cpfNormalized) {
+          valid = false;
+          error = 'CPF inválido';
         }
 
-        leads.push({ nome, convenio, telefone, telefone2: telefone2 || undefined, cpf: cpf || undefined, tag: tag || undefined, valid, error });
+        leads.push({ nome, convenio, telefone, telefone2: telefone2 || undefined, cpf: cpfNormalized || undefined, tag: tag || undefined, valid, error });
       }
 
       setParsedLeads(leads);
