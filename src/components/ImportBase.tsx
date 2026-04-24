@@ -117,6 +117,9 @@ export function ImportBase({ onBack }: ImportBaseProps) {
   const [showDuplicateAlert, setShowDuplicateAlert] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
+  // Modo de importação para Governo BA: 'full' (cria + atualiza) ou 'margin_only' (só atualiza margem)
+  const [importMode, setImportMode] = useState<'full' | 'margin_only'>('full');
+
   // Check if user is admin
   const isAdmin = profile?.role === 'admin';
 
