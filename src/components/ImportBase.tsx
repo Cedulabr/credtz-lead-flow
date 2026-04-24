@@ -920,7 +920,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                 <li>• <strong>Nome</strong> - Nome completo do lead (obrigatório)</li>
                 <li>• <strong>Telefone 1</strong> - 10 ou 11 dígitos (obrigatório)</li>
                 <li>• <strong>Telefone 2</strong> - 10 ou 11 dígitos (opcional)</li>
-                <li>• <strong>Convênio</strong> - Ex: INSS, SIAPE, etc (obrigatório)</li>
+                <li>• <strong>Convênio</strong> - <em>definido no seletor acima, não inclua na planilha</em></li>
                 <li>• <strong>CPF</strong> - 11 dígitos (opcional)</li>
               </ul>
             </div>
