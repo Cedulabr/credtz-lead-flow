@@ -71,6 +71,14 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
             count: Number(t.available_count) 
           })));
         }
+
+        // Processar Bancos
+        if (bancoRes?.data) {
+          setBancos(bancoRes.data.map((b: any) => ({
+            value: b.banco,
+            count: Number(b.available_count),
+          })));
+        }
       } catch (error) {
         console.error('Erro ao carregar opções:', error);
       } finally {
