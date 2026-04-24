@@ -952,7 +952,41 @@ export function ImportBase({ onBack }: ImportBaseProps) {
         </CardContent>
       </Card>
 
-      {/* Instructions Card */}
+      {/* Modo de importação (somente Governo BA) */}
+      {baseFormat === 'governo' && (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="pt-6">
+            <Label className="text-sm font-medium mb-2 block">Modo de importação</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setImportMode('full')}
+                className={`text-left p-4 rounded-lg border-2 transition-all ${importMode === 'full' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}
+              >
+                <div className="font-semibold text-sm">📥 Importação completa</div>
+                <div className="text-xs text-muted-foreground mt-1">Cria leads novos e atualiza os existentes (margem, situação, parcelas...).</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportMode('margin_only')}
+                className={`text-left p-4 rounded-lg border-2 transition-all ${importMode === 'margin_only' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}
+              >
+                <div className="font-semibold text-sm">🔄 Atualizar apenas margem</div>
+                <div className="text-xs text-muted-foreground mt-1">Não cria novos leads. Apenas atualiza margem, situação e parcelas pagas dos clientes já existentes. Registra a data da atualização.</div>
+              </button>
+            </div>
+            {importMode === 'margin_only' && (
+              <Alert className="mt-3">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Modo "Atualizar apenas margem"</AlertTitle>
+                <AlertDescription>
+                  Use esta opção quando você só quer refrescar a margem dos clientes do Governo BA já cadastrados — sem mexer nos contatos, banco ou ADE existentes.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
       <Card className="border-0 shadow-lg bg-gradient-to-r from-primary/5 to-transparent">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
