@@ -332,7 +332,17 @@ export function useLeadsPremium() {
 
       if (error) throw error;
 
-      if (data?.length > 0) {
+      // Filtro client-side: leads com telefone (se solicitado)
+      let filtered = data || [];
+      if (options.requireTelefone === true) {
+        filtered = filtered.filter((l: any) => {
+          const digits = String(l.phone || '').replace(/\D/g, '');
+          return digits.length >= 10;
+        });
+      }
+
+      if (filtered?.length > 0) {
+        const data = filtered;
         const requestedAt = new Date().toISOString();
         const deadlineDate = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
         const leadsToInsert = data.map((lead: any) => ({
