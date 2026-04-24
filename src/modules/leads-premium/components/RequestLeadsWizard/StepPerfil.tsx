@@ -16,8 +16,10 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
   const [convenios, setConvenios] = useState<AvailableOption[]>([]);
   const [ddds, setDdds] = useState<AvailableOption[]>([]);
   const [tags, setTags] = useState<AvailableOption[]>([]);
+  const [bancos, setBancos] = useState<AvailableOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAllDDDs, setShowAllDDDs] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Carregar opções disponíveis - apenas uma vez
   useEffect(() => {
@@ -26,14 +28,15 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate }: StepProps
     const loadOptions = async () => {
       try {
         // Carregar em paralelo
-        const [convenioRes, dddRes, tagRes] = await Promise.all([
+        const [convenioRes, dddRes, tagRes, bancoRes] = await Promise.all([
           supabase
             .from('leads_database')
             .select('convenio')
             .eq('is_available', true)
             .not('convenio', 'is', null),
           supabase.rpc('get_available_ddds'),
-          supabase.rpc('get_available_tags')
+          supabase.rpc('get_available_tags'),
+          (supabase as any).rpc('get_available_bancos'),
         ]);
 
         if (!mounted) return;
