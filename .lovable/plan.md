@@ -1,188 +1,141 @@
 
 
-## Reconstrução completa do modal "Pedir Novos Leads"
+## Correções no Leads Premium — Governo BA, banco/parcelas, telefone e blacklist 30 dias
 
-Refazer o wizard do zero com layout fixo (header/indicador/conteúdo scrollável/footer fixo), 5 etapas, e fluxo dinâmico baseado no convênio escolhido.
+### Diagnóstico (com base no estado atual do banco e código)
 
-### 1. Estrutura de layout (corrige o bug crítico dos botões flutuantes)
+1. **Sistema entrega lead de outro produto ao pedir Governo:** o wizard envia `convenio_filter = 'GOVERNO BA'` corretamente, mas o usuário está selecionando "Servidor Público" sem perceber que `tipoLead='servidor'` no front mapeia para o convênio. Confirmado no banco: existem **184 084 leads INSS, 3 165 SIAPE e apenas 14 GOVERNO BA**. Como a etapa 2 do servidor ainda permite seguir mesmo sem UF e o `request_leads_with_credits` cai em fallback `convenio_filter=NULL`, ele entrega leads de qualquer convênio. Precisa **forçar `convenio='GOVERNO BA'`** quando `tipoLead='servidor'` e UF=BA.
 
-**`src/modules/leads-premium/components/RequestLeadsWizard/index.tsx`** — reescrito:
+2. **Banco/Consignatária não aparece para Governo:** todos os 14 leads de Governo importados têm `banco = NULL`. Olhando o parser `parseGovernoCSV` (linha 243): `const bancoI = idx('consignataria');`. O `idx` usa `headers.every(needle ⊂ h)` — funciona. Mas no **arquivo real** o cabeçalho vem com cedilha/acento corrompido (`ConsignatÃ¡ria`) e a função `normalizeHeader` precisa remover diacríticos antes do match. Provavelmente está removendo, mas a coluna **"Convênio"** extra na planilha quebrou a indexação porque `parseCSVLine` não lida com a última coluna acentuada. **Mais crítico:** o ADE veio para a coluna banco no preview (ex.: `BANCO - BRASIL [360]` está em `ade`, e `banco=NULL`). O mapeamento dos índices está deslocado.
 
-- Dialog desktop: `max-w-[520px]` + `h-[90vh]` + `p-0` (remover padding interno do DialogContent para controlar tudo via flex).
-- Mobile: `Sheet side="bottom"` com `h-[92vh] p-0`.
-- Container interno em **flex column** com 4 regiões fixas:
-  ```
-  <div className="flex flex-col h-full overflow-hidden">
-    <header className="flex-shrink-0 px-5 py-4 border-b">…título + X</header>
-    <div className="flex-shrink-0 px-5 py-3 border-b bg-muted/30">…step indicator</div>
-    <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">…conteúdo da etapa</div>
-    <footer className="flex-shrink-0 px-5 py-3 border-t bg-background flex gap-3">…Voltar / Próximo</footer>
-  </div>
-  ```
-- O conteúdo central usa `overflow-y-auto` nativo (sem `ScrollArea` Radix, que causa interferência com `min-h-0` em alguns layouts). Garante que **o footer nunca seja empurrado para fora**.
-- Botão **X** de fechar no canto superior direito do header (substitui o close padrão do Radix posicionado de forma confiável).
-- Indicador de etapas: 5 bolinhas conectadas. Em telas `< 480px` (`sm:hidden`), mostrar apenas as bolinhas + label da etapa atual abaixo. Acima disso, mostrar as labels.
+3. **Parcelas pagas / prazo original (Prestações):** confirmado pelo banco — `parcelas_pagas=15017` (lixo, deveria ser ~15) e `parcela=120` (deveria ser valor R$). O parser está pegando colunas erradas. A coluna **"Prestações"** não está sendo mapeada para `parcelas_em_aberto` (prazo original) e **"Pagas"** está pegando outra coluna numérica.
 
-### 2. Step 1 — Tipo de Convênio (substitui StepTipoLead)
+4. **Aviso "leads com telefone" para Governo:** hoje só dispara para INSS/SIAPE/CLT. O usuário pede que **também dispare para Governo**.
 
-**`StepTipoLead.tsx`** — atualizar:
+5. **Blacklist de 30 dias:** já existe a tabela `leads_blacklist` (criada em `20251229193056`) e `add_lead_to_blacklist`/`blacklist_lead_with_duration`. Mas:
+   - A função `request_leads_with_credits` **NÃO consulta `leads_blacklist`** — só checa `leads_distribution` (que tem expiração de **10 anos**, ou seja, eterna). Resultado: leads recusados por outro usuário podem ser entregues novamente; e o mesmo lead "trabalhado e devolvido" nunca volta para ninguém.
+   - Precisamos que `leads_distribution.expires_at` seja **30 dias** (não 10 anos) e que a função respeite ambas tabelas.
 
-- Título: "Qual convênio você quer trabalhar?" / Subtítulo: "Selecione o convênio principal dos leads".
-- Reduzir para **4 cards** (remover "FGTS" e "Todos"; renomear "Servidor" → "Servidor Público"):
-  - 💛 **INSS** — "Aposentados e pensionistas INSS"
-  - 🔵 **SIAPE** — "Servidores federais (folha federal)"
-  - 🏛️ **Servidor Público** — "Estadual e municipal — escolha o estado"
-  - 📋 **CLT / Privado** — "Trabalhadores com carteira assinada"
-- Atualizar `TIPOS_LEAD` em `types.ts` com esses 4 ids: `inss`, `siape`, `servidor`, `clt`.
-- Próximo desabilitado até `data.tipoLead` estar setado (já é o comportamento atual — manter `canProceed` para etapa 0).
+---
 
-### 3. Step 2 — Perfil dinâmico (refatorar StepPerfil)
+### Mudanças
 
-**`StepPerfil.tsx`** — reescrito do zero, render condicional por `data.tipoLead`:
+#### A. Correção do parser `parseGovernoCSV` em `src/components/ImportBase.tsx`
 
-#### Componentes auxiliares (extraídos para arquivos novos em `RequestLeadsWizard/fields/`):
-- `TagsField.tsx` — input de busca + dropdown de tags existentes + chips removíveis. Reusa o RPC `get_available_tags`.
-- `DDDField.tsx` — chips de DDDs em destaque (FEATURED_DDDS) + colapsável "Ver todos os DDDs (N)" com lista completa e contagens. Botão "Limpar seleção".
-- `EstadoField.tsx` — `<Select>` com nomes completos dos estados brasileiros (mapeamento UF→nome). Obrigatório para Servidor Público. Mostra erro "Selecione o estado para continuar" se vazio ao tentar avançar. Helper text: "A região é definida automaticamente pelo estado selecionado."
-- `ContractFiltersSection.tsx` — seção colapsável "Filtros de contrato" (expandida por padrão para Servidor Público) com:
-  - Banco / Consignatária (Select)
-  - Faixa de parcela (Slider duplo 0–5000) — display "R$ 0 — R$ 5.000"
-  - Margem disponível mínima (Input number)
-  - Parcelas pagas (mínimo) (Input number) — **novo campo** `parcelasPagasMin: number | null`
-  - Valor de parcela (Slider duplo 0–2000) — **alias do mesmo `parcelaMin/Max`** para evitar duplicação no schema (parcela == valor da parcela). Vou nomeá-lo "Valor de parcela" e remover o duplicado "Faixa de parcela" para não confundir — mantenho um único slider de parcela.
+Reescrever os índices das colunas baseando-se **exatamente** no cabeçalho fornecido pelo usuário:
 
-#### Fluxos por convênio:
+```
+CPF | Servidor | Matrícula | Tipo Serviço (Servidor) | Serviço (Servidor) |
+Margem Disponível (R$) | Margem Total (R$) | Consignatária | Situação | ADE |
+Serviço (Consignatária) | Prestações | Pagas | Valor | Deferimento |
+Quitação | Ultimo Desconto | Ultima Parcela | Convênio
+```
 
-| Convênio | Tags | DDD | Estado | Filtros contrato | Telefone alert |
-|---|---|---|---|---|---|
-| INSS | ✅ | ✅ | — | — | ✅ |
-| SIAPE | ✅ | ✅ | — | — | ✅ |
-| Servidor Público | — | — | ✅ obrigatório | ✅ expandido | — |
-| CLT / Privado | ✅ | ✅ | — | — | ✅ |
+Mapeamento corrigido:
+- `banco` ← coluna **Consignatária** (índice 7)
+- `prazo_original` (`parcelas_em_aberto`) ← **Prestações** (índice 11) — prazo total do contrato
+- `parcelas_pagas` ← **Pagas** (índice 12)
+- `parcela` ← **Valor** (índice 13)
+- `ade` ← **ADE** (índice 9) — não confundir com banco
+- Ignorar a coluna **Convênio** do CSV (já é "GOVERNO BA" pelo formato).
 
-#### Banner "Leads com telefone" (INSS/SIAPE/CLT)
+Substituir os `findIndex` heurísticos por uma função `findColumn(headers, candidates[])` que tenta múltiplas variações normalizadas. Adicionar sanitização extra para cabeçalhos com encoding quebrado (Latin-1 vs UTF-8). Logar no console o mapeamento detectado para debug.
 
-Implementação: ao clicar **Próximo** na etapa 2 e `data.tipoLead ∈ {inss, siape, clt}`:
-1. Disparar query: `supabase.rpc('count_leads_with_phone', { convenio_filter, ddd_filter, tag_filter })` — **nova RPC** que retorna `{ total: int, with_phone: int }` filtrando por `is_available=true` e `phone IS NOT NULL AND phone != ''`.
-2. Se `with_phone > 0`, mostrar banner inline azul-claro **dentro da etapa 2** com dois botões:
-   - **"Sim, com telefone"** → setar `data.requireTelefone = true`, avançar para Step 3.
-   - **"Não, incluir todos"** → setar `data.requireTelefone = false`, avançar.
-3. Se `with_phone === 0`, avançar direto.
+Renomear o display: "Prazo original do contrato" no preview e no resumo do wizard, em vez de "Parcelas em aberto".
 
-Estado local da etapa: `phoneCheckResult: { with_phone, total } | null` + `isCheckingPhone: boolean`.
+#### B. Reimportar dados do Governo BA já existentes (corrigir os 14 leads)
 
-### 4. Step 3 — Quantidade
+Como apenas 14 registros estão com dados errados, criar uma migration que **DELETE FROM leads_database WHERE convenio='GOVERNO BA' AND banco IS NULL** para limpar os registros corrompidos. Usuário reimporta o CSV depois do parser corrigido.
 
-Sem alterações estruturais. Manter `StepQuantidade.tsx` atual.
+#### C. Forçar convênio quando tipoLead = 'servidor' (Governo)
 
-### 5. Step 4 — Resumo (reescrever StepResumo)
-
-Lista limpa agrupada por seção, mostrando apenas o que faz sentido pelo convênio escolhido:
-- **Convênio**: nome
-- **Estado** (se servidor): nome completo
-- **DDDs**: lista ou "Todos"
-- **Tags**: lista ou "Nenhuma"
-- **Filtros de contrato** (se servidor): banco, faixa de parcela, margem mín, parcelas pagas mín — listar apenas os preenchidos. Se nenhum, mostrar "Padrão".
-- **Leads com telefone**: "Sim" / "Não" / "Não aplicável" (servidor)
-- **Quantidade** + **Créditos restantes** (mantém o card existente)
-
-Cada linha com botão de ✏️ que volta à etapa correspondente.
-
-### 6. Step 5 — Confirmar
-
-Manter `StepConfirmacao.tsx` atual (preview de leads + aviso de prazo 48h). Atualizar a chamada `preview_available_leads` para passar `require_telefone` quando aplicável (se a RPC suportar; caso contrário, tratar no frontend filtrando o resultado).
-
-### 7. Mudanças em `types.ts`
-
+Em `src/modules/leads-premium/components/RequestLeadsWizard/index.tsx` (handler `handleConfirm`) ou no hook `requestLeads`, garantir o mapeamento explícito:
 ```ts
-export interface LeadRequestData {
-  tipoLead: 'inss' | 'siape' | 'servidor' | 'clt' | null;
-  // perfil
-  uf: string | null;          // obrigatório para servidor
-  ddds: string[];
-  tags: string[];
-  requireTelefone: boolean | null;  // null = não perguntado, true/false = resposta
-  // contrato (servidor)
-  banco: string | null;
-  parcelaMin: number | null;
-  parcelaMax: number | null;
-  margemMin: number | null;
-  parcelasPagasMin: number | null;  // NOVO
-  // quantidade
-  quantidade: number;
-  prioridade: 'recentes' | 'antigos' | 'aleatorio';
-  // descontinuados (mantidos no tipo só para compat com hook):
-  convenio: string | null;  // será derivado de tipoLead na hora de chamar a RPC
-}
-
-export const TIPOS_LEAD = [
-  { id: 'inss',     label: 'INSS',             description: 'Aposentados e pensionistas INSS', icon: '💛' },
-  { id: 'siape',    label: 'SIAPE',            description: 'Servidores federais (folha federal)', icon: '🔵' },
-  { id: 'servidor', label: 'Servidor Público', description: 'Estadual e municipal — escolha o estado', icon: '🏛️' },
-  { id: 'clt',      label: 'CLT / Privado',    description: 'Trabalhadores com carteira assinada', icon: '📋' },
-];
-
-export const UF_NOMES: Record<string,string> = { BA:'Bahia', SP:'São Paulo', /* … */ };
+const convenioFilter =
+  data.tipoLead === 'inss'    ? 'INSS' :
+  data.tipoLead === 'siape'   ? 'SIAPE' :
+  data.tipoLead === 'servidor'? 'GOVERNO BA' :   // hoje só BA disponível
+  data.tipoLead === 'clt'     ? 'CLT' :
+  null;
 ```
+Hoje o wizard envia `data.convenio` que pode estar nulo, caindo no fallback que entrega qualquer convênio.
 
-### 8. Backend — nova RPC `count_leads_with_phone`
+#### D. Aviso "leads com telefone" também para Governo
 
-Migration adiciona:
+Em `StepPerfil.tsx`, ampliar a condição que dispara `count_leads_with_phone` para incluir `'servidor'`. Em `count_leads_with_phone` (RPC já existe) o `convenio_filter` será `'GOVERNO BA'`. O banner `PhoneAlertBanner` aparece igual: **"Encontramos X leads do convênio GOVERNO BA com telefone. Deseja priorizar?"**
+
+#### E. Blacklist de 30 dias respeitada na entrega de leads
+
+**Migration SQL:**
+
+1. Alterar default de `leads_distribution.expires_at` para **`now() + interval '30 days'`** (em vez de 10 anos).
+2. **Backfill** dos registros existentes com `expires_at > now() + interval '60 days'` para `now() + interval '30 days'` — opcional, marcar como "expira em 30 dias a partir de agora" para limpar a base.
+3. Recriar `request_leads_with_credits` adicionando dois filtros adicionais no SELECT:
+   ```sql
+   -- excluir leads na blacklist ativa (qualquer usuário, qualquer motivo)
+   AND NOT EXISTS (
+     SELECT 1 FROM public.leads_blacklist lb
+     WHERE lb.cpf = ld.cpf
+       AND lb.expires_at > now()
+   )
+   -- excluir leads em distribuição ativa (qualquer usuário)
+   AND NOT EXISTS (
+     SELECT 1 FROM public.leads_distribution dist
+     WHERE dist.lead_id = ld.id
+       AND dist.expires_at > now()
+   )
+   ```
+   Trocar a inserção em `leads_distribution` para usar `now() + interval '30 days'` no `expires_at`.
+
+4. Ao adicionar lead na blacklist (já existe `add_lead_to_blacklist`), garantir `duration_days=30` por padrão e usar nas transições para `recusou_oferta`, `sem_interesse`, `sem_possibilidade`, `nao_e_cliente`, `sem_retorno`, `nao_e_whatsapp`. Atualizar `useLeadsPremium.ts` linha 197-200 para incluir todos esses status com 30 dias de blacklist (preserva 60 dias só para `sem_interesse` se preferir, mas o usuário pediu **30 dias uniformes**).
+
+#### F. Mensagem clara ao usuário quando não há leads
+
+Se o `request_leads_with_credits` retornar 0, mostrar toast: **"Não há leads do convênio {Governo BA / INSS / SIAPE} disponíveis com os filtros atuais. Os leads podem estar em blacklist temporária ou já distribuídos."**
+
+---
+
+### Arquivos editados
+
+- `src/components/ImportBase.tsx` — parser `parseGovernoCSV` corrigido, mapeamento por nome de coluna fixo, label "Prazo original"
+- `src/modules/leads-premium/components/RequestLeadsWizard/index.tsx` — força `convenioFilter` baseado em `tipoLead`
+- `src/modules/leads-premium/components/RequestLeadsWizard/StepPerfil.tsx` — banner de telefone também para `servidor`
+- `src/modules/leads-premium/components/RequestLeadsWizard/StepResumo.tsx` — mostrar "Prazo original" quando aplicável
+- `src/modules/leads-premium/hooks/useLeadsPremium.ts` — blacklist 30 dias para todos os status de descarte; passar `convenioFilter` correto
+- `src/modules/leads-premium/components/RequestLeadsWizard/fields/ContractFiltersSection.tsx` — adicionar input "Prazo original mínimo" (opcional, espelha `parcelas_em_aberto`)
+
+### Migration Supabase
+
 ```sql
-create or replace function public.count_leads_with_phone(
-  convenio_filter text default null,
-  ddd_filter text[] default null,
-  tag_filter text[] default null
-) returns table(total bigint, with_phone bigint)
-language sql stable security definer set search_path=public as $$
-  select 
-    count(*) as total,
-    count(*) filter (where phone is not null and length(trim(phone)) >= 8) as with_phone
-  from public.leads_database
-  where is_available = true
-    and (convenio_filter is null or upper(convenio) = upper(convenio_filter))
-    and (ddd_filter is null or substring(regexp_replace(phone,'\D','','g') from 3 for 2) = any(ddd_filter))
-    and (tag_filter is null or tag = any(tag_filter));
-$$;
-grant execute on function public.count_leads_with_phone(text,text[],text[]) to authenticated;
+-- 1. Limpar registros Governo BA corrompidos (banco NULL, parcelas inválidas)
+DELETE FROM public.leads_database
+WHERE convenio = 'GOVERNO BA' AND (banco IS NULL OR parcelas_pagas > 600);
+
+-- 2. Alterar default de expires_at para 30 dias
+ALTER TABLE public.leads_distribution
+  ALTER COLUMN expires_at SET DEFAULT (now() + interval '30 days');
+
+-- 3. Recriar request_leads_with_credits respeitando blacklist + distribution 30d
+CREATE OR REPLACE FUNCTION public.request_leads_with_credits(
+  convenio_filter text DEFAULT NULL,
+  banco_filter text DEFAULT NULL,
+  produto_filter text DEFAULT NULL,
+  leads_requested integer DEFAULT 10,
+  ddd_filter text[] DEFAULT NULL,
+  tag_filter text[] DEFAULT NULL,
+  parcela_min numeric DEFAULT NULL,
+  parcela_max numeric DEFAULT NULL,
+  margem_min numeric DEFAULT NULL
+) RETURNS TABLE(...) ...
+-- adiciona filtro NOT EXISTS leads_blacklist (expires_at > now())
+-- altera leads_distribution.expires_at insert para now() + interval '30 days'
 ```
-
-Atualizar `request_leads_with_credits` para aceitar dois novos parâmetros opcionais `require_phone boolean` e `parcelas_pagas_min int`, filtrando no SELECT interno. (Migration adicional usando `CREATE OR REPLACE` mantendo overload de 6 parâmetros já documentado em `mem://constraints/autolead-rpc-overloads` — vou adicionar uma **nova versão com 11 parâmetros nominais** sem quebrar a antiga.)
-
-### 9. Hook `useLeadsPremium.ts`
-
-Atualizar `handleRequestLeads` para repassar `require_phone` e `parcelas_pagas_min` ao RPC novo. Mapear `tipoLead` para `convenio_filter`:
-- `inss` → `'INSS'`
-- `siape` → `'SIAPE'`
-- `servidor` → `'GOVERNO BA'` (e demais — manter `convenio_filter` por nome de UF? Por enquanto deixar `'GOVERNO ' + uf` ou apenas filtrar via DDDs do estado).
-- `clt` → `'CLT'`
-
-### 10. Arquivos editados / criados
-
-**Editados:**
-- `src/modules/leads-premium/components/RequestLeadsWizard/index.tsx` — layout fixo
-- `src/modules/leads-premium/components/RequestLeadsWizard/StepTipoLead.tsx` — 4 cards
-- `src/modules/leads-premium/components/RequestLeadsWizard/StepPerfil.tsx` — render dinâmico
-- `src/modules/leads-premium/components/RequestLeadsWizard/StepResumo.tsx` — agrupado por seção
-- `src/modules/leads-premium/components/RequestLeadsWizard/StepConfirmacao.tsx` — passar require_phone
-- `src/modules/leads-premium/components/RequestLeadsWizard/types.ts` — novos campos, UF_NOMES
-- `src/modules/leads-premium/hooks/useLeadsPremium.ts` — passar novos params à RPC
-
-**Criados:**
-- `src/modules/leads-premium/components/RequestLeadsWizard/fields/TagsField.tsx`
-- `src/modules/leads-premium/components/RequestLeadsWizard/fields/DDDField.tsx`
-- `src/modules/leads-premium/components/RequestLeadsWizard/fields/EstadoField.tsx`
-- `src/modules/leads-premium/components/RequestLeadsWizard/fields/ContractFiltersSection.tsx`
-- `src/modules/leads-premium/components/RequestLeadsWizard/fields/PhoneAlertBanner.tsx`
-
-**Migration SQL (Supabase):**
-- Função `count_leads_with_phone(text, text[], text[])`
-- Sobrecarga estendida de `request_leads_with_credits` com `require_phone boolean` e `parcelas_pagas_min int`
 
 ### Resultado esperado
 
-- Modal compacto 520×90vh com botões **Voltar/Próximo sempre visíveis** no rodapé fixo.
-- Etapa 1 com 4 opções de convênio (INSS, SIAPE, Servidor Público, CLT/Privado).
-- Etapa 2 muda completamente baseada no convênio: Servidor Público mostra Estado obrigatório + filtros de contrato expandidos; INSS/SIAPE/CLT mostram Tags + DDDs + alerta de telefone ao avançar.
-- Estado preserva entre Voltar/Próximo. Validação inline para campos obrigatórios. Tudo em português.
+- Importar a planilha de Governo BA novamente: bancos (Consignatária), parcelas pagas, prazo original (Prestações) e valor de parcela aparecem corretamente.
+- Pedir leads de "Servidor Público" entrega **somente** GOVERNO BA, nunca INSS/SIAPE.
+- Banner "leads com telefone" também aparece para Governo.
+- Filtro de Banco no wizard mostra os bancos reais dos leads de Governo (BRADESCO, BMG, etc.).
+- Blacklist de 30 dias: leads recusados por qualquer usuário ficam ocultos por 30 dias para todos. Após 30 dias, voltam ao pool. Leads em distribuição ativa (não trabalhados ainda) ficam ocultos por 30 dias após a entrega — depois retornam ao pool se não foram trabalhados.
 
