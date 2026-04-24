@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { motion } from "framer-motion";
-import { Check, MapPin, Building2, Tag, Users, Clock, Sparkles, Edit2, Phone, FileText } from "lucide-react";
+import { Check, MapPin, Tag, Users, Clock, Sparkles, Edit2, Phone, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -190,5 +190,3 @@ export const StepResumo = memo(function StepResumo({
   );
 });
 
-// Backwards-compat building blocks (Building2 import retained even if unused above)
-void Building2;
