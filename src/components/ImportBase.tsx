@@ -949,7 +949,7 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                 </p>
               </div>
               <div className="flex flex-col items-center gap-2">
-                <Label htmlFor="file-upload" className="cursor-pointer">
+                <Label htmlFor="file-upload" className={effectiveConvenio ? "cursor-pointer" : "cursor-not-allowed"}>
                   <Input
                     id="file-upload"
                     ref={fileInputRef}
@@ -957,9 +957,9 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                     accept=".csv,.xlsx,.xls"
                     className="hidden"
                     onChange={handleFileChange}
-                    disabled={isParsing}
+                    disabled={isParsing || !effectiveConvenio}
                   />
-                  <Button asChild disabled={isParsing}>
+                  <Button asChild disabled={isParsing || !effectiveConvenio}>
                     <span>
                       {isParsing ? (
                         <>
@@ -975,6 +975,9 @@ export function ImportBase({ onBack }: ImportBaseProps) {
                     </span>
                   </Button>
                 </Label>
+                {!effectiveConvenio && (
+                  <p className="text-xs text-destructive">Selecione o convênio acima primeiro.</p>
+                )}
               </div>
             </div>
           </CardContent>
