@@ -5623,6 +5623,79 @@ export type Database = {
           },
         ]
       }
+      novavida_credentials: {
+        Row: {
+          active: boolean
+          cliente: string
+          company_id: string
+          created_at: string
+          id: string
+          senha: string
+          updated_at: string
+          usuario: string
+        }
+        Insert: {
+          active?: boolean
+          cliente: string
+          company_id: string
+          created_at?: string
+          id?: string
+          senha: string
+          updated_at?: string
+          usuario: string
+        }
+        Update: {
+          active?: boolean
+          cliente?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          senha?: string
+          updated_at?: string
+          usuario?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "novavida_credentials_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      novavida_token_cache: {
+        Row: {
+          company_id: string
+          expires_at: string
+          generated_at: string
+          id: string
+          token: string
+        }
+        Insert: {
+          company_id: string
+          expires_at?: string
+          generated_at?: string
+          id?: string
+          token: string
+        }
+        Update: {
+          company_id?: string
+          expires_at?: string
+          generated_at?: string
+          id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "novavida_token_cache_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_receipts: {
         Row: {
           company_id: string
@@ -7328,6 +7401,142 @@ export type Database = {
             columns: ["reply_to_id"]
             isOneToOne: false
             referencedRelation: "team_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telefonia_consultas: {
+        Row: {
+          company_id: string
+          cpf: string
+          credits_used: number
+          error_message: string | null
+          id: string
+          lead_id: string | null
+          metodo: string
+          queried_at: string
+          queried_by: string | null
+          resultado: Json | null
+          status: string
+        }
+        Insert: {
+          company_id: string
+          cpf: string
+          credits_used?: number
+          error_message?: string | null
+          id?: string
+          lead_id?: string | null
+          metodo: string
+          queried_at?: string
+          queried_by?: string | null
+          resultado?: Json | null
+          status?: string
+        }
+        Update: {
+          company_id?: string
+          cpf?: string
+          credits_used?: number
+          error_message?: string | null
+          id?: string
+          lead_id?: string | null
+          metodo?: string
+          queried_at?: string
+          queried_by?: string | null
+          resultado?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telefonia_consultas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telefonia_consultas_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telefonia_numeros: {
+        Row: {
+          assinante: boolean | null
+          company_id: string
+          consulta_id: string
+          cpf: string
+          created_at: string
+          ddd: string | null
+          flhot: boolean | null
+          id: string
+          lead_id: string | null
+          numero: string | null
+          numero_completo: string | null
+          operadora: string | null
+          posicao: number | null
+          procon: boolean | null
+          tem_whatsapp: boolean | null
+          tipo: string | null
+        }
+        Insert: {
+          assinante?: boolean | null
+          company_id: string
+          consulta_id: string
+          cpf: string
+          created_at?: string
+          ddd?: string | null
+          flhot?: boolean | null
+          id?: string
+          lead_id?: string | null
+          numero?: string | null
+          numero_completo?: string | null
+          operadora?: string | null
+          posicao?: number | null
+          procon?: boolean | null
+          tem_whatsapp?: boolean | null
+          tipo?: string | null
+        }
+        Update: {
+          assinante?: boolean | null
+          company_id?: string
+          consulta_id?: string
+          cpf?: string
+          created_at?: string
+          ddd?: string | null
+          flhot?: boolean | null
+          id?: string
+          lead_id?: string | null
+          numero?: string | null
+          numero_completo?: string | null
+          operadora?: string | null
+          posicao?: number | null
+          procon?: boolean | null
+          tem_whatsapp?: boolean | null
+          tipo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telefonia_numeros_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telefonia_numeros_consulta_id_fkey"
+            columns: ["consulta_id"]
+            isOneToOne: false
+            referencedRelation: "telefonia_consultas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telefonia_numeros_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
         ]
