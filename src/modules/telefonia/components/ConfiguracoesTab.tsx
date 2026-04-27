@@ -3,14 +3,33 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Eye, EyeOff, KeyRound, Loader2, CheckCircle2, XCircle, BarChart3 } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  KeyRound,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  BarChart3,
+} from "lucide-react";
 import { useNovaVidaCredentials } from "../hooks/useNovaVidaCredentials";
 import { useTelefoniaUsage } from "../hooks/useTelefoniaUsage";
+import { TokenManagementCard } from "./TokenManagementCard";
+import { IntegrationHealthCard } from "./IntegrationHealthCard";
 import { toast } from "sonner";
 
 export function ConfiguracoesTab() {
-  const { creds, tokenExpiresAt, loading, saving, save, testConnection, companyId } =
-    useNovaVidaCredentials();
+  const {
+    creds,
+    tokenExpiresAt,
+    loading,
+    saving,
+    save,
+    testConnection,
+    refreshTokenNow,
+    setManualToken,
+    companyId,
+  } = useNovaVidaCredentials();
   const { stats } = useTelefoniaUsage();
   const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
@@ -47,8 +66,6 @@ export function ConfiguracoesTab() {
     }
   };
 
-  const tokenValid = tokenExpiresAt && new Date(tokenExpiresAt) > new Date();
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12 text-muted-foreground">
@@ -66,7 +83,7 @@ export function ConfiguracoesTab() {
   }
 
   return (
-    <div className="max-w-xl mx-auto space-y-4">
+    <div className="max-w-2xl mx-auto space-y-4">
       <Card className="p-4 sm:p-6 space-y-4">
         <div className="flex items-center gap-2">
           <KeyRound className="h-5 w-5 text-primary" />
@@ -129,16 +146,19 @@ export function ConfiguracoesTab() {
             </span>
           </div>
         )}
-        <div className="pt-2 border-t text-sm">
-          {tokenValid ? (
-            <span className="text-green-600">
-              Token atual válido até: {new Date(tokenExpiresAt!).toLocaleString("pt-BR")}
-            </span>
-          ) : (
-            <span className="text-muted-foreground">Nenhum token em cache</span>
-          )}
-        </div>
       </Card>
+
+      <TokenManagementCard
+        tokenExpiresAt={tokenExpiresAt}
+        refreshTokenNow={refreshTokenNow}
+        setManualToken={setManualToken}
+      />
+
+      <IntegrationHealthCard
+        companyId={companyId}
+        hasCredentials={!!creds}
+        tokenExpiresAt={tokenExpiresAt}
+      />
 
       <Card className="p-4 sm:p-6 space-y-3">
         <div className="flex items-center gap-2">
