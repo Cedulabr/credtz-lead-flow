@@ -287,6 +287,7 @@ serve(async (req) => {
     const cpfRaw = body.cpf as string | undefined;
     const metodo = body.metodo as Metodo | undefined;
     const leadId = (body.lead_id as string) || null;
+    const forceRefresh = body.force_refresh === true;
     let companyId = body.company_id as string | undefined;
 
     if (!cpfRaw) return json({ error: "cpf_required" }, 400);
@@ -310,31 +311,35 @@ serve(async (req) => {
     if (!companyId) return json({ error: "no_company" }, 400);
 
     // 7-day cache
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: cached } = await admin
-      .from("telefonia_consultas")
-      .select("id, resultado, status")
-      .eq("company_id", companyId)
-      .eq("cpf", cpf)
-      .eq("metodo", metodo)
-      .eq("status", "success")
-      .gte("queried_at", sevenDaysAgo)
-      .order("queried_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    if (!forceRefresh) {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: cached } = await admin
+        .from("telefonia_consultas")
+        .select("id, resultado, status, queried_at, nome_retornado, total_telefones")
+        .eq("company_id", companyId)
+        .eq("cpf", cpf)
+        .eq("metodo", metodo)
+        .eq("status", "success")
+        .gte("queried_at", sevenDaysAgo)
+        .order("queried_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (cached) {
-      const { data: phones } = await admin
-        .from("telefonia_numeros")
-        .select("*")
-        .eq("consulta_id", cached.id);
-      return json({
-        status: "success",
-        cached: true,
-        consulta_id: cached.id,
-        resultado: cached.resultado,
-        telefones: phones ?? [],
-      });
+      if (cached) {
+        const { data: phones } = await admin
+          .from("telefonia_numeros")
+          .select("*")
+          .eq("consulta_id", cached.id);
+        return json({
+          status: "success",
+          cached: true,
+          from_cache: true,
+          consulta_id: cached.id,
+          resultado: cached.resultado,
+          telefones: phones ?? [],
+          cached_at: cached.queried_at,
+        });
+      }
     }
 
     // Get token
