@@ -300,8 +300,19 @@ export function ImportWizard({ open, onOpenChange, onCompleted }: ImportWizardPr
             </div>
           ) : currentStep === 'mapping' ? (
             <div className="space-y-3">
-              <h3 className="font-semibold text-lg">Mapeie as colunas do seu arquivo</h3>
-              <p className="text-sm text-muted-foreground">Campos obrigatórios não mapeados aparecem em vermelho.</p>
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <h3 className="font-semibold text-lg">Mapeie as colunas do seu arquivo</h3>
+                  <p className="text-sm text-muted-foreground">Campos obrigatórios não mapeados aparecem em vermelho.</p>
+                </div>
+                {convenio && (
+                  <FieldRequirementsEditor
+                    convenio={convenio}
+                    fields={fields}
+                    onSaved={reloadFieldConfig}
+                  />
+                )}
+              </div>
               <div className="grid grid-cols-1 gap-2">
                 {fields.map(f => {
                   const missing = f.required && !mapping[f.key];
