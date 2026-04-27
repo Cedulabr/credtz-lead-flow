@@ -197,6 +197,7 @@ export function autoMapHeaders(systemFields: FieldDef[], fileHeaders: string[]):
     convenio: ['convenio'],
     data_nascimento: ['datanascimento', 'nascimento', 'dtnascimento'],
     tipo_beneficio: ['beneficio', 'tipobeneficio', 'orgao', 'organ'],
+    tag: ['tag', 'tags', 'etiqueta', 'categoria', 'campanha'],
   };
   const result: Record<string, string> = {};
   for (const f of systemFields) {
