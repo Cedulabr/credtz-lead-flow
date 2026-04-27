@@ -111,6 +111,7 @@ export function ImportWizard({ open, onOpenChange, onCompleted }: ImportWizardPr
             file_size_bytes: file?.size,
             chunk_index: Math.floor(i / CHUNK),
             chunk_total: Math.ceil(total / CHUNK),
+            required_fields: fields.filter(f => f.required).map(f => f.key),
           },
         });
         if (error) throw error;
