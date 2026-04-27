@@ -16,16 +16,19 @@ function b64(s: string) {
 async function getValidToken(
   admin: ReturnType<typeof createClient>,
   companyId: string,
+  opts: { forceRefresh?: boolean } = {},
 ): Promise<{ token?: string; error?: string }> {
-  // 1. cache lookup
-  const { data: cached } = await admin
-    .from("novavida_token_cache")
-    .select("token, expires_at")
-    .eq("company_id", companyId)
-    .maybeSingle();
+  // 1. cache lookup (skipped when forceRefresh)
+  if (!opts.forceRefresh) {
+    const { data: cached } = await admin
+      .from("novavida_token_cache")
+      .select("token, expires_at")
+      .eq("company_id", companyId)
+      .maybeSingle();
 
-  if (cached && new Date(cached.expires_at as string) > new Date()) {
-    return { token: cached.token as string };
+    if (cached && new Date(cached.expires_at as string) > new Date()) {
+      return { token: cached.token as string };
+    }
   }
 
   // 2. credentials
@@ -114,7 +117,11 @@ serve(async (req) => {
     if (claimsErr || !claimsData?.claims) return json({ error: "unauthorized" }, 401);
     const userId = claimsData.claims.sub as string;
 
-    let body: { company_id?: string } = {};
+    let body: {
+      company_id?: string;
+      force_refresh?: boolean;
+      manual_token?: string;
+    } = {};
     try {
       body = await req.json();
     } catch {
@@ -134,7 +141,29 @@ serve(async (req) => {
     }
     if (!companyId) return json({ error: "no_company" }, 400);
 
-    const result = await getValidToken(admin, companyId);
+    // Manual token override: persist the user-supplied token for 24h
+    if (body.manual_token && typeof body.manual_token === "string") {
+      const token = body.manual_token.trim();
+      if (token.length < 20) return json({ error: "invalid_manual_token" }, 400);
+      const expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const { error: upErr } = await admin
+        .from("novavida_token_cache")
+        .upsert(
+          {
+            company_id: companyId,
+            token,
+            generated_at: new Date().toISOString(),
+            expires_at,
+          },
+          { onConflict: "company_id" },
+        );
+      if (upErr) return json({ error: upErr.message }, 500);
+      return json({ token, manual: true, expires_at });
+    }
+
+    const result = await getValidToken(admin, companyId, {
+      forceRefresh: body.force_refresh === true,
+    });
     if (result.error) return json({ error: result.error }, 400);
     return json({ token: result.token });
   } catch (e) {
