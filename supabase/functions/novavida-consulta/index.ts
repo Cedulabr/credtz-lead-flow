@@ -442,6 +442,30 @@ serve(async (req) => {
       }
     }
 
+    // Try to extract returned name early so we can store it
+    let nomeRetornado: string | null = null;
+    if (status === "success") {
+      if (metodo === "NVCHECK_JSON") {
+        const cad = parsed?.d?.CONSULTA?.CADASTRAIS ?? parsed?.CONSULTA?.CADASTRAIS;
+        nomeRetornado = asString(cad?.NOME) || null;
+      } else {
+        const cad = parsed?.CONSULTA?.CADASTRO;
+        nomeRetornado = asString(cad?.NOME) || null;
+      }
+    }
+
+    // Extract phones on success first to know total
+    let telefones: NormPhone[] = [];
+    if (status === "success") {
+      if (metodo === "NVCHECK_JSON") {
+        const consulta = parsed?.d?.CONSULTA ?? parsed?.CONSULTA ?? {};
+        telefones = extractPhonesNvcheck(consulta);
+      } else {
+        const consulta = parsed?.CONSULTA ?? {};
+        telefones = extractPhonesNvbook(consulta);
+      }
+    }
+
     // Insert consulta
     const { data: insConsulta, error: insErr } = await admin
       .from("telefonia_consultas")
@@ -455,6 +479,9 @@ serve(async (req) => {
         error_message: errorMessage,
         credits_used: credits,
         queried_by: userId,
+        nome_retornado: nomeRetornado,
+        total_telefones: telefones.length,
+        from_cache: false,
       })
       .select("id")
       .single();
@@ -464,35 +491,25 @@ serve(async (req) => {
     }
     const consultaId = insConsulta.id as string;
 
-    // Extract phones on success
-    let telefones: NormPhone[] = [];
-    if (status === "success") {
-      if (metodo === "NVCHECK_JSON") {
-        const consulta = parsed?.d?.CONSULTA ?? parsed?.CONSULTA ?? {};
-        telefones = extractPhonesNvcheck(consulta);
-      } else {
-        const consulta = parsed?.CONSULTA ?? {};
-        telefones = extractPhonesNvbook(consulta);
-      }
-
-      if (telefones.length > 0) {
-        const rows = telefones.map((p) => ({
-          consulta_id: consultaId,
-          company_id: companyId,
-          lead_id: leadId,
-          cpf,
-          ...p,
-        }));
-        await admin.from("telefonia_numeros").insert(rows);
-      }
+    if (telefones.length > 0) {
+      const rows = telefones.map((p) => ({
+        consulta_id: consultaId,
+        company_id: companyId,
+        lead_id: leadId,
+        cpf,
+        ...p,
+      }));
+      await admin.from("telefonia_numeros").insert(rows);
     }
 
     return json({
       status,
       cached: false,
+      from_cache: false,
       consulta_id: consultaId,
       resultado: parsed,
       telefones,
+      nome_retornado: nomeRetornado,
       error: errorMessage,
     });
   } catch (e) {
