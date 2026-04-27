@@ -13,9 +13,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { OptionCard } from "./wizard/OptionCard";
 import {
-  Convenio, Subtipo, FIELDS_BY_CONVENIO, ESTADOS_BR, CONVENIO_LABELS, SUBTIPO_LABELS,
+  Convenio, Subtipo, ESTADOS_BR, CONVENIO_LABELS, SUBTIPO_LABELS,
   autoMapHeaders,
 } from "./wizard/columnsConfig";
+import { useImportFieldConfig } from "./wizard/useImportFieldConfig";
 import { downloadTemplate, downloadSkippedReport, parseFile } from "./wizard/xlsxTemplate";
 import { cn } from "@/lib/utils";
 
@@ -44,7 +45,8 @@ export function ImportWizard({ open, onOpenChange, onCompleted }: ImportWizardPr
   const [result, setResult] = useState<any>(null);
   const [showColumns, setShowColumns] = useState(false);
 
-  const fields = convenio ? FIELDS_BY_CONVENIO[convenio] : [];
+  const { getFields } = useImportFieldConfig();
+  const fields = convenio ? getFields(convenio) : [];
 
   // Calcula passos dinâmicos
   const steps: StepId[] = (() => {
@@ -109,6 +111,7 @@ export function ImportWizard({ open, onOpenChange, onCompleted }: ImportWizardPr
             file_size_bytes: file?.size,
             chunk_index: Math.floor(i / CHUNK),
             chunk_total: Math.ceil(total / CHUNK),
+            required_fields: fields.filter(f => f.required).map(f => f.key),
           },
         });
         if (error) throw error;

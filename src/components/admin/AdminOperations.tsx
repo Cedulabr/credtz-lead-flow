@@ -12,7 +12,8 @@ import {
   ChevronRight,
   ArrowLeft,
   Copy,
-  MessageSquare
+  MessageSquare,
+  FileSpreadsheet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -26,6 +27,7 @@ import { AdminDuplicatesManager } from '@/components/AdminDuplicatesManager';
 import { AdminInactivitySettings } from '@/components/AdminInactivitySettings';
 import { AdminSmsCreditsManagement } from '@/components/AdminSmsCreditsManagement';
 import { AdminBankingAPI } from '@/components/admin/AdminBankingAPI';
+import { LeadsImportFieldsConfig } from '@/components/admin/LeadsImportFieldsConfig';
 
 type OperationSection = 
   | 'menu' 
@@ -36,7 +38,8 @@ type OperationSection =
   | 'bank-reuse' 
   | 'duplicates'
   | 'inactivity'
-  | 'banking-api';
+  | 'banking-api'
+  | 'leads-import-fields';
 
 interface SectionItem {
   id: OperationSection;
@@ -122,6 +125,16 @@ export function AdminOperations() {
       badge: 'Novo',
       badgeVariant: 'default' as const,
     },
+    {
+      id: 'leads-import-fields' as OperationSection,
+      label: 'Campos de Importação',
+      description: 'Definir campos obrigatórios na importação de leads por convênio',
+      icon: FileSpreadsheet,
+      color: 'text-cyan-600',
+      bgColor: 'bg-cyan-100 dark:bg-cyan-900/30',
+      badge: 'Novo',
+      badgeVariant: 'default' as const,
+    },
   ];
 
   const renderContent = () => {
@@ -142,6 +155,8 @@ export function AdminOperations() {
         return <AdminInactivitySettings />;
       case 'banking-api':
         return <AdminBankingAPI />;
+      case 'leads-import-fields':
+        return <LeadsImportFieldsConfig />;
       default:
         return null;
     }
