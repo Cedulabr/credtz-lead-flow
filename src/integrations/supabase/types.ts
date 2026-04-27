@@ -5366,6 +5366,39 @@ export type Database = {
           },
         ]
       }
+      leads_import_field_config: {
+        Row: {
+          company_id: string
+          convenio: string
+          created_at: string
+          field_key: string
+          id: string
+          is_required: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          company_id: string
+          convenio: string
+          created_at?: string
+          field_key: string
+          id?: string
+          is_required?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          convenio?: string
+          created_at?: string
+          field_key?: string
+          id?: string
+          is_required?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       leads_indicados: {
         Row: {
           company_id: string | null

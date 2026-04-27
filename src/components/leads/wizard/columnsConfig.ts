@@ -19,13 +19,15 @@ export const ESTADOS_BR = [
   'Santa Catarina', 'São Paulo', 'Sergipe', 'Tocantins',
 ];
 
-// Campos exigidos por convênio para IMPORTAÇÃO completa
-export const FIELDS_BY_CONVENIO: Record<Convenio, FieldDef[]> = {
+// Campos exigidos por convênio para IMPORTAÇÃO completa (PADRÃO).
+// Pode ser sobrescrito por configuração da empresa em `leads_import_field_config`.
+export const DEFAULT_FIELDS_BY_CONVENIO: Record<Convenio, FieldDef[]> = {
   INSS: [
     { key: 'cpf', label: 'CPF', required: true, group: 'cadastro' },
     { key: 'name', label: 'Nome', required: true, group: 'cadastro' },
     { key: 'data_nascimento', label: 'Data de Nascimento', required: false, group: 'cadastro' },
     { key: 'tipo_beneficio', label: 'Benefício', required: false, group: 'cadastro' },
+    { key: 'tag', label: 'Tag', required: false, group: 'cadastro' },
     { key: 'ddd', label: 'DDD', required: false, group: 'contato' },
     { key: 'phone', label: 'Telefone', required: false, group: 'contato' },
     { key: 'margem_disponivel', label: 'Margem Livre', required: true, group: 'margem' },
@@ -39,6 +41,7 @@ export const FIELDS_BY_CONVENIO: Record<Convenio, FieldDef[]> = {
     { key: 'name', label: 'Nome', required: true, group: 'cadastro' },
     { key: 'matricula', label: 'Matrícula', required: true, group: 'cadastro' },
     { key: 'tipo_beneficio', label: 'Órgão', required: false, group: 'cadastro' },
+    { key: 'tag', label: 'Tag', required: false, group: 'cadastro' },
     { key: 'ddd', label: 'DDD', required: false, group: 'contato' },
     { key: 'phone', label: 'Telefone', required: false, group: 'contato' },
     { key: 'margem_disponivel', label: 'Margem Livre', required: true, group: 'margem' },
@@ -52,6 +55,7 @@ export const FIELDS_BY_CONVENIO: Record<Convenio, FieldDef[]> = {
     { key: 'name', label: 'Nome (Servidor)', required: true, group: 'cadastro' },
     { key: 'matricula', label: 'Matrícula', required: true, group: 'cadastro' },
     { key: 'tipo_servico_servidor', label: 'Tipo', required: true, group: 'cadastro' },
+    { key: 'tag', label: 'Tag', required: false, group: 'cadastro' },
     { key: 'margem_disponivel', label: 'Margem Livre', required: true, group: 'margem' },
     { key: 'margem_total', label: 'Margem Total', required: true, group: 'margem' },
     { key: 'banco', label: 'Banco', required: true, group: 'emprestimo' },
@@ -67,6 +71,21 @@ export const FIELDS_BY_CONVENIO: Record<Convenio, FieldDef[]> = {
     { key: 'phone', label: 'Telefone', required: false, group: 'contato' },
   ],
 };
+
+// Compat: alias para código existente que importa FIELDS_BY_CONVENIO
+export const FIELDS_BY_CONVENIO = DEFAULT_FIELDS_BY_CONVENIO;
+
+// Aplica overrides de configuração da empresa (mapa { field_key -> is_required })
+// sobre a lista padrão de campos do convênio.
+export function applyFieldOverrides(
+  fields: FieldDef[],
+  overrides: Record<string, boolean> | null | undefined,
+): FieldDef[] {
+  if (!overrides || Object.keys(overrides).length === 0) return fields;
+  return fields.map(f => (
+    f.key in overrides ? { ...f, required: !!overrides[f.key] } : f
+  ));
+}
 
 // Grupos de atualização (Atualizar Dados)
 export type UpdateGroup = 'contato' | 'margem' | 'emprestimo' | 'parcelas' | 'cadastro';
