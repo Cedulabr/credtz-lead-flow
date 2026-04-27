@@ -95,5 +95,36 @@ export function useNovaVidaCredentials() {
     return { ok: false, message: "Resposta inesperada" };
   };
 
-  return { companyId, creds, tokenExpiresAt, loading, saving, save, testConnection, reload: load };
+  const refreshTokenNow = async () => {
+    const { data, error } = await supabase.functions.invoke("novavida-get-token", {
+      body: { force_refresh: true },
+    });
+    if (error) return { ok: false, message: error.message };
+    if ((data as any)?.error) return { ok: false, message: (data as any).error };
+    await load();
+    return { ok: true, message: "Token renovado com sucesso." };
+  };
+
+  const setManualToken = async (token: string) => {
+    const { data, error } = await supabase.functions.invoke("novavida-get-token", {
+      body: { manual_token: token },
+    });
+    if (error) return { ok: false, message: error.message };
+    if ((data as any)?.error) return { ok: false, message: (data as any).error };
+    await load();
+    return { ok: true, message: "Token manual salvo. Válido por 24h." };
+  };
+
+  return {
+    companyId,
+    creds,
+    tokenExpiresAt,
+    loading,
+    saving,
+    save,
+    testConnection,
+    refreshTokenNow,
+    setManualToken,
+    reload: load,
+  };
 }
