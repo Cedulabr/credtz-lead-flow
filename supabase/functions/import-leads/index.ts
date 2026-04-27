@@ -81,11 +81,19 @@ Deno.serve(async (req) => {
     const company_id = uc?.company_id ?? null;
 
     const payload = await req.json() as ImportPayload;
-    const { convenio, subtipo, estado, mapping, rows, file_name, file_hash, file_size_bytes } = payload;
+    const { convenio, subtipo, estado, mapping, rows, file_name, file_hash, file_size_bytes, required_fields } = payload;
 
     if (!convenio || !mapping || !Array.isArray(rows)) {
       return new Response(JSON.stringify({ error: 'Invalid payload' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+
+    // Conjunto de campos exigidos por validação. Se vier vazio do cliente,
+    // mantém comportamento histórico (cpf + name obrigatórios).
+    const requiredSet = new Set(
+      (required_fields && required_fields.length > 0)
+        ? required_fields
+        : ['cpf', 'name']
+    );
 
     // Cria import log inicial
     const { data: importLog } = await adminClient.from('import_logs').insert({
