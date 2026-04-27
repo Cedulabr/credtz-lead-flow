@@ -13,7 +13,7 @@ function b64(s: string) {
   return btoa(unescape(encodeURIComponent(s)));
 }
 
-export async function getValidToken(
+async function getValidToken(
   admin: ReturnType<typeof createClient>,
   companyId: string,
 ): Promise<{ token?: string; error?: string }> {
