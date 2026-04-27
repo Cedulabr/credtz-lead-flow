@@ -5952,6 +5952,7 @@ export type Database = {
           can_access_relatorio_desempenho: boolean | null
           can_access_sms: boolean | null
           can_access_tabela_comissoes: boolean | null
+          can_access_telefonia: boolean
           can_access_televendas: boolean | null
           can_access_whatsapp: boolean | null
           company: string | null
@@ -6000,6 +6001,7 @@ export type Database = {
           can_access_relatorio_desempenho?: boolean | null
           can_access_sms?: boolean | null
           can_access_tabela_comissoes?: boolean | null
+          can_access_telefonia?: boolean
           can_access_televendas?: boolean | null
           can_access_whatsapp?: boolean | null
           company?: string | null
@@ -6048,6 +6050,7 @@ export type Database = {
           can_access_relatorio_desempenho?: boolean | null
           can_access_sms?: boolean | null
           can_access_tabela_comissoes?: boolean | null
+          can_access_telefonia?: boolean
           can_access_televendas?: boolean | null
           can_access_whatsapp?: boolean | null
           company?: string | null
@@ -7411,39 +7414,48 @@ export type Database = {
           cpf: string
           credits_used: number
           error_message: string | null
+          from_cache: boolean
           id: string
           lead_id: string | null
           metodo: string
+          nome_retornado: string | null
           queried_at: string
           queried_by: string | null
           resultado: Json | null
           status: string
+          total_telefones: number
         }
         Insert: {
           company_id: string
           cpf: string
           credits_used?: number
           error_message?: string | null
+          from_cache?: boolean
           id?: string
           lead_id?: string | null
           metodo: string
+          nome_retornado?: string | null
           queried_at?: string
           queried_by?: string | null
           resultado?: Json | null
           status?: string
+          total_telefones?: number
         }
         Update: {
           company_id?: string
           cpf?: string
           credits_used?: number
           error_message?: string | null
+          from_cache?: boolean
           id?: string
           lead_id?: string | null
           metodo?: string
+          nome_retornado?: string | null
           queried_at?: string
           queried_by?: string | null
           resultado?: Json | null
           status?: string
+          total_telefones?: number
         }
         Relationships: [
           {
