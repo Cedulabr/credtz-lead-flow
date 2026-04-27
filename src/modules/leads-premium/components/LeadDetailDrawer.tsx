@@ -473,6 +473,42 @@ export function LeadDetailDrawer({
                   <p className="font-medium">{lead.convenio || "Não informado"}</p>
                 </div>
               </div>
+
+              {/* Telefonia lookup action */}
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  size={lead.phone ? "sm" : "default"}
+                  variant={lead.phone ? "outline" : "default"}
+                  className={cn(
+                    "w-full sm:w-auto",
+                    !lead.phone && "bg-blue-600 hover:bg-blue-700 text-white"
+                  )}
+                  onClick={() => {
+                    if (!lead.cpf) {
+                      setTelefoniaCpfWarning(true);
+                      return;
+                    }
+                    setTelefoniaCpfWarning(false);
+                    setTelefoniaOpen(true);
+                  }}
+                >
+                  {lead.phone ? (
+                    <><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Atualizar telefone</>
+                  ) : (
+                    <><SearchIcon className="h-4 w-4 mr-2" /> Buscar telefone via CPF</>
+                  )}
+                </Button>
+                {telefoniaCpfWarning && !lead.cpf && (
+                  <Alert variant="destructive" className="py-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      Adicione o CPF do lead antes de buscar o telefone.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+
               {lead.notes && (
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-xs text-muted-foreground mb-1">Observações</p>
@@ -483,7 +519,23 @@ export function LeadDetailDrawer({
                 Criado em {format(new Date(lead.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
               </div>
             </CollapsibleContent>
+            <LeadTelefonesEncontrados
+              leadId={lead.id}
+              leadName={lead.name}
+              cpf={lead.cpf}
+              refreshKey={telefonesRefreshKey}
+              onLeadUpdated={() => onStatusChange(lead.id, lead.status)}
+            />
           </Collapsible>
+
+          <LeadTelefoniaModal
+            open={telefoniaOpen}
+            onOpenChange={setTelefoniaOpen}
+            lead={{ id: lead.id, name: lead.name, cpf: lead.cpf }}
+            onConsultaComplete={() => setTelefonesRefreshKey((k) => k + 1)}
+            onLeadUpdated={() => onStatusChange(lead.id, lead.status)}
+          />
+
 
           <Separator />
 
