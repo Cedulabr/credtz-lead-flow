@@ -17,6 +17,7 @@ import {
   autoMapHeaders,
 } from "./wizard/columnsConfig";
 import { useImportFieldConfig } from "./wizard/useImportFieldConfig";
+import { FieldRequirementsEditor } from "./wizard/FieldRequirementsEditor";
 import { downloadTemplate, downloadSkippedReport, parseFile } from "./wizard/xlsxTemplate";
 import { cn } from "@/lib/utils";
 
