@@ -1,6 +1,64 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { getValidToken } from "../novavida-get-token/index.ts";
+
+const NV_TOKEN_URL = "https://wsnv.novavidati.com.br/WSLocalizador.asmx";
+function b64(s: string) {
+  return btoa(unescape(encodeURIComponent(s)));
+}
+async function getValidToken(
+  admin: ReturnType<typeof createClient>,
+  companyId: string,
+): Promise<{ token?: string; error?: string }> {
+  const { data: cached } = await admin
+    .from("novavida_token_cache")
+    .select("token, expires_at")
+    .eq("company_id", companyId)
+    .maybeSingle();
+  if (cached && new Date(cached.expires_at as string) > new Date()) {
+    return { token: cached.token as string };
+  }
+  const { data: creds } = await admin
+    .from("novavida_credentials")
+    .select("usuario, senha, cliente, active")
+    .eq("company_id", companyId)
+    .eq("active", true)
+    .maybeSingle();
+  if (!creds) return { error: "credentials_not_configured" };
+  const envelope = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <GerarToken xmlns="http://tempuri.org/">
+      <usuario>${b64(creds.usuario as string)}</usuario>
+      <senha>${b64(creds.senha as string)}</senha>
+      <cliente>${b64(creds.cliente as string)}</cliente>
+    </GerarToken>
+  </soap:Body>
+</soap:Envelope>`;
+  const resp = await fetch(NV_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/xml; charset=utf-8",
+      SOAPAction: '"http://tempuri.org/GerarToken"',
+    },
+    body: envelope,
+  });
+  const text = await resp.text();
+  if (!resp.ok) return { error: `nv_http_${resp.status}: ${text.slice(0, 200)}` };
+  const match = text.match(/<GerarTokenResult>([\s\S]*?)<\/GerarTokenResult>/);
+  if (!match) return { error: "token_parse_failed" };
+  const token = match[1].trim();
+  if (!token || /USUARIO, SENHA OU CLIENTE INCORRETO/i.test(token) || /SEM ACESSO AO SISTEMA/i.test(token)) {
+    return { error: "auth_error" };
+  }
+  const expires_at = new Date(Date.now() + (23 * 60 + 50) * 60 * 1000).toISOString();
+  await admin
+    .from("novavida_token_cache")
+    .upsert(
+      { company_id: companyId, token, generated_at: new Date().toISOString(), expires_at },
+      { onConflict: "company_id" },
+    );
+  return { token };
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
