@@ -44,6 +44,7 @@ import {
   LazyPortFlowModule,
   LazyVoicerModule,
   LazyNotasModule,
+  LazyTelefoniaModule,
 } from "@/components/LazyComponents";
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -153,6 +154,10 @@ const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMes
     permission: 'can_access_notas',
     blockedMessage: 'Acesso ao módulo Notas & Workspace bloqueado pelo administrador',
   },
+  telefonia: {
+    permission: 'can_access_telefonia',
+    blockedMessage: 'Acesso ao módulo Telefonia bloqueado pelo administrador',
+  },
 };
 
 // ── Main Component ────────────────────────────────────────────────────
@@ -209,6 +214,7 @@ const Index = () => {
     portflow: <div className="p-4"><LazyPortFlowModule /></div>,
     voicer: <LazyVoicerModule />,
     notas: <LazyNotasModule />,
+    telefonia: <LazyTelefoniaModule />,
   }), [setActiveTab]);
 
   // ── Render active tab ──────────────────────────────────────────────

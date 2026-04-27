@@ -24,6 +24,7 @@ const navItems = [
   { id: "proposal-generator", label: "Gerador de Propostas", icon: FileText, permissionKey: "can_access_gerador_propostas" },
   { id: "activate-leads", label: "Activate Leads", icon: Zap, permissionKey: "can_access_activate_leads" },
   { id: "leads", label: "Leads Premium", icon: TrendingUp, permissionKey: "can_access_premium_leads" },
+  { id: "telefonia", label: "Telefonia", icon: Phone, permissionKey: "can_access_telefonia" },
   { id: "baseoff-consulta", label: "Consulta Base OFF", icon: Database, permissionKey: "can_access_baseoff_consulta" },
   { id: "my-clients", label: "Meus Clientes", icon: Users, permissionKey: "can_access_meus_clientes" },
   { id: "televendas", label: "Televendas", icon: Phone, permissionKey: "can_access_televendas" },
