@@ -46,7 +46,7 @@ export function ImportWizard({ open, onOpenChange, onCompleted }: ImportWizardPr
   const [result, setResult] = useState<any>(null);
   const [showColumns, setShowColumns] = useState(false);
 
-  const { getFields } = useImportFieldConfig();
+  const { getFields, reload: reloadFieldConfig } = useImportFieldConfig();
   const fields = convenio ? getFields(convenio) : [];
 
   // Calcula passos dinâmicos
