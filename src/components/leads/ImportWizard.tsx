@@ -13,9 +13,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { OptionCard } from "./wizard/OptionCard";
 import {
-  Convenio, Subtipo, FIELDS_BY_CONVENIO, ESTADOS_BR, CONVENIO_LABELS, SUBTIPO_LABELS,
+  Convenio, Subtipo, ESTADOS_BR, CONVENIO_LABELS, SUBTIPO_LABELS,
   autoMapHeaders,
 } from "./wizard/columnsConfig";
+import { useImportFieldConfig } from "./wizard/useImportFieldConfig";
 import { downloadTemplate, downloadSkippedReport, parseFile } from "./wizard/xlsxTemplate";
 import { cn } from "@/lib/utils";
 
