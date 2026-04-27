@@ -155,6 +155,8 @@ export function AdminOperations() {
         return <AdminInactivitySettings />;
       case 'banking-api':
         return <AdminBankingAPI />;
+      case 'leads-import-fields':
+        return <LeadsImportFieldsConfig />;
       default:
         return null;
     }
