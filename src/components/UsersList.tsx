@@ -83,6 +83,7 @@ export function UsersList() {
     { key: "can_access_meu_numero", label: "Meu Número", defaultValue: true },
     { key: "can_access_sms", label: "Comunicação SMS", defaultValue: false },
     { key: "can_access_whatsapp", label: "WhatsApp", defaultValue: false },
+    { key: "can_access_telefonia", label: "Telefonia", defaultValue: false },
   ] as const;
 
   // Gerar estado inicial baseado nos módulos definidos
