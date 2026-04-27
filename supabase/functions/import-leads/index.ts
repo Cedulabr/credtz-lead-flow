@@ -128,22 +128,47 @@ Deno.serve(async (req) => {
     // Pré-coleta para checagem em lote de duplicidade
     const candidates: Array<{ row: any; payload: any; key: string | null }> = [];
 
+    let rowIdx = 0;
     for (const row of rows) {
-      const cpf = normalizeCpf(get(row, 'cpf'));
-      const name = String(get(row, 'name') ?? '').trim();
-      if (!cpf || !name) {
-        invalid++;
-        skipped.push({ cpf: cpf ?? undefined, reason: 'CPF ou nome inválido', row });
-        continue;
-      }
+      rowIdx++;
+      const cpfRaw = normalizeCpf(get(row, 'cpf'));
+      const nameRaw = String(get(row, 'name') ?? '').trim();
+
+      const ddd = String(get(row, 'ddd') ?? '').replace(/\D/g, '');
+      const phoneRaw = String(get(row, 'phone') ?? '').replace(/\D/g, '');
+      const phoneJoined = phoneRaw ? (ddd && !phoneRaw.startsWith(ddd) ? ddd + phoneRaw : phoneRaw) : '';
+
+      // Validação dinâmica: só rejeita se o campo for marcado obrigatório.
+      const missing: string[] = [];
+      if (requiredSet.has('cpf') && !cpfRaw) missing.push('CPF');
+      if (requiredSet.has('name') && !nameRaw) missing.push('Nome');
+      if (requiredSet.has('phone') && !phoneJoined) missing.push('Telefone');
 
       const banco = String(get(row, 'banco') ?? '').trim() || null;
       const parcela = toNumber(get(row, 'parcela'));
       const parcelas_em_aberto = toInt(get(row, 'parcelas_em_aberto'));
+      const margem_disponivel = toNumber(get(row, 'margem_disponivel'));
+      const margem_total = toNumber(get(row, 'margem_total'));
+      const matricula = String(get(row, 'matricula') ?? '').trim() || null;
+      const tagVal = String(get(row, 'tag') ?? '').trim() || null;
 
-      const ddd = String(get(row, 'ddd') ?? '').replace(/\D/g, '');
-      const phoneRaw = String(get(row, 'phone') ?? '').replace(/\D/g, '');
-      const phone = phoneRaw ? (ddd && !phoneRaw.startsWith(ddd) ? ddd + phoneRaw : phoneRaw) : null;
+      // Outras validações dinâmicas comuns
+      if (requiredSet.has('banco') && !banco) missing.push('Banco');
+      if (requiredSet.has('margem_disponivel') && margem_disponivel == null) missing.push('Margem Livre');
+      if (requiredSet.has('margem_total') && margem_total == null) missing.push('Margem Total');
+      if (requiredSet.has('matricula') && !matricula) missing.push('Matrícula');
+      if (requiredSet.has('tag') && !tagVal) missing.push('Tag');
+
+      if (missing.length > 0) {
+        invalid++;
+        skipped.push({ cpf: cpfRaw ?? undefined, reason: `Campos obrigatórios ausentes: ${missing.join(', ')}`, row });
+        continue;
+      }
+
+      // Para colunas NOT NULL no banco (name, phone) sempre garantir um valor.
+      const cpf = cpfRaw; // pode ser null (coluna aceita)
+      const name = nameRaw || 'SEM NOME';
+      const phone = phoneJoined || `0000000000${rowIdx}`.slice(-11);
 
       const leadPayload: any = {
         cpf,
@@ -151,13 +176,14 @@ Deno.serve(async (req) => {
         phone,
         convenio: String(get(row, 'convenio') ?? convenio),
         banco,
-        matricula: String(get(row, 'matricula') ?? '').trim() || null,
-        margem_disponivel: toNumber(get(row, 'margem_disponivel')),
-        margem_total: toNumber(get(row, 'margem_total')),
+        matricula,
+        margem_disponivel,
+        margem_total,
         situacao: String(get(row, 'situacao') ?? '').trim() || null,
         ade: String(get(row, 'ade') ?? '').trim() || null,
         tipo_servico_servidor: String(get(row, 'tipo_servico_servidor') ?? '').trim() || null,
         tipo_beneficio: String(get(row, 'tipo_beneficio') ?? '').trim() || null,
+        tag: tagVal,
         parcela,
         parcelas_em_aberto,
         parcelas_pagas: toInt(get(row, 'parcelas_pagas')),
@@ -172,7 +198,7 @@ Deno.serve(async (req) => {
         import_log_id: importLogId,
       };
 
-      const dedupKey = (banco && parcela != null && parcelas_em_aberto != null)
+      const dedupKey = (cpf && banco && parcela != null && parcelas_em_aberto != null)
         ? `${cpf}|${banco}|${parcela}|${parcelas_em_aberto}`
         : null;
 
