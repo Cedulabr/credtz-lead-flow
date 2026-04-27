@@ -125,6 +125,16 @@ export function AdminOperations() {
       badge: 'Novo',
       badgeVariant: 'default' as const,
     },
+    {
+      id: 'leads-import-fields' as OperationSection,
+      label: 'Campos de Importação',
+      description: 'Definir campos obrigatórios na importação de leads por convênio',
+      icon: FileSpreadsheet,
+      color: 'text-cyan-600',
+      bgColor: 'bg-cyan-100 dark:bg-cyan-900/30',
+      badge: 'Novo',
+      badgeVariant: 'default' as const,
+    },
   ];
 
   const renderContent = () => {
