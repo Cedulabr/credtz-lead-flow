@@ -2,10 +2,13 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Info, AlertCircle, Phone, Link as LinkIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Info, AlertCircle, Phone, ShieldCheck, Sparkles } from "lucide-react";
 import { SearchForm } from "./SearchForm";
 import { ResultCard } from "./ResultCard";
 import { useTelefoniaQuery } from "../hooks/useTelefoniaQuery";
+import { useTelefoniaUsage } from "../hooks/useTelefoniaUsage";
 import type { Metodo } from "../utils/methodConfig";
 import { toast } from "sonner";
 
@@ -15,7 +18,8 @@ interface Props {
 }
 
 export function ConsultarTab({ leadContext, onGoToConfig }: Props) {
-  const { loading, result, error, run, reset } = useTelefoniaQuery();
+  const { loading, result, error, run } = useTelefoniaQuery();
+  const { stats } = useTelefoniaUsage();
   const [lastArgs, setLastArgs] = useState<{ cpf: string; metodo: Metodo } | null>(null);
 
   const handleSubmit = (cpf: string, metodo: Metodo) => {
@@ -53,81 +57,98 @@ export function ConsultarTab({ leadContext, onGoToConfig }: Props) {
   const errInfo = error ? errorMap[error] : null;
 
   return (
-    <div className="max-w-[680px] mx-auto space-y-4">
-      <Card className="p-4 sm:p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Phone className="h-5 w-5 text-primary" />
-          <h2 className="font-semibold">Consultar telefones por CPF</h2>
+    <div className="max-w-[720px] mx-auto space-y-4">
+      {/* Hero compact */}
+      <Card className="p-4 sm:p-5 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/20">
+        <div className="flex items-start gap-3 flex-wrap">
+          <div className="h-10 w-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+            <Phone className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="font-bold text-lg leading-tight">Consultar telefones por CPF</h2>
+              <Badge variant="outline" className="text-[10px] gap-1">
+                <Sparkles className="h-3 w-3" /> Nova Vida TI
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Localize números, WhatsApp e perfil completo. Cache de 7 dias para o mesmo CPF.
+            </p>
+          </div>
+          <div className="flex gap-2 ml-auto text-center">
+            <div className="px-3 py-1.5 rounded-md bg-background/60">
+              <div className="text-lg font-bold leading-none">{stats.total}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">Mês</div>
+            </div>
+            <div className="px-3 py-1.5 rounded-md bg-background/60">
+              <div className="text-lg font-bold leading-none text-green-600">{stats.cache}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">Cache</div>
+            </div>
+            <div className="px-3 py-1.5 rounded-md bg-background/60">
+              <div className="text-lg font-bold leading-none">{stats.credits}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">Créditos</div>
+            </div>
+          </div>
         </div>
+      </Card>
+
+      <Card className="p-4 sm:p-5">
         <SearchForm loading={loading} onSubmit={handleSubmit} />
       </Card>
 
       {errInfo && (
         <Alert variant={errInfo.variant}>
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between gap-2">
+          <AlertDescription className="flex items-center justify-between gap-2 flex-wrap">
             <span>{errInfo.msg}</span>
-            {error === "credentials_not_configured" && (
+            {(error === "credentials_not_configured" || error === "auth_error") && (
               <Button size="sm" variant="outline" onClick={onGoToConfig}>
                 Ir para Configurações →
-              </Button>
-            )}
-            {error === "auth_error" && (
-              <Button size="sm" variant="outline" onClick={onGoToConfig}>
-                Configurações
               </Button>
             )}
           </AlertDescription>
         </Alert>
       )}
 
-      {isNotFound && (
+      {loading && (
+        <Card className="p-4 space-y-3">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </Card>
+      )}
+
+      {!loading && isNotFound && (
         <Alert>
           <Info className="h-4 w-4" />
           <AlertDescription>Nenhum número encontrado para este CPF.</AlertDescription>
         </Alert>
       )}
 
-      {isSuccess && result?.from_cache && (
-        <Alert>
-          <Info className="h-4 w-4" />
+      {!loading && isSuccess && result?.from_cache && (
+        <Alert className="border-blue-500/30 bg-blue-50/50 dark:bg-blue-950/20">
+          <ShieldCheck className="h-4 w-4 text-blue-600" />
           <AlertDescription className="flex items-center justify-between gap-2 flex-wrap">
             <span>
-              Resultado em cache
+              Resultado em <b>cache</b>
               {cachedAt && ` — consultado em ${cachedAt.toLocaleString("pt-BR")}`}. Nenhum
               crédito consumido.
             </span>
-            <Button size="sm" variant="link" onClick={handleForce} className="h-auto p-0">
+            <Button size="sm" variant="outline" onClick={handleForce}>
               Forçar nova consulta
             </Button>
           </AlertDescription>
         </Alert>
       )}
 
-      {isSuccess && result && (
-        <>
-          <ResultCard
-            metodo={lastArgs?.metodo || "NVBOOK_CEL_OBG_WHATS"}
-            resultado={result.resultado}
-            telefones={result.telefones || []}
-            leadContext={leadContext}
-            onLeadUpdated={() => toast.success("Lead atualizado")}
-          />
-          {leadContext && (result.telefones?.length || 0) > 0 && (
-            <div className="sticky bottom-4 flex justify-center">
-              <Button
-                onClick={async () => {
-                  // already linked via lead_id when called; show confirmation
-                  toast.success(`Resultado vinculado ao lead ${leadContext.name}`);
-                }}
-                className="shadow-lg"
-              >
-                <LinkIcon className="h-4 w-4 mr-2" />
-                Vinculado ao lead {leadContext.name}
-              </Button>
-            </div>
-          )}
-        </>
+      {!loading && isSuccess && result && (
+        <ResultCard
+          metodo={lastArgs?.metodo || "NVBOOK_CEL_OBG_WHATS"}
+          resultado={result.resultado}
+          telefones={result.telefones || []}
+          leadContext={leadContext}
+          onLeadUpdated={() => toast.success("Lead atualizado")}
+        />
       )}
     </div>
   );

@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Search, Lock } from "lucide-react";
+import { Loader2, Search, Lock, Check } from "lucide-react";
 import { formatCpf, isValidCpf, onlyDigits } from "../utils/cpfMask";
-import { METODOS, type Metodo } from "../utils/methodConfig";
+import { type Metodo } from "../utils/methodConfig";
+import { MethodPicker } from "./MethodPicker";
+import { cn } from "@/lib/utils";
 
 interface Props {
   loading: boolean;
@@ -23,7 +24,6 @@ export function SearchForm({ loading, onSubmit, initialCpf, lockCpf }: Props) {
   }, [initialCpf]);
 
   const valid = isValidCpf(cpf);
-  const helper = METODOS.find((m) => m.value === metodo)?.helper;
 
   return (
     <form
@@ -34,11 +34,12 @@ export function SearchForm({ loading, onSubmit, initialCpf, lockCpf }: Props) {
       }}
       className="space-y-4"
     >
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="cpf" className="flex items-center gap-1.5">
-            CPF {lockCpf && <Lock className="h-3 w-3 text-muted-foreground" />}
-          </Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="cpf" className="flex items-center gap-1.5">
+          CPF do consultado
+          {lockCpf && <Lock className="h-3 w-3 text-muted-foreground" />}
+        </Label>
+        <div className="relative">
           <Input
             id="cpf"
             inputMode="numeric"
@@ -48,39 +49,38 @@ export function SearchForm({ loading, onSubmit, initialCpf, lockCpf }: Props) {
             maxLength={14}
             autoFocus={!lockCpf}
             readOnly={lockCpf}
-            className={lockCpf ? "bg-muted cursor-not-allowed" : undefined}
+            className={cn(
+              "pr-10 font-mono text-base",
+              lockCpf && "bg-muted cursor-not-allowed",
+              valid && !lockCpf && "border-green-500/60",
+            )}
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Método</Label>
-          <Select value={metodo} onValueChange={(v) => setMetodo(v as Metodo)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {METODOS.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  <span className="mr-2">{m.icon}</span>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {valid && (
+            <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-600" />
+          )}
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">{helper}</p>
+
+      <div className="space-y-2">
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          Tipo de consulta
+        </Label>
+        <MethodPicker value={metodo} onChange={setMetodo} />
+      </div>
+
       <Button
         type="submit"
         disabled={!valid || loading}
-        className="w-full sm:w-auto"
+        size="lg"
+        className="w-full"
       >
         {loading ? (
           <>
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Consultando...
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Consultando Nova Vida TI...
           </>
         ) : (
           <>
-            <Search className="h-4 w-4 mr-2" /> Consultar
+            <Search className="h-4 w-4 mr-2" /> Consultar agora
           </>
         )}
       </Button>

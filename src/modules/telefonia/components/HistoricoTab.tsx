@@ -86,10 +86,36 @@ export function HistoricoTab({ onOpenLead }: { onOpenLead?: (id: string) => void
     }
   };
 
+  const STATUS_CHIPS = [
+    { value: ALL, label: "Tudo" },
+    { value: "success", label: "Sucesso" },
+    { value: "not_found", label: "Não encontrado" },
+    { value: "error", label: "Erro" },
+    { value: "auth_error", label: "Auth" },
+    { value: "quota_exceeded", label: "Quota" },
+  ];
+
   return (
     <div className="space-y-4">
-      <Card className="p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <Card className="p-4 space-y-3">
+        <div className="flex flex-wrap gap-1.5">
+          {STATUS_CHIPS.map((c) => (
+            <button
+              key={c.value}
+              type="button"
+              onClick={() => setStatus(c.value)}
+              className={
+                "px-3 py-1 rounded-full text-xs font-medium border transition " +
+                (status === c.value
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background hover:bg-muted border-border")
+              }
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="space-y-1.5">
             <Label>De</Label>
             <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -111,21 +137,7 @@ export function HistoricoTab({ onOpenLead }: { onOpenLead?: (id: string) => void
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>Status</Label>
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Todos</SelectItem>
-                <SelectItem value="success">Sucesso</SelectItem>
-                <SelectItem value="not_found">Não encontrado</SelectItem>
-                <SelectItem value="error">Erro</SelectItem>
-                <SelectItem value="auth_error">Auth error</SelectItem>
-                <SelectItem value="quota_exceeded">Quota</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>CPF</Label>
+            <Label>CPF / Nome</Label>
             <Input
               placeholder="Buscar CPF"
               value={cpf}
