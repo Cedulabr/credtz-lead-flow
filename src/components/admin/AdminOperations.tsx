@@ -38,7 +38,8 @@ type OperationSection =
   | 'bank-reuse' 
   | 'duplicates'
   | 'inactivity'
-  | 'banking-api';
+  | 'banking-api'
+  | 'leads-import-fields';
 
 interface SectionItem {
   id: OperationSection;
