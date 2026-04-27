@@ -17,6 +17,7 @@ import {
   autoMapHeaders,
 } from "./wizard/columnsConfig";
 import { useImportFieldConfig } from "./wizard/useImportFieldConfig";
+import { FieldRequirementsEditor } from "./wizard/FieldRequirementsEditor";
 import { downloadTemplate, downloadSkippedReport, parseFile } from "./wizard/xlsxTemplate";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +46,7 @@ export function ImportWizard({ open, onOpenChange, onCompleted }: ImportWizardPr
   const [result, setResult] = useState<any>(null);
   const [showColumns, setShowColumns] = useState(false);
 
-  const { getFields } = useImportFieldConfig();
+  const { getFields, reload: reloadFieldConfig } = useImportFieldConfig();
   const fields = convenio ? getFields(convenio) : [];
 
   // Calcula passos dinâmicos
@@ -299,8 +300,19 @@ export function ImportWizard({ open, onOpenChange, onCompleted }: ImportWizardPr
             </div>
           ) : currentStep === 'mapping' ? (
             <div className="space-y-3">
-              <h3 className="font-semibold text-lg">Mapeie as colunas do seu arquivo</h3>
-              <p className="text-sm text-muted-foreground">Campos obrigatórios não mapeados aparecem em vermelho.</p>
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <h3 className="font-semibold text-lg">Mapeie as colunas do seu arquivo</h3>
+                  <p className="text-sm text-muted-foreground">Campos obrigatórios não mapeados aparecem em vermelho.</p>
+                </div>
+                {convenio && (
+                  <FieldRequirementsEditor
+                    convenio={convenio}
+                    fields={fields}
+                    onSaved={reloadFieldConfig}
+                  />
+                )}
+              </div>
               <div className="grid grid-cols-1 gap-2">
                 {fields.map(f => {
                   const missing = f.required && !mapping[f.key];
