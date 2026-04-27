@@ -41,6 +41,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProductSelectCard } from "./ProductEducationPopover";
+import { LeadTelefoniaModal } from "./LeadTelefoniaModal";
+import { LeadTelefonesEncontrados } from "./LeadTelefonesEncontrados";
+import { Search as SearchIcon, RefreshCw } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface LeadDetailDrawerProps {
   lead: Lead | null;
