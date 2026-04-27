@@ -17,6 +17,7 @@ interface ImportPayload {
   file_name?: string;
   file_hash?: string;
   file_size_bytes?: number;
+  required_fields?: string[]; // configurável por empresa
 }
 
 const normalizeCpf = (raw: any): string | null => {
