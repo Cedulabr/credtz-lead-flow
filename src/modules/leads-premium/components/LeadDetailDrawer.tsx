@@ -75,6 +75,11 @@ export function LeadDetailDrawer({
   const [cpfValue, setCpfValue] = useState("");
   const [savingCpf, setSavingCpf] = useState(false);
 
+  // Telefonia integration state
+  const [telefoniaOpen, setTelefoniaOpen] = useState(false);
+  const [telefoniaCpfWarning, setTelefoniaCpfWarning] = useState(false);
+  const [telefonesRefreshKey, setTelefonesRefreshKey] = useState(0);
+
   // Contato Futuro state
   const [showFutureContactModal, setShowFutureContactModal] = useState(false);
   const [futureContactDate, setFutureContactDate] = useState("");
