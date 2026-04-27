@@ -1,132 +1,110 @@
-## Reconstrução do fluxo de Importação e Atualização — Leads Premium
+# Telefonia Module — Backend Infrastructure (Step 1)
 
-Vamos substituir completamente o `ImportBase.tsx` atual (com campo fixo "Governo BA") por um wizard dinâmico em 6 passos, e criar um novo fluxo "Atualizar Dados" com seleção de campos. Todo o processamento pesado vai para Edge Functions.
+Create the backend foundation for the new "Telefonia" module that integrates with the **Nova Vida TI** SOAP/JSON WebService to query phone numbers and full profile data by CPF. This step is backend-only (DB schema + 2 Edge Functions). UI will come in subsequent prompts.
 
----
+## Adjustments vs the original prompt
 
-### 1. Banco de dados (migration)
+After inspecting the actual schema, two corrections are required:
 
-**Tabela `import_logs`** — adicionar colunas faltantes:
-- `convenio` (text), `subtipo` (text), `estado` (text)
-- `tipo` (text: `'import'` | `'update'`)
-- `fields_updated` (jsonb)
-- `skipped_detail` (jsonb) — lista de linhas ignoradas com motivo
+1. **No `user_profiles` table** — the project uses `profiles` + `user_companies` (multi-tenant). RLS must use `user_companies` to resolve the caller's `company_id`, following the existing `tenant_isolation` pattern (memory: `database-join-constraints`, `gestor-oversight-scope-v2`).
+2. **`leads` table has no `telefone`/`ddd` columns** — only `id`, `cpf`, `company_id`. Step 9 ("update leads.telefone/ddd") will be **skipped in this backend step**. The phones are still saved to `telefonia_numeros` and can be linked to a lead via `lead_id`. Updating leads with phones will be revisited when the UI prompt arrives (we'll either add columns or write to a related table then).
 
-**Tabela `leads_database`** — chave de deduplicação:
-- Índice único parcial: `(company_id, cpf, banco, parcela, parcelas_em_aberto)` onde os 4 últimos não são nulos. Permite mesmo CPF em bancos/contratos diferentes.
-- Adicionar coluna `subtipo` (federal/estadual/municipal) e `estado` (UF) para filtros futuros.
+Everything else matches the spec.
 
-**Edge Functions novas:**
-- `import-leads` — recebe arquivo já parseado (JSON de linhas + mapeamento + convênio/subtipo/estado), insere em lote, aplica regra de duplicidade `CPF+Banco+Valor Parcela+Total Parcelas`, grava `import_logs` com `skipped_detail`.
-- `update-leads-data` — recebe linhas + campos a atualizar + estratégia de múltiplos contratos (`all` / `latest` / `manual`), faz match por CPF normalizado, atualiza apenas as colunas marcadas, registra histórico de margem quando aplicável.
+## 1. Database migration
 
-Ambas usam service role internamente, validam JWT do chamador e respeitam `company_id` do perfil.
+New tables (all with RLS, tenant-isolated by `company_id` resolved through `user_companies`):
 
----
+- **`novavida_credentials`** — per-company API credentials (`usuario`, `senha`, `cliente`, `active`). Unique on `company_id`.
+- **`novavida_token_cache`** — per-company token cache with `expires_at = now() + interval '23 hours 50 minutes'`. Unique on `company_id`.
+- **`telefonia_consultas`** — every query (`cpf`, `metodo`, `resultado jsonb`, `status`, `error_message`, `credits_used`, `queried_by`, `queried_at`, optional `lead_id`).
+- **`telefonia_numeros`** — normalized phones extracted from results (`ddd`, `numero`, `numero_completo`, `tipo`, `tem_whatsapp`, `procon`, `operadora`, `flhot`, `assinante`, `posicao`).
 
-### 2. Frontend — novo Wizard de Importação
+RLS policies (one per table, SELECT/INSERT/UPDATE/DELETE):
 
-**Novo componente:** `src/components/leads/ImportWizard.tsx` (substitui o modal atual em `ImportBase.tsx`).
-
-Stepper dinâmico com renderização condicional:
-
-```text
-Step 1: Convênio (INSS / SIAPE / Servidor Público)
-   │
-   ├─ INSS ────────────────────────────────► Step 4
-   ├─ SIAPE ───────────────────────────────► Step 4
-   └─ Servidor Público ──► Step 2: Vínculo
-                              ├─ Federal ──► Step 4
-                              └─ Estadual/Municipal ──► Step 3: Estado ──► Step 4
-
-Step 4: Upload de arquivo (.csv / .xlsx)
-        + colunas esperadas (collapsible) + download de template
-        + preview das primeiras 5 linhas
-
-Step 5: Mapeamento de colunas (auto-match exato + destacar obrigatórios)
-
-Step 6: Confirmação + barra de progresso + resumo final
+```sql
+-- helper used by all four tables
+using (company_id in (
+  select company_id from public.user_companies
+  where user_id = auth.uid() and is_active = true
+))
 ```
 
-**Cards de seleção:** componentes radio visuais (com ícone, título, descrição) reutilizando `Card` + estado selecionado destacado com `border-primary`.
+Plus an **admin override** using the existing `has_role_safe(auth.uid(), 'admin')` helper so super-admins see/manage everything (matches existing project patterns).
 
-**Estado selecionado UF:** `Command` + `Popover` (pattern shadcn combobox) com 27 estados.
+Indexes: `(company_id, cpf, metodo, queried_at desc)` on `telefonia_consultas` for the 7-day cache lookup; `(consulta_id)` and `(company_id, cpf)` on `telefonia_numeros`.
 
-**Templates .xlsx:** gerados client-side usando a skill XLSX (openpyxl não está disponível no browser, mas dá pra usar a lib `xlsx` já provavelmente instalada — verifico no `package.json` na implementação; se não, uso `sheetjs` via CDN ou geração CSV como fallback).
+`updated_at` trigger on `novavida_credentials`.
 
-**Parser:** mantém a lógica atual de leitura via `FileReader` + `xlsx` para extrair headers e amostra; envia o array completo de linhas para a Edge Function.
+## 2. Edge Function: `novavida-get-token`
 
----
+Path: `supabase/functions/novavida-get-token/index.ts`. Registered in `supabase/config.toml` with `verify_jwt = false` (token validated in code via the caller's JWT).
 
-### 3. Frontend — novo "Atualizar Dados"
+Flow:
+1. Validate auth (read JWT, get `user.id`).
+2. Resolve `company_id` from `user_companies` (or accept it in body for admin).
+3. SELECT from `novavida_token_cache` where `company_id = ?` and `expires_at > now()`. If found → return `{ token }`.
+4. Else SELECT credentials from `novavida_credentials` where `company_id = ? and active = true`. If missing → `{ error: 'credentials_not_configured' }`.
+5. Base64-encode `usuario`, `senha`, `cliente` and POST a SOAP envelope to `https://wsnv.novavidati.com.br/WSLocalizador.asmx` with `SOAPAction: "http://tempuri.org/GerarToken"`.
+6. Parse XML, extract `<GerarTokenResult>`.
+7. UPSERT into `novavida_token_cache` with `expires_at = now() + interval '23 hours 50 minutes'`.
+8. Return `{ token }`.
 
-**Novo componente:** `src/components/leads/UpdateDataWizard.tsx` (substitui o toggle "margin_only" atual).
+Errors returned with proper status codes and CORS headers (uses the standard `corsHeaders` block already used across the project).
 
-```text
-Step 1: Checkboxes multi-select (Telefone/DDD, Margem, Empréstimos,
-        Parcelas, Dados cadastrais)
-        + Toggle "Quando CPF tiver múltiplos contratos":
-           ◉ Atualizar todos
-           ○ Apenas o mais recente
-           ○ Escolha manual
+## 3. Edge Function: `novavida-consulta`
 
-Step 2: Upload (mostra apenas colunas necessárias para os campos marcados)
+Path: `supabase/functions/novavida-consulta/index.ts`. Registered with `verify_jwt = false`.
 
-Step 3: Mapeamento de colunas (apenas campos relevantes)
+Input body: `{ company_id?, lead_id?, cpf, metodo }` where `metodo ∈ { 'NVBOOK_CEL_OBG', 'NVBOOK_CEL_OBG_WHATS', 'NVCHECK_JSON' }`.
 
-Step 4: Preview com:
-        - CPFs encontrados (únicos / múltiplos contratos)
-        - CPFs não encontrados
-        - Aviso se >20% não encontrados
-        - Botão "Confirmar Atualização"
+Flow:
+1. Auth + resolve `company_id` (same pattern as token function).
+2. **Validate CPF** with regex (11 digits after stripping non-digits). Return 400 on invalid.
+3. **7-day cache**: SELECT most recent `telefonia_consultas` row for `(company_id, cpf, metodo)` within last 7 days with `status='success'`. If found → return cached `resultado` immediately, do NOT call the API, do NOT consume credits.
+4. Call `novavida-get-token` internally (service role) to get a valid token.
+5. Build the request per method:
+   - **NVBOOK_CEL_OBG** → `POST https://wsnv.novavidati.com.br/WSLocalizador.asmx/NVBOOK_CEL_OBG` with form-encoded `DOCUMENTO` + `TOKEN`.
+   - **NVBOOK_CEL_OBG_WHATS** → `POST https://wsnv.novavidati.com.br/WSLocalizador.asmx/NvBookCelObWhats` with `DOCUMENTO` + `TOKEN`.
+   - **NVCHECK_JSON** → `POST https://wsnv.novavidati.com.br/WSLocalizador.asmx/NVCHECKJson` with `Content-Type: application/json`, `Token: <token>` header, body `{ "nvcheck": { "Documento": cpf } }`.
+6. Parse XML (custom lightweight parser, no external dep) or JSON depending on method.
+7. Detect API error strings in the body and map to status:
+   - `USUARIO, SENHA OU CLIENTE INCORRETO` → `auth_error`
+   - `SEM ACESSO AO SISTEMA` → `no_access`
+   - `QUANTIDADE CONFIGURADA ATINGIDA` → `quota_exceeded`
+   - empty/no records → `not_found`
+   - else → `success`
+8. INSERT a row in `telefonia_consultas` with full `resultado` jsonb, `status`, `error_message`, `credits_used` (1 on success, 0 otherwise), `queried_by = user.id`.
+9. **Extract & normalize phones** into `telefonia_numeros`:
+   - **NVBOOK** methods → iterate `<CELULARES>/<CELULAR>` (`tipo='celular'`, fields `DDDCEL`, `CEL`, `PROCON`, `FLWHATSAPP`) and `<TELEFONES>/<TELEFONE>` (`tipo='fixo'`, `DDD`, `TELEFONE`, `PROCON`).
+   - **NVCHECK** → iterate `TELEFONES[]` mapping `TIPO_TELEFONE`: `'C'→celular`, `'F'→fixo`, plus `OPERADORA`, `FLHOT`, `ASSINANTE`, `PROCON`, `POSICAO`.
+   - For each: `numero_completo = ddd + numero`, `tem_whatsapp` from `FLWHATSAPP === 'S'` (NVBOOK) or `null` (NVCHECK). Bulk insert.
+10. **Lead update step is skipped in this backend step** (see Adjustments). The `lead_id` is still stored on `telefonia_consultas` and `telefonia_numeros` so the future UI can link them.
+11. Return the parsed result `{ status, consulta_id, resultado, telefones: [...] }`.
+
+CORS, input validation with explicit checks, structured logs on errors. Uses `SUPABASE_SERVICE_ROLE_KEY` only inside the function (never exposed).
+
+## 4. Config file
+
+Append to `supabase/config.toml`:
+```toml
+[functions.novavida-get-token]
+verify_jwt = false
+
+[functions.novavida-consulta]
+verify_jwt = false
 ```
 
-CPF é sempre obrigatório como chave de match (normalizado removendo `.` e `-`).
+## What this step delivers
 
----
+- 4 new tables with full RLS isolation per company + admin override.
+- 2 deployed Edge Functions ready to be called from the future Telefonia UI.
+- Token caching (24h) and result caching (7 days) to minimize API cost.
+- Audit trail of every query in `telefonia_consultas`.
 
-### 4. Integração
+## What's NOT in this step (coming in the next prompts)
 
-- `LeadsBulkActions.tsx` ganha um botão "Atualizar Dados" que abre `UpdateDataWizard`.
-- O botão "Importar Base" existente abre `ImportWizard` (modal full-screen em mobile).
-- Após conclusão, exibir tela de sucesso com:
-  - Métricas: contratos importados, ignorados, CPFs únicos novos, CPFs já existentes com novos contratos.
-  - Link "Baixar relatório de ignorados (.xlsx)" se houver `skipped_detail`.
-
----
-
-### 5. Resumo de arquivos
-
-**Criar:**
-- `supabase/functions/import-leads/index.ts`
-- `supabase/functions/update-leads-data/index.ts`
-- `src/components/leads/ImportWizard.tsx`
-- `src/components/leads/UpdateDataWizard.tsx`
-- `src/components/leads/wizard/StepConvenio.tsx`
-- `src/components/leads/wizard/StepSubtipo.tsx`
-- `src/components/leads/wizard/StepEstado.tsx`
-- `src/components/leads/wizard/StepUpload.tsx`
-- `src/components/leads/wizard/StepMapping.tsx`
-- `src/components/leads/wizard/StepConfirm.tsx`
-- `src/components/leads/wizard/columnsConfig.ts` (catálogo de campos por convênio + templates)
-- `src/components/leads/wizard/xlsxTemplate.ts` (gerador de modelo .xlsx)
-- Migration SQL com colunas novas em `import_logs`, `leads_database` e índice único parcial.
-
-**Editar:**
-- `src/components/ImportBase.tsx` — substituir UI de importação pelo novo `ImportWizard`; remover toggle "margin_only".
-- `src/components/LeadsBulkActions.tsx` — adicionar botão "Atualizar Dados".
-- `src/components/LeadsDatabase.tsx` — apenas integração se necessário.
-
-**Manter:**
-- `useLeadsPremium.ts`, `RequestLeadsWizard/*`, demais views.
-
----
-
-### 6. Pontos de atenção
-
-- Arquivos grandes: Edge Function processa em chunks de 500 linhas; frontend envia em batches sequenciais e atualiza progresso.
-- Detecção de arquivo duplicado (`fileHash`) é mantida.
-- Auto-scan de duplicatas existente (`auto_scan_duplicates_after_import`) continua funcionando porque não conflita com a nova regra (ele apenas detecta CPF+banco+parcela já implementado).
-- RLS: políticas de `leads_database` já filtram por `company_id`; Edge Function usa o `company_id` do perfil do chamador.
-
-Confirma para eu seguir com a implementação?
+- Telefonia UI module (`src/modules/telefonia/...`).
+- Admin screen to register `novavida_credentials` per company.
+- Linking phones back to `leads` (will require deciding whether to add `telefone`/`ddd` columns to `leads` or use a new join table).
+- Routing/menu entry.
