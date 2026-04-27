@@ -53,11 +53,11 @@ export function useTelefoniaHistorico(filters: HistoricoFilters) {
       const userIds = Array.from(new Set(list.map((r) => r.queried_by).filter(Boolean))) as string[];
       if (userIds.length) {
         const { data: profs } = await (supabase.rpc as any)("get_profiles_by_ids", {
-          _user_ids: userIds,
+          user_ids: userIds,
         });
         const m: Record<string, string> = {};
         (profs || []).forEach((p: any) => {
-          m[p.id || p.user_id] = p.name || p.full_name || p.email || "—";
+          m[p.id] = p.name || p.email || "—";
         });
         setUsersMap(m);
       } else {
