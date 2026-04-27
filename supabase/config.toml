@@ -74,3 +74,10 @@ verify_jwt = false
 
 [functions.voicer-enhance-text]
 verify_jwt = false
+
+[functions.novavida-get-token]
+verify_jwt = false
+
+[functions.novavida-consulta]
+verify_jwt = false
+
