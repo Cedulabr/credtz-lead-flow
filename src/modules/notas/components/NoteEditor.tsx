@@ -3,7 +3,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, Pin, Tag as TagIcon, Bell, Archive, Trash2, CheckSquare, MoreHorizontal } from "lucide-react";
+import { X, Pin, Tag as TagIcon, Bell, Archive, Trash2, CheckSquare, MoreHorizontal, User } from "lucide-react";
 import { BlockEditor } from "./BlockEditor";
 import { ChecklistNote, type ChecklistItem } from "./ChecklistNote";
 import { NOTE_COLORS, LABEL_COLORS, type Note, type NoteColor, type NoteLabel } from "../types";
@@ -20,6 +20,7 @@ interface Props {
   onToggleLabel?: (labelId: string) => Promise<any> | void;
   onArchive?: () => void;
   onTrash?: () => void;
+  authorLabel?: string | null;
 }
 
 const labelColor = (id: string) => LABEL_COLORS.find((c) => c.id === id)?.className ?? "bg-gray-500";
@@ -34,6 +35,7 @@ export function NoteEditor({
   onToggleLabel,
   onArchive,
   onTrash,
+  authorLabel,
 }: Props) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState<any>([]);
@@ -121,9 +123,16 @@ export function NoteEditor({
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent side="right" className={cn("w-full sm:max-w-2xl p-0 flex flex-col", palette.bg)}>
-        <div className="flex items-center justify-between border-b px-4 py-2">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {savingState === "saving" ? "Salvando..." : "Salvo"}
+        <div className="flex items-center justify-between border-b px-4 py-2 gap-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+            <span className="whitespace-nowrap">{savingState === "saving" ? "Salvando..." : "Salvo"}</span>
+            {authorLabel && (
+              <span className="flex items-center gap-1 truncate">
+                <span className="opacity-50">·</span>
+                <User className="h-3 w-3 shrink-0" />
+                <span className="truncate">{authorLabel}</span>
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1">
             <Button size="icon" variant="ghost" className={cn(pinned && "text-primary")} onClick={() => setPinned(!pinned)}>

@@ -5564,13 +5564,14 @@ export type Database = {
           content: Json
           cover_image: string | null
           created_at: string
-          created_by: string | null
+          created_by: string
           folder_id: string | null
           id: string
           linked_contact_id: string | null
           order_index: number
           pinned: boolean
           reminder_at: string | null
+          reminder_notified_at: string | null
           tags: string[]
           title: string | null
           trashed_at: string | null
@@ -5584,13 +5585,14 @@ export type Database = {
           content?: Json
           cover_image?: string | null
           created_at?: string
-          created_by?: string | null
+          created_by: string
           folder_id?: string | null
           id?: string
           linked_contact_id?: string | null
           order_index?: number
           pinned?: boolean
           reminder_at?: string | null
+          reminder_notified_at?: string | null
           tags?: string[]
           title?: string | null
           trashed_at?: string | null
@@ -5604,13 +5606,14 @@ export type Database = {
           content?: Json
           cover_image?: string | null
           created_at?: string
-          created_by?: string | null
+          created_by?: string
           folder_id?: string | null
           id?: string
           linked_contact_id?: string | null
           order_index?: number
           pinned?: boolean
           reminder_at?: string | null
+          reminder_notified_at?: string | null
           tags?: string[]
           title?: string | null
           trashed_at?: string | null

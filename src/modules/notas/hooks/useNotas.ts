@@ -153,7 +153,12 @@ export function useNotes(section: NotesSection, search: string, labelFilter?: { 
 
   const updateNote = async (id: string, patch: Partial<Note>) => {
     setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, ...patch } as Note : n)));
-    await supabase.from("notes").update(patch as any).eq("id", id);
+    // If the reminder was changed, reset notified flag so it can fire again
+    const finalPatch: any = { ...patch };
+    if (Object.prototype.hasOwnProperty.call(patch, "reminder_at")) {
+      finalPatch.reminder_notified_at = null;
+    }
+    await supabase.from("notes").update(finalPatch).eq("id", id);
   };
 
   const archiveNote = async (id: string, archived = true) => {

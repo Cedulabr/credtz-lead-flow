@@ -4,9 +4,12 @@ import { NotebookPen, Trello } from "lucide-react";
 import { NotesView } from "./views/NotesView";
 import { BoardsView } from "./views/BoardsView";
 import { QuickCaptureFab } from "./components/QuickCaptureFab";
+import { ReminderAlertDialog } from "./components/ReminderAlertDialog";
+import { useReminderWatcher } from "./hooks/useReminderWatcher";
 
 export function NotasModule() {
   const [tab, setTab] = useState<"notas" | "quadros">("notas");
+  const { activeAlerts, dismissAlert, dismissAll } = useReminderWatcher();
 
   return (
     <div className="relative h-[calc(100vh-3.5rem)] md:h-screen flex flex-col bg-background">
@@ -35,6 +38,12 @@ export function NotasModule() {
       </Tabs>
 
       <QuickCaptureFab />
+
+      <ReminderAlertDialog
+        alerts={activeAlerts}
+        onDismiss={dismissAlert}
+        onDismissAll={dismissAll}
+      />
     </div>
   );
 }
