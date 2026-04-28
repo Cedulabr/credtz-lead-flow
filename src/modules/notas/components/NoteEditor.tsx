@@ -3,7 +3,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, Pin, Tag as TagIcon, Bell, Archive, Trash2, CheckSquare, MoreHorizontal } from "lucide-react";
+import { X, Pin, Tag as TagIcon, Bell, Archive, Trash2, CheckSquare, MoreHorizontal, User } from "lucide-react";
 import { BlockEditor } from "./BlockEditor";
 import { ChecklistNote, type ChecklistItem } from "./ChecklistNote";
 import { NOTE_COLORS, LABEL_COLORS, type Note, type NoteColor, type NoteLabel } from "../types";
@@ -20,6 +20,7 @@ interface Props {
   onToggleLabel?: (labelId: string) => Promise<any> | void;
   onArchive?: () => void;
   onTrash?: () => void;
+  authorLabel?: string | null;
 }
 
 const labelColor = (id: string) => LABEL_COLORS.find((c) => c.id === id)?.className ?? "bg-gray-500";
