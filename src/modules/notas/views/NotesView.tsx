@@ -21,6 +21,7 @@ import { InlineNoteCreator } from "../components/InlineNoteCreator";
 import { LabelManagerDialog } from "../components/LabelManagerDialog";
 import { useFolders, useNotes } from "../hooks/useNotas";
 import { useLabels } from "../hooks/useLabels";
+import { useNotesAuthors } from "../hooks/useNotesAuthors";
 import type { Note, NotesSection } from "../types";
 import { cn } from "@/lib/utils";
 
@@ -85,6 +86,10 @@ export function NotesView() {
     return () => window.removeEventListener("notas:refresh", handler);
   }, [fetchNotes]);
 
+  const { getAuthorLabel, isGestorOrAdmin } = useNotesAuthors(
+    notes.map((n) => n.created_by)
+  );
+
   const meta = sectionMeta(
     section,
     section.kind === "label" ? labels.find((l) => l.id === section.labelId)?.name : undefined,
@@ -100,6 +105,7 @@ export function NotesView() {
       note={n}
       labels={labels}
       noteLabelIds={noteLabelsMap[n.id] ?? []}
+      authorLabel={isGestorOrAdmin ? getAuthorLabel(n.created_by) : null}
       onClick={() => setEditingNote(n)}
       onPin={() => updateNote(n.id, { pinned: !n.pinned })}
       onDelete={() => trashNote(n.id)}
