@@ -115,6 +115,18 @@ export function useNotes(section: NotesSection, search: string, labelFilter?: { 
   }, [fetchNotes]);
 
   const createNote = async (partial: Partial<Note>): Promise<Note | undefined> => {
+    const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    let companyId: string | null = null;
+    if (userId) {
+      const { data: uc } = await supabase
+        .from("user_companies")
+        .select("company_id")
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      companyId = (uc as any)?.company_id ?? null;
+    }
     const insertPayload: any = {
       title: partial.title ?? "Sem título",
       content: partial.content ?? [],
@@ -125,10 +137,15 @@ export function useNotes(section: NotesSection, search: string, labelFilter?: { 
       reminder_at: partial.reminder_at ?? null,
       linked_contact_id: partial.linked_contact_id ?? null,
       checklist_mode: partial.checklist_mode ?? false,
-      created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+      created_by: userId,
+      company_id: companyId,
     };
     const { data, error } = await supabase.from("notes").insert(insertPayload).select().single();
-    if (!error && data) {
+    if (error) {
+      console.error("Erro ao criar nota:", error);
+      throw error;
+    }
+    if (data) {
       setNotes((prev) => [data as Note, ...prev]);
       return data as Note;
     }

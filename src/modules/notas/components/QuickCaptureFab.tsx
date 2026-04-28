@@ -24,11 +24,27 @@ export function QuickCaptureFab() {
     const contentJson = content
       ? { type: "doc", content: content.split("\n").map((line) => ({ type: "paragraph", content: line ? [{ type: "text", text: line }] : [] })) }
       : [];
+
+    const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+    let companyId: string | null = null;
+    if (userId) {
+      const { data: uc } = await supabase
+        .from("user_companies")
+        .select("company_id")
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      companyId = (uc as any)?.company_id ?? null;
+    }
+
     const { error } = await (supabase.from("notes") as any).insert({
       title: title || "Sem título",
       content: contentJson as any,
       tags: tagsArr,
       color: "yellow",
+      created_by: userId,
+      company_id: companyId,
     });
     setSaving(false);
     if (error) {
