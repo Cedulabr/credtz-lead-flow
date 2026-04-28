@@ -1,4 +1,4 @@
-import { Pin, Trash2, Copy, Tag as TagIcon, Archive, ArchiveRestore, Bell, RotateCcw } from "lucide-react";
+import { Pin, Trash2, Copy, Tag as TagIcon, Archive, ArchiveRestore, Bell, RotateCcw, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,7 @@ interface Props {
   inArchive?: boolean;
   labels?: NoteLabel[];
   noteLabelIds?: string[];
+  authorLabel?: string | null;
 }
 
 const labelColor = (id: string) => LABEL_COLORS.find((c) => c.id === id)?.className ?? "bg-gray-500";
@@ -47,6 +48,7 @@ export function NoteCard({
   inArchive,
   labels = [],
   noteLabelIds = [],
+  authorLabel,
 }: Props) {
   const palette = NOTE_COLORS.find((c) => c.id === note.color) ?? NOTE_COLORS[0];
   const isChecklist = note.checklist_mode && Array.isArray(note.content);
@@ -130,8 +132,16 @@ export function NoteCard({
         </div>
       )}
 
-      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
-        <span className="text-[10px] text-muted-foreground">{date}</span>
+      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40 gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[10px] text-muted-foreground whitespace-nowrap">{date}</span>
+          {authorLabel && (
+            <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 gap-0.5 max-w-[140px]">
+              <User className="h-2.5 w-2.5 shrink-0" />
+              <span className="truncate">{authorLabel}</span>
+            </Badge>
+          )}
+        </div>
         <div className="hidden group-hover:flex gap-0.5">
           {inTrash ? (
             <>
