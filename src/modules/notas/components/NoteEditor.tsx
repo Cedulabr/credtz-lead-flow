@@ -35,6 +35,7 @@ export function NoteEditor({
   onToggleLabel,
   onArchive,
   onTrash,
+  authorLabel,
 }: Props) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState<any>([]);
