@@ -17,8 +17,8 @@ export function useNotesAuthors(userIds: (string | null | undefined)[]) {
   const { profile, isAdmin } = useAuth();
   const [authors, setAuthors] = useState<Record<string, AuthorInfo>>({});
 
-  const isGestorOrAdmin =
-    isAdmin || profile?.role === "gestor" || profile?.role === "admin";
+  const role = (profile as any)?.role as string | undefined;
+  const isGestorOrAdmin = isAdmin || role === "gestor" || role === "admin";
 
   // build a stable key based on unique IDs
   const uniqueIds = Array.from(
