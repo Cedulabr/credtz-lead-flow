@@ -252,6 +252,7 @@ export function NotesView() {
         onToggleLabel={(labelId) => editingNote && toggleNoteLabel(editingNote.id, labelId)}
         onArchive={editingNote ? () => { archiveNote(editingNote.id, !editingNote.archived); setEditingNote(null); } : undefined}
         onTrash={editingNote ? () => { trashNote(editingNote.id); setEditingNote(null); } : undefined}
+        authorLabel={editingNote && isGestorOrAdmin ? getAuthorLabel(editingNote.created_by) : null}
       />
 
       <LabelManagerDialog

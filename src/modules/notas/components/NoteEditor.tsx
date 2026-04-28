@@ -123,9 +123,16 @@ export function NoteEditor({
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent side="right" className={cn("w-full sm:max-w-2xl p-0 flex flex-col", palette.bg)}>
-        <div className="flex items-center justify-between border-b px-4 py-2">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {savingState === "saving" ? "Salvando..." : "Salvo"}
+        <div className="flex items-center justify-between border-b px-4 py-2 gap-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+            <span className="whitespace-nowrap">{savingState === "saving" ? "Salvando..." : "Salvo"}</span>
+            {authorLabel && (
+              <span className="flex items-center gap-1 truncate">
+                <span className="opacity-50">·</span>
+                <User className="h-3 w-3 shrink-0" />
+                <span className="truncate">{authorLabel}</span>
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1">
             <Button size="icon" variant="ghost" className={cn(pinned && "text-primary")} onClick={() => setPinned(!pinned)}>
