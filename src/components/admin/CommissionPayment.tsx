@@ -705,6 +705,159 @@ export function CommissionPayment() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Commission Dialog */}
+      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Lançar Comissão em Lote</DialogTitle>
+            <DialogDescription>
+              Configure como a comissão será aplicada a todas as {filteredProposals.length} propostas filtradas.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Resumo do escopo */}
+            <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Propostas no lote</span>
+                <span className="font-semibold">{filteredProposals.length}</span>
+              </div>
+              {productFilter !== 'all' && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Produto</span>
+                  <span className="font-medium">{productFilter}</span>
+                </div>
+              )}
+              {bankFilter !== 'all' && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Banco</span>
+                  <span className="font-medium">{bankFilter}</span>
+                </div>
+              )}
+              {userFilter !== 'all' && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Funcionário</span>
+                  <span className="font-medium">{uniqueUsers.find(([id]) => id === userFilter)?.[1] || userFilter}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Tipo de comissão */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tipo de comissão</label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={bulkMode === 'percentual' ? 'default' : 'outline'}
+                  onClick={() => setBulkMode('percentual')}
+                >
+                  Percentual (%)
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={bulkMode === 'fixo' ? 'default' : 'outline'}
+                  onClick={() => setBulkMode('fixo')}
+                >
+                  Valor Fixo (R$)
+                </Button>
+              </div>
+            </div>
+
+            {/* Base de cálculo */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Base de cálculo</label>
+              <Select value={bulkBase} onValueChange={(v: any) => setBulkBase(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="parcela">Valor da Parcela</SelectItem>
+                  <SelectItem value="saldo_devedor">Saldo Devedor</SelectItem>
+                  <SelectItem value="bruto">Bruto (Troco)</SelectItem>
+                  <SelectItem value="liquido">Líquido</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                A base será aplicada por proposta usando o respectivo valor de cada uma.
+              </p>
+            </div>
+
+            {/* Valor */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium">
+                {bulkMode === 'percentual' ? 'Percentual (%)' : 'Valor fixo por proposta (R$)'}
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder={bulkMode === 'percentual' ? 'Ex: 2.5' : 'Ex: 150.00'}
+                value={bulkInput}
+                onChange={e => setBulkInput(e.target.value)}
+              />
+            </div>
+
+            {/* Modo de aplicação */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Modo de aplicação</label>
+              <div className="flex flex-col gap-2">
+                <label className={`flex items-start gap-2 rounded-md border p-2 cursor-pointer ${bulkApplyMode === 'forced' ? 'border-primary bg-primary/5' : ''}`}>
+                  <input
+                    type="radio"
+                    className="mt-1"
+                    checked={bulkApplyMode === 'forced'}
+                    onChange={() => setBulkApplyMode('forced')}
+                  />
+                  <div className="text-sm">
+                    <div className="font-medium">Aplicar a todas</div>
+                    <div className="text-xs text-muted-foreground">
+                      Usa o valor digitado em todas as propostas, ignorando regras cadastradas.
+                    </div>
+                  </div>
+                </label>
+                <label className={`flex items-start gap-2 rounded-md border p-2 cursor-pointer ${bulkApplyMode === 'rule_first' ? 'border-primary bg-primary/5' : ''}`}>
+                  <input
+                    type="radio"
+                    className="mt-1"
+                    checked={bulkApplyMode === 'rule_first'}
+                    onChange={() => setBulkApplyMode('rule_first')}
+                  />
+                  <div className="text-sm">
+                    <div className="font-medium">Usar regra cadastrada quando existir</div>
+                    <div className="text-xs text-muted-foreground">
+                      Aplica a regra de comissão por banco/produto/nível; usa o valor digitado apenas onde não houver regra.
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Preview total */}
+            <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/30 p-3 text-center border border-emerald-200 dark:border-emerald-900">
+              <div className="text-xs text-muted-foreground mb-1">Total estimado a lançar</div>
+              <div className="text-2xl font-bold tabular-nums text-emerald-600">
+                R$ {filteredProposals.reduce((sum, p) => sum + resolveBulkValues(p).amount, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1">
+                {filteredProposals.length} proposta(s) — base: {BASE_LABELS[bulkBase]}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="sticky bottom-0 bg-background pt-3 border-t">
+            <Button variant="outline" onClick={() => setBulkDialogOpen(false)} disabled={postingAll}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmBulkPost} disabled={postingAll || !bulkInput}>
+              {postingAll ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Receipt className="h-4 w-4 mr-2" />}
+              {postingAll ? 'Lançando...' : `Confirmar (${filteredProposals.length})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
