@@ -114,7 +114,7 @@ export function ExportPDFButton({ filteredTelevendas, filteredStats, filters, is
         { label: "Produto", w: 24 },
         { label: "Banco", w: 22 },
         { label: "Status", w: 22 },
-        { label: "Valor", w: 22 },
+        { label: "Valor Parcela", w: 22 },
       ];
       const tableW = cols.reduce((s, c) => s + c.w, 0);
 
@@ -153,7 +153,7 @@ export function ExportPDFButton({ filteredTelevendas, filteredStats, filters, is
           (tv.tipo_operacao || "").substring(0, 14),
           (tv.banco || "").substring(0, 12),
           (tv.status || "").substring(0, 12),
-          formatCurrency(tv.troco),
+          formatCurrency(tv.parcela),
         ];
 
         rowData.forEach((val, ci) => {
