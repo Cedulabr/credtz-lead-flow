@@ -53,14 +53,22 @@ export function CommissionPayment() {
   const [bankFilter, setBankFilter] = useState('all');
   const [userFilter, setUserFilter] = useState('all');
   const [monthFilter, setMonthFilter] = useState('all');
+  const [productFilter, setProductFilter] = useState('all');
 
-  // Dialog state
+  // Dialog state (individual)
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<PaidProposal | null>(null);
   const [commissionMode, setCommissionMode] = useState<'percentual' | 'fixo'>('percentual');
   const [commissionBase, setCommissionBase] = useState<'parcela' | 'saldo_devedor' | 'bruto' | 'liquido'>('parcela');
   const [commissionInput, setCommissionInput] = useState('');
   const [dialogPosting, setDialogPosting] = useState(false);
+
+  // Bulk dialog state
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkMode, setBulkMode] = useState<'percentual' | 'fixo'>('percentual');
+  const [bulkBase, setBulkBase] = useState<'parcela' | 'saldo_devedor' | 'bruto' | 'liquido'>('parcela');
+  const [bulkInput, setBulkInput] = useState('');
+  const [bulkApplyMode, setBulkApplyMode] = useState<'forced' | 'rule_first'>('forced');
 
   useEffect(() => {
     fetchData();
