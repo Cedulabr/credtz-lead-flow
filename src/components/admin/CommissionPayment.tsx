@@ -261,14 +261,48 @@ export function CommissionPayment() {
     }
   };
 
-  const handlePostAll = async () => {
+  // Calcula valores usando os controles do diálogo de lote
+  const computeFromBulk = (proposal: PaidProposal) => {
+    const inputVal = parseFloat(bulkInput) || 0;
+    const baseValue = getBaseValueByMode(proposal, bulkBase);
+    let percentage = 0;
+    let amount = 0;
+    if (bulkMode === 'percentual') {
+      percentage = inputVal;
+      amount = baseValue * (inputVal / 100);
+    } else {
+      amount = inputVal;
+      percentage = baseValue > 0 ? (inputVal / baseValue) * 100 : 0;
+    }
+    return { amount, percentage, baseValue };
+  };
+
+  const resolveBulkValues = (proposal: PaidProposal) => {
+    if (bulkApplyMode === 'rule_first') {
+      const r = calculateCommission(proposal);
+      if (r.rule) return { amount: r.amount, percentage: r.percentage, baseValue: r.baseValue };
+    }
+    return computeFromBulk(proposal);
+  };
+
+  const bulkTotalEstimated = useMemo(() => {
+    if (!bulkDialogOpen) return 0;
+    return filteredProposals.reduce((sum, p) => sum + resolveBulkValues(p).amount, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bulkDialogOpen, bulkInput, bulkMode, bulkBase, bulkApplyMode, filteredProposals]);
+
+  const handleConfirmBulkPost = async () => {
+    if (!bulkInput || parseFloat(bulkInput) <= 0) {
+      toast({ title: 'Informe um valor válido', variant: 'destructive' });
+      return;
+    }
     setPostingAll(true);
     let success = 0;
     let failed = 0;
 
     for (const proposal of filteredProposals) {
       try {
-        const { amount, percentage, baseValue } = calculateCommission(proposal);
+        const { amount, percentage, baseValue } = resolveBulkValues(proposal);
 
         const { error } = await supabase.from('commissions').insert({
           user_id: proposal.user_id,
@@ -298,6 +332,7 @@ export function CommissionPayment() {
       description: `${success} lançadas, ${failed} com erro`,
     });
 
+    setBulkDialogOpen(false);
     await fetchData();
     setPostingAll(false);
   };
