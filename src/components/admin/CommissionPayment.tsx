@@ -364,6 +364,7 @@ export function CommissionPayment() {
       const matchCompany = companyFilter === 'all' || p.company_id === companyFilter;
       const matchBank = bankFilter === 'all' || p.banco.toLowerCase() === bankFilter.toLowerCase();
       const matchUser = userFilter === 'all' || p.user_id === userFilter;
+      const matchProduct = productFilter === 'all' || (p.tipo_operacao || '').toLowerCase() === productFilter.toLowerCase();
       const matchMonth = (() => {
         if (monthFilter === 'all') return true;
         const dateStr = p.data_pagamento || p.data_venda;
@@ -372,12 +373,16 @@ export function CommissionPayment() {
           return format(parseISO(dateStr), 'yyyy-MM') === monthFilter;
         } catch { return false; }
       })();
-      return matchSearch && matchCompany && matchBank && matchUser && matchMonth;
+      return matchSearch && matchCompany && matchBank && matchUser && matchProduct && matchMonth;
     });
-  }, [proposals, searchTerm, companyFilter, bankFilter, userFilter, monthFilter]);
+  }, [proposals, searchTerm, companyFilter, bankFilter, userFilter, productFilter, monthFilter]);
 
   const uniqueBanks = useMemo(() => {
     return [...new Set(proposals.map(p => p.banco))].sort();
+  }, [proposals]);
+
+  const uniqueProducts = useMemo(() => {
+    return [...new Set(proposals.map(p => p.tipo_operacao).filter(Boolean))].sort();
   }, [proposals]);
 
   if (isLoading) {
