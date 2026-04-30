@@ -285,12 +285,6 @@ export function CommissionPayment() {
     return computeFromBulk(proposal);
   };
 
-  const bulkTotalEstimated = useMemo(() => {
-    if (!bulkDialogOpen) return 0;
-    return filteredProposals.reduce((sum, p) => sum + resolveBulkValues(p).amount, 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bulkDialogOpen, bulkInput, bulkMode, bulkBase, bulkApplyMode, filteredProposals]);
-
   const handleConfirmBulkPost = async () => {
     if (!bulkInput || parseFloat(bulkInput) <= 0) {
       toast({ title: 'Informe um valor válido', variant: 'destructive' });
