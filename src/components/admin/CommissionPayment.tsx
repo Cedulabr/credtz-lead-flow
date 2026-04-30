@@ -470,6 +470,17 @@ export function CommissionPayment() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={productFilter} onValueChange={setProductFilter}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Produto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos produtos</SelectItem>
+                  {uniqueProducts.map(prod => (
+                    <SelectItem key={prod} value={prod}>{prod}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={monthFilter} onValueChange={setMonthFilter}>
                 <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Mês" />
@@ -483,7 +494,13 @@ export function CommissionPayment() {
               </Select>
               {filteredProposals.length > 0 && (
                 <Button
-                  onClick={handlePostAll}
+                  onClick={() => {
+                    setBulkInput('');
+                    setBulkMode('percentual');
+                    setBulkBase('parcela');
+                    setBulkApplyMode('forced');
+                    setBulkDialogOpen(true);
+                  }}
                   disabled={postingAll}
                   className="gap-2 ml-auto"
                 >
