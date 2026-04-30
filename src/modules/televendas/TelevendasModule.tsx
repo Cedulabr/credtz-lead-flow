@@ -28,7 +28,7 @@ import { useTelevendasStats } from "./hooks/useTelevendasStats";
 import { SmartSearch } from "./components/SmartSearch";
 import { StatusChangeModal } from "./components/StatusChangeModal";
 import { FiltersDrawer } from "./components/FiltersDrawer";
-import { ExportPDFButton } from "./components/ExportPDFButton";
+import { ExportTelevendasButton } from "./components/ExportTelevendasButton";
 import { DetailModal } from "./components/DetailModal";
 import { EditProposalModal } from "./components/EditProposalModal";
 import { CollaboratorEditModal } from "./components/CollaboratorEditModal";
@@ -719,7 +719,7 @@ export const TelevendasModule = () => {
                 <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
                 <span className="hidden sm:inline">Sync</span>
               </Button>
-              <ExportPDFButton
+              <ExportTelevendasButton
                 filteredTelevendas={filteredTelevendas}
                 filteredStats={filteredStats}
                 filters={filters}
