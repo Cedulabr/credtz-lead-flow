@@ -53,14 +53,22 @@ export function CommissionPayment() {
   const [bankFilter, setBankFilter] = useState('all');
   const [userFilter, setUserFilter] = useState('all');
   const [monthFilter, setMonthFilter] = useState('all');
+  const [productFilter, setProductFilter] = useState('all');
 
-  // Dialog state
+  // Dialog state (individual)
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<PaidProposal | null>(null);
   const [commissionMode, setCommissionMode] = useState<'percentual' | 'fixo'>('percentual');
   const [commissionBase, setCommissionBase] = useState<'parcela' | 'saldo_devedor' | 'bruto' | 'liquido'>('parcela');
   const [commissionInput, setCommissionInput] = useState('');
   const [dialogPosting, setDialogPosting] = useState(false);
+
+  // Bulk dialog state
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkMode, setBulkMode] = useState<'percentual' | 'fixo'>('percentual');
+  const [bulkBase, setBulkBase] = useState<'parcela' | 'saldo_devedor' | 'bruto' | 'liquido'>('parcela');
+  const [bulkInput, setBulkInput] = useState('');
+  const [bulkApplyMode, setBulkApplyMode] = useState<'forced' | 'rule_first'>('forced');
 
   useEffect(() => {
     fetchData();
@@ -253,14 +261,42 @@ export function CommissionPayment() {
     }
   };
 
-  const handlePostAll = async () => {
+  // Calcula valores usando os controles do diálogo de lote
+  const computeFromBulk = (proposal: PaidProposal) => {
+    const inputVal = parseFloat(bulkInput) || 0;
+    const baseValue = getBaseValueByMode(proposal, bulkBase);
+    let percentage = 0;
+    let amount = 0;
+    if (bulkMode === 'percentual') {
+      percentage = inputVal;
+      amount = baseValue * (inputVal / 100);
+    } else {
+      amount = inputVal;
+      percentage = baseValue > 0 ? (inputVal / baseValue) * 100 : 0;
+    }
+    return { amount, percentage, baseValue };
+  };
+
+  const resolveBulkValues = (proposal: PaidProposal) => {
+    if (bulkApplyMode === 'rule_first') {
+      const r = calculateCommission(proposal);
+      if (r.rule) return { amount: r.amount, percentage: r.percentage, baseValue: r.baseValue };
+    }
+    return computeFromBulk(proposal);
+  };
+
+  const handleConfirmBulkPost = async () => {
+    if (!bulkInput || parseFloat(bulkInput) <= 0) {
+      toast({ title: 'Informe um valor válido', variant: 'destructive' });
+      return;
+    }
     setPostingAll(true);
     let success = 0;
     let failed = 0;
 
     for (const proposal of filteredProposals) {
       try {
-        const { amount, percentage, baseValue } = calculateCommission(proposal);
+        const { amount, percentage, baseValue } = resolveBulkValues(proposal);
 
         const { error } = await supabase.from('commissions').insert({
           user_id: proposal.user_id,
@@ -290,6 +326,7 @@ export function CommissionPayment() {
       description: `${success} lançadas, ${failed} com erro`,
     });
 
+    setBulkDialogOpen(false);
     await fetchData();
     setPostingAll(false);
   };
@@ -327,6 +364,7 @@ export function CommissionPayment() {
       const matchCompany = companyFilter === 'all' || p.company_id === companyFilter;
       const matchBank = bankFilter === 'all' || p.banco.toLowerCase() === bankFilter.toLowerCase();
       const matchUser = userFilter === 'all' || p.user_id === userFilter;
+      const matchProduct = productFilter === 'all' || (p.tipo_operacao || '').toLowerCase() === productFilter.toLowerCase();
       const matchMonth = (() => {
         if (monthFilter === 'all') return true;
         const dateStr = p.data_pagamento || p.data_venda;
@@ -335,12 +373,16 @@ export function CommissionPayment() {
           return format(parseISO(dateStr), 'yyyy-MM') === monthFilter;
         } catch { return false; }
       })();
-      return matchSearch && matchCompany && matchBank && matchUser && matchMonth;
+      return matchSearch && matchCompany && matchBank && matchUser && matchProduct && matchMonth;
     });
-  }, [proposals, searchTerm, companyFilter, bankFilter, userFilter, monthFilter]);
+  }, [proposals, searchTerm, companyFilter, bankFilter, userFilter, productFilter, monthFilter]);
 
   const uniqueBanks = useMemo(() => {
     return [...new Set(proposals.map(p => p.banco))].sort();
+  }, [proposals]);
+
+  const uniqueProducts = useMemo(() => {
+    return [...new Set(proposals.map(p => p.tipo_operacao).filter(Boolean))].sort();
   }, [proposals]);
 
   if (isLoading) {
@@ -428,6 +470,17 @@ export function CommissionPayment() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={productFilter} onValueChange={setProductFilter}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Produto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos produtos</SelectItem>
+                  {uniqueProducts.map(prod => (
+                    <SelectItem key={prod} value={prod}>{prod}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={monthFilter} onValueChange={setMonthFilter}>
                 <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Mês" />
@@ -441,7 +494,13 @@ export function CommissionPayment() {
               </Select>
               {filteredProposals.length > 0 && (
                 <Button
-                  onClick={handlePostAll}
+                  onClick={() => {
+                    setBulkInput('');
+                    setBulkMode('percentual');
+                    setBulkBase('parcela');
+                    setBulkApplyMode('forced');
+                    setBulkDialogOpen(true);
+                  }}
                   disabled={postingAll}
                   className="gap-2 ml-auto"
                 >
@@ -642,6 +701,159 @@ export function CommissionPayment() {
             <Button onClick={handleConfirmCommission} disabled={dialogPosting || !commissionInput}>
               {dialogPosting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Confirmar Lançamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Commission Dialog */}
+      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Lançar Comissão em Lote</DialogTitle>
+            <DialogDescription>
+              Configure como a comissão será aplicada a todas as {filteredProposals.length} propostas filtradas.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Resumo do escopo */}
+            <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Propostas no lote</span>
+                <span className="font-semibold">{filteredProposals.length}</span>
+              </div>
+              {productFilter !== 'all' && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Produto</span>
+                  <span className="font-medium">{productFilter}</span>
+                </div>
+              )}
+              {bankFilter !== 'all' && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Banco</span>
+                  <span className="font-medium">{bankFilter}</span>
+                </div>
+              )}
+              {userFilter !== 'all' && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Funcionário</span>
+                  <span className="font-medium">{uniqueUsers.find(([id]) => id === userFilter)?.[1] || userFilter}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Tipo de comissão */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tipo de comissão</label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={bulkMode === 'percentual' ? 'default' : 'outline'}
+                  onClick={() => setBulkMode('percentual')}
+                >
+                  Percentual (%)
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={bulkMode === 'fixo' ? 'default' : 'outline'}
+                  onClick={() => setBulkMode('fixo')}
+                >
+                  Valor Fixo (R$)
+                </Button>
+              </div>
+            </div>
+
+            {/* Base de cálculo */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Base de cálculo</label>
+              <Select value={bulkBase} onValueChange={(v: any) => setBulkBase(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="parcela">Valor da Parcela</SelectItem>
+                  <SelectItem value="saldo_devedor">Saldo Devedor</SelectItem>
+                  <SelectItem value="bruto">Bruto (Troco)</SelectItem>
+                  <SelectItem value="liquido">Líquido</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                A base será aplicada por proposta usando o respectivo valor de cada uma.
+              </p>
+            </div>
+
+            {/* Valor */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium">
+                {bulkMode === 'percentual' ? 'Percentual (%)' : 'Valor fixo por proposta (R$)'}
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder={bulkMode === 'percentual' ? 'Ex: 2.5' : 'Ex: 150.00'}
+                value={bulkInput}
+                onChange={e => setBulkInput(e.target.value)}
+              />
+            </div>
+
+            {/* Modo de aplicação */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Modo de aplicação</label>
+              <div className="flex flex-col gap-2">
+                <label className={`flex items-start gap-2 rounded-md border p-2 cursor-pointer ${bulkApplyMode === 'forced' ? 'border-primary bg-primary/5' : ''}`}>
+                  <input
+                    type="radio"
+                    className="mt-1"
+                    checked={bulkApplyMode === 'forced'}
+                    onChange={() => setBulkApplyMode('forced')}
+                  />
+                  <div className="text-sm">
+                    <div className="font-medium">Aplicar a todas</div>
+                    <div className="text-xs text-muted-foreground">
+                      Usa o valor digitado em todas as propostas, ignorando regras cadastradas.
+                    </div>
+                  </div>
+                </label>
+                <label className={`flex items-start gap-2 rounded-md border p-2 cursor-pointer ${bulkApplyMode === 'rule_first' ? 'border-primary bg-primary/5' : ''}`}>
+                  <input
+                    type="radio"
+                    className="mt-1"
+                    checked={bulkApplyMode === 'rule_first'}
+                    onChange={() => setBulkApplyMode('rule_first')}
+                  />
+                  <div className="text-sm">
+                    <div className="font-medium">Usar regra cadastrada quando existir</div>
+                    <div className="text-xs text-muted-foreground">
+                      Aplica a regra de comissão por banco/produto/nível; usa o valor digitado apenas onde não houver regra.
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Preview total */}
+            <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/30 p-3 text-center border border-emerald-200 dark:border-emerald-900">
+              <div className="text-xs text-muted-foreground mb-1">Total estimado a lançar</div>
+              <div className="text-2xl font-bold tabular-nums text-emerald-600">
+                R$ {filteredProposals.reduce((sum, p) => sum + resolveBulkValues(p).amount, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1">
+                {filteredProposals.length} proposta(s) — base: {BASE_LABELS[bulkBase]}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="sticky bottom-0 bg-background pt-3 border-t">
+            <Button variant="outline" onClick={() => setBulkDialogOpen(false)} disabled={postingAll}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmBulkPost} disabled={postingAll || !bulkInput}>
+              {postingAll ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Receipt className="h-4 w-4 mr-2" />}
+              {postingAll ? 'Lançando...' : `Confirmar (${filteredProposals.length})`}
             </Button>
           </DialogFooter>
         </DialogContent>

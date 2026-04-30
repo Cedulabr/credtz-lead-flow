@@ -1,68 +1,70 @@
 ## Objetivo
 
-Hoje, no wizard de importação de Leads Premium (`src/components/leads/ImportWizard.tsx`), os campos obrigatórios de cada convênio (INSS, SIAPE, Servidor Público) estão **fixos no código** em `src/components/leads/wizard/columnsConfig.ts`. Isso impede importar listas que não têm todos os dados (ex.: listagem de INSS só com nome, telefone e tag).
+No módulo **Admin → Financeiro → Pagamento de Comissão**, ao clicar em **"Lançar Todas"**, abrir um diálogo de configuração onde o admin escolhe **como** a comissão será calculada para o lote inteiro, e adicionar um **filtro de Produto** para permitir lançar em massa por categoria (Portabilidade, Margem, Refinanciamento, Cartão, etc.).
 
-A solução: permitir que **admin e gestor** definam, via painel de configurações, quais campos são obrigatórios para cada convênio. Adicionar também o campo "Tag" ao wizard.
+## Mudanças
 
-## O que será entregue
+### 1. Novo filtro: Produto
+Adicionar `productFilter` ao lado dos filtros existentes (Empresa, Banco, Funcionário, Mês). As opções serão geradas dinamicamente a partir do campo `tipo_operacao` das propostas pendentes (Portabilidade, Margem Livre, Refinanciamento, Cartão Benefício, Cartão Consignado, Novo, etc.). O filtro entra na lógica de `filteredProposals`.
 
-1. **Configuração flexível por convênio (admin/gestor)**
-   - Nova tela em `Admin → Leads Premium → Campos de Importação`.
-   - Para cada convênio (INSS, SIAPE, Servidor Público) o gestor vê todos os campos disponíveis e marca quais devem ser **obrigatórios** na importação.
-   - Botão "Restaurar padrão" para voltar à configuração original.
-   - Botão "Salvar" persiste no banco e passa a valer imediatamente para todos os usuários da empresa.
+### 2. Botão "Lançar Todas" abre um diálogo de configuração
+Hoje o botão chama `handlePostAll` direto, usando a regra cadastrada em `commission_rules` para cada proposta. A mudança:
 
-2. **Suporte a Tag na importação**
-   - Adicionar campo `tag` no catálogo de campos (group: cadastro), opcional por padrão, mapeável no passo de mapeamento.
-   - Auto-mapeamento reconhece colunas "tag", "etiqueta", "categoria".
-   - O valor da tag é gravado em `leads_database.tags` (array existente).
+- Botão passa a abrir um novo diálogo `BulkCommissionDialog`.
+- O diálogo mostra: total de propostas filtradas, breakdown por produto/banco, e os controles abaixo.
 
-3. **Wizard de importação respeita configuração**
-   - O passo "Mapeamento" passa a ler os campos obrigatórios da configuração da empresa (cai no padrão se não houver).
-   - Validação `canProceed` usa a lista dinâmica.
-   - Indicador visual (✅/⬜ e asterisco vermelho) reflete os campos obrigatórios configurados.
+### 3. Controles do diálogo de lote
+Mesma lógica do diálogo individual já existente, aplicada ao lote inteiro:
 
-## Mudanças técnicas
+- **Tipo de comissão**: `percentual` ou `valor_fixo` (radio).
+- **Base de cálculo**: `parcela`, `saldo_devedor`, `bruto`, `liquido` (radio).
+- **Valor**: input único (% ou R$ conforme o tipo).
+- **Modo de aplicação** (radio adicional):
+  - **Aplicar a todas** — usa o valor digitado em todas as propostas filtradas.
+  - **Usar regra cadastrada quando existir** — fallback para `commission_rules` por banco/produto/nível e usa o valor digitado só onde não houver regra (comportamento atual aprimorado).
+- **Pré-visualização**: mostra valor total estimado em R$ com base na configuração escolhida, antes de confirmar.
 
-### Banco de dados
-Nova tabela `leads_import_field_config`:
-- `id uuid pk`
-- `company_id uuid` (isolamento multi-tenant — cada empresa tem sua própria config)
-- `convenio text` (`INSS` | `SIAPE` | `SERVIDOR_PUBLICO`)
-- `field_key text` (chave do campo, ex.: `cpf`, `name`, `phone`)
-- `is_required boolean`
-- `updated_by uuid`, `updated_at timestamptz`
-- Unique `(company_id, convenio, field_key)`
-- RLS: SELECT para todos os autenticados da company; INSERT/UPDATE/DELETE só para `admin` e `gestor` (via `has_role_safe`).
+### 4. Processamento em lote
+Substituir a lógica interna de `handlePostAll`:
 
-### Frontend
-- `src/components/leads/wizard/columnsConfig.ts`
-  - Adicionar campo `tag` (opcional) no catálogo dos 3 convênios e no auto-mapeamento.
-  - Renomear `FIELDS_BY_CONVENIO` para `DEFAULT_FIELDS_BY_CONVENIO` (mantém defaults).
-- Novo hook `src/components/leads/wizard/useImportFieldConfig.ts`
-  - Carrega overrides da tabela `leads_import_field_config` para a empresa do usuário.
-  - Retorna `getFields(convenio)` aplicando os overrides sobre o default.
-- `src/components/leads/ImportWizard.tsx`
-  - Trocar `const fields = FIELDS_BY_CONVENIO[convenio]` por `getFields(convenio)` do hook.
-- Nova tela `src/components/admin/LeadsImportFieldsConfig.tsx`
-  - Tabs por convênio (INSS, SIAPE, Servidor Público).
-  - Lista todos os campos com switch "Obrigatório".
-  - Botões "Restaurar padrão" e "Salvar".
-- Registrar rota/menu no painel Admin existente (acesso: admin + gestor).
+- Para cada proposta filtrada, calcular `baseValue` conforme `commissionBase` (reaproveitar `getBaseValueByMode`).
+- Calcular `amount` e `percentage` conforme `commissionMode` e o valor digitado (reaproveitar `getDialogCommissionValues`).
+- Inserir em `commissions` com `status='pago'` e `televendas_id` (mantém deduplicação atual).
+- Toast final com sucesso/falha + refresh.
 
-### Lógica de gravação da Tag
-No `submit()` do wizard, quando o campo `tag` está mapeado, incluir o valor no payload enviado para a edge function de importação. A edge function existente já trata `tags`; verificaremos e ajustaremos se necessário para concatenar a tag importada ao array.
+## Detalhes técnicos
 
-## Fluxo do usuário (gestor INSS só com nome/telefone/tag)
+**Arquivo único alterado**: `src/components/admin/CommissionPayment.tsx`
 
-1. Gestor entra em `Admin → Campos de Importação → INSS`.
-2. Desmarca "Obrigatório" de: CPF, Margem Livre, Margem Total, Banco.
-3. Mantém marcado: Nome, Telefone, Tag.
-4. Salva.
-5. Vai em Leads Premium → Importar → INSS → faz upload do CSV.
-6. No mapeamento, só Nome, Telefone e Tag aparecem com asterisco vermelho.
-7. Importação prossegue normalmente.
+- Adicionar estado: `productFilter`, `bulkDialogOpen`, `bulkMode`, `bulkBase`, `bulkInput`, `bulkApplyMode` ('forced' | 'rule_first'), `bulkPosting`.
+- `uniqueProducts = useMemo(...)` derivado de `proposals.map(p => p.tipo_operacao)`.
+- Adicionar `<Select>` "Produto" na barra de filtros (linha junto com Funcionário/Mês).
+- Incluir `matchProduct` em `filteredProposals`.
+- Trocar `onClick={handlePostAll}` por `onClick={() => setBulkDialogOpen(true)}`.
+- Criar `<Dialog>` de bulk config com mesmos componentes UI já usados (`RadioGroup`, `Input`, `Select`).
+- Função `executeBulkPost()`:
+  ```ts
+  for (const p of filteredProposals) {
+    let amount, percentage, baseValue;
+    if (bulkApplyMode === 'rule_first') {
+      const r = calculateCommission(p);
+      if (r.rule) ({ amount, percentage, baseValue } = r);
+      else ({ amount, percentage, baseValue } = computeFromBulkInputs(p));
+    } else {
+      ({ amount, percentage, baseValue } = computeFromBulkInputs(p));
+    }
+    await supabase.from('commissions').insert({ ... });
+  }
+  ```
+- `computeFromBulkInputs(p)` é uma versão de `getDialogCommissionValues` que recebe `bulkMode`, `bulkBase`, `bulkInput`.
 
-## Fora de escopo
-- Não muda regras de deduplicação nem a edge function de processamento (além do ajuste de tag, se preciso).
-- Atualização em massa (`UpdateWizard`) continua usando os grupos atuais.
+**Sem mudanças de banco** — usa as colunas já existentes em `commissions` (`commission_amount`, `commission_percentage`, `credit_value`).
+
+**Sem mudanças no diálogo individual** — continua funcionando exatamente como hoje.
+
+## Resultado para o usuário
+
+- Filtro de Produto disponível para selecionar e lançar em massa "todas as Portabilidades", "todas as Margens", "todos os Refinanciamentos", "todos os Cartões".
+- Ao clicar em "Lançar Todas (N)", abre diálogo perguntando: tipo (%/R$), base (parcela/saldo devedor/bruto/líquido), valor, e se respeita a regra cadastrada quando existir.
+- Vê o total estimado antes de confirmar.
+- Confirma e lança tudo de uma vez com a configuração escolhida.
