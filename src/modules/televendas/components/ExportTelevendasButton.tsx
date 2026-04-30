@@ -131,25 +131,60 @@ export function ExportTelevendasButton({
 
     const wb = XLSX.utils.book_new();
 
-    // Resumo
-    const resumo = [
-      { Métrica: "Total de Propostas", Valor: filteredStats.totalPropostas },
-      { Métrica: "Propostas Pagas", Valor: filteredStats.paidCount },
-      { Métrica: "Propostas Ativas", Valor: filteredStats.totalPropostasAtivas },
-      { Métrica: "Críticos", Valor: filteredStats.criticos },
-      { Métrica: "Alertas", Valor: filteredStats.alertas },
-      { Métrica: "Valor Total Pago", Valor: filteredStats.totalBrutoPago },
-    ];
-    const wsResumo = XLSX.utils.json_to_sheet(resumo);
-    XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo");
+    // Aba principal: Televendas (mesmas colunas escolhidas, igual ao PDF)
+    const headerLabels = cols.map((c) => c.label);
+    const ws = XLSX.utils.json_to_sheet(rows, { header: headerLabels });
 
-    const ws = XLSX.utils.json_to_sheet(rows);
-    // Auto-width simples
+    // Formatação monetária BRL nas colunas de valor
+    const moneyKeys: ColumnKey[] = ["parcela", "troco", "saldo_devedor"];
+    const moneyColIdx = cols
+      .map((c, i) => (moneyKeys.includes(c.key) ? i : -1))
+      .filter((i) => i >= 0);
+
+    const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+    for (let R = 1; R <= range.e.r; R++) {
+      moneyColIdx.forEach((C) => {
+        const addr = XLSX.utils.encode_cell({ r: R, c: C });
+        const cell = ws[addr];
+        if (cell && typeof cell.v === "number") {
+          cell.t = "n";
+          cell.z = 'R$ #,##0.00;[Red]-R$ #,##0.00';
+        }
+      });
+    }
+
+    // Auto-width
     const colWidths = cols.map((c) => ({
-      wch: Math.max(c.label.length + 2, 14),
+      wch: Math.max(c.label.length + 2, c.key === "observacao" ? 40 : 16),
     }));
     (ws as any)["!cols"] = colWidths;
+    (ws as any)["!autofilter"] = { ref: ws["!ref"] };
+
     XLSX.utils.book_append_sheet(wb, ws, "Televendas");
+
+    // Aba secundária: Resumo (KPIs + filtros ativos), igual ao topo do PDF
+    const activeFilters: string[] = [];
+    if (filters.product && filters.product !== "all") activeFilters.push(`Produto: ${filters.product}`);
+    if (filters.month && filters.month !== "all") activeFilters.push(`Mês: ${filters.month}`);
+    if (filters.status && filters.status !== "all") activeFilters.push(`Status: ${filters.status}`);
+    if (filters.search) activeFilters.push(`Busca: ${filters.search}`);
+
+    const resumo: (string | number)[][] = [
+      ["Relatório Gestão de Televendas"],
+      [`Gerado em: ${new Date().toLocaleString("pt-BR")}`],
+      [`Filtros: ${activeFilters.length ? activeFilters.join(" | ") : "Nenhum"}`],
+      [],
+      ["Métrica", "Valor"],
+      ["Total de Propostas", filteredStats.totalPropostas],
+      ["Propostas Pagas", filteredStats.paidCount],
+      ["Propostas Ativas", filteredStats.totalPropostasAtivas],
+      ["Críticos", filteredStats.criticos],
+      ["Alertas", filteredStats.alertas],
+      ["Valor Total Pago", filteredStats.totalBrutoPago],
+    ];
+    const wsResumo = XLSX.utils.aoa_to_sheet(resumo);
+    (wsResumo as any)["!cols"] = [{ wch: 28 }, { wch: 22 }];
+    XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo");
 
     const dateStr = new Date().toLocaleDateString("pt-BR").replace(/\//g, "-");
     XLSX.writeFile(wb, `televendas_${dateStr}.xlsx`);
