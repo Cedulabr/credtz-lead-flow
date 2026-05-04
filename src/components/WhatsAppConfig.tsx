@@ -92,7 +92,9 @@ export function WhatsAppConfig() {
       const { data, error } = await supabase.functions.invoke("sync-whatsapp-instances");
       if (error) throw error;
       if (data?.success) {
-        toast.success(`Sincronização concluída: ${data.updated} atualizadas, ${data.created} novas, ${data.disconnected} desconectadas`);
+        const errMsg = data.errors > 0 ? ` • ${data.errors} com erro` : "";
+        toast.success(`Sincronização: ${data.total} encontradas • ${data.updated} atualizadas • ${data.created} novas • ${data.disconnected} desconectadas${errMsg}`);
+        if (data.errors > 0) console.warn("Sync errors:", data.errorDetails);
         fetchInstances();
       } else {
         toast.error(data?.error || "Erro ao sincronizar");
