@@ -159,6 +159,8 @@ Deno.serve(async (req) => {
         updated,
         created,
         disconnected,
+        errors,
+        errorDetails: errorDetails.slice(0, 20),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
