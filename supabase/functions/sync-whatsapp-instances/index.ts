@@ -84,33 +84,71 @@ Deno.serve(async (req) => {
     let created = 0;
     let disconnected = 0;
 
-    for (const evoInst of evoInstances) {
-      const instanceName = evoInst.instance?.instanceName || evoInst.instanceName || evoInst.name;
-      if (!instanceName) continue;
+    let errors = 0;
+    const errorDetails: string[] = [];
 
-      const state = evoInst.instance?.state || evoInst.state || "unknown";
+    for (const evoInst of evoInstances) {
+      // Support multiple Evolution API response shapes (v1 nested, v2 flat)
+      const instanceName =
+        evoInst.instance?.instanceName ||
+        evoInst.instanceName ||
+        evoInst.name ||
+        evoInst.instance?.name;
+      if (!instanceName) {
+        console.warn("Skipping instance without name:", JSON.stringify(evoInst).slice(0, 200));
+        continue;
+      }
+
+      const state =
+        evoInst.instance?.state ||
+        evoInst.state ||
+        evoInst.connectionStatus ||
+        evoInst.instance?.connectionStatus ||
+        evoInst.status ||
+        "unknown";
       const newStatus = state === "open" ? "connected" : "disconnected";
       if (newStatus === "disconnected") disconnected++;
 
+      // Try to extract phone number
+      const ownerJid =
+        evoInst.ownerJid ||
+        evoInst.instance?.owner ||
+        evoInst.owner ||
+        evoInst.number ||
+        null;
+      const phoneNumber = ownerJid
+        ? String(ownerJid).replace(/@.*/, "").replace(/\D/g, "") || null
+        : null;
+
       const existing = existingMap.get(instanceName);
 
-      if (existing) {
-        // Update status
-        await supabase
-          .from("whatsapp_instances")
-          .update({ instance_status: newStatus })
-          .eq("id", (existing as any).id);
-        updated++;
-      } else {
-        // Insert new instance
-        await supabase
-          .from("whatsapp_instances")
-          .insert({
-            instance_name: instanceName,
-            instance_status: newStatus,
-            user_id: user.id,
-          });
-        created++;
+      try {
+        if (existing) {
+          const updateData: any = { instance_status: newStatus };
+          if (phoneNumber) updateData.phone_number = phoneNumber;
+          const { error: upErr } = await supabase
+            .from("whatsapp_instances")
+            .update(updateData)
+            .eq("id", (existing as any).id);
+          if (upErr) throw upErr;
+          updated++;
+        } else {
+          const { error: insErr } = await supabase
+            .from("whatsapp_instances")
+            .insert({
+              instance_name: instanceName,
+              instance_status: newStatus,
+              phone_number: phoneNumber,
+              user_id: user.id,
+            });
+          if (insErr) throw insErr;
+          created++;
+        }
+      } catch (e: any) {
+        errors++;
+        const msg = `${instanceName}: ${e?.message || e}`;
+        console.error("Sync row error:", msg);
+        errorDetails.push(msg);
       }
     }
 
