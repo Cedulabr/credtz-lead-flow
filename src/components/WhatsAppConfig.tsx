@@ -606,10 +606,31 @@ export function WhatsAppConfig() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button onClick={handleSyncInstances} disabled={syncing} className="gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white">
-              {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Sincronizar com EasynFlow
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button disabled={syncing} className="gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white">
+                  {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Sincronizar com EasynFlow
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem onClick={() => handleSyncInstances("all")}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <div className="flex flex-col">
+                    <span className="font-medium">Sincronização total</span>
+                    <span className="text-xs text-muted-foreground">Recalcula todas as instâncias</span>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSyncInstances("pending")}>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  <div className="flex flex-col">
+                    <span className="font-medium">Apenas pendentes</span>
+                    <span className="text-xs text-muted-foreground">Ignora as já conectadas</span>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button onClick={openNewForm} className="gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white">
               <Plus className="h-4 w-4" /> Nova Instância
             </Button>
