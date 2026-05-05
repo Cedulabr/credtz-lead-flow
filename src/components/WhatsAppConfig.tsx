@@ -11,10 +11,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   MessageCircle, Save, Loader2, CheckCircle, XCircle, RefreshCw, Send,
   History, Plus, Trash2, Edit, Phone, Clock, Ban, Building2, User, Shield, Users,
-  AlertTriangle, RotateCcw, Pencil
+  AlertTriangle, RotateCcw, Pencil, ChevronDown
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
