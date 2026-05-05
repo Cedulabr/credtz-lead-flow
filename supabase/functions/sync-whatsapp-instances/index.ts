@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
     // Get existing instances from DB
     const { data: existingInstances } = await supabase
       .from("whatsapp_instances")
-      .select("id, instance_name, instance_status");
+      .select("id, instance_name, instance_status, phone_number");
 
     const existingMap = new Map(
       (existingInstances || []).map((i: any) => [i.instance_name, i])
@@ -92,6 +92,7 @@ Deno.serve(async (req) => {
     let updated = 0;
     let created = 0;
     let disconnected = 0;
+    let skipped = 0;
 
     let errors = 0;
     const errorDetails: string[] = [];
