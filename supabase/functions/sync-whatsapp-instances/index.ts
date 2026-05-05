@@ -34,6 +34,15 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Parse body for sync mode (default: 'all')
+    let mode: "all" | "pending" = "all";
+    try {
+      if (req.method === "POST") {
+        const body = await req.json().catch(() => ({}));
+        if (body?.mode === "pending") mode = "pending";
+      }
+    } catch (_) {}
+
     // Get user from token
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: userError } = await createClient(
