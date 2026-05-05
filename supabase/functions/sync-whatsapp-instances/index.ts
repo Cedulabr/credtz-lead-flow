@@ -172,10 +172,12 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
+        mode,
         total: evoInstances.length,
         updated,
         created,
         disconnected,
+        skipped,
         errors,
         errorDetails: errorDetails.slice(0, 20),
       }),
