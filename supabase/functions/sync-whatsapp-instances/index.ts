@@ -34,6 +34,15 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Parse body for sync mode (default: 'all')
+    let mode: "all" | "pending" = "all";
+    try {
+      if (req.method === "POST") {
+        const body = await req.json().catch(() => ({}));
+        if (body?.mode === "pending") mode = "pending";
+      }
+    } catch (_) {}
+
     // Get user from token
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: userError } = await createClient(
@@ -74,7 +83,7 @@ Deno.serve(async (req) => {
     // Get existing instances from DB
     const { data: existingInstances } = await supabase
       .from("whatsapp_instances")
-      .select("id, instance_name, instance_status");
+      .select("id, instance_name, instance_status, phone_number");
 
     const existingMap = new Map(
       (existingInstances || []).map((i: any) => [i.instance_name, i])
@@ -83,6 +92,7 @@ Deno.serve(async (req) => {
     let updated = 0;
     let created = 0;
     let disconnected = 0;
+    let skipped = 0;
 
     let errors = 0;
     const errorDetails: string[] = [];
@@ -122,6 +132,13 @@ Deno.serve(async (req) => {
 
       const existing = existingMap.get(instanceName);
 
+      // In 'pending' mode, skip instances already connected with phone number set
+      if (mode === "pending" && existing && (existing as any).instance_status === "connected" && (existing as any).phone_number) {
+        skipped++;
+        continue;
+      }
+
+
       try {
         if (existing) {
           const updateData: any = { instance_status: newStatus };
@@ -155,10 +172,12 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
+        mode,
         total: evoInstances.length,
         updated,
         created,
         disconnected,
+        skipped,
         errors,
         errorDetails: errorDetails.slice(0, 20),
       }),

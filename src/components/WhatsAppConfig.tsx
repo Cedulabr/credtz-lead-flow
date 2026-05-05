@@ -11,10 +11,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   MessageCircle, Save, Loader2, CheckCircle, XCircle, RefreshCw, Send,
   History, Plus, Trash2, Edit, Phone, Clock, Ban, Building2, User, Shield, Users,
-  AlertTriangle, RotateCcw, Pencil
+  AlertTriangle, RotateCcw, Pencil, ChevronDown
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -86,14 +87,18 @@ export function WhatsAppConfig() {
   const [testResults, setTestResults] = useState<Record<string, "success" | "error">>({});
   const [syncing, setSyncing] = useState(false);
 
-  const handleSyncInstances = async () => {
+  const handleSyncInstances = async (mode: "all" | "pending" = "all") => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-whatsapp-instances");
+      const { data, error } = await supabase.functions.invoke("sync-whatsapp-instances", {
+        body: { mode },
+      });
       if (error) throw error;
       if (data?.success) {
         const errMsg = data.errors > 0 ? ` • ${data.errors} com erro` : "";
-        toast.success(`Sincronização: ${data.total} encontradas • ${data.updated} atualizadas • ${data.created} novas • ${data.disconnected} desconectadas${errMsg}`);
+        const skipMsg = data.skipped > 0 ? ` • ${data.skipped} ignoradas` : "";
+        const label = mode === "pending" ? "Apenas pendentes" : "Sincronização total";
+        toast.success(`${label}: ${data.total} encontradas • ${data.updated} atualizadas • ${data.created} novas • ${data.disconnected} desconectadas${skipMsg}${errMsg}`);
         if (data.errors > 0) console.warn("Sync errors:", data.errorDetails);
         fetchInstances();
       } else {
@@ -601,10 +606,31 @@ export function WhatsAppConfig() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button onClick={handleSyncInstances} disabled={syncing} className="gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white">
-              {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Sincronizar com EasynFlow
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button disabled={syncing} className="gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white">
+                  {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Sincronizar com EasynFlow
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem onClick={() => handleSyncInstances("all")}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <div className="flex flex-col">
+                    <span className="font-medium">Sincronização total</span>
+                    <span className="text-xs text-muted-foreground">Recalcula todas as instâncias</span>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSyncInstances("pending")}>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  <div className="flex flex-col">
+                    <span className="font-medium">Apenas pendentes</span>
+                    <span className="text-xs text-muted-foreground">Ignora as já conectadas</span>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button onClick={openNewForm} className="gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white">
               <Plus className="h-4 w-4" /> Nova Instância
             </Button>
