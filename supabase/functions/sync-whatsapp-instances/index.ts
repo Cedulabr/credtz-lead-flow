@@ -131,6 +131,13 @@ Deno.serve(async (req) => {
 
       const existing = existingMap.get(instanceName);
 
+      // In 'pending' mode, skip instances already connected with phone number set
+      if (mode === "pending" && existing && (existing as any).instance_status === "connected" && (existing as any).phone_number) {
+        skipped++;
+        continue;
+      }
+
+
       try {
         if (existing) {
           const updateData: any = { instance_status: newStatus };
