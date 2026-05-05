@@ -87,14 +87,18 @@ export function WhatsAppConfig() {
   const [testResults, setTestResults] = useState<Record<string, "success" | "error">>({});
   const [syncing, setSyncing] = useState(false);
 
-  const handleSyncInstances = async () => {
+  const handleSyncInstances = async (mode: "all" | "pending" = "all") => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-whatsapp-instances");
+      const { data, error } = await supabase.functions.invoke("sync-whatsapp-instances", {
+        body: { mode },
+      });
       if (error) throw error;
       if (data?.success) {
         const errMsg = data.errors > 0 ? ` • ${data.errors} com erro` : "";
-        toast.success(`Sincronização: ${data.total} encontradas • ${data.updated} atualizadas • ${data.created} novas • ${data.disconnected} desconectadas${errMsg}`);
+        const skipMsg = data.skipped > 0 ? ` • ${data.skipped} ignoradas` : "";
+        const label = mode === "pending" ? "Apenas pendentes" : "Sincronização total";
+        toast.success(`${label}: ${data.total} encontradas • ${data.updated} atualizadas • ${data.created} novas • ${data.disconnected} desconectadas${skipMsg}${errMsg}`);
         if (data.errors > 0) console.warn("Sync errors:", data.errorDetails);
         fetchInstances();
       } else {
