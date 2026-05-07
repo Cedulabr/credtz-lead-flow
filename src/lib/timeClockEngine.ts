@@ -235,6 +235,14 @@ export function evaluateDay(
 
   if (isHoliday) {
     status = workedMinutes > 0 && !hasHigh ? 'ok' : 'feriado';
+    // Feriado nunca gera banco negativo nem desconto
+    if (status === 'feriado') {
+      workedMinutes = 0;
+      overtimeMinutes = 0;
+      bankBalance = 0;
+      delayMinutes = 0;
+      earlyExitMinutes = 0;
+    }
   } else if (hasHigh) {
     status = 'pendente_ajuste';
     workedMinutes = 0;
@@ -244,8 +252,14 @@ export function evaluateDay(
     status = 'observacao';
   } else if (workedMinutes === 0 && !isWorkDay) {
     status = 'folga';
+    bankBalance = 0;
   } else {
     status = 'ok';
+  }
+
+  // Folga nunca gera banco negativo
+  if (!isWorkDay && status !== 'ok') {
+    bankBalance = 0;
   }
 
   return {
