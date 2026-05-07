@@ -125,7 +125,23 @@ export function ClosurePanel() {
     return pendings;
   };
 
+  const closePeriod = async () => {
     if (!companyId || !canManage) return;
+    // Validar pendências antes de fechar (a menos que o usuário tenha forçado)
+    if (!forceClose) {
+      setBusy(true);
+      try {
+        const pendings = await findPendingDays(companyId, period);
+        if (pendings.length > 0) {
+          setPendingPreview(pendings);
+          setBusy(false);
+          return;
+        }
+      } catch (e) {
+        // se pré-validação falhar, segue o fluxo normal
+      }
+      setBusy(false);
+    }
     setBusy(true);
     try {
       const periodDate = `${period}-01`;
