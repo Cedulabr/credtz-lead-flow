@@ -22,6 +22,7 @@ import {
   type DayResult,
   type DaySchedule,
 } from '@/lib/timeClockEngine';
+import { getBrazilianHolidays } from './brazilianHolidays';
 
 const NAVY: [number, number, number] = [10, 31, 68];
 const BLUE: [number, number, number] = [59, 130, 246];
@@ -34,10 +35,16 @@ interface TimeClockPDFProps {
   companyCNPJ?: string;
 }
 
-/** Normaliza para NFC e remove caracteres de controle invisíveis que quebram encoding em jsPDF. */
+/** Normaliza para NFC, remove caracteres de controle e ruído de mojibake antigo. */
 const safe = (v: unknown): string => {
   if (v === null || v === undefined) return '';
-  return String(v).normalize('NFC').replace(/[\u0000-\u001F\u007F]/g, '');
+  let s = String(v).normalize('NFC');
+  // Remove controle, replacement char e zero-width
+  s = s.replace(/[\u0000-\u001F\u007F\uFFFD\u200B-\u200F\u2028-\u202F\u2060]/g, '');
+  // Detecta mojibake tipo "#ó" ou letras isoladas separadas por espaço (ex.: "d e l a y")
+  if (/^#?[^\sa-zA-Z0-9]{1,3}\s*$/.test(s.trim())) return '';
+  if (/^([a-zA-Z]\s){2,}[a-zA-Z]?$/.test(s.trim())) return '';
+  return s;
 };
 
 const dayNamesShort: Record<number, string> = {
@@ -151,7 +158,16 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const salary = salaryRes.data as any;
       const dayOffMap: Record<string, string> = {};
       (dayOffsRes.data || []).forEach((d: any) => { dayOffMap[d.off_date] = d.off_type; });
-      const holidaySet = new Set((holidaysRes.data || []).map((h: any) => h.holiday_date));
+      const holidaySet = new Set<string>((holidaysRes.data || []).map((h: any) => h.holiday_date));
+      // Fundir feriados nacionais calculados (Meeus/Jones/Butcher) — cobrir feriados ausentes do DB
+      const periodYear = parseISO(startDate).getFullYear();
+      getBrazilianHolidays(periodYear).forEach(h => {
+        if (h.date >= startDate && h.date <= endDate) holidaySet.add(h.date);
+      });
+      // Day offs marcados como 'feriado' também contam
+      Object.entries(dayOffMap).forEach(([date, type]) => {
+        if (type === 'feriado') holidaySet.add(date);
+      });
 
       const sched: DaySchedule | null = schedule
         ? {
@@ -317,19 +333,51 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
 
       afterY += 28;
 
-      // Desconto estimado
+      // Desconto estimado — fórmula trabalhista completa
+      // hora = salário / (jornada_diária × dias_úteis_mês)
+      // dia  = hora × jornada_diária
+      // desconto = faltas×dia + pendentes×dia + (atrasos+saídas_antecipadas)/60 × hora
       if (salary?.base_salary) {
         const base = Number(salary.base_salary);
-        const perMin = base / 220 / 60;
-        const desconto = (summary.delay + summary.earlyExit) * perMin;
-        const liquido = base - desconto;
+        const dailyHours = sched?.daily_hours || 8;
+        // Dias úteis do mês baseados em work_days, descontando feriados
+        const workDays = sched?.work_days || [1, 2, 3, 4, 5];
+        const businessDays = days.filter(d => {
+          const ds = format(d, 'yyyy-MM-dd');
+          return workDays.includes(d.getDay()) && !holidaySet.has(ds);
+        }).length || 22;
+        const valorHora = base / (dailyHours * businessDays);
+        const valorDia = valorHora * dailyHours;
+        const descAtrasos = ((summary.delay + summary.earlyExit) / 60) * valorHora;
+        const descFaltas = summary.absences * valorDia;
+        const descPendentes = summary.pending * valorDia;
+        const desconto = descAtrasos + descFaltas + descPendentes;
+        const liquido = Math.max(0, base - desconto);
+        const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         doc.setTextColor(...NAVY);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.text(safe(`Valor/hora: R$ ${fmt(valorHora)}  ·  Valor/dia: R$ ${fmt(valorDia)}  ·  Dias úteis: ${businessDays}`), 12, afterY);
+        afterY += 5;
+        doc.text(
+          safe(`Desc. faltas (${summary.absences}): R$ ${fmt(descFaltas)}  ·  Desc. atrasos/saídas: R$ ${fmt(descAtrasos)}  ·  Desc. pendentes (${summary.pending}): R$ ${fmt(descPendentes)}`),
+          12,
+          afterY
+        );
+        afterY += 5;
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
-        doc.text(safe(`Salário base: R$ ${base.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`), 12, afterY);
-        doc.text(safe(`Desconto estimado: R$ ${desconto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`), pw / 2 - 30, afterY);
-        doc.text(safe(`Líquido estimado: R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`), pw - 14, afterY, { align: 'right' });
+        doc.text(safe(`Salário base: R$ ${fmt(base)}`), 12, afterY);
+        doc.text(safe(`Desconto estimado: R$ ${fmt(desconto)}`), pw / 2 - 30, afterY);
+        doc.text(safe(`Líquido estimado: R$ ${fmt(liquido)}`), pw - 14, afterY, { align: 'right' });
         afterY += 8;
+        if (summary.pending > 0) {
+          doc.setTextColor(180, 30, 30);
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'italic');
+          doc.text(safe(`⚠ Existem ${summary.pending} dia(s) pendente(s) de ajuste — desconto provisório, regularize antes do fechamento.`), 12, afterY);
+          afterY += 5;
+        }
       }
 
       // QR + assinatura + persistir validação
@@ -387,7 +435,10 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         work_days: schedule.work_days ?? [1, 2, 3, 4, 5],
       } : null;
       const day = parseISO(selectedDate);
-      const result = evaluateDay(records, sched, day.getDay(), !!holidayRes.data);
+      // Considera feriado se vem do DB OU dos feriados nacionais calculados
+      const nationalHolidays = new Set(getBrazilianHolidays(day.getFullYear()).map(h => h.date));
+      const isHoliday = !!holidayRes.data || nationalHolidays.has(selectedDate);
+      const result = evaluateDay(records, sched, day.getDay(), isHoliday);
 
       const doc = new jsPDF();
       const pw = doc.internal.pageSize.getWidth();
@@ -487,9 +538,16 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       ]);
       const records = recordsRes.data || [];
       const schedule = scheduleRes.data as any;
-      const holidaySet = new Set((holidaysRes.data || []).map((h: any) => h.holiday_date));
+      const holidaySet = new Set<string>((holidaysRes.data || []).map((h: any) => h.holiday_date));
+      const periodYear = parseISO(startDate).getFullYear();
+      getBrazilianHolidays(periodYear).forEach(h => {
+        if (h.date >= startDate && h.date <= endDate) holidaySet.add(h.date);
+      });
       const dayOffMap: Record<string, string> = {};
       (dayOffsRes.data || []).forEach((d: any) => { dayOffMap[d.off_date] = d.off_type; });
+      Object.entries(dayOffMap).forEach(([date, type]) => {
+        if (type === 'feriado') holidaySet.add(date);
+      });
       const justifications = justRes.data || [];
 
       const sched: DaySchedule | null = schedule ? {

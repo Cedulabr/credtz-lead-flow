@@ -33,6 +33,7 @@ export interface Inconsistency {
     | 'SAIDA_DUPLICADA'
     | 'PAUSA_INCOMPLETA'
     | 'SAIDA_SEM_ENTRADA'
+    | 'ENTRADA_SEM_SAIDA'
     | 'SAIDA_ANTES_ENTRADA'
     | 'PAUSA_INVERTIDA'
     | 'PAUSA_EXCESSIVA'
@@ -63,6 +64,7 @@ export const inconsistencyLabels: Record<Inconsistency['code'], string> = {
   SAIDA_DUPLICADA: 'Mais de uma saída registrada',
   PAUSA_INCOMPLETA: 'Pausa aberta sem fechamento',
   SAIDA_SEM_ENTRADA: 'Saída sem entrada correspondente',
+  ENTRADA_SEM_SAIDA: 'Entrada registrada sem saída',
   SAIDA_ANTES_ENTRADA: 'Saída anterior à entrada',
   PAUSA_INVERTIDA: 'Fim de pausa anterior ao início',
   PAUSA_EXCESSIVA: 'Pausa acima de 4 horas',
@@ -165,6 +167,10 @@ export function evaluateDay(
   if (exits.length > 1) incons.push({ code: 'SAIDA_DUPLICADA', severity: 'high', message: inconsistencyLabels.SAIDA_DUPLICADA });
   if (pInicios.length !== pFins.length) incons.push({ code: 'PAUSA_INCOMPLETA', severity: 'high', message: inconsistencyLabels.PAUSA_INCOMPLETA });
   if (entries.length === 0 && exits.length > 0) incons.push({ code: 'SAIDA_SEM_ENTRADA', severity: 'high', message: inconsistencyLabels.SAIDA_SEM_ENTRADA });
+  // Entrada sem saída em dia útil já encerrado: pendência crítica (não pode ser tratado como OK)
+  if (entries.length >= 1 && exits.length === 0 && isWorkDay && !isHoliday) {
+    incons.push({ code: 'ENTRADA_SEM_SAIDA', severity: 'high', message: inconsistencyLabels.ENTRADA_SEM_SAIDA });
+  }
 
   // Duplicatas exatas (mesmo tipo, mesmo minuto)
   const seen = new Set<string>();
@@ -229,6 +235,14 @@ export function evaluateDay(
 
   if (isHoliday) {
     status = workedMinutes > 0 && !hasHigh ? 'ok' : 'feriado';
+    // Feriado nunca gera banco negativo nem desconto
+    if (status === 'feriado') {
+      workedMinutes = 0;
+      overtimeMinutes = 0;
+      bankBalance = 0;
+      delayMinutes = 0;
+      earlyExitMinutes = 0;
+    }
   } else if (hasHigh) {
     status = 'pendente_ajuste';
     workedMinutes = 0;
@@ -238,8 +252,14 @@ export function evaluateDay(
     status = 'observacao';
   } else if (workedMinutes === 0 && !isWorkDay) {
     status = 'folga';
+    bankBalance = 0;
   } else {
     status = 'ok';
+  }
+
+  // Folga nunca gera banco negativo
+  if (!isWorkDay && status !== 'ok') {
+    bankBalance = 0;
   }
 
   return {

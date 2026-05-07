@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, eachDayOfInterval, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calculateTotalBreakMinutes, parseTimeToMinutes, formatMinutesToHM } from '@/lib/timeClockCalculations';
+import { getBrazilianHolidays } from './brazilianHolidays';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
 
@@ -117,6 +118,14 @@ export function DiscountCalculator() {
     const days = eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) });
     const now = new Date();
 
+    // Feriados nacionais para o ano do período (cobre feriados ausentes do DB local)
+    const periodYear = parseISO(startDate).getFullYear();
+    const holidaySet = new Set(
+      getBrazilianHolidays(periodYear)
+        .map(h => h.date)
+        .filter(d => d >= startDate && d <= endDate)
+    );
+
     const result: DiscountRow[] = profiles.map(profile => {
       const uid = profile.id;
       const salary = salaryMap[uid] || 0;
@@ -131,22 +140,29 @@ export function DiscountCalculator() {
       let workedMinutes = 0;
       let absences = 0;
       let dayOffCount = 0;
+      let pendingDays = 0; // dias com entrada sem saída em dia útil passado
+      let businessDays = 0; // para valor/dia dinâmico
 
       days.forEach(day => {
         if (day > now) return;
         const dateStr = format(day, 'yyyy-MM-dd');
         const dayOfWeek = day.getDay();
         const isWorkDay = workDays.includes(dayOfWeek);
+        const isHoliday = holidaySet.has(dateStr);
 
         if (!isWorkDay) return;
 
-        // Check if it's a day off
+        // Feriado: não conta como expected nem como falta
+        if (isHoliday) return;
+
+        // Folga programada: não conta como expected
         if (userDayOffs.has(dateStr)) {
           dayOffCount++;
-          return; // Don't count as expected
+          return;
         }
 
         expectedMinutes += dailyHours * 60;
+        businessDays++;
 
         const dayRecords = userRecords.filter(r => r.clock_date === dateStr);
         const entry = dayRecords.find(r => r.clock_type === 'entrada');
@@ -157,19 +173,21 @@ export function DiscountCalculator() {
           const exitMin = parseTimeToMinutes(exit.clock_time);
           const breakMin = calculateTotalBreakMinutes(dayRecords);
           workedMinutes += Math.max(0, exitMin - entryMin - breakMin);
+        } else if (entry && !exit) {
+          // Entrada sem saída: pendência → desconta como dia
+          if (!userJustifications.has(dateStr)) pendingDays++;
         } else if (!entry) {
-          // No entry - check justification
-          if (!userJustifications.has(dateStr)) {
-            absences++;
-          }
+          if (!userJustifications.has(dateStr)) absences++;
         }
       });
 
-      const negativeMinutes = Math.max(0, expectedMinutes - workedMinutes);
-      const hourRate = salary > 0 ? salary / 176 : 0;
-      const discountNegativeHours = (negativeMinutes / 60) * hourRate;
-      const dailyRate = salary > 0 ? salary / 22 : 0;
-      const discountAbsences = absences * dailyRate;
+      // Fórmula trabalhista coerente com a jornada do colaborador
+      const effectiveBusinessDays = businessDays || 22;
+      const valorHora = salary > 0 ? salary / (dailyHours * effectiveBusinessDays) : 0;
+      const valorDia = valorHora * dailyHours;
+      const negativeMinutes = Math.max(0, expectedMinutes - workedMinutes - (absences + pendingDays) * dailyHours * 60);
+      const discountNegativeHours = (negativeMinutes / 60) * valorHora;
+      const discountAbsences = (absences + pendingDays) * valorDia;
       const totalDiscount = discountNegativeHours + discountAbsences;
       const netEstimated = Math.max(0, salary - totalDiscount);
 
@@ -180,7 +198,7 @@ export function DiscountCalculator() {
         expectedMinutes,
         workedMinutes,
         negativeMinutes,
-        absences,
+        absences: absences + pendingDays,
         dayOffs: dayOffCount,
         discountNegativeHours,
         discountAbsences,
@@ -323,7 +341,7 @@ export function DiscountCalculator() {
                 Calculadora de Descontos
               </CardTitle>
               <CardDescription>
-                Horas negativas × (salário / 176) + faltas × (salário / 22)
+                Faltas/Pendentes × valor-dia + horas negativas × valor-hora (jornada × dias úteis do mês, descontando feriados)
               </CardDescription>
             </div>
             <div className="flex gap-2">

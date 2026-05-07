@@ -10,8 +10,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Lock, Unlock, Loader2, Calendar, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, startOfMonth } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { evaluateDay, type DaySchedule } from '@/lib/timeClockEngine';
+import { getBrazilianHolidays } from './brazilianHolidays';
 
 interface Closure {
   id: string;
@@ -34,6 +36,8 @@ export function ClosurePanel() {
   const [busy, setBusy] = useState(false);
   const [reopenTarget, setReopenTarget] = useState<Closure | null>(null);
   const [reopenReason, setReopenReason] = useState('');
+  const [pendingPreview, setPendingPreview] = useState<{ user: string; date: string; reason: string }[] | null>(null);
+  const [forceClose, setForceClose] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -65,8 +69,79 @@ export function ClosurePanel() {
 
   const canManage = isAdmin || isGestor;
 
+  const findPendingDays = async (cid: string, periodMonth: string) => {
+    const startDate = `${periodMonth}-01`;
+    const endDate = format(endOfMonth(parseISO(startDate)), 'yyyy-MM-dd');
+    const { data: ucUsers } = await supabase
+      .from('user_companies')
+      .select('user_id')
+      .eq('company_id', cid)
+      .eq('is_active', true);
+    const userIds = (ucUsers || []).map((u: any) => u.user_id);
+    if (userIds.length === 0) return [];
+    const [recRes, schedRes, profRes, holRes, offRes] = await Promise.all([
+      supabase.from('time_clock').select('user_id, clock_date, clock_type, clock_time')
+        .in('user_id', userIds).gte('clock_date', startDate).lte('clock_date', endDate),
+      supabase.from('time_clock_schedules').select('*').in('user_id', userIds).eq('is_active', true),
+      supabase.from('profiles').select('id, name, email').in('id', userIds),
+      (supabase as any).from('brazilian_holidays').select('holiday_date').gte('holiday_date', startDate).lte('holiday_date', endDate),
+      supabase.from('time_clock_day_offs').select('user_id, off_date, off_type').in('user_id', userIds).gte('off_date', startDate).lte('off_date', endDate),
+    ]);
+    const holidaySet = new Set<string>((holRes.data || []).map((h: any) => h.holiday_date));
+    getBrazilianHolidays(parseISO(startDate).getFullYear()).forEach(h => {
+      if (h.date >= startDate && h.date <= endDate) holidaySet.add(h.date);
+    });
+    (offRes.data || []).forEach((o: any) => { if (o.off_type === 'feriado') holidaySet.add(o.off_date); });
+    const schedByUser: Record<string, any> = {};
+    (schedRes.data || []).forEach((s: any) => { schedByUser[s.user_id] = s; });
+    const profByUser: Record<string, any> = {};
+    (profRes.data || []).forEach((p: any) => { profByUser[p.id] = p; });
+    const days = eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) });
+    const now = new Date();
+    const pendings: { user: string; date: string; reason: string }[] = [];
+    for (const uid of userIds) {
+      const sched = schedByUser[uid];
+      const ds: DaySchedule | null = sched ? {
+        entry_time: sched.entry_time, exit_time: sched.exit_time,
+        daily_hours: Number(sched.daily_hours),
+        tolerance_minutes: sched.tolerance_minutes ?? 10,
+        work_days: sched.work_days ?? [1, 2, 3, 4, 5],
+      } : null;
+      for (const d of days) {
+        if (d > now) continue;
+        const dateStr = format(d, 'yyyy-MM-dd');
+        const dayRecs = (recRes.data || []).filter((r: any) => r.user_id === uid && r.clock_date === dateStr)
+          .map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
+        const result = evaluateDay(dayRecs as any, ds, d.getDay(), holidaySet.has(dateStr));
+        if (result.status === 'pendente_ajuste') {
+          pendings.push({
+            user: profByUser[uid]?.name || profByUser[uid]?.email || uid.slice(0, 8),
+            date: format(d, 'dd/MM/yyyy'),
+            reason: result.inconsistencies.map(i => i.message).join(' • ') || 'Inconsistência',
+          });
+        }
+      }
+    }
+    return pendings;
+  };
+
   const closePeriod = async () => {
     if (!companyId || !canManage) return;
+    // Validar pendências antes de fechar (a menos que o usuário tenha forçado)
+    if (!forceClose) {
+      setBusy(true);
+      try {
+        const pendings = await findPendingDays(companyId, period);
+        if (pendings.length > 0) {
+          setPendingPreview(pendings);
+          setBusy(false);
+          return;
+        }
+      } catch (e) {
+        // se pré-validação falhar, segue o fluxo normal
+      }
+      setBusy(false);
+    }
     setBusy(true);
     try {
       const periodDate = `${period}-01`;
@@ -98,10 +173,12 @@ export function ClosurePanel() {
         period_month: periodDate,
         action: 'closed',
         performed_by: user!.id,
-        reason: 'Fechamento manual do período',
+        reason: forceClose ? 'Fechamento forçado com pendências' : 'Fechamento manual do período',
       });
 
       toast({ title: 'Período fechado com sucesso!' });
+      setForceClose(false);
+      setPendingPreview(null);
       await loadClosures(companyId);
     } catch (e: any) {
       toast({ title: 'Erro ao fechar período', description: e.message, variant: 'destructive' });
@@ -228,6 +305,44 @@ export function ClosurePanel() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!pendingPreview} onOpenChange={(o) => { if (!o) { setPendingPreview(null); setForceClose(false); } }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-500" /> Pendências encontradas
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Existem <strong>{pendingPreview?.length || 0}</strong> dia(s) com inconsistências críticas no período. Recomenda-se regularizar antes do fechamento (ex.: solicitar ajuste de batidas faltantes).
+            </p>
+            <div className="max-h-72 overflow-y-auto border rounded-lg divide-y">
+              {(pendingPreview || []).map((p, i) => (
+                <div key={i} className="p-2 text-xs flex justify-between gap-2">
+                  <div>
+                    <div className="font-medium">{p.user}</div>
+                    <div className="text-muted-foreground">{p.reason}</div>
+                  </div>
+                  <Badge variant="destructive">{p.date}</Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setPendingPreview(null); setForceClose(false); }}>
+              Cancelar e revisar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => { setForceClose(true); setPendingPreview(null); setTimeout(() => closePeriod(), 50); }}
+              disabled={busy}
+            >
+              Fechar mesmo assim
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!reopenTarget} onOpenChange={(o) => !o && setReopenTarget(null)}>
         <DialogContent>
