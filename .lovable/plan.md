@@ -1,156 +1,92 @@
 
-# Evolução Corporativa do Módulo de Controle de Ponto
+# Correções no Módulo Controle de Ponto
 
-Entrega em **3 fases priorizadas**, com regras trabalhistas, motor de inconsistências, novo PDF UTF-8 e dashboard de RH nível Convenia/Tangerino/Pontotel.
-
-Decisões já alinhadas:
-- Registros antigos: **reprocessamento silencioso** (sem marcar pendentes em massa).
-- Reabertura de período fechado: **Admin e Gestor da empresa** (com log).
+Análise do PDF `espelho-ponto-2026-04` revelou 5 categorias de erros. Todos são de **lógica/apresentação** (frontend), centradas em `src/lib/timeClockEngine.ts`, `src/components/TimeClock/DiscountCalculator.tsx` e `src/components/TimeClock/TimeClockPDF.tsx`.
 
 ---
 
-## FASE 1 — Núcleo Confiável (juridicamente seguro)
+## 1. Feriados gerando falta e banco negativo
 
-### 1.1 Motor de Validação de Batidas (`timeClockValidation.ts`)
-Função pura que recebe as batidas do dia + jornada e retorna `{ status, inconsistencies[], metrics | null }`.
+**Bug:** Em `timeClockEngine.ts` linha 154, quando não há registros e o dia é útil, retorna `falta` com `bankBalanceMinutes = -expectedMinutes`. Mas a checagem de `isHoliday` (linha 152) só dispara quando a flag é `true`, e mesmo assim — o erro real é que `expectedMinutes` (linha 134) já foi correto a 0 em feriado, mas no PDF aparece `-06:00` no banco do feriado, indicando que o flag `isHoliday` **não está chegando para 03/04 e 21/04**.
 
-Regras bloqueantes (não calcula horas, marca dia como `PENDENTE_AJUSTE`):
-- saída < entrada
-- `pausa_fim` < `pausa_inicio`
-- número de `pausa_fim` ≠ `pausa_inicio` (pausa aberta)
-- pausa > 4h sem justificativa
-- batidas duplicadas (mesmo tipo no mesmo minuto)
-- horários inválidos / fora de 00:00–23:59
-- entrada sem saída em dia já encerrado (D-1 fechado)
-- saída sem entrada
-- jornada > 12h (CLT) sem justificativa
-- horários invertidos / fora de ordem cronológica
+**Causa:** A consulta `brazilian_holidays` busca por `holiday_date` exato. Provavelmente esses feriados não existem na tabela (ou são feriados estaduais/municipais). Mesmo assim, o engine deve **nunca** descontar banco em dia sem registro se for feriado/folga.
 
-### 1.2 Novo Motor de Cálculo (`timeClockCalculations.ts` reescrito)
-Calcula **somente** quando o dia é válido. Saídas separadas:
-- horas trabalhadas, horas previstas, horas extras
-- atraso, saída antecipada
-- pausas (total + por intervalo)
-- saldo do dia para banco de horas
-- faltas (nenhuma batida em dia útil)
-- horas justificadas / abonadas
+**Correção:**
+- Garantir em `evaluateDay`: se `isHoliday=true` OU `!isWorkDay`, **nunca** retornar `bankBalanceMinutes` negativo.
+- Tratar `time_clock_day_offs` com `off_type='feriado'` como feriado também (passar `isHoliday=true` para o engine quando o tipo for feriado).
+- No `DiscountCalculator`, ao calcular `expectedMinutes`, subtrair feriados (já busca `dayOffs` mas falta integrar `brazilian_holidays`).
 
-Regras:
-- Intervalo subtraído automaticamente.
-- Dias `PENDENTE_AJUSTE` **não entram** em banco, extras, descontos ou totais até aprovação.
-- Feriados → status próprio (roxo); trabalho em feriado vira extra 100%.
+## 2. Dia incompleto (28/04) marcado como OK
 
-### 1.3 Status visual por dia (badges)
-- 🟢 VERDE — jornada correta
-- 🟡 AMARELO — observação (atraso/saída antecipada dentro tolerância)
-- 🔴 VERMELHO — inconsistência grave (PENDENTE_AJUSTE)
-- 🔵 AZUL — justificado/abonado
-- ⚫ CINZA — falta
-- 🟣 ROXO — feriado
+**Bug:** Em `timeClockEngine.ts` linha 189, a condição `entries.length === 1 && exits.length === 1` falha quando só há entrada. Cai no `else` (linha 237+) onde `delayMinutes=0, earlyExitMinutes=0, incons=[]` → status vira `ok` (linha 242).
 
-Aplicado em `MyHistory`, `ManagerDashboard` e PDF.
+**Correção:** Adicionar inconsistência `ENTRADA_SEM_SAIDA` (severity high) quando `entries.length >= 1 && exits.length === 0` em dia útil já passado. Status vira `pendente_ajuste`. Bloquear esse dia no fechamento.
 
-### 1.4 PDF Profissional UTF-8 (`TimeClockPDF.tsx` reescrito)
-- Migra geração para **jsPDF + jspdf-autotable** com fonte embutida que suporta acentos (Roboto-Regular.ttf via `addFileToVFS`/`addFont`) — elimina os `#ó� �P�e�n�d`.
-- Cabeçalho: logo, empresa, colaborador, cargo, CPF, período, jornada contratada.
-- Tabela: Data | Dia | Entrada | Saída | Intervalo | Trabalhadas | Atraso | Extra | Banco | Status | Observações.
-- Rodapé totalizador: trabalhado, previsto, extras, banco, atrasos, faltas, justificadas, desconto estimado.
-- Paginação `Página X de Y`, data/hora de geração, hash SHA-256 do conteúdo, espaço para assinaturas (colaborador / gestor).
-- Linhas vermelhas para dias `PENDENTE_AJUSTE`.
+## 3. Desconto salarial absurdamente baixo
 
-### 1.5 Migração SQL (Fase 1)
-- Coluna `daily_status` em `time_clocks` (enum: ok, observacao, pendente_ajuste, justificado, falta, feriado).
-- Tabela `time_clock_day_summary` (cache por user_id+data: minutos trabalhados, extras, banco, atraso, saída antecipada, status, inconsistências jsonb).
-- Trigger que recalcula a linha de resumo a cada insert/update/delete em `time_clocks`.
-- Função `recalc_user_day(user_id, date)` (SECURITY DEFINER) usada pelo trigger e pelo job de reprocessamento silencioso de histórico.
-
----
-
-## FASE 2 — Dashboard RH + Fluxo de Ajuste
-
-### 2.1 Dashboard RH (`HRDashboard.tsx`)
-Cards e gráficos (Recharts) escopados por `company_id`:
-- Total de atrasos (mês) + ranking top 10
-- Faltas no mês
-- Saldo de banco de horas por colaborador
-- Colaboradores com pendências (PENDENTE_AJUSTE)
-- Inconsistências por tipo
-- Horas extras pagas vs banco
-- Métrica mensal comparativa
-
-### 2.2 Filtros avançados (componente reutilizável)
-Período, colaborador, status, atrasos, faltas, inconsistências, extras, banco. Reaproveitado em Histórico, Dashboard, PDF e Excel.
-
-### 2.3 Exportação Excel
-Mesmas colunas do PDF + abas de totais por colaborador (usa `xlsx`).
-
-### 2.4 Fluxo de Ajuste de Ponto
-- Tabela `time_clock_adjustment_requests` (user_id, company_id, clock_date, motivo, comprovante_url, status, manager_id, manager_note, created_at, decided_at).
-- Bucket privado `time-clock-attachments` com Signed URL 1h (segue padrão do projeto).
-- Tela colaborador: solicitar ajuste, anexar comprovante, ver histórico.
-- Tela gestor: aprovar/reprovar com observação; aprovação cria/edita batidas e dispara `recalc_user_day`.
-- Notificação push reaproveitando sistema existente.
-
----
-
-## FASE 3 — Auditoria, Fechamento e Validação Documental
-
-### 3.1 Trava de fechamento de período
-- Tabela `time_clock_closures` (company_id, period_month, closed_at, closed_by, reopened_at?, reopened_by?, reason).
-- Após fechado: edições de batidas bloqueadas via RLS + trigger.
-- Reabertura permitida para **Admin e Gestor** da empresa, com motivo obrigatório e log.
-
-### 3.2 Log de Auditoria expandido
-- `time_clock_logs` já existe — adicionar `change_reason`, `field_changed`, `previous_value`, `new_value` por campo.
-- Tela "Histórico de Alterações" por dia (quem, quando, o quê, por quê).
-
-### 3.3 Validação documental do PDF
-- Hash SHA-256 do PDF gravado em `time_clock_pdf_validations` (hash, user_id, period, generated_by, generated_at).
-- QRCode no rodapé apontando para `/validar-ponto/:hash` que confirma autenticidade.
-
-### 3.4 Performance
-- Índices: `(user_id, clock_date)`, `(company_id, clock_date)`, `(daily_status)`.
-- Paginação server-side em Histórico e Dashboard via range queries.
-
----
-
-## Detalhes Técnicos
-
-**Stack mantida**: React + TS + Tailwind + shadcn + Supabase. Sem novas libs além de `jspdf`, `jspdf-autotable`, `xlsx`, `qrcode` (todas leves).
-
-**Timezone**: Tudo persistido em `America/Sao_Paulo` usando `date-fns-tz`. Cálculos sempre em minutos desde 00:00 local; nunca `new Date(string)` sem normalizar.
-
-**Reprocessamento silencioso de histórico**: migração roda `SELECT recalc_user_day(user_id, clock_date) FROM (SELECT DISTINCT user_id, clock_date FROM time_clocks) t;` em background — popula `time_clock_day_summary` sem alterar batidas originais.
-
-**RLS**: 
-- Colaborador vê só seus dias e ajustes.
-- Gestor vê company_id (via `has_role_safe` + `user_companies`).
-- Admin vê tudo.
-- Edição bloqueada em períodos com `time_clock_closures` ativo (sem `reopened_at`).
-
-**Arquivos principais a criar/alterar**:
-```text
-src/components/TimeClock/
-  ├─ index.tsx                     (nova aba "RH")
-  ├─ engine/
-  │   ├─ validation.ts             (motor inconsistências)
-  │   ├─ calculations.ts           (cálculo refatorado)
-  │   └─ statusBadges.tsx
-  ├─ pdf/
-  │   ├─ TimeClockPDF.tsx          (reescrito, jsPDF + Roboto)
-  │   └─ pdfHelpers.ts
-  ├─ excel/ExportTimeClockExcel.ts
-  ├─ HRDashboard.tsx               (Fase 2)
-  ├─ AdjustmentRequest.tsx         (Fase 2)
-  ├─ AdjustmentReview.tsx          (Fase 2)
-  ├─ ClosurePanel.tsx              (Fase 3)
-  └─ AuditTrail.tsx                (Fase 3)
-supabase/migrations/               (3 migrações, uma por fase)
+**Bug:** No `TimeClockPDF.tsx` linha 324:
+```ts
+const desconto = (summary.delay + summary.earlyExit) * perMin;
 ```
+Só desconta atrasos + saídas antecipadas. **Ignora faltas inteiras**. Por isso o líquido ficou em R$ 1.141 (real ≈ R$ 883).
+
+**Correção:** Reescrever fórmula de desconto consolidada (igual ao `DiscountCalculator`):
+```
+valor_hora    = base_salary / (daily_hours * dias_uteis_mes)  // ou /220 mantendo CLT
+valor_dia     = valor_hora * daily_hours
+desconto_faltas       = absences * valor_dia
+desconto_atraso       = (delay + earlyExit) / 60 * valor_hora
+desconto_pendentes    = pending * valor_dia   // dias bloqueados também descontam
+desconto_total        = soma
+liquido               = base - desconto_total
+```
+Com 6h/dia e 132h/mês: hora ≈ R$ 9,09 ✓ alinhado ao cálculo manual do usuário.
+
+Aplicar **a mesma fórmula** em `DiscountCalculator.tsx` (linhas 168-174 hoje usam 176h e 22 dias fixos — trocar por `daily_hours * 22` dinâmico do schedule, e descontar pendentes).
+
+## 4. Encoding quebrado (`#ó` e `#ó d e l a y`)
+
+**Causa:** Vem do campo `notes` no banco (registros antigos com mojibake). O `safe()` em `TimeClockPDF.tsx:38` faz NFC + remove controle, mas mantém caracteres Unicode "soltos".
+
+**Correção:** Em `safe()`:
+- Remover replacement char `\uFFFD` e zero-width spaces.
+- Se a string contiver sequência tipo `^[#\p{L}]\s\p{L}\s\p{L}` (letras separadas por espaço único), descartar como ruído.
+- Truncar `obs` a caracteres ASCII + acentos latinos válidos.
+
+## 5. Validações antes do fechamento
+
+Adicionar checagem em `ClosurePanel.tsx`: bloquear fechamento do mês se houver dias com status `pendente_ajuste` (entradas sem saída, inconsistências altas). Mostrar lista dos dias problema.
 
 ---
 
-## Resultado Esperado
-Módulo confiável juridicamente, com cálculos auditáveis, PDF oficial sem encoding quebrado, dashboard de RH e fluxo completo de ajuste/fechamento — pronto para uso empresarial real.
+## Arquivos a alterar
 
-Posso começar pela **Fase 1** assim que aprovar.
+1. **`src/lib/timeClockEngine.ts`**
+   - Adicionar code `ENTRADA_SEM_SAIDA` e `SAIDA_SEM_ENTRADA` (já existe) ao bloco que muda status para `pendente_ajuste`.
+   - Garantir `bankBalanceMinutes = 0` para `feriado` e `folga` sempre.
+   - Quando há entrada mas falta saída em dia útil passado → push inconsistência high → `pendente_ajuste`.
+
+2. **`src/components/TimeClock/TimeClockPDF.tsx`**
+   - Buscar `time_clock_day_offs.off_type='feriado'` e fundir no `holidaySet`.
+   - Reescrever bloco de Desconto (linhas 320-333) para incluir faltas + pendentes + valor_hora dinâmico.
+   - Endurecer `safe()` contra mojibake.
+   - Mostrar coluna "Desc. Faltas" no totalizador.
+
+3. **`src/components/TimeClock/DiscountCalculator.tsx`**
+   - Trocar `salary/176` e `salary/22` por valores dinâmicos baseados em `schedule.daily_hours` e dias úteis do mês menos feriados/folgas.
+   - Considerar `pendente_ajuste` (dias bloqueados) como desconto se não justificados.
+   - Buscar `brazilian_holidays` e excluir do `expectedMinutes`.
+
+4. **`src/components/TimeClock/ClosurePanel.tsx`**
+   - Antes de fechar, listar dias `pendente_ajuste` do período. Bloquear fechamento ou exigir confirmação explícita.
+
+## Validação
+
+Após implementar, regenerar PDF do mesmo período (Alana / Abril 2026) e verificar:
+- Faltas reais = 4 (não 6) — feriados 03/04 e 21/04 com status `Feriado`, banco 0.
+- 28/04 com status `Pendente de Ajuste` (não OK).
+- Desconto ≈ R$ 316, líquido ≈ R$ 884.
+- Sem `#ó` nas observações.
+- ClosurePanel impede fechar Abril enquanto 28/04 estiver pendente.
+
+Posso seguir?
