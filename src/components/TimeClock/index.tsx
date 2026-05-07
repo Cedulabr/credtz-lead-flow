@@ -153,8 +153,18 @@ export function TimeClock() {
           <HourBank />
         </TabsContent>
 
+        <TabsContent value="adjustments">
+          <AdjustmentRequest companyId={companyId} />
+        </TabsContent>
+
         {canManage && (
           <>
+            <TabsContent value="hr">
+              <HRDashboard />
+            </TabsContent>
+            <TabsContent value="review">
+              <AdjustmentReview />
+            </TabsContent>
             <TabsContent value="dashboard">
               <ManagerDashboard />
             </TabsContent>
