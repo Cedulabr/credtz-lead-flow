@@ -36,6 +36,8 @@ export function ClosurePanel() {
   const [busy, setBusy] = useState(false);
   const [reopenTarget, setReopenTarget] = useState<Closure | null>(null);
   const [reopenReason, setReopenReason] = useState('');
+  const [pendingPreview, setPendingPreview] = useState<{ user: string; date: string; reason: string }[] | null>(null);
+  const [forceClose, setForceClose] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
