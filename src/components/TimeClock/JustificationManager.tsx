@@ -136,8 +136,8 @@ export function JustificationManager({ isManager = false }: JustificationManager
       
       if (error) throw error;
       
-      const { data } = supabase.storage.from('time-clock-documents').getPublicUrl(fileName);
-      return data.publicUrl;
+      // Store the relative path; consumers must generate signed URLs to view
+      return fileName;
     } catch (error: any) {
       toast({ title: 'Erro ao enviar arquivo', description: error.message, variant: 'destructive' });
       return null;

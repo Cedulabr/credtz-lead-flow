@@ -59,8 +59,8 @@ export function useTimeClock(userId: string | undefined) {
         .from('time-clock-photos')
         .upload(fileName, photoBlob, { contentType: 'image/jpeg' });
       if (error) throw error;
-      const { data } = supabase.storage.from('time-clock-photos').getPublicUrl(fileName);
-      return data.publicUrl;
+      // Store the relative path; consumers must generate signed URLs to view
+      return fileName;
     } catch (error) {
       console.error('Error uploading photo:', error);
       return null;

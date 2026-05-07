@@ -14,12 +14,8 @@ export default function ValidatePoint() {
   useEffect(() => {
     (async () => {
       if (!hash) return;
-      const { data } = await (supabase as any)
-        .from('time_clock_pdf_validations')
-        .select('*')
-        .ilike('hash', `${hash}%`)
-        .maybeSingle();
-      setRecord(data);
+      const { data } = await (supabase as any).rpc('validate_time_clock_pdf', { p_hash: hash });
+      setRecord(Array.isArray(data) ? data[0] : data);
       setLoading(false);
     })();
   }, [hash]);
