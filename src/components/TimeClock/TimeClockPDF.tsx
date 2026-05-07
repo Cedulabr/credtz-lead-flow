@@ -22,6 +22,7 @@ import {
   type DayResult,
   type DaySchedule,
 } from '@/lib/timeClockEngine';
+import { getBrazilianHolidays } from './brazilianHolidays';
 
 const NAVY: [number, number, number] = [10, 31, 68];
 const BLUE: [number, number, number] = [59, 130, 246];
