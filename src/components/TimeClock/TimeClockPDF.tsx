@@ -140,7 +140,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const startDate = `${selectedMonth}-01`;
       const endDate = format(endOfMonth(parseISO(startDate)), 'yyyy-MM-dd');
 
-      const [recordsRes, justRes, scheduleRes, profileRes, salaryRes, dayOffsRes, holidaysRes] = await Promise.all([
+      const [recordsRes, justRes, scheduleRes, profileRes, salaryRes, dayOffsRes, holidaysRes, hbRes] = await Promise.all([
         supabase.from('time_clock').select('*').eq('user_id', userId)
           .gte('clock_date', startDate).lte('clock_date', endDate)
           .order('clock_date').order('clock_time'),
@@ -152,7 +152,9 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         supabase.from('time_clock_day_offs').select('off_date, off_type').eq('user_id', userId)
           .gte('off_date', startDate).lte('off_date', endDate),
         (supabase as any).from("brazilian_holidays").select('holiday_date').gte('holiday_date', startDate).lte('holiday_date', endDate),
+        (supabase as any).from('hour_bank_settings').select('discount_mode').limit(1).maybeSingle(),
       ]);
+      const discountMode: DiscountMode = (hbRes?.data?.discount_mode as DiscountMode) || 'financeiro';
 
       const records = recordsRes.data || [];
       const justifications = justRes.data || [];
