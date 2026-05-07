@@ -10,8 +10,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Lock, Unlock, Loader2, Calendar, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, startOfMonth } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { evaluateDay, type DaySchedule } from '@/lib/timeClockEngine';
+import { getBrazilianHolidays } from './brazilianHolidays';
 
 interface Closure {
   id: string;
