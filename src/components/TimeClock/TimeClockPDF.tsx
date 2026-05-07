@@ -169,6 +169,16 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         if (type === 'feriado') holidaySet.add(date);
       });
 
+      const sched: DaySchedule | null = schedule
+        ? {
+            entry_time: schedule.entry_time,
+            exit_time: schedule.exit_time,
+            daily_hours: Number(schedule.daily_hours),
+            tolerance_minutes: schedule.tolerance_minutes ?? 10,
+            work_days: schedule.work_days ?? [1, 2, 3, 4, 5],
+          }
+        : null;
+
       const days = eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) });
       const dayResults: { date: Date; result: DayResult; obs: string }[] = days.map((day) => {
         const dateStr = format(day, 'yyyy-MM-dd');
