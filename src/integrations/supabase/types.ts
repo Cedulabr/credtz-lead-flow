@@ -9471,6 +9471,10 @@ export type Database = {
           read_at: string | null
           rendered_message: string | null
           replied_at: string | null
+          second_message_error: string | null
+          second_message_scheduled_at: string | null
+          second_message_sent: boolean
+          second_message_sent_at: string | null
           sent_at: string | null
           sent_via_instance_id: string | null
           status: string
@@ -9489,6 +9493,10 @@ export type Database = {
           read_at?: string | null
           rendered_message?: string | null
           replied_at?: string | null
+          second_message_error?: string | null
+          second_message_scheduled_at?: string | null
+          second_message_sent?: boolean
+          second_message_sent_at?: string | null
           sent_at?: string | null
           sent_via_instance_id?: string | null
           status?: string
@@ -9507,6 +9515,10 @@ export type Database = {
           read_at?: string | null
           rendered_message?: string | null
           replied_at?: string | null
+          second_message_error?: string | null
+          second_message_scheduled_at?: string | null
+          second_message_sent?: boolean
+          second_message_sent_at?: string | null
           sent_at?: string | null
           sent_via_instance_id?: string | null
           status?: string
@@ -9555,6 +9567,12 @@ export type Database = {
           read_count: number
           replied_count: number
           scheduled_at: string | null
+          second_message_caption: string | null
+          second_message_delay_seconds: number
+          second_message_enabled: boolean
+          second_message_media_type: string | null
+          second_message_media_url: string | null
+          second_message_text: string | null
           sent_count: number
           started_at: string | null
           status: string
@@ -9586,6 +9604,12 @@ export type Database = {
           read_count?: number
           replied_count?: number
           scheduled_at?: string | null
+          second_message_caption?: string | null
+          second_message_delay_seconds?: number
+          second_message_enabled?: boolean
+          second_message_media_type?: string | null
+          second_message_media_url?: string | null
+          second_message_text?: string | null
           sent_count?: number
           started_at?: string | null
           status?: string
@@ -9617,6 +9641,12 @@ export type Database = {
           read_count?: number
           replied_count?: number
           scheduled_at?: string | null
+          second_message_caption?: string | null
+          second_message_delay_seconds?: number
+          second_message_enabled?: boolean
+          second_message_media_type?: string | null
+          second_message_media_url?: string | null
+          second_message_text?: string | null
           sent_count?: number
           started_at?: string | null
           status?: string
