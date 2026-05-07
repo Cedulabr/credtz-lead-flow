@@ -97,6 +97,14 @@ export function TimeClock() {
           </TabsTrigger>
           {canManage && (
             <>
+              <TabsTrigger value="hr" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">RH</span>
+              </TabsTrigger>
+              <TabsTrigger value="review" className="flex items-center gap-2">
+                <ClipboardCheck className="h-4 w-4" />
+                <span className="hidden sm:inline">Revisão</span>
+              </TabsTrigger>
               <TabsTrigger value="dashboard" className="flex items-center gap-2">
                 <LayoutDashboard className="h-4 w-4" />
                 <span className="hidden sm:inline">Painel</span>
