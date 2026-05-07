@@ -64,6 +64,7 @@ export const inconsistencyLabels: Record<Inconsistency['code'], string> = {
   SAIDA_DUPLICADA: 'Mais de uma saída registrada',
   PAUSA_INCOMPLETA: 'Pausa aberta sem fechamento',
   SAIDA_SEM_ENTRADA: 'Saída sem entrada correspondente',
+  ENTRADA_SEM_SAIDA: 'Entrada registrada sem saída',
   SAIDA_ANTES_ENTRADA: 'Saída anterior à entrada',
   PAUSA_INVERTIDA: 'Fim de pausa anterior ao início',
   PAUSA_EXCESSIVA: 'Pausa acima de 4 horas',
