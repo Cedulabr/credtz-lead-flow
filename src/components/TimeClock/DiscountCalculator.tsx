@@ -81,15 +81,17 @@ export function DiscountCalculator() {
     const startDate = `${selectedMonth}-01`;
     const endDate = format(endOfMonth(parseISO(startDate)), 'yyyy-MM-dd');
 
-    const [profilesRes, salariesRes, schedulesRes, recordsRes, dayOffsRes, justRes] = await Promise.all([
+    const [profilesRes, salariesRes, schedulesRes, recordsRes, dayOffsRes, justRes, hbSettingsRes] = await Promise.all([
       supabase.from('profiles').select('id, name, email').in('id', userIds).eq('is_active', true),
       supabase.from('employee_salaries').select('*').in('user_id', userIds).eq('is_active', true),
       supabase.from('time_clock_schedules').select('*').in('user_id', userIds).eq('is_active', true),
       supabase.from('time_clock').select('*').in('user_id', userIds).gte('clock_date', startDate).lte('clock_date', endDate).order('clock_time', { ascending: true }),
       supabase.from('time_clock_day_offs').select('*').in('user_id', userIds).gte('off_date', startDate).lte('off_date', endDate),
       supabase.from('time_clock_justifications').select('*').in('user_id', userIds).gte('reference_date', startDate).lte('reference_date', endDate).eq('status', 'approved'),
+      (supabase as any).from('hour_bank_settings').select('discount_mode').limit(1).maybeSingle(),
     ]);
 
+    const discountMode: 'financeiro' | 'banco' | 'misto' = (hbSettingsRes?.data?.discount_mode as any) || 'financeiro';
     const profiles = profilesRes.data || [];
     const salaryMap: Record<string, number> = {};
     salariesRes.data?.forEach((s: any) => { salaryMap[s.user_id] = Number(s.base_salary) || 0; });
@@ -186,8 +188,21 @@ export function DiscountCalculator() {
       const valorHora = salary > 0 ? salary / (dailyHours * effectiveBusinessDays) : 0;
       const valorDia = valorHora * dailyHours;
       const negativeMinutes = Math.max(0, expectedMinutes - workedMinutes - (absences + pendingDays) * dailyHours * 60);
-      const discountNegativeHours = (negativeMinutes / 60) * valorHora;
-      const discountAbsences = (absences + pendingDays) * valorDia;
+
+      // Modo de desconto: evita dupla penalidade
+      // financeiro: desconta tudo em folha
+      // banco: tudo vai para banco negativo (sem desconto financeiro)
+      // misto: faltas em folha, atrasos/horas negativas no banco
+      let discountNegativeHours = 0;
+      let discountAbsences = 0;
+      if (discountMode === 'financeiro') {
+        discountNegativeHours = (negativeMinutes / 60) * valorHora;
+        discountAbsences = (absences + pendingDays) * valorDia;
+      } else if (discountMode === 'misto') {
+        discountAbsences = (absences + pendingDays) * valorDia;
+        // horas negativas vão para o banco — não descontam
+      }
+      // discountMode === 'banco' → ambos zero
       const totalDiscount = discountNegativeHours + discountAbsences;
       const netEstimated = Math.max(0, salary - totalDiscount);
 

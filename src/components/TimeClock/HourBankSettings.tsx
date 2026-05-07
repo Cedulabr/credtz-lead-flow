@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Save, Loader2, Settings } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Save, Loader2, Settings, Wallet, Banknote, Layers } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import type { HourBankSettings as HBSettings } from './types';
+import type { HourBankSettings as HBSettings, DiscountMode } from './types';
 
 export function HourBankSettingsPanel() {
   const { toast } = useToast();
@@ -30,7 +31,8 @@ export function HourBankSettingsPanel() {
         max_bank_balance_minutes: 7200,
         allow_negative_discount: true,
         overtime_multiplier: 1.50,
-      }).select().single();
+        discount_mode: 'financeiro',
+      } as any).select().single();
       if (newData) setSettings(newData as unknown as HBSettings);
     }
     setLoading(false);
@@ -45,7 +47,8 @@ export function HourBankSettingsPanel() {
       max_bank_balance_minutes: settings.max_bank_balance_minutes,
       allow_negative_discount: settings.allow_negative_discount,
       overtime_multiplier: settings.overtime_multiplier,
-    }).eq('id', settings.id);
+      discount_mode: settings.discount_mode,
+    } as any).eq('id', settings.id);
 
     if (error) {
       toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' });
@@ -88,6 +91,43 @@ export function HourBankSettingsPanel() {
             <p className="text-xs text-muted-foreground">{Math.floor(settings.max_bank_balance_minutes / 60)}h de saldo máximo</p>
           </div>
         </div>
+
+        <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
+          <div>
+            <Label className="text-base font-semibold">Modo de Desconto</Label>
+            <p className="text-xs text-muted-foreground mt-1">
+              Define como faltas, atrasos e saídas antecipadas são contabilizados — evita que o colaborador seja punido duas vezes (desconto em folha + banco negativo).
+            </p>
+          </div>
+          <RadioGroup
+            value={settings.discount_mode || 'financeiro'}
+            onValueChange={(v) => setSettings({ ...settings, discount_mode: v as DiscountMode })}
+            className="grid gap-3"
+          >
+            <label className="flex items-start gap-3 p-3 rounded-md border bg-background cursor-pointer hover:bg-accent/40">
+              <RadioGroupItem value="financeiro" id="dm-fin" className="mt-1" />
+              <div className="flex-1">
+                <div className="flex items-center gap-2 font-medium"><Wallet className="h-4 w-4" /> Apenas Financeiro</div>
+                <p className="text-xs text-muted-foreground">Faltas e atrasos viram desconto em folha. Banco de horas só registra extras voluntárias e compensações. <strong>Recomendado para RH simples.</strong></p>
+              </div>
+            </label>
+            <label className="flex items-start gap-3 p-3 rounded-md border bg-background cursor-pointer hover:bg-accent/40">
+              <RadioGroupItem value="banco" id="dm-bank" className="mt-1" />
+              <div className="flex-1">
+                <div className="flex items-center gap-2 font-medium"><Banknote className="h-4 w-4" /> Apenas Banco</div>
+                <p className="text-xs text-muted-foreground">Faltas e atrasos viram banco negativo (compensáveis com folga ou horas extras). Sem desconto financeiro automático.</p>
+              </div>
+            </label>
+            <label className="flex items-start gap-3 p-3 rounded-md border bg-background cursor-pointer hover:bg-accent/40">
+              <RadioGroupItem value="misto" id="dm-mix" className="mt-1" />
+              <div className="flex-1">
+                <div className="flex items-center gap-2 font-medium"><Layers className="h-4 w-4" /> Misto</div>
+                <p className="text-xs text-muted-foreground">Atrasos e saídas antecipadas vão para o banco (compensáveis). Faltas inteiras viram desconto em folha.</p>
+              </div>
+            </label>
+          </RadioGroup>
+        </div>
+
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label>Permitir Desconto de Horas Negativas</Label>

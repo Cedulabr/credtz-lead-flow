@@ -19,8 +19,11 @@ import {
   formatHM,
   dayStatusLabels,
   dayStatusColor,
+  subStatusLabels,
+  subStatusColor,
   type DayResult,
   type DaySchedule,
+  type DiscountMode,
 } from '@/lib/timeClockEngine';
 import { getBrazilianHolidays } from './brazilianHolidays';
 
@@ -137,7 +140,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const startDate = `${selectedMonth}-01`;
       const endDate = format(endOfMonth(parseISO(startDate)), 'yyyy-MM-dd');
 
-      const [recordsRes, justRes, scheduleRes, profileRes, salaryRes, dayOffsRes, holidaysRes] = await Promise.all([
+      const [recordsRes, justRes, scheduleRes, profileRes, salaryRes, dayOffsRes, holidaysRes, hbRes] = await Promise.all([
         supabase.from('time_clock').select('*').eq('user_id', userId)
           .gte('clock_date', startDate).lte('clock_date', endDate)
           .order('clock_date').order('clock_time'),
@@ -149,7 +152,9 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         supabase.from('time_clock_day_offs').select('off_date, off_type').eq('user_id', userId)
           .gte('off_date', startDate).lte('off_date', endDate),
         (supabase as any).from("brazilian_holidays").select('holiday_date').gte('holiday_date', startDate).lte('holiday_date', endDate),
+        (supabase as any).from('hour_bank_settings').select('discount_mode').limit(1).maybeSingle(),
       ]);
+      const discountMode: DiscountMode = (hbRes?.data?.discount_mode as DiscountMode) || 'financeiro';
 
       const records = recordsRes.data || [];
       const justifications = justRes.data || [];
@@ -186,7 +191,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           .filter((r: any) => r.clock_date === dateStr)
           .map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
         const isHoliday = holidaySet.has(dateStr);
-        const result = evaluateDay(dayRecords, sched, day.getDay(), isHoliday);
+        const result = evaluateDay(dayRecords, sched, day.getDay(), isHoliday, discountMode);
         const off = dayOffMap[dateStr];
         const just = justifications.find((j: any) => j.reference_date === dateStr);
         let obs = '';
@@ -254,7 +259,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           result.delayMinutes > 0 ? formatHM(result.delayMinutes) : '-',
           result.overtimeMinutes > 0 ? formatHM(result.overtimeMinutes) : '-',
           result.bankBalanceMinutes !== 0 ? formatHM(result.bankBalanceMinutes) : '-',
-          dayStatusLabels[result.status],
+          result.subStatus ? subStatusLabels[result.subStatus] : dayStatusLabels[result.status],
           safe(obs).slice(0, 60),
         ];
       });
@@ -283,13 +288,15 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           if (data.section !== 'body') return;
           const r = dayResults[data.row.index];
           if (!r) return;
-          const color = dayStatusColor[r.result.status].pdfRgb;
+          const baseColor = r.result.subStatus
+            ? subStatusColor[r.result.subStatus].pdfRgb
+            : dayStatusColor[r.result.status].pdfRgb;
           if (data.column.index === 9) {
-            data.cell.styles.fillColor = color;
+            data.cell.styles.fillColor = baseColor;
             data.cell.styles.textColor = [30, 30, 30];
           }
           if (r.result.status === 'pendente_ajuste') {
-            data.cell.styles.fillColor = color;
+            data.cell.styles.fillColor = baseColor;
             data.cell.styles.textColor = [127, 29, 29];
           }
         },
@@ -348,16 +355,21 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         }).length || 22;
         const valorHora = base / (dailyHours * businessDays);
         const valorDia = valorHora * dailyHours;
-        const descAtrasos = ((summary.delay + summary.earlyExit) / 60) * valorHora;
-        const descFaltas = summary.absences * valorDia;
-        const descPendentes = summary.pending * valorDia;
+        const descAtrasosBruto = ((summary.delay + summary.earlyExit) / 60) * valorHora;
+        const descFaltasBruto = summary.absences * valorDia;
+        const descPendentesBruto = summary.pending * valorDia;
+        // Aplicar modo de desconto
+        const descAtrasos = discountMode === 'banco' ? 0 : descAtrasosBruto;
+        const descFaltas = discountMode === 'banco' ? 0 : descFaltasBruto;
+        const descPendentes = discountMode === 'banco' ? 0 : descPendentesBruto;
         const desconto = descAtrasos + descFaltas + descPendentes;
         const liquido = Math.max(0, base - desconto);
         const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const modoLabel = discountMode === 'financeiro' ? 'Financeiro' : discountMode === 'banco' ? 'Banco' : 'Misto';
         doc.setTextColor(...NAVY);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
-        doc.text(safe(`Valor/hora: R$ ${fmt(valorHora)}  ·  Valor/dia: R$ ${fmt(valorDia)}  ·  Dias úteis: ${businessDays}`), 12, afterY);
+        doc.text(safe(`Modo de desconto: ${modoLabel}  ·  Valor/hora: R$ ${fmt(valorHora)}  ·  Valor/dia: R$ ${fmt(valorDia)}  ·  Dias úteis: ${businessDays}`), 12, afterY);
         afterY += 5;
         doc.text(
           safe(`Desc. faltas (${summary.absences}): R$ ${fmt(descFaltas)}  ·  Desc. atrasos/saídas: R$ ${fmt(descAtrasos)}  ·  Desc. pendentes (${summary.pending}): R$ ${fmt(descPendentes)}`),
@@ -376,6 +388,13 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           doc.setFontSize(7);
           doc.setFont('helvetica', 'italic');
           doc.text(safe(`⚠ Existem ${summary.pending} dia(s) pendente(s) de ajuste — desconto provisório, regularize antes do fechamento.`), 12, afterY);
+          afterY += 5;
+        }
+        if (discountMode === 'banco') {
+          doc.setTextColor(180, 30, 30);
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'italic');
+          doc.text(safe(`Modo Banco ativo: faltas e atrasos não geram desconto financeiro — saldo será compensado via banco de horas.`), 12, afterY);
           afterY += 5;
         }
       }
@@ -480,7 +499,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...NAVY);
       doc.setFontSize(10);
-      doc.text(safe(`Status do Dia: ${dayStatusLabels[result.status]}`), pw / 2, yp + 1, { align: 'center' });
+      doc.text(safe(`Status do Dia: ${result.subStatus ? subStatusLabels[result.subStatus] : dayStatusLabels[result.status]}`), pw / 2, yp + 1, { align: 'center' });
       yp += 15;
 
       doc.setFont('helvetica', 'normal');
