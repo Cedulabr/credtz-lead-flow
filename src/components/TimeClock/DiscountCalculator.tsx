@@ -81,15 +81,17 @@ export function DiscountCalculator() {
     const startDate = `${selectedMonth}-01`;
     const endDate = format(endOfMonth(parseISO(startDate)), 'yyyy-MM-dd');
 
-    const [profilesRes, salariesRes, schedulesRes, recordsRes, dayOffsRes, justRes] = await Promise.all([
+    const [profilesRes, salariesRes, schedulesRes, recordsRes, dayOffsRes, justRes, hbSettingsRes] = await Promise.all([
       supabase.from('profiles').select('id, name, email').in('id', userIds).eq('is_active', true),
       supabase.from('employee_salaries').select('*').in('user_id', userIds).eq('is_active', true),
       supabase.from('time_clock_schedules').select('*').in('user_id', userIds).eq('is_active', true),
       supabase.from('time_clock').select('*').in('user_id', userIds).gte('clock_date', startDate).lte('clock_date', endDate).order('clock_time', { ascending: true }),
       supabase.from('time_clock_day_offs').select('*').in('user_id', userIds).gte('off_date', startDate).lte('off_date', endDate),
       supabase.from('time_clock_justifications').select('*').in('user_id', userIds).gte('reference_date', startDate).lte('reference_date', endDate).eq('status', 'approved'),
+      (supabase as any).from('hour_bank_settings').select('discount_mode').limit(1).maybeSingle(),
     ]);
 
+    const discountMode: 'financeiro' | 'banco' | 'misto' = (hbSettingsRes?.data?.discount_mode as any) || 'financeiro';
     const profiles = profilesRes.data || [];
     const salaryMap: Record<string, number> = {};
     salariesRes.data?.forEach((s: any) => { salaryMap[s.user_id] = Number(s.base_salary) || 0; });
