@@ -14,6 +14,9 @@ import { SalaryManager } from './SalaryManager';
 import { DayOffManager } from './DayOffManager';
 import { DiscountCalculator } from './DiscountCalculator';
 import { AuditDashboard } from './AuditDashboard';
+import { AdjustmentRequest } from './AdjustmentRequest';
+import { AdjustmentReview } from './AdjustmentReview';
+import { HRDashboard } from './HRDashboard';
 import { BlockedAccess } from '@/components/BlockedAccess';
 import { Loader2 } from 'lucide-react';
 
