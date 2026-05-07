@@ -4335,6 +4335,7 @@ export type Database = {
           allow_negative_discount: boolean | null
           company_id: string | null
           created_at: string | null
+          discount_mode: Database["public"]["Enums"]["discount_mode_type"]
           id: string
           max_bank_balance_minutes: number | null
           max_overtime_monthly_minutes: number | null
@@ -4346,6 +4347,7 @@ export type Database = {
           allow_negative_discount?: boolean | null
           company_id?: string | null
           created_at?: string | null
+          discount_mode?: Database["public"]["Enums"]["discount_mode_type"]
           id?: string
           max_bank_balance_minutes?: number | null
           max_overtime_monthly_minutes?: number | null
@@ -4357,6 +4359,7 @@ export type Database = {
           allow_negative_discount?: boolean | null
           company_id?: string | null
           created_at?: string | null
+          discount_mode?: Database["public"]["Enums"]["discount_mode_type"]
           id?: string
           max_bank_balance_minutes?: number | null
           max_overtime_monthly_minutes?: number | null
@@ -10645,6 +10648,7 @@ export type Database = {
         | "feriado"
         | "folga"
         | "sem_jornada"
+      discount_mode_type: "financeiro" | "banco" | "misto"
       document_status: "pending" | "sent" | "approved" | "rejected"
       person_type: "pf" | "pj"
       tenant_role: "super_admin" | "gestor" | "agente"
@@ -10815,6 +10819,7 @@ export const Constants = {
         "folga",
         "sem_jornada",
       ],
+      discount_mode_type: ["financeiro", "banco", "misto"],
       document_status: ["pending", "sent", "approved", "rejected"],
       person_type: ["pf", "pj"],
       tenant_role: ["super_admin", "gestor", "agente"],
