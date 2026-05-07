@@ -435,7 +435,10 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         work_days: schedule.work_days ?? [1, 2, 3, 4, 5],
       } : null;
       const day = parseISO(selectedDate);
-      const result = evaluateDay(records, sched, day.getDay(), !!holidayRes.data);
+      // Considera feriado se vem do DB OU dos feriados nacionais calculados
+      const nationalHolidays = new Set(getBrazilianHolidays(day.getFullYear()).map(h => h.date));
+      const isHoliday = !!holidayRes.data || nationalHolidays.has(selectedDate);
+      const result = evaluateDay(records, sched, day.getDay(), isHoliday);
 
       const doc = new jsPDF();
       const pw = doc.internal.pageSize.getWidth();
