@@ -4,17 +4,28 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Download, FileText, Loader2, Calendar } from 'lucide-react';
+import { Download, FileText, Loader2, Calendar, FileSpreadsheet } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import QRCode from 'qrcode';
+import * as XLSX from 'xlsx';
 import { format, parseISO, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { calculateTotalBreakMinutes, parseTimeToMinutes, formatMinutesToHMCompact } from '@/lib/timeClockCalculations';
+import {
+  evaluateDay,
+  summarizePeriod,
+  formatHM,
+  dayStatusLabels,
+  dayStatusColor,
+  type DayResult,
+  type DaySchedule,
+} from '@/lib/timeClockEngine';
 
-const EASYN_NAVY = [10, 31, 68] as const;
-const EASYN_BLUE = [59, 130, 246] as const;
-const WHITE = [255, 255, 255] as const;
+const NAVY: [number, number, number] = [10, 31, 68];
+const BLUE: [number, number, number] = [59, 130, 246];
+const WHITE: [number, number, number] = [255, 255, 255];
 
 interface TimeClockPDFProps {
   userId?: string;
@@ -23,632 +34,316 @@ interface TimeClockPDFProps {
   companyCNPJ?: string;
 }
 
+/** Normaliza para NFC e remove caracteres de controle invisíveis que quebram encoding em jsPDF. */
+const safe = (v: unknown): string => {
+  if (v === null || v === undefined) return '';
+  return String(v).normalize('NFC').replace(/[\u0000-\u001F\u007F]/g, '');
+};
+
+const dayNamesShort: Record<number, string> = {
+  0: 'Dom', 1: 'Seg', 2: 'Ter', 3: 'Qua', 4: 'Qui', 5: 'Sex', 6: 'Sáb',
+};
+
+async function sha256(text: string): Promise<string> {
+  const buf = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export function TimeClockPDF({ userId, userName, companyName = 'Empresa', companyCNPJ }: TimeClockPDFProps) {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [reportType, setReportType] = useState<'daily' | 'monthly'>('monthly');
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'xlsx'>('pdf');
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const { toast } = useToast();
 
-  const drawHeader = (doc: jsPDF, pageWidth: number) => {
-    doc.setFillColor(...EASYN_NAVY);
-    doc.rect(0, 0, pageWidth, 38, 'F');
-    doc.setFillColor(...EASYN_BLUE);
-    doc.rect(0, 38, pageWidth, 2, 'F');
+  const drawHeader = (doc: jsPDF) => {
+    const pw = doc.internal.pageSize.getWidth();
+    doc.setFillColor(...NAVY);
+    doc.rect(0, 0, pw, 28, 'F');
+    doc.setFillColor(...BLUE);
+    doc.rect(0, 28, pw, 1.5, 'F');
     doc.setTextColor(...WHITE);
-    doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text('EASYN', 14, 18);
-    doc.setFontSize(9);
+    doc.setFontSize(16);
+    doc.text(safe('EASYN'), 14, 14);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text('Sistema de Gestão de Ponto', 14, 26);
+    doc.text(safe('Sistema Profissional de Controle de Ponto'), 14, 21);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text(safe(companyName), pw - 14, 14, { align: 'right' });
+    if (companyCNPJ) {
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(safe(`CNPJ: ${companyCNPJ}`), pw - 14, 21, { align: 'right' });
+    }
   };
 
-  const drawCompanyInfo = (doc: jsPDF, pageWidth: number) => {
-    doc.setTextColor(...WHITE);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text(companyName || 'Empresa', pageWidth - 14, 18, { align: 'right' });
-    if (companyCNPJ) {
-      doc.setFontSize(9);
+  const drawFooter = (doc: jsPDF, hash: string) => {
+    const pw = doc.internal.pageSize.getWidth();
+    const ph = doc.internal.pageSize.getHeight();
+    const total = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= total; i++) {
+      doc.setPage(i);
+      doc.setFillColor(...NAVY);
+      doc.rect(0, ph - 12, pw, 12, 'F');
+      doc.setTextColor(...WHITE);
       doc.setFont('helvetica', 'normal');
-      doc.text(`CNPJ: ${companyCNPJ}`, pageWidth - 14, 26, { align: 'right' });
+      doc.setFontSize(7);
+      doc.text(
+        safe(`Easyn — Documento gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")} | Hash: ${hash.slice(0, 16)}…`),
+        14, ph - 5
+      );
+      doc.text(safe(`Página ${i} de ${total}`), pw - 14, ph - 5, { align: 'right' });
     }
   };
 
   const drawSignatureArea = (doc: jsPDF, yPos: number) => {
-    const pageWidth = doc.internal.pageSize.getWidth();
-    doc.setFontSize(8);
+    const pw = doc.internal.pageSize.getWidth();
+    doc.setFontSize(7);
     doc.setTextColor(80, 80, 80);
     doc.setFont('helvetica', 'italic');
-    doc.text('Declaro que as informações acima são verdadeiras e conferem com meu registro de ponto.', pageWidth / 2, yPos, { align: 'center' });
-    yPos += 15;
+    doc.text(
+      safe('Declaro que as informações acima são verdadeiras e conferem com meu registro de ponto.'),
+      pw / 2, yPos, { align: 'center' }
+    );
+    yPos += 14;
     doc.setDrawColor(0, 0, 0);
-    doc.line(20, yPos, 90, yPos);
-    doc.setFontSize(8);
+    doc.line(20, yPos, 100, yPos);
+    doc.line(pw - 100, yPos, pw - 20, yPos);
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
     doc.setTextColor(0, 0, 0);
-    doc.text('Assinatura do Colaborador', 55, yPos + 5, { align: 'center' });
-    doc.text('Data: ___/___/______', 55, yPos + 11, { align: 'center' });
-    doc.line(120, yPos, 190, yPos);
-    doc.text('Assinatura do Gestor', 155, yPos + 5, { align: 'center' });
-    doc.text('Data: ___/___/______', 155, yPos + 11, { align: 'center' });
-    yPos += 22;
-    doc.setDrawColor(180, 180, 180);
-    doc.setLineDashPattern([2, 2], 0);
-    doc.rect(pageWidth / 2 - 25, yPos, 50, 20);
-    doc.setFontSize(7);
-    doc.setTextColor(150, 150, 150);
-    doc.text('Carimbo da Empresa', pageWidth / 2, yPos + 12, { align: 'center' });
-    doc.setLineDashPattern([], 0);
+    doc.text(safe('Assinatura do Colaborador'), 60, yPos + 5, { align: 'center' });
+    doc.text(safe('Assinatura do Gestor / RH'), pw - 60, yPos + 5, { align: 'center' });
+    doc.text(safe('Data: ___/___/______'), 60, yPos + 11, { align: 'center' });
+    doc.text(safe('Data: ___/___/______'), pw - 60, yPos + 11, { align: 'center' });
   };
 
-  const drawFooter = (doc: jsPDF) => {
-    const pageWidth = doc.internal.pageSize.getWidth();
-    doc.setFillColor(...EASYN_NAVY);
-    doc.rect(0, 282, pageWidth, 15, 'F');
-    doc.setFontSize(7);
-    doc.setTextColor(...WHITE);
-    doc.text(`Easyn — Sistema de Gestão de Ponto | Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`, pageWidth / 2, 290, { align: 'center' });
-  };
-
-  const generateDailyPDF = async () => {
-    setLoading(true);
-    try {
-      const { data: records } = await supabase
-        .from('time_clock').select('*').eq('user_id', userId)
-        .eq('clock_date', selectedDate).order('clock_time', { ascending: true });
-
-      const { data: justifications } = await supabase
-        .from('time_clock_justifications').select('*').eq('user_id', userId)
-        .eq('reference_date', selectedDate);
-
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      drawHeader(doc, pageWidth);
-      drawCompanyInfo(doc, pageWidth);
-
-      let yPos = 50;
-      doc.setTextColor(...EASYN_NAVY);
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.text('FOLHA DE PONTO DIÁRIA', pageWidth / 2, yPos, { align: 'center' });
-
-      yPos += 15;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Colaborador:', 14, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(userName || 'Não informado', 48, yPos);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Data:', 120, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(format(parseISO(selectedDate), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR }), 133, yPos);
-
-      yPos += 18;
-      doc.setFillColor(240, 243, 248);
-      doc.rect(14, yPos - 5, pageWidth - 28, 10, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(...EASYN_NAVY);
-      doc.text('REGISTROS DO DIA', pageWidth / 2, yPos + 1, { align: 'center' });
-
-      yPos += 14;
-      const entry = records?.find(r => r.clock_type === 'entrada');
-      const breakStarts = records?.filter(r => r.clock_type === 'pausa_inicio') || [];
-      const breakEnds = records?.filter(r => r.clock_type === 'pausa_fim') || [];
-      const exit = records?.find(r => r.clock_type === 'saida');
-
-      const rows = [
-        { label: 'Entrada', record: entry },
-        { label: 'Início Pausa', record: breakStarts[0] },
-        { label: 'Fim Pausa', record: breakEnds[0] },
-        { label: 'Saída', record: exit },
-      ];
-
-      doc.setFontSize(10);
-      rows.forEach((row) => {
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...EASYN_NAVY);
-        doc.text(row.label + ':', 20, yPos);
-        doc.setFont('helvetica', 'normal');
-        if (row.record) {
-          const time = row.record.clock_time;
-          const timeStr = time.includes('T') ? format(parseISO(time), 'HH:mm:ss') : time.slice(0, 8);
-          doc.setTextColor(0, 0, 0);
-          doc.text(timeStr, 60, yPos);
-          if (row.record.city) {
-            doc.setFontSize(8);
-            doc.setTextColor(100, 100, 100);
-            doc.text(`${row.record.city}/${row.record.state}`, 90, yPos);
-            doc.setFontSize(10);
-          }
-        } else {
-          doc.setTextColor(150, 150, 150);
-          doc.text('Não registrado', 60, yPos);
-        }
-        yPos += 10;
-      });
-
-      yPos += 8;
-      doc.setFillColor(...EASYN_BLUE);
-      doc.rect(14, yPos - 5, pageWidth - 28, 10, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...WHITE);
-      doc.text('RESUMO', pageWidth / 2, yPos + 1, { align: 'center' });
-
-      yPos += 14;
-      let totalMinutes = 0;
-      const breakMinutes = calculateTotalBreakMinutes(records || []);
-      if (entry && exit) {
-        totalMinutes = Math.floor((parseISO(exit.clock_time).getTime() - parseISO(entry.clock_time).getTime()) / 60000);
-        totalMinutes -= breakMinutes;
-      }
-
-      doc.setTextColor(...EASYN_NAVY);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Total Trabalhado:', 20, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}min`, 65, yPos);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Intervalo:', 110, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`${Math.floor(breakMinutes / 60)}h ${breakMinutes % 60}min`, 140, yPos);
-
-      if (justifications && justifications.length > 0) {
-        yPos += 16;
-        doc.setFillColor(255, 243, 205);
-        doc.rect(14, yPos - 5, pageWidth - 28, 10, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...EASYN_NAVY);
-        doc.text('JUSTIFICATIVAS', pageWidth / 2, yPos + 1, { align: 'center' });
-        yPos += 12;
-        justifications.forEach((just: any) => {
-          doc.setFont('helvetica', 'bold');
-          doc.text(`• ${just.justification_type}:`, 20, yPos);
-          doc.setFont('helvetica', 'normal');
-          doc.text(just.description?.substring(0, 60) || '', 60, yPos);
-          doc.text(`[${just.status}]`, 170, yPos);
-          yPos += 8;
-        });
-      }
-
-      drawSignatureArea(doc, yPos + 20);
-      drawFooter(doc);
-      doc.save(`ponto-diario-${selectedDate}.pdf`);
-      toast({ title: 'PDF gerado com sucesso!' });
-    } catch (error: any) {
-      toast({ title: 'Erro ao gerar PDF', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-    setShowModal(false);
-  };
-
+  // ==================== MENSAL ====================
   const generateMonthlyPDF = async () => {
     setLoading(true);
     try {
       const startDate = `${selectedMonth}-01`;
       const endDate = format(endOfMonth(parseISO(startDate)), 'yyyy-MM-dd');
 
-      const [recordsRes, justRes, scheduleRes, profileRes, salaryRes, dayOffsRes] = await Promise.all([
+      const [recordsRes, justRes, scheduleRes, profileRes, salaryRes, dayOffsRes, holidaysRes] = await Promise.all([
         supabase.from('time_clock').select('*').eq('user_id', userId)
           .gte('clock_date', startDate).lte('clock_date', endDate)
-          .order('clock_date', { ascending: true }).order('clock_time', { ascending: true }),
+          .order('clock_date').order('clock_time'),
         supabase.from('time_clock_justifications').select('*').eq('user_id', userId)
           .gte('reference_date', startDate).lte('reference_date', endDate),
-        supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).single(),
-        supabase.from('profiles').select('name, email, cpf, role').eq('id', userId).single(),
-        supabase.from('employee_salaries').select('*').eq('user_id', userId).eq('is_active', true).single(),
+        supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).maybeSingle(),
+        supabase.from('profiles').select('name, email, cpf, role').eq('id', userId).maybeSingle(),
+        supabase.from('employee_salaries').select('*').eq('user_id', userId).eq('is_active', true).maybeSingle(),
         supabase.from('time_clock_day_offs').select('off_date, off_type').eq('user_id', userId)
           .gte('off_date', startDate).lte('off_date', endDate),
+        supabase.from('brazilian_holidays').select('holiday_date').gte('holiday_date', startDate).lte('holiday_date', endDate),
       ]);
 
       const records = recordsRes.data || [];
       const justifications = justRes.data || [];
-      const schedule = scheduleRes.data;
-      const profile = profileRes.data;
-      const salary = salaryRes.data;
+      const schedule = scheduleRes.data as any;
+      const profile = profileRes.data as any;
+      const salary = salaryRes.data as any;
       const dayOffMap: Record<string, string> = {};
       (dayOffsRes.data || []).forEach((d: any) => { dayOffMap[d.off_date] = d.off_type; });
+      const holidaySet = new Set((holidaysRes.data || []).map((h: any) => h.holiday_date));
 
-      const doc = new jsPDF({ orientation: 'landscape' });
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
+      const sched: DaySchedule | null = schedule
+        ? {
+            entry_time: schedule.entry_time,
+            exit_time: schedule.exit_time,
+            daily_hours: Number(schedule.daily_hours),
+            tolerance_minutes: schedule.tolerance_minutes ?? 10,
+            work_days: schedule.work_days ?? [1, 2, 3, 4, 5],
+          }
+        : null;
 
-      // ==================== HEADER ====================
-      drawHeader(doc, pageWidth);
-      drawCompanyInfo(doc, pageWidth);
-
-      // Title
-      let yPos = 48;
-      doc.setTextColor(...EASYN_NAVY);
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('ESPELHO DE PONTO MENSAL', pageWidth / 2, yPos, { align: 'center' });
-
-      // Employee info line 1
-      yPos += 10;
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...EASYN_NAVY);
-      doc.text('Colaborador:', 14, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      doc.text(userName || profile?.name || 'Não informado', 45, yPos);
-
-      const cargoText = salary?.cargo || (profile?.role === 'admin' ? 'Administrador' : 'Colaborador');
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...EASYN_NAVY);
-      doc.text('Cargo:', 120, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      doc.text(cargoText, 135, yPos);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...EASYN_NAVY);
-      doc.text('Período:', 200, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      const periodoText = format(parseISO(startDate), "MMMM 'de' yyyy", { locale: ptBR });
-      doc.text(periodoText.charAt(0).toUpperCase() + periodoText.slice(1), 220, yPos);
-
-      // Employee info line 2
-      yPos += 7;
-      if (profile?.cpf) {
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...EASYN_NAVY);
-        doc.text('CPF:', 14, yPos);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(0, 0, 0);
-        const cpf = profile.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-        doc.text(cpf, 28, yPos);
-      }
-      if (schedule) {
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...EASYN_NAVY);
-        doc.text('Jornada:', 120, yPos);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(0, 0, 0);
-        doc.text(`${schedule.entry_time?.slice(0, 5)} às ${schedule.exit_time?.slice(0, 5)} | ${schedule.daily_hours}h/dia`, 142, yPos);
-      }
-
-      // ==================== TABLE HEADER ====================
-      yPos += 10;
-      const HEADER_RED: [number, number, number] = [180, 30, 30];
-      doc.setFillColor(...HEADER_RED);
-      doc.rect(14, yPos - 4, pageWidth - 28, 10, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
-      doc.setTextColor(...WHITE);
-
-      // Column positions for landscape
-      const cols = {
-        data: 16,
-        dia: 35,
-        entrada: 62,
-        saida: 82,
-        pausaIni: 100,
-        pausaFim: 118,
-        totalIntervalo: 136,
-        atraso: 156,
-        licMed: 175,
-        ferias: 193,
-        justificativa: 210,
-        totalHoras: 233,
-        obs: 255,
-      };
-
-      doc.text('Data', cols.data, yPos + 2);
-      doc.text('Dia da Semana', cols.dia, yPos + 2);
-      doc.text('Entrada', cols.entrada, yPos + 2);
-      doc.text('Saída', cols.saida, yPos + 2);
-      doc.text('Pausa Início', cols.pausaIni, yPos + 2);
-      doc.text('Pausa Fim', cols.pausaFim, yPos + 2);
-      doc.text('Tot. Intervalo', cols.totalIntervalo, yPos + 2);
-      doc.text('Atraso', cols.atraso, yPos + 2);
-      doc.text('Lic. Méd.', cols.licMed, yPos + 2);
-      doc.text('Férias', cols.ferias, yPos + 2);
-      doc.text('Justif.', cols.justificativa, yPos + 2);
-      doc.text('Total Horas', cols.totalHoras, yPos + 2);
-      doc.text('Obs', cols.obs, yPos + 2);
-
-      yPos += 11;
-
-      // ==================== TABLE ROWS ====================
       const days = eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) });
-      const workDays = schedule?.work_days || [1, 2, 3, 4, 5];
-      const expectedDailyMinutes = (schedule?.daily_hours || 8) * 60;
-
-      let totalWorkedMinutes = 0;
-      let totalDelayMinutes = 0;
-      let totalBreakMinutesAll = 0;
-      let totalDelays = 0;
-      let totalAbsences = 0;
-      let totalOvertime = 0;
-      let justifiedDelays = 0;
-      let unjustifiedDelays = 0;
-
-      const dayNames: Record<number, string> = {
-        0: 'Domingo', 1: 'Segunda-feira', 2: 'Terça-feira',
-        3: 'Quarta-feira', 4: 'Quinta-feira', 5: 'Sexta-feira', 6: 'Sábado',
-      };
-
-      const fmtTime = (r: any) => {
-        if (!r) return '-';
-        const t = r.clock_time;
-        return t.includes('T') ? format(parseISO(t), 'HH:mm') : t.slice(0, 5);
-      };
-
-      const fmtMinToHM = (min: number): string => {
-        if (min <= 0) return '-';
-        const h = Math.floor(min / 60);
-        const m = min % 60;
-        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-      };
-
-      days.forEach((day) => {
+      const dayResults: { date: Date; result: DayResult; obs: string }[] = days.map((day) => {
         const dateStr = format(day, 'yyyy-MM-dd');
-        const dayRecords = records.filter(r => r.clock_date === dateStr);
-        const dayOfWeek = day.getDay();
-        const isWorkDay = workDays.includes(dayOfWeek);
-        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
-        // Page break
-        if (yPos > pageHeight - 35) {
-          drawFooter(doc);
-          doc.addPage('landscape');
-          yPos = 20;
-          // Redraw table header on new page
-          doc.setFillColor(...HEADER_RED);
-          doc.rect(14, yPos - 4, pageWidth - 28, 10, 'F');
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(7);
-          doc.setTextColor(...WHITE);
-          doc.text('Data', cols.data, yPos + 2);
-          doc.text('Dia da Semana', cols.dia, yPos + 2);
-          doc.text('Entrada', cols.entrada, yPos + 2);
-          doc.text('Saída', cols.saida, yPos + 2);
-          doc.text('Pausa Início', cols.pausaIni, yPos + 2);
-          doc.text('Pausa Fim', cols.pausaFim, yPos + 2);
-          doc.text('Tot. Intervalo', cols.totalIntervalo, yPos + 2);
-          doc.text('Atraso', cols.atraso, yPos + 2);
-          doc.text('Lic. Méd.', cols.licMed, yPos + 2);
-          doc.text('Férias', cols.ferias, yPos + 2);
-          doc.text('Justif.', cols.justificativa, yPos + 2);
-          doc.text('Total Horas', cols.totalHoras, yPos + 2);
-          doc.text('Obs', cols.obs, yPos + 2);
-          yPos += 11;
-        }
-
-        const entry = dayRecords.find(r => r.clock_type === 'entrada');
-        const breakStarts = dayRecords.filter(r => r.clock_type === 'pausa_inicio');
-        const breakEnds = dayRecords.filter(r => r.clock_type === 'pausa_fim');
-        const exit = dayRecords.find(r => r.clock_type === 'saida');
-        const breakMinutes = calculateTotalBreakMinutes(dayRecords);
-        totalBreakMinutesAll += breakMinutes;
-
-        let workedMinutes = 0;
-        let delayMinutes = 0;
-        let status = '';
-        let obsText = '';
-
-        if (!isWorkDay) {
-          status = isWeekend ? '' : '';
-          // Weekend row background
-          doc.setFillColor(240, 240, 240);
-          doc.rect(14, yPos - 3.5, pageWidth - 28, 6, 'F');
-        }
-
-        // Check day-off
-        const dayOffType = dayOffMap[dateStr];
-        const DAY_OFF_LABELS: Record<string, string> = {
-          folga: 'FOLGA', feriado: 'FERIADO', licenca: 'LICENÇA', ferias: 'FÉRIAS', abono: 'ABONO',
-        };
-
-        if (dayOffType) {
-          // Day-off row background
-          doc.setFillColor(220, 240, 255);
-          doc.rect(14, yPos - 3.5, pageWidth - 28, 6, 'F');
-          obsText = DAY_OFF_LABELS[dayOffType] || 'FOLGA';
-        } else if (entry && exit) {
-          workedMinutes = Math.floor((parseISO(exit.clock_time).getTime() - parseISO(entry.clock_time).getTime()) / 60000);
-          workedMinutes -= breakMinutes;
-          if (workedMinutes < 0) workedMinutes = 0;
-          if (schedule && isWorkDay) {
-            const scheduledMin = parseTimeToMinutes(schedule.entry_time) + (schedule.tolerance_minutes || 0);
-            const actualMin = parseTimeToMinutes(entry.clock_time);
-            if (actualMin > scheduledMin) {
-              delayMinutes = actualMin - parseTimeToMinutes(schedule.entry_time);
-              totalDelays++;
-              totalDelayMinutes += delayMinutes;
-            }
-          }
-          totalWorkedMinutes += workedMinutes;
-          if (isWorkDay && workedMinutes > expectedDailyMinutes) {
-            totalOvertime += workedMinutes - expectedDailyMinutes;
-          }
-        } else if (isWorkDay && !entry && !dayOffType) {
-          totalAbsences++;
-          obsText = 'FALTA';
-        } else if (isWorkDay && entry && !exit) {
-          obsText = 'INCOMPLETO';
-        }
-
-        // Justification for this day
-        const dayJust = justifications.find(j => j.reference_date === dateStr);
-        let justLabel = '';
-        let isLicMed = false;
-        if (dayJust) {
-          const jType = (dayJust as any).justification_type || '';
-          if (jType.toLowerCase().includes('médic') || jType.toLowerCase().includes('atestado') || jType.toLowerCase().includes('medic')) {
-            isLicMed = true;
-          }
-          if (dayJust.status === 'approved') {
-            justLabel = '✓ Apr';
-            if (delayMinutes > 0) justifiedDelays++;
-          } else if (dayJust.status === 'rejected') {
-            justLabel = '✗ Rej';
-            if (delayMinutes > 0) unjustifiedDelays++;
-          } else {
-            justLabel = '⏳ Pend';
-            if (delayMinutes > 0) unjustifiedDelays++;
-          }
-        } else {
-          if (delayMinutes > 0) unjustifiedDelays++;
-        }
-
-        // Draw row
-        doc.setFontSize(6.5);
-        doc.setFont('helvetica', 'normal');
-
-        // Date
-        doc.setTextColor(0, 0, 0);
-        doc.text(format(day, 'dd/MM/yyyy'), cols.data, yPos);
-
-        // Day of week
-        if (isWeekend) {
-          doc.setTextColor(150, 150, 150);
-        } else {
-          doc.setTextColor(0, 0, 0);
-        }
-        doc.text(dayNames[dayOfWeek] || '', cols.dia, yPos);
-
-        // Time columns
-        doc.setTextColor(0, 0, 0);
-        doc.text(fmtTime(entry), cols.entrada, yPos);
-        doc.text(fmtTime(exit), cols.saida, yPos);
-        doc.text(fmtTime(breakStarts[0]), cols.pausaIni, yPos);
-        doc.text(fmtTime(breakEnds[breakEnds.length - 1]), cols.pausaFim, yPos);
-        doc.text(breakMinutes > 0 ? fmtMinToHM(breakMinutes) : '-', cols.totalIntervalo, yPos);
-
-        // Delay column
-        if (delayMinutes > 0) {
-          doc.setTextColor(220, 80, 20);
-          doc.text(`${delayMinutes}min`, cols.atraso, yPos);
-        } else {
-          doc.setTextColor(0, 0, 0);
-          doc.text('-', cols.atraso, yPos);
-        }
-
-        // Lic. Med column
-        doc.setTextColor(0, 0, 0);
-        doc.text(isLicMed ? 'Sim' : '-', cols.licMed, yPos);
-
-        // Férias column
-        doc.text('-', cols.ferias, yPos);
-
-        // Justification column
-        if (justLabel) {
-          if (justLabel.includes('Apr')) doc.setTextColor(16, 185, 129);
-          else if (justLabel.includes('Rej')) doc.setTextColor(239, 68, 68);
-          else doc.setTextColor(245, 158, 11);
-          doc.text(justLabel, cols.justificativa, yPos);
-        } else {
-          doc.setTextColor(0, 0, 0);
-          doc.text('-', cols.justificativa, yPos);
-        }
-
-        // Total Horas column
-        doc.setTextColor(0, 0, 0);
-        doc.text(workedMinutes > 0 ? fmtMinToHM(workedMinutes) : '-', cols.totalHoras, yPos);
-
-        // Obs column
-        const dayOffLabels = ['FOLGA', 'FERIADO', 'LICENÇA', 'FÉRIAS', 'ABONO'];
-        if (dayOffLabels.includes(obsText)) {
-          doc.setTextColor(59, 130, 246);
-          doc.setFont('helvetica', 'bold');
-          doc.text(obsText, cols.obs, yPos);
-          doc.setFont('helvetica', 'normal');
-        } else if (obsText === 'FALTA') {
-          doc.setTextColor(239, 68, 68);
-          doc.setFont('helvetica', 'bold');
-          doc.text('FALTA', cols.obs, yPos);
-          doc.setFont('helvetica', 'normal');
-        } else if (obsText === 'INCOMPLETO') {
-          doc.setTextColor(249, 115, 22);
-          doc.text('INC', cols.obs, yPos);
-        } else if (isWeekend && !entry) {
-          doc.setTextColor(150, 150, 150);
-          doc.text('FDS', cols.obs, yPos);
-        } else {
-          doc.setTextColor(0, 0, 0);
-          doc.text('-', cols.obs, yPos);
-        }
-
-        // Separator line
-        doc.setDrawColor(220, 220, 220);
-        doc.line(14, yPos + 2, pageWidth - 14, yPos + 2);
-
-        yPos += 6;
+        const dayRecords = records
+          .filter((r: any) => r.clock_date === dateStr)
+          .map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
+        const isHoliday = holidaySet.has(dateStr);
+        const result = evaluateDay(dayRecords, sched, day.getDay(), isHoliday);
+        const off = dayOffMap[dateStr];
+        const just = justifications.find((j: any) => j.reference_date === dateStr);
+        let obs = '';
+        if (off) obs = off.toUpperCase();
+        else if (just) obs = `${(just as any).status === 'approved' ? '✓' : (just as any).status === 'rejected' ? '✗' : '⏳'} ${(just as any).justification_type}`;
+        else if (result.inconsistencies.length > 0) obs = result.inconsistencies.map(i => i.message).join(' • ');
+        return { date: day, result, obs };
       });
 
-      // ==================== SUMMARY ====================
-      yPos += 6;
-      const summaryHeight = salary ? 38 : 24;
+      const summary = summarizePeriod(dayResults.map(d => d.result));
 
-      if (yPos + summaryHeight + 55 > pageHeight - 15) {
-        drawFooter(doc);
-        doc.addPage('landscape');
-        yPos = 20;
-      }
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pw = doc.internal.pageSize.getWidth();
+      drawHeader(doc);
 
-      doc.setFillColor(...EASYN_NAVY);
-      doc.rect(14, yPos - 4, pageWidth - 28, summaryHeight, 'F');
-      doc.setTextColor(...WHITE);
-      doc.setFontSize(7.5);
+      // Título e info
+      let yPos = 36;
+      doc.setTextColor(...NAVY);
+      doc.setFontSize(13);
       doc.setFont('helvetica', 'bold');
+      doc.text(safe('ESPELHO DE PONTO MENSAL'), pw / 2, yPos, { align: 'center' });
 
-      const totalH = Math.floor(totalWorkedMinutes / 60);
-      const totalM = totalWorkedMinutes % 60;
-      const workDaysInMonth = days.filter(d => workDays.includes(d.getDay())).length;
-      const expectedHours = workDaysInMonth * (schedule?.daily_hours || 8);
-      const overtimeH = Math.floor(totalOvertime / 60);
-      const overtimeM = totalOvertime % 60;
-      const balanceMinutes = totalWorkedMinutes - (expectedHours * 60);
-      const balanceH = Math.floor(Math.abs(balanceMinutes) / 60);
-      const balanceM = Math.abs(balanceMinutes) % 60;
-      const delayH = Math.floor(totalDelayMinutes / 60);
-      const delayM = totalDelayMinutes % 60;
+      yPos += 7;
+      doc.setFontSize(8.5);
+      const periodoLabel = format(parseISO(startDate), "MMMM 'de' yyyy", { locale: ptBR });
+      const cargoText = salary?.cargo || (profile?.role === 'admin' ? 'Administrador' : 'Colaborador');
+      const cpfFormatted = profile?.cpf ? profile.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '-';
+      const jornadaTxt = schedule
+        ? `${String(schedule.entry_time).slice(0, 5)} às ${String(schedule.exit_time).slice(0, 5)} — ${schedule.daily_hours}h/dia`
+        : 'Não definida';
 
-      // Row 1
-      doc.text(`Total Trabalhado: ${String(totalH).padStart(2,'0')}:${String(totalM).padStart(2,'0')}`, 18, yPos + 4);
-      doc.text(`Carga Prevista: ${expectedHours}h`, 90, yPos + 4);
-      doc.text(`Horas Extras: ${String(overtimeH).padStart(2,'0')}:${String(overtimeM).padStart(2,'0')}`, 155, yPos + 4);
-      doc.text(`Banco de Horas: ${balanceMinutes >= 0 ? '+' : '-'}${String(balanceH).padStart(2,'0')}:${String(balanceM).padStart(2,'0')}`, 220, yPos + 4);
+      const infoLines = [
+        [`Colaborador: ${userName || profile?.name || '-'}`, `Cargo: ${cargoText}`, `Período: ${periodoLabel.charAt(0).toUpperCase() + periodoLabel.slice(1)}`],
+        [`CPF: ${cpfFormatted}`, `Jornada: ${jornadaTxt}`, `Empresa: ${companyName}`],
+      ];
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(40, 40, 40);
+      infoLines.forEach((line) => {
+        doc.text(safe(line[0]), 14, yPos);
+        doc.text(safe(line[1]), pw / 2 - 30, yPos);
+        doc.text(safe(line[2]), pw - 14, yPos, { align: 'right' });
+        yPos += 5;
+      });
 
-      // Row 2
-      doc.text(`Atrasos: ${totalDelays} ocorrências | Total: ${String(delayH).padStart(2,'0')}:${String(delayM).padStart(2,'0')}`, 18, yPos + 12);
-      doc.text(`Atr. Justificados: ${justifiedDelays}`, 115, yPos + 12);
-      doc.text(`Atr. Não Justificados: ${unjustifiedDelays}`, 175, yPos + 12);
-      doc.text(`Faltas: ${totalAbsences}`, 245, yPos + 12);
+      yPos += 2;
 
-      // Row 3 - Total Pausas
-      doc.text(`Total Pausas: ${fmtMinToHM(totalBreakMinutesAll) === '-' ? '00:00' : fmtMinToHM(totalBreakMinutesAll)}`, 18, yPos + 20);
+      // Tabela
+      const head = [['Data', 'Dia', 'Entrada', 'Saída', 'Intervalo', 'Trab.', 'Atraso', 'Extra', 'Banco', 'Status', 'Observações']];
+      const body = dayResults.map(({ date, result, obs }) => {
+        const entries = records.filter((r: any) => r.clock_date === format(date, 'yyyy-MM-dd'));
+        const entry = entries.find((r: any) => r.clock_type === 'entrada');
+        const exit = entries.find((r: any) => r.clock_type === 'saida');
+        const fmtTime = (r: any) => {
+          if (!r) return '-';
+          const t = r.clock_time;
+          return t.includes('T') ? format(parseISO(t), 'HH:mm') : String(t).slice(0, 5);
+        };
+        return [
+          format(date, 'dd/MM/yyyy'),
+          dayNamesShort[date.getDay()],
+          fmtTime(entry),
+          fmtTime(exit),
+          result.breakMinutes > 0 ? formatHM(result.breakMinutes) : '-',
+          result.workedMinutes > 0 ? formatHM(result.workedMinutes) : '-',
+          result.delayMinutes > 0 ? formatHM(result.delayMinutes) : '-',
+          result.overtimeMinutes > 0 ? formatHM(result.overtimeMinutes) : '-',
+          result.bankBalanceMinutes !== 0 ? formatHM(result.bankBalanceMinutes) : '-',
+          dayStatusLabels[result.status],
+          safe(obs).slice(0, 60),
+        ];
+      });
 
-      // Salary row (if available)
-      if (salary) {
-        const baseSalary = Number(salary.base_salary);
-        const discountPerMinute = baseSalary / 176 / 60;
-        // Only discount unjustified delay minutes
-        const unjustifiedDelayMinutes = unjustifiedDelays > 0 ? totalDelayMinutes : 0;
-        const totalDiscount = unjustifiedDelayMinutes * discountPerMinute;
-        const netPay = baseSalary - totalDiscount;
+      autoTable(doc, {
+        head,
+        body,
+        startY: yPos,
+        theme: 'grid',
+        styles: { font: 'helvetica', fontSize: 7.5, cellPadding: 1.5, textColor: [30, 30, 30] },
+        headStyles: { fillColor: NAVY, textColor: WHITE, fontStyle: 'bold', fontSize: 8, halign: 'center' },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 22 },
+          1: { halign: 'center', cellWidth: 14 },
+          2: { halign: 'center', cellWidth: 18 },
+          3: { halign: 'center', cellWidth: 18 },
+          4: { halign: 'center', cellWidth: 20 },
+          5: { halign: 'center', cellWidth: 18 },
+          6: { halign: 'center', cellWidth: 18 },
+          7: { halign: 'center', cellWidth: 18 },
+          8: { halign: 'center', cellWidth: 18 },
+          9: { halign: 'center', cellWidth: 30, fontStyle: 'bold' },
+          10: { halign: 'left' },
+        },
+        didParseCell: (data) => {
+          if (data.section !== 'body') return;
+          const r = dayResults[data.row.index];
+          if (!r) return;
+          const color = dayStatusColor[r.result.status].pdfRgb;
+          if (data.column.index === 9) {
+            data.cell.styles.fillColor = color;
+            data.cell.styles.textColor = [30, 30, 30];
+          }
+          if (r.result.status === 'pendente_ajuste') {
+            data.cell.styles.fillColor = color;
+            data.cell.styles.textColor = [127, 29, 29];
+          }
+        },
+        margin: { left: 8, right: 8, bottom: 18 },
+      });
 
-        doc.setFillColor(...EASYN_BLUE);
-        doc.rect(14, yPos + summaryHeight - 14, pageWidth - 28, 0.5, 'F');
+      let afterY = (doc as any).lastAutoTable.finalY + 6;
 
-        doc.text(`Salário Base: R$ ${baseSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 18, yPos + summaryHeight - 6);
-        doc.text(`Desconto Atrasos: R$ ${totalDiscount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 115, yPos + summaryHeight - 6);
-        doc.setFontSize(9);
-        doc.text(`Valor Líquido Estimado: R$ ${netPay.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 210, yPos + summaryHeight - 6);
-        doc.setFontSize(7.5);
+      // Totais
+      if (afterY > doc.internal.pageSize.getHeight() - 70) {
+        doc.addPage('landscape');
+        afterY = 36;
+        drawHeader(doc);
       }
 
-      // ==================== SIGNATURE ====================
-      drawSignatureArea(doc, yPos + summaryHeight + 8);
-      drawFooter(doc);
+      const expectedH = formatHM(summary.expected);
+      const workedH = formatHM(summary.worked);
+      const overtimeH = formatHM(summary.overtime);
+      const bankH = formatHM(summary.bank);
+      const delayH = formatHM(summary.delay);
+      const earlyH = formatHM(summary.earlyExit);
 
+      doc.setFillColor(...NAVY);
+      doc.rect(8, afterY, pw - 16, 22, 'F');
+      doc.setTextColor(...WHITE);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.text(safe('TOTALIZADORES DO PERÍODO'), 12, afterY + 5);
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      const cells = [
+        [`Trabalhado: ${workedH}`, `Previsto: ${expectedH}`, `Extras: ${overtimeH}`, `Banco: ${bankH}`],
+        [`Atrasos: ${delayH}`, `Saídas Antec.: ${earlyH}`, `Faltas: ${summary.absences}`, `Pendentes: ${summary.pending}`],
+      ];
+      cells.forEach((line, li) => {
+        line.forEach((cell, ci) => {
+          doc.text(safe(cell), 12 + ci * ((pw - 24) / 4), afterY + 12 + li * 6);
+        });
+      });
+
+      afterY += 28;
+
+      // Desconto estimado
+      if (salary?.base_salary) {
+        const base = Number(salary.base_salary);
+        const perMin = base / 220 / 60;
+        const desconto = (summary.delay + summary.earlyExit) * perMin;
+        const liquido = base - desconto;
+        doc.setTextColor(...NAVY);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.text(safe(`Salário base: R$ ${base.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`), 12, afterY);
+        doc.text(safe(`Desconto estimado: R$ ${desconto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`), pw / 2 - 30, afterY);
+        doc.text(safe(`Líquido estimado: R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`), pw - 14, afterY, { align: 'right' });
+        afterY += 8;
+      }
+
+      // QR + assinatura
+      const docHash = await sha256(JSON.stringify({ userId, period: selectedMonth, days: dayResults.length, summary, ts: Date.now() }));
+      try {
+        const qr = await QRCode.toDataURL(`https://easyn.app/validar-ponto/${docHash.slice(0, 32)}`, { width: 120, margin: 0 });
+        doc.addImage(qr, 'PNG', pw - 32, afterY, 22, 22);
+        doc.setFontSize(6);
+        doc.setTextColor(80, 80, 80);
+        doc.text(safe('Validação'), pw - 21, afterY + 26, { align: 'center' });
+      } catch {/* ignore */}
+
+      drawSignatureArea(doc, afterY + 6);
+      drawFooter(doc, docHash);
       doc.save(`espelho-ponto-${selectedMonth}.pdf`);
       toast({ title: 'PDF gerado com sucesso!' });
     } catch (error: any) {
@@ -658,11 +353,214 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
     setShowModal(false);
   };
 
+  // ==================== DIÁRIO ====================
+  const generateDailyPDF = async () => {
+    setLoading(true);
+    try {
+      const [recordsRes, justRes, scheduleRes, profileRes, holidayRes] = await Promise.all([
+        supabase.from('time_clock').select('*').eq('user_id', userId).eq('clock_date', selectedDate).order('clock_time'),
+        supabase.from('time_clock_justifications').select('*').eq('user_id', userId).eq('reference_date', selectedDate),
+        supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).maybeSingle(),
+        supabase.from('profiles').select('name, cpf, role').eq('id', userId).maybeSingle(),
+        supabase.from('brazilian_holidays').select('holiday_date').eq('holiday_date', selectedDate).maybeSingle(),
+      ]);
+
+      const records = (recordsRes.data || []).map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
+      const schedule = scheduleRes.data as any;
+      const profile = profileRes.data as any;
+      const sched: DaySchedule | null = schedule ? {
+        entry_time: schedule.entry_time, exit_time: schedule.exit_time,
+        daily_hours: Number(schedule.daily_hours),
+        tolerance_minutes: schedule.tolerance_minutes ?? 10,
+        work_days: schedule.work_days ?? [1, 2, 3, 4, 5],
+      } : null;
+      const day = parseISO(selectedDate);
+      const result = evaluateDay(records, sched, day.getDay(), !!holidayRes.data);
+
+      const doc = new jsPDF();
+      const pw = doc.internal.pageSize.getWidth();
+      drawHeader(doc);
+
+      let yPos = 38;
+      doc.setTextColor(...NAVY);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text(safe('FOLHA DE PONTO DIÁRIA'), pw / 2, yPos, { align: 'center' });
+
+      yPos += 10;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(40, 40, 40);
+      doc.text(safe(`Colaborador: ${userName || profile?.name || '-'}`), 14, yPos);
+      doc.text(safe(`Data: ${format(day, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}`), pw - 14, yPos, { align: 'right' });
+
+      yPos += 8;
+      const recRes = (recordsRes.data || []);
+      const fmtTime = (t: string) => t.includes('T') ? format(parseISO(t), 'HH:mm:ss') : String(t).slice(0, 8);
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Tipo', 'Horário', 'Localização']],
+        body: [
+          ['Entrada', recRes.find((r: any) => r.clock_type === 'entrada') ? fmtTime(recRes.find((r: any) => r.clock_type === 'entrada').clock_time) : '-', recRes.find((r: any) => r.clock_type === 'entrada')?.city ? `${recRes.find((r: any) => r.clock_type === 'entrada').city}/${recRes.find((r: any) => r.clock_type === 'entrada').state || ''}` : '-'],
+          ['Início Pausa', recRes.find((r: any) => r.clock_type === 'pausa_inicio') ? fmtTime(recRes.find((r: any) => r.clock_type === 'pausa_inicio').clock_time) : '-', '-'],
+          ['Fim Pausa', recRes.find((r: any) => r.clock_type === 'pausa_fim') ? fmtTime(recRes.find((r: any) => r.clock_type === 'pausa_fim').clock_time) : '-', '-'],
+          ['Saída', recRes.find((r: any) => r.clock_type === 'saida') ? fmtTime(recRes.find((r: any) => r.clock_type === 'saida').clock_time) : '-', recRes.find((r: any) => r.clock_type === 'saida')?.city ? `${recRes.find((r: any) => r.clock_type === 'saida').city}/${recRes.find((r: any) => r.clock_type === 'saida').state || ''}` : '-'],
+        ].map(row => row.map(safe)),
+        theme: 'grid',
+        styles: { font: 'helvetica', fontSize: 9 },
+        headStyles: { fillColor: NAVY, textColor: WHITE },
+      });
+
+      let yp = (doc as any).lastAutoTable.finalY + 8;
+      doc.setFillColor(...dayStatusColor[result.status].pdfRgb);
+      doc.rect(14, yp - 5, pw - 28, 10, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...NAVY);
+      doc.setFontSize(10);
+      doc.text(safe(`Status do Dia: ${dayStatusLabels[result.status]}`), pw / 2, yp + 1, { align: 'center' });
+      yp += 15;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(40, 40, 40);
+      const items = [
+        [`Trabalhado: ${formatHM(result.workedMinutes)}`, `Previsto: ${formatHM(result.expectedMinutes)}`],
+        [`Intervalo: ${formatHM(result.breakMinutes)}`, `Atraso: ${formatHM(result.delayMinutes)}`],
+        [`Extras: ${formatHM(result.overtimeMinutes)}`, `Banco: ${formatHM(result.bankBalanceMinutes)}`],
+      ];
+      items.forEach((line) => {
+        doc.text(safe(line[0]), 18, yp);
+        doc.text(safe(line[1]), pw / 2 + 5, yp);
+        yp += 6;
+      });
+
+      if (result.inconsistencies.length > 0) {
+        yp += 4;
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(180, 30, 30);
+        doc.text(safe('Inconsistências detectadas:'), 14, yp);
+        yp += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(60, 60, 60);
+        result.inconsistencies.forEach(i => {
+          doc.text(safe(`• ${i.message}`), 18, yp);
+          yp += 5;
+        });
+      }
+
+      const hash = await sha256(JSON.stringify({ userId, date: selectedDate, result, ts: Date.now() }));
+      drawSignatureArea(doc, Math.max(yp + 10, doc.internal.pageSize.getHeight() - 60));
+      drawFooter(doc, hash);
+      doc.save(`folha-ponto-${selectedDate}.pdf`);
+      toast({ title: 'PDF gerado com sucesso!' });
+    } catch (error: any) {
+      toast({ title: 'Erro ao gerar PDF', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+    setShowModal(false);
+  };
+
+  // ==================== EXCEL ====================
+  const generateExcel = async () => {
+    setLoading(true);
+    try {
+      const startDate = `${selectedMonth}-01`;
+      const endDate = format(endOfMonth(parseISO(startDate)), 'yyyy-MM-dd');
+      const [recordsRes, scheduleRes, holidaysRes, dayOffsRes, justRes] = await Promise.all([
+        supabase.from('time_clock').select('*').eq('user_id', userId).gte('clock_date', startDate).lte('clock_date', endDate).order('clock_date').order('clock_time'),
+        supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).maybeSingle(),
+        supabase.from('brazilian_holidays').select('holiday_date').gte('holiday_date', startDate).lte('holiday_date', endDate),
+        supabase.from('time_clock_day_offs').select('off_date, off_type').eq('user_id', userId).gte('off_date', startDate).lte('off_date', endDate),
+        supabase.from('time_clock_justifications').select('*').eq('user_id', userId).gte('reference_date', startDate).lte('reference_date', endDate),
+      ]);
+      const records = recordsRes.data || [];
+      const schedule = scheduleRes.data as any;
+      const holidaySet = new Set((holidaysRes.data || []).map((h: any) => h.holiday_date));
+      const dayOffMap: Record<string, string> = {};
+      (dayOffsRes.data || []).forEach((d: any) => { dayOffMap[d.off_date] = d.off_type; });
+      const justifications = justRes.data || [];
+
+      const sched: DaySchedule | null = schedule ? {
+        entry_time: schedule.entry_time, exit_time: schedule.exit_time,
+        daily_hours: Number(schedule.daily_hours),
+        tolerance_minutes: schedule.tolerance_minutes ?? 10,
+        work_days: schedule.work_days ?? [1, 2, 3, 4, 5],
+      } : null;
+
+      const days = eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) });
+      const rows: any[] = days.map(day => {
+        const ds = format(day, 'yyyy-MM-dd');
+        const dayRecords = records.filter((r: any) => r.clock_date === ds).map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
+        const result = evaluateDay(dayRecords, sched, day.getDay(), holidaySet.has(ds));
+        const fmtTime = (type: string) => {
+          const r = records.find((x: any) => x.clock_date === ds && x.clock_type === type);
+          if (!r) return '';
+          const t = r.clock_time;
+          return t.includes('T') ? format(parseISO(t), 'HH:mm') : String(t).slice(0, 5);
+        };
+        const just = justifications.find((j: any) => j.reference_date === ds);
+        const off = dayOffMap[ds];
+        return {
+          'Data': format(day, 'dd/MM/yyyy'),
+          'Dia': dayNamesShort[day.getDay()],
+          'Entrada': fmtTime('entrada'),
+          'Pausa Início': fmtTime('pausa_inicio'),
+          'Pausa Fim': fmtTime('pausa_fim'),
+          'Saída': fmtTime('saida'),
+          'Intervalo': formatHM(result.breakMinutes),
+          'Trabalhado': formatHM(result.workedMinutes),
+          'Previsto': formatHM(result.expectedMinutes),
+          'Atraso': formatHM(result.delayMinutes),
+          'Saída Antec.': formatHM(result.earlyExitMinutes),
+          'Extra': formatHM(result.overtimeMinutes),
+          'Banco': formatHM(result.bankBalanceMinutes),
+          'Status': dayStatusLabels[result.status],
+          'Folga/Tipo': off ? off.toUpperCase() : '',
+          'Justificativa': just ? `[${(just as any).status}] ${(just as any).justification_type}` : '',
+          'Inconsistências': result.inconsistencies.map(i => i.message).join(' | '),
+        };
+      });
+
+      const summary = summarizePeriod(days.map(day => {
+        const ds = format(day, 'yyyy-MM-dd');
+        const dayRecords = records.filter((r: any) => r.clock_date === ds).map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
+        return evaluateDay(dayRecords, sched, day.getDay(), holidaySet.has(ds));
+      }));
+
+      const totals = [
+        { Métrica: 'Total Trabalhado', Valor: formatHM(summary.worked) },
+        { Métrica: 'Total Previsto', Valor: formatHM(summary.expected) },
+        { Métrica: 'Horas Extras', Valor: formatHM(summary.overtime) },
+        { Métrica: 'Banco de Horas', Valor: formatHM(summary.bank) },
+        { Métrica: 'Atrasos', Valor: formatHM(summary.delay) },
+        { Métrica: 'Saídas Antecipadas', Valor: formatHM(summary.earlyExit) },
+        { Métrica: 'Faltas', Valor: summary.absences },
+        { Métrica: 'Dias Pendentes', Valor: summary.pending },
+        { Métrica: 'Justificados', Valor: summary.justified },
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Espelho de Ponto');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(totals), 'Totais');
+      XLSX.writeFile(wb, `espelho-ponto-${selectedMonth}.xlsx`);
+      toast({ title: 'Excel gerado com sucesso!' });
+    } catch (error: any) {
+      toast({ title: 'Erro ao gerar Excel', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+    setShowModal(false);
+  };
+
+  const handleGenerate = () => {
+    if (exportFormat === 'xlsx') return generateExcel();
+    return reportType === 'daily' ? generateDailyPDF() : generateMonthlyPDF();
+  };
+
   return (
     <>
       <Button onClick={() => setShowModal(true)} variant="outline">
         <Download className="h-4 w-4 mr-2" />
-        Gerar PDF
+        Exportar Espelho
       </Button>
 
       <Dialog open={showModal} onOpenChange={setShowModal}>
@@ -670,28 +568,36 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Gerar Relatório PDF
+              Exportar Espelho de Ponto
             </DialogTitle>
             <DialogDescription>
-              Escolha o tipo de relatório que deseja gerar
+              Escolha o formato e o período do relatório
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Tipo de Relatório</Label>
-              <Select value={reportType} onValueChange={(v) => setReportType(v as 'daily' | 'monthly')}>
+              <Label>Formato</Label>
+              <Select value={exportFormat} onValueChange={(v) => setExportFormat(v as 'pdf' | 'xlsx')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="daily">
-                    <div className="flex items-center gap-2"><Calendar className="h-4 w-4" />Folha Diária</div>
-                  </SelectItem>
-                  <SelectItem value="monthly">
-                    <div className="flex items-center gap-2"><FileText className="h-4 w-4" />Espelho Mensal</div>
-                  </SelectItem>
+                  <SelectItem value="pdf"><div className="flex items-center gap-2"><FileText className="h-4 w-4" />PDF Profissional</div></SelectItem>
+                  <SelectItem value="xlsx"><div className="flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" />Planilha Excel</div></SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {reportType === 'daily' ? (
+            {exportFormat === 'pdf' && (
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select value={reportType} onValueChange={(v) => setReportType(v as 'daily' | 'monthly')}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily"><div className="flex items-center gap-2"><Calendar className="h-4 w-4" />Folha Diária</div></SelectItem>
+                    <SelectItem value="monthly"><div className="flex items-center gap-2"><FileText className="h-4 w-4" />Espelho Mensal</div></SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {exportFormat === 'pdf' && reportType === 'daily' ? (
               <div className="space-y-2">
                 <Label>Data</Label>
                 <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
@@ -705,9 +611,9 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
-            <Button onClick={reportType === 'daily' ? generateDailyPDF : generateMonthlyPDF} disabled={loading}>
+            <Button onClick={handleGenerate} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
-              Gerar PDF
+              Exportar
             </Button>
           </DialogFooter>
         </DialogContent>
