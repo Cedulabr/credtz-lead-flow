@@ -188,8 +188,21 @@ export function DiscountCalculator() {
       const valorHora = salary > 0 ? salary / (dailyHours * effectiveBusinessDays) : 0;
       const valorDia = valorHora * dailyHours;
       const negativeMinutes = Math.max(0, expectedMinutes - workedMinutes - (absences + pendingDays) * dailyHours * 60);
-      const discountNegativeHours = (negativeMinutes / 60) * valorHora;
-      const discountAbsences = (absences + pendingDays) * valorDia;
+
+      // Modo de desconto: evita dupla penalidade
+      // financeiro: desconta tudo em folha
+      // banco: tudo vai para banco negativo (sem desconto financeiro)
+      // misto: faltas em folha, atrasos/horas negativas no banco
+      let discountNegativeHours = 0;
+      let discountAbsences = 0;
+      if (discountMode === 'financeiro') {
+        discountNegativeHours = (negativeMinutes / 60) * valorHora;
+        discountAbsences = (absences + pendingDays) * valorDia;
+      } else if (discountMode === 'misto') {
+        discountAbsences = (absences + pendingDays) * valorDia;
+        // horas negativas vão para o banco — não descontam
+      }
+      // discountMode === 'banco' → ambos zero
       const totalDiscount = discountNegativeHours + discountAbsences;
       const netEstimated = Math.max(0, salary - totalDiscount);
 
