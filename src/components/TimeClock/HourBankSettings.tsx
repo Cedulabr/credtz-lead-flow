@@ -31,7 +31,8 @@ export function HourBankSettingsPanel() {
         max_bank_balance_minutes: 7200,
         allow_negative_discount: true,
         overtime_multiplier: 1.50,
-      }).select().single();
+        discount_mode: 'financeiro',
+      } as any).select().single();
       if (newData) setSettings(newData as unknown as HBSettings);
     }
     setLoading(false);
@@ -46,7 +47,8 @@ export function HourBankSettingsPanel() {
       max_bank_balance_minutes: settings.max_bank_balance_minutes,
       allow_negative_discount: settings.allow_negative_discount,
       overtime_multiplier: settings.overtime_multiplier,
-    }).eq('id', settings.id);
+      discount_mode: settings.discount_mode,
+    } as any).eq('id', settings.id);
 
     if (error) {
       toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' });
