@@ -14,9 +14,15 @@ serve(async (req) => {
   try {
     const { file, fileName, clientId } = await req.json();
     
-    // MinIO configuration
-    const S3_ACCESS_KEY = "dwDgcvisQ35tobfwssIp";
-    const S3_SECRET_KEY = "6UFcbJbPQFtw1imqR2u9EGkvVsdHXw8zCN6blsrE";
+    // MinIO configuration (read from secrets)
+    const S3_ACCESS_KEY = Deno.env.get("MINIO_ACCESS_KEY");
+    const S3_SECRET_KEY = Deno.env.get("MINIO_SECRET_KEY");
+    if (!S3_ACCESS_KEY || !S3_SECRET_KEY) {
+      return new Response(
+        JSON.stringify({ success: false, error: "MinIO credentials not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     const S3_BUCKET = "crm";
     const S3_ENDPOINT = "s3.minio.opensys.tech";
     const S3_REGION = "us-east-1";
