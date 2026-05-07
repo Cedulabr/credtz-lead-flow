@@ -141,7 +141,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         supabase.from('employee_salaries').select('*').eq('user_id', userId).eq('is_active', true).maybeSingle(),
         supabase.from('time_clock_day_offs').select('off_date, off_type').eq('user_id', userId)
           .gte('off_date', startDate).lte('off_date', endDate),
-        supabase.from('brazilian_holidays').select('holiday_date').gte('holiday_date', startDate).lte('holiday_date', endDate),
+        (supabase as any).from("brazilian_holidays").select('holiday_date').gte('holiday_date', startDate).lte('holiday_date', endDate),
       ]);
 
       const records = recordsRes.data || [];
@@ -362,7 +362,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         supabase.from('time_clock_justifications').select('*').eq('user_id', userId).eq('reference_date', selectedDate),
         supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).maybeSingle(),
         supabase.from('profiles').select('name, cpf, role').eq('id', userId).maybeSingle(),
-        supabase.from('brazilian_holidays').select('holiday_date').eq('holiday_date', selectedDate).maybeSingle(),
+        (supabase as any).from("brazilian_holidays").select('holiday_date').eq('holiday_date', selectedDate).maybeSingle(),
       ]);
 
       const records = (recordsRes.data || []).map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
@@ -469,7 +469,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const [recordsRes, scheduleRes, holidaysRes, dayOffsRes, justRes] = await Promise.all([
         supabase.from('time_clock').select('*').eq('user_id', userId).gte('clock_date', startDate).lte('clock_date', endDate).order('clock_date').order('clock_time'),
         supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).maybeSingle(),
-        supabase.from('brazilian_holidays').select('holiday_date').gte('holiday_date', startDate).lte('holiday_date', endDate),
+        (supabase as any).from("brazilian_holidays").select('holiday_date').gte('holiday_date', startDate).lte('holiday_date', endDate),
         supabase.from('time_clock_day_offs').select('off_date, off_type').eq('user_id', userId).gte('off_date', startDate).lte('off_date', endDate),
         supabase.from('time_clock_justifications').select('*').eq('user_id', userId).gte('reference_date', startDate).lte('reference_date', endDate),
       ]);
