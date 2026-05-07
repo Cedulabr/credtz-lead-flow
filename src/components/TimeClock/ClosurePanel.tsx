@@ -69,7 +69,62 @@ export function ClosurePanel() {
 
   const canManage = isAdmin || isGestor;
 
-  const closePeriod = async () => {
+  const findPendingDays = async (cid: string, periodMonth: string) => {
+    const startDate = `${periodMonth}-01`;
+    const endDate = format(endOfMonth(parseISO(startDate)), 'yyyy-MM-dd');
+    const { data: ucUsers } = await supabase
+      .from('user_companies')
+      .select('user_id')
+      .eq('company_id', cid)
+      .eq('is_active', true);
+    const userIds = (ucUsers || []).map((u: any) => u.user_id);
+    if (userIds.length === 0) return [];
+    const [recRes, schedRes, profRes, holRes, offRes] = await Promise.all([
+      supabase.from('time_clock').select('user_id, clock_date, clock_type, clock_time')
+        .in('user_id', userIds).gte('clock_date', startDate).lte('clock_date', endDate),
+      supabase.from('time_clock_schedules').select('*').in('user_id', userIds).eq('is_active', true),
+      supabase.from('profiles').select('id, name, email').in('id', userIds),
+      (supabase as any).from('brazilian_holidays').select('holiday_date').gte('holiday_date', startDate).lte('holiday_date', endDate),
+      supabase.from('time_clock_day_offs').select('user_id, off_date, off_type').in('user_id', userIds).gte('off_date', startDate).lte('off_date', endDate),
+    ]);
+    const holidaySet = new Set<string>((holRes.data || []).map((h: any) => h.holiday_date));
+    getBrazilianHolidays(parseISO(startDate).getFullYear()).forEach(h => {
+      if (h.date >= startDate && h.date <= endDate) holidaySet.add(h.date);
+    });
+    (offRes.data || []).forEach((o: any) => { if (o.off_type === 'feriado') holidaySet.add(o.off_date); });
+    const schedByUser: Record<string, any> = {};
+    (schedRes.data || []).forEach((s: any) => { schedByUser[s.user_id] = s; });
+    const profByUser: Record<string, any> = {};
+    (profRes.data || []).forEach((p: any) => { profByUser[p.id] = p; });
+    const days = eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) });
+    const now = new Date();
+    const pendings: { user: string; date: string; reason: string }[] = [];
+    for (const uid of userIds) {
+      const sched = schedByUser[uid];
+      const ds: DaySchedule | null = sched ? {
+        entry_time: sched.entry_time, exit_time: sched.exit_time,
+        daily_hours: Number(sched.daily_hours),
+        tolerance_minutes: sched.tolerance_minutes ?? 10,
+        work_days: sched.work_days ?? [1, 2, 3, 4, 5],
+      } : null;
+      for (const d of days) {
+        if (d > now) continue;
+        const dateStr = format(d, 'yyyy-MM-dd');
+        const dayRecs = (recRes.data || []).filter((r: any) => r.user_id === uid && r.clock_date === dateStr)
+          .map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
+        const result = evaluateDay(dayRecs as any, ds, d.getDay(), holidaySet.has(dateStr));
+        if (result.status === 'pendente_ajuste') {
+          pendings.push({
+            user: profByUser[uid]?.name || profByUser[uid]?.email || uid.slice(0, 8),
+            date: format(d, 'dd/MM/yyyy'),
+            reason: result.inconsistencies.map(i => i.message).join(' • ') || 'Inconsistência',
+          });
+        }
+      }
+    }
+    return pendings;
+  };
+
     if (!companyId || !canManage) return;
     setBusy(true);
     try {
