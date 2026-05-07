@@ -91,6 +91,10 @@ export function TimeClock() {
             <Timer className="h-4 w-4" />
             <span className="hidden sm:inline">Banco Horas</span>
           </TabsTrigger>
+          <TabsTrigger value="adjustments" className="flex items-center gap-2">
+            <Pencil className="h-4 w-4" />
+            <span className="hidden sm:inline">Ajustes</span>
+          </TabsTrigger>
           {canManage && (
             <>
               <TabsTrigger value="dashboard" className="flex items-center gap-2">
