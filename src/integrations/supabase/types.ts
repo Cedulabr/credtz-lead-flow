@@ -8094,6 +8094,60 @@ export type Database = {
           },
         ]
       }
+      time_clock_adjustment_requests: {
+        Row: {
+          adjustment_type: Database["public"]["Enums"]["adjustment_type"]
+          attachment_path: string | null
+          clock_date: string
+          company_id: string
+          created_at: string
+          id: string
+          proposed_time: string | null
+          reason: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["adjustment_status"]
+          target_record_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          adjustment_type: Database["public"]["Enums"]["adjustment_type"]
+          attachment_path?: string | null
+          clock_date: string
+          company_id: string
+          created_at?: string
+          id?: string
+          proposed_time?: string | null
+          reason: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["adjustment_status"]
+          target_record_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          adjustment_type?: Database["public"]["Enums"]["adjustment_type"]
+          attachment_path?: string | null
+          clock_date?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          proposed_time?: string | null
+          reason?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["adjustment_status"]
+          target_record_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       time_clock_alerts: {
         Row: {
           alert_type: string
@@ -10456,6 +10510,19 @@ export type Database = {
       validate_phone: { Args: { phone_input: string }; Returns: boolean }
     }
     Enums: {
+      adjustment_status: "pending" | "approved" | "rejected" | "cancelled"
+      adjustment_type:
+        | "add_entry"
+        | "add_exit"
+        | "add_break_start"
+        | "add_break_end"
+        | "edit_entry"
+        | "edit_exit"
+        | "edit_break_start"
+        | "edit_break_end"
+        | "remove_record"
+        | "justify_absence"
+        | "other"
       app_role: "admin" | "partner"
       collaborative_access_type: "admin" | "operator" | "readonly"
       collaborative_link_category:
@@ -10610,6 +10677,20 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      adjustment_status: ["pending", "approved", "rejected", "cancelled"],
+      adjustment_type: [
+        "add_entry",
+        "add_exit",
+        "add_break_start",
+        "add_break_end",
+        "edit_entry",
+        "edit_exit",
+        "edit_break_start",
+        "edit_break_end",
+        "remove_record",
+        "justify_absence",
+        "other",
+      ],
       app_role: ["admin", "partner"],
       collaborative_access_type: ["admin", "operator", "readonly"],
       collaborative_link_category: [

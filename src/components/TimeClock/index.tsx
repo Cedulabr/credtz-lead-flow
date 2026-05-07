@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, History, Settings as SettingsIcon, CalendarClock, FileText, LayoutDashboard, Timer, DollarSign, CalendarOff, Calculator, ShieldAlert } from 'lucide-react';
+import { Clock, History, Settings as SettingsIcon, CalendarClock, FileText, LayoutDashboard, Timer, DollarSign, CalendarOff, Calculator, ShieldAlert, Pencil, ClipboardCheck, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ClockButton } from './ClockButton';
@@ -14,6 +14,9 @@ import { SalaryManager } from './SalaryManager';
 import { DayOffManager } from './DayOffManager';
 import { DiscountCalculator } from './DiscountCalculator';
 import { AuditDashboard } from './AuditDashboard';
+import { AdjustmentRequest } from './AdjustmentRequest';
+import { AdjustmentReview } from './AdjustmentReview';
+import { HRDashboard } from './HRDashboard';
 import { BlockedAccess } from '@/components/BlockedAccess';
 import { Loader2 } from 'lucide-react';
 
@@ -71,7 +74,7 @@ export function TimeClock() {
       </div>
 
       <Tabs defaultValue="clock" className="space-y-6">
-        <TabsList className={`grid w-full ${canManage ? 'grid-cols-5 lg:grid-cols-10' : 'grid-cols-4'}`}>
+        <TabsList className={`grid w-full ${canManage ? 'grid-cols-5 lg:grid-cols-13' : 'grid-cols-5'}`}>
           <TabsTrigger value="clock" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             <span className="hidden sm:inline">Ponto</span>
@@ -88,8 +91,20 @@ export function TimeClock() {
             <Timer className="h-4 w-4" />
             <span className="hidden sm:inline">Banco Horas</span>
           </TabsTrigger>
+          <TabsTrigger value="adjustments" className="flex items-center gap-2">
+            <Pencil className="h-4 w-4" />
+            <span className="hidden sm:inline">Ajustes</span>
+          </TabsTrigger>
           {canManage && (
             <>
+              <TabsTrigger value="hr" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">RH</span>
+              </TabsTrigger>
+              <TabsTrigger value="review" className="flex items-center gap-2">
+                <ClipboardCheck className="h-4 w-4" />
+                <span className="hidden sm:inline">Revisão</span>
+              </TabsTrigger>
               <TabsTrigger value="dashboard" className="flex items-center gap-2">
                 <LayoutDashboard className="h-4 w-4" />
                 <span className="hidden sm:inline">Painel</span>
@@ -138,8 +153,18 @@ export function TimeClock() {
           <HourBank />
         </TabsContent>
 
+        <TabsContent value="adjustments">
+          <AdjustmentRequest companyId={companyId} />
+        </TabsContent>
+
         {canManage && (
           <>
+            <TabsContent value="hr">
+              <HRDashboard />
+            </TabsContent>
+            <TabsContent value="review">
+              <AdjustmentReview />
+            </TabsContent>
             <TabsContent value="dashboard">
               <ManagerDashboard />
             </TabsContent>
