@@ -173,10 +173,12 @@ export function ClosurePanel() {
         period_month: periodDate,
         action: 'closed',
         performed_by: user!.id,
-        reason: 'Fechamento manual do período',
+        reason: forceClose ? 'Fechamento forçado com pendências' : 'Fechamento manual do período',
       });
 
       toast({ title: 'Período fechado com sucesso!' });
+      setForceClose(false);
+      setPendingPreview(null);
       await loadClosures(companyId);
     } catch (e: any) {
       toast({ title: 'Erro ao fechar período', description: e.message, variant: 'destructive' });
