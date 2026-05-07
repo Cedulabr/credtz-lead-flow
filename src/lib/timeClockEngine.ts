@@ -167,6 +167,10 @@ export function evaluateDay(
   if (exits.length > 1) incons.push({ code: 'SAIDA_DUPLICADA', severity: 'high', message: inconsistencyLabels.SAIDA_DUPLICADA });
   if (pInicios.length !== pFins.length) incons.push({ code: 'PAUSA_INCOMPLETA', severity: 'high', message: inconsistencyLabels.PAUSA_INCOMPLETA });
   if (entries.length === 0 && exits.length > 0) incons.push({ code: 'SAIDA_SEM_ENTRADA', severity: 'high', message: inconsistencyLabels.SAIDA_SEM_ENTRADA });
+  // Entrada sem saída em dia útil já encerrado: pendência crítica (não pode ser tratado como OK)
+  if (entries.length >= 1 && exits.length === 0 && isWorkDay && !isHoliday) {
+    incons.push({ code: 'ENTRADA_SEM_SAIDA', severity: 'high', message: inconsistencyLabels.ENTRADA_SEM_SAIDA });
+  }
 
   // Duplicatas exatas (mesmo tipo, mesmo minuto)
   const seen = new Set<string>();
