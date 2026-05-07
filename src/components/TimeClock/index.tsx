@@ -76,7 +76,7 @@ export function TimeClock() {
       </div>
 
       <Tabs defaultValue="clock" className="space-y-6">
-        <TabsList className={`grid w-full ${canManage ? 'grid-cols-5 lg:grid-cols-13' : 'grid-cols-5'}`}>
+        <TabsList className={`grid w-full ${canManage ? 'grid-cols-5 lg:grid-cols-15' : 'grid-cols-5'}`}>
           <TabsTrigger value="clock" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             <span className="hidden sm:inline">Ponto</span>
@@ -126,6 +126,14 @@ export function TimeClock() {
               <TabsTrigger value="schedules" className="flex items-center gap-2">
                 <CalendarClock className="h-4 w-4" />
                 <span className="hidden sm:inline">Jornadas</span>
+              </TabsTrigger>
+              <TabsTrigger value="closure" className="flex items-center gap-2">
+                <Lock className="h-4 w-4" />
+                <span className="hidden sm:inline">Fechamento</span>
+              </TabsTrigger>
+              <TabsTrigger value="trail" className="flex items-center gap-2">
+                <ScrollText className="h-4 w-4" />
+                <span className="hidden sm:inline">Trilha</span>
               </TabsTrigger>
               <TabsTrigger value="audit" className="flex items-center gap-2">
                 <ShieldAlert className="h-4 w-4" />
