@@ -487,7 +487,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...NAVY);
       doc.setFontSize(10);
-      doc.text(safe(`Status do Dia: ${dayStatusLabels[result.status]}`), pw / 2, yp + 1, { align: 'center' });
+      doc.text(safe(`Status do Dia: ${result.subStatus ? subStatusLabels[result.subStatus] : dayStatusLabels[result.status]}`), pw / 2, yp + 1, { align: 'center' });
       yp += 15;
 
       doc.setFont('helvetica', 'normal');
