@@ -10675,6 +10675,15 @@ export type Database = {
       validate_cpf: { Args: { cpf_input: string }; Returns: boolean }
       validate_email: { Args: { email_input: string }; Returns: boolean }
       validate_phone: { Args: { phone_input: string }; Returns: boolean }
+      validate_time_clock_pdf: {
+        Args: { p_hash: string }
+        Returns: {
+          generated_at: string
+          hash: string
+          period_end: string
+          period_start: string
+        }[]
+      }
     }
     Enums: {
       adjustment_status: "pending" | "approved" | "rejected" | "cancelled"
