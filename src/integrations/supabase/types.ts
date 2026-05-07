@@ -8301,6 +8301,75 @@ export type Database = {
           },
         ]
       }
+      time_clock_day_summary: {
+        Row: {
+          bank_balance_minutes: number
+          break_minutes: number
+          company_id: string | null
+          created_at: string
+          day_date: string
+          day_of_week: number
+          delay_minutes: number
+          early_exit_minutes: number
+          expected_minutes: number
+          id: string
+          inconsistencies: Json
+          is_locked: boolean
+          locked_at: string | null
+          locked_by: string | null
+          notes: string | null
+          overtime_minutes: number
+          status: Database["public"]["Enums"]["day_status"]
+          updated_at: string
+          user_id: string
+          worked_minutes: number
+        }
+        Insert: {
+          bank_balance_minutes?: number
+          break_minutes?: number
+          company_id?: string | null
+          created_at?: string
+          day_date: string
+          day_of_week: number
+          delay_minutes?: number
+          early_exit_minutes?: number
+          expected_minutes?: number
+          id?: string
+          inconsistencies?: Json
+          is_locked?: boolean
+          locked_at?: string | null
+          locked_by?: string | null
+          notes?: string | null
+          overtime_minutes?: number
+          status?: Database["public"]["Enums"]["day_status"]
+          updated_at?: string
+          user_id: string
+          worked_minutes?: number
+        }
+        Update: {
+          bank_balance_minutes?: number
+          break_minutes?: number
+          company_id?: string | null
+          created_at?: string
+          day_date?: string
+          day_of_week?: number
+          delay_minutes?: number
+          early_exit_minutes?: number
+          expected_minutes?: number
+          id?: string
+          inconsistencies?: Json
+          is_locked?: boolean
+          locked_at?: string | null
+          locked_by?: string | null
+          notes?: string | null
+          overtime_minutes?: number
+          status?: Database["public"]["Enums"]["day_status"]
+          updated_at?: string
+          user_id?: string
+          worked_minutes?: number
+        }
+        Relationships: []
+      }
       time_clock_hour_bank: {
         Row: {
           absence_count: number | null
@@ -8546,6 +8615,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      time_clock_period_closures: {
+        Row: {
+          closed_at: string
+          closed_by: string
+          company_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          period_month: string
+          reopen_reason: string | null
+          reopened_at: string | null
+          reopened_by: string | null
+        }
+        Insert: {
+          closed_at?: string
+          closed_by: string
+          company_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          period_month: string
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+        }
+        Update: {
+          closed_at?: string
+          closed_by?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          period_month?: string
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+        }
+        Relationships: []
       }
       time_clock_schedules: {
         Row: {
@@ -9238,6 +9346,7 @@ export type Database = {
           rendered_message: string | null
           replied_at: string | null
           sent_at: string | null
+          sent_via_instance_id: string | null
           status: string
           variables: Json
         }
@@ -9255,6 +9364,7 @@ export type Database = {
           rendered_message?: string | null
           replied_at?: string | null
           sent_at?: string | null
+          sent_via_instance_id?: string | null
           status?: string
           variables?: Json
         }
@@ -9272,6 +9382,7 @@ export type Database = {
           rendered_message?: string | null
           replied_at?: string | null
           sent_at?: string | null
+          sent_via_instance_id?: string | null
           status?: string
           variables?: Json
         }
@@ -9304,6 +9415,8 @@ export type Database = {
           failed_count: number
           id: string
           instance_id: string
+          instance_ids: string[]
+          last_instance_index: number
           list_id: string
           max_interval_seconds: number
           media_type: string | null
@@ -9333,6 +9446,8 @@ export type Database = {
           failed_count?: number
           id?: string
           instance_id: string
+          instance_ids?: string[]
+          last_instance_index?: number
           list_id: string
           max_interval_seconds?: number
           media_type?: string | null
@@ -9362,6 +9477,8 @@ export type Database = {
           failed_count?: number
           id?: string
           instance_id?: string
+          instance_ids?: string[]
+          last_instance_index?: number
           list_id?: string
           max_interval_seconds?: number
           media_type?: string | null
@@ -10144,6 +10261,10 @@ export type Database = {
       }
       is_gestor_or_admin: { Args: { _user_id: string }; Returns: boolean }
       is_global_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_period_closed: {
+        Args: { _company_id: string; _date: string }
+        Returns: boolean
+      }
       is_same_company_gestor: {
         Args: { _target_user_id: string; _user_id: string }
         Returns: boolean
@@ -10191,6 +10312,14 @@ export type Database = {
         }[]
       }
       process_expired_future_contacts: { Args: never; Returns: number }
+      recalc_history: {
+        Args: { _from?: string; _to?: string; _user_id?: string }
+        Returns: number
+      }
+      recalc_user_day: {
+        Args: { _date: string; _user_id: string }
+        Returns: undefined
+      }
       release_expired_blacklisted_leads: { Args: never; Returns: Json }
       remove_baseoff_duplicates: { Args: never; Returns: number }
       remove_leads_database_duplicates: { Args: never; Returns: number }
@@ -10338,6 +10467,15 @@ export type Database = {
         | "outros"
       collaborative_permission_type: "view" | "edit" | "create" | "delete"
       company_role: "gestor" | "colaborador"
+      day_status:
+        | "ok"
+        | "observacao"
+        | "pendente_ajuste"
+        | "justificado"
+        | "falta"
+        | "feriado"
+        | "folga"
+        | "sem_jornada"
       document_status: "pending" | "sent" | "approved" | "rejected"
       person_type: "pf" | "pj"
       tenant_role: "super_admin" | "gestor" | "agente"
@@ -10484,6 +10622,16 @@ export const Constants = {
       ],
       collaborative_permission_type: ["view", "edit", "create", "delete"],
       company_role: ["gestor", "colaborador"],
+      day_status: [
+        "ok",
+        "observacao",
+        "pendente_ajuste",
+        "justificado",
+        "falta",
+        "feriado",
+        "folga",
+        "sem_jornada",
+      ],
       document_status: ["pending", "sent", "approved", "rejected"],
       person_type: ["pf", "pj"],
       tenant_role: ["super_admin", "gestor", "agente"],
