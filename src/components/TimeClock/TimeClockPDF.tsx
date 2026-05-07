@@ -538,9 +538,16 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       ]);
       const records = recordsRes.data || [];
       const schedule = scheduleRes.data as any;
-      const holidaySet = new Set((holidaysRes.data || []).map((h: any) => h.holiday_date));
+      const holidaySet = new Set<string>((holidaysRes.data || []).map((h: any) => h.holiday_date));
+      const periodYear = parseISO(startDate).getFullYear();
+      getBrazilianHolidays(periodYear).forEach(h => {
+        if (h.date >= startDate && h.date <= endDate) holidaySet.add(h.date);
+      });
       const dayOffMap: Record<string, string> = {};
       (dayOffsRes.data || []).forEach((d: any) => { dayOffMap[d.off_date] = d.off_type; });
+      Object.entries(dayOffMap).forEach(([date, type]) => {
+        if (type === 'feriado') holidaySet.add(date);
+      });
       const justifications = justRes.data || [];
 
       const sched: DaySchedule | null = schedule ? {
