@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
+import ValidatePoint from "./pages/ValidatePoint";
 import { TestDatabase } from "./components/TestDatabase";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/validar-ponto/:hash" element={<ValidatePoint />} />
               <Route path="/test-database" element={<TestDatabase />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

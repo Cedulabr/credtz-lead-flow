@@ -332,10 +332,22 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         afterY += 8;
       }
 
-      // QR + assinatura
-      const docHash = await sha256(JSON.stringify({ userId, period: selectedMonth, days: dayResults.length, summary, ts: Date.now() }));
+      // QR + assinatura + persistir validação
+      const docHash = await sha256(JSON.stringify({ userId, period: selectedMonth, days: dayResults.length, summary }));
       try {
-        const qr = await QRCode.toDataURL(`https://easyn.app/validar-ponto/${docHash.slice(0, 32)}`, { width: 120, margin: 0 });
+        await (supabase as any).from('time_clock_pdf_validations').insert({
+          hash: docHash,
+          user_id: userId,
+          period_start: startDate,
+          period_end: endDate,
+          generated_by: (await supabase.auth.getUser()).data.user?.id,
+          totals: summary as any,
+          metadata: { type: 'monthly', userName, companyName },
+        });
+      } catch { /* hash duplicado é ok */ }
+      try {
+        const validationUrl = `${window.location.origin}/validar-ponto/${docHash.slice(0, 32)}`;
+        const qr = await QRCode.toDataURL(validationUrl, { width: 120, margin: 0 });
         doc.addImage(qr, 'PNG', pw - 32, afterY, 22, 22);
         doc.setFontSize(6);
         doc.setTextColor(80, 80, 80);

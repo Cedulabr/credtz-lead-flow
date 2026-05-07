@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, History, Settings as SettingsIcon, CalendarClock, FileText, LayoutDashboard, Timer, DollarSign, CalendarOff, Calculator, ShieldAlert, Pencil, ClipboardCheck, BarChart3 } from 'lucide-react';
+import { Clock, History, Settings as SettingsIcon, CalendarClock, FileText, LayoutDashboard, Timer, DollarSign, CalendarOff, Calculator, ShieldAlert, Pencil, ClipboardCheck, BarChart3, Lock, ScrollText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ClockButton } from './ClockButton';
@@ -17,6 +17,8 @@ import { AuditDashboard } from './AuditDashboard';
 import { AdjustmentRequest } from './AdjustmentRequest';
 import { AdjustmentReview } from './AdjustmentReview';
 import { HRDashboard } from './HRDashboard';
+import { ClosurePanel } from './ClosurePanel';
+import { AuditTrail } from './AuditTrail';
 import { BlockedAccess } from '@/components/BlockedAccess';
 import { Loader2 } from 'lucide-react';
 
@@ -74,7 +76,7 @@ export function TimeClock() {
       </div>
 
       <Tabs defaultValue="clock" className="space-y-6">
-        <TabsList className={`grid w-full ${canManage ? 'grid-cols-5 lg:grid-cols-13' : 'grid-cols-5'}`}>
+        <TabsList className={`grid w-full ${canManage ? 'grid-cols-5 lg:grid-cols-15' : 'grid-cols-5'}`}>
           <TabsTrigger value="clock" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             <span className="hidden sm:inline">Ponto</span>
@@ -124,6 +126,14 @@ export function TimeClock() {
               <TabsTrigger value="schedules" className="flex items-center gap-2">
                 <CalendarClock className="h-4 w-4" />
                 <span className="hidden sm:inline">Jornadas</span>
+              </TabsTrigger>
+              <TabsTrigger value="closure" className="flex items-center gap-2">
+                <Lock className="h-4 w-4" />
+                <span className="hidden sm:inline">Fechamento</span>
+              </TabsTrigger>
+              <TabsTrigger value="trail" className="flex items-center gap-2">
+                <ScrollText className="h-4 w-4" />
+                <span className="hidden sm:inline">Trilha</span>
               </TabsTrigger>
               <TabsTrigger value="audit" className="flex items-center gap-2">
                 <ShieldAlert className="h-4 w-4" />
@@ -182,6 +192,12 @@ export function TimeClock() {
             </TabsContent>
             <TabsContent value="audit">
               <AuditDashboard />
+            </TabsContent>
+            <TabsContent value="closure">
+              <ClosurePanel />
+            </TabsContent>
+            <TabsContent value="trail">
+              <AuditTrail />
             </TabsContent>
           </>
         )}

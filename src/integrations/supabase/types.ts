@@ -8264,6 +8264,39 @@ export type Database = {
           },
         ]
       }
+      time_clock_closure_logs: {
+        Row: {
+          action: string
+          closure_id: string | null
+          company_id: string
+          created_at: string
+          id: string
+          performed_by: string
+          period_month: string
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          closure_id?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          performed_by: string
+          period_month: string
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          closure_id?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          performed_by?: string
+          period_month?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
       time_clock_consent: {
         Row: {
           consent_date: string | null
@@ -8669,6 +8702,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      time_clock_pdf_validations: {
+        Row: {
+          company_id: string | null
+          generated_at: string
+          generated_by: string
+          hash: string
+          id: string
+          metadata: Json
+          period_end: string
+          period_start: string
+          totals: Json
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          generated_at?: string
+          generated_by: string
+          hash: string
+          id?: string
+          metadata?: Json
+          period_end: string
+          period_start: string
+          totals?: Json
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          generated_at?: string
+          generated_by?: string
+          hash?: string
+          id?: string
+          metadata?: Json
+          period_end?: string
+          period_start?: string
+          totals?: Json
+          user_id?: string
+        }
+        Relationships: []
       }
       time_clock_period_closures: {
         Row: {
