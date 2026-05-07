@@ -158,17 +158,16 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const salary = salaryRes.data as any;
       const dayOffMap: Record<string, string> = {};
       (dayOffsRes.data || []).forEach((d: any) => { dayOffMap[d.off_date] = d.off_type; });
-      const holidaySet = new Set((holidaysRes.data || []).map((h: any) => h.holiday_date));
-
-      const sched: DaySchedule | null = schedule
-        ? {
-            entry_time: schedule.entry_time,
-            exit_time: schedule.exit_time,
-            daily_hours: Number(schedule.daily_hours),
-            tolerance_minutes: schedule.tolerance_minutes ?? 10,
-            work_days: schedule.work_days ?? [1, 2, 3, 4, 5],
-          }
-        : null;
+      const holidaySet = new Set<string>((holidaysRes.data || []).map((h: any) => h.holiday_date));
+      // Fundir feriados nacionais calculados (Meeus/Jones/Butcher) — cobrir feriados ausentes do DB
+      const periodYear = parseISO(startDate).getFullYear();
+      getBrazilianHolidays(periodYear).forEach(h => {
+        if (h.date >= startDate && h.date <= endDate) holidaySet.add(h.date);
+      });
+      // Day offs marcados como 'feriado' também contam
+      Object.entries(dayOffMap).forEach(([date, type]) => {
+        if (type === 'feriado') holidaySet.add(date);
+      });
 
       const days = eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) });
       const dayResults: { date: Date; result: DayResult; obs: string }[] = days.map((day) => {
