@@ -333,19 +333,51 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
 
       afterY += 28;
 
-      // Desconto estimado
+      // Desconto estimado — fórmula trabalhista completa
+      // hora = salário / (jornada_diária × dias_úteis_mês)
+      // dia  = hora × jornada_diária
+      // desconto = faltas×dia + pendentes×dia + (atrasos+saídas_antecipadas)/60 × hora
       if (salary?.base_salary) {
         const base = Number(salary.base_salary);
-        const perMin = base / 220 / 60;
-        const desconto = (summary.delay + summary.earlyExit) * perMin;
-        const liquido = base - desconto;
+        const dailyHours = sched?.daily_hours || 8;
+        // Dias úteis do mês baseados em work_days, descontando feriados
+        const workDays = sched?.work_days || [1, 2, 3, 4, 5];
+        const businessDays = days.filter(d => {
+          const ds = format(d, 'yyyy-MM-dd');
+          return workDays.includes(d.getDay()) && !holidaySet.has(ds);
+        }).length || 22;
+        const valorHora = base / (dailyHours * businessDays);
+        const valorDia = valorHora * dailyHours;
+        const descAtrasos = ((summary.delay + summary.earlyExit) / 60) * valorHora;
+        const descFaltas = summary.absences * valorDia;
+        const descPendentes = summary.pending * valorDia;
+        const desconto = descAtrasos + descFaltas + descPendentes;
+        const liquido = Math.max(0, base - desconto);
+        const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         doc.setTextColor(...NAVY);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.text(safe(`Valor/hora: R$ ${fmt(valorHora)}  ·  Valor/dia: R$ ${fmt(valorDia)}  ·  Dias úteis: ${businessDays}`), 12, afterY);
+        afterY += 5;
+        doc.text(
+          safe(`Desc. faltas (${summary.absences}): R$ ${fmt(descFaltas)}  ·  Desc. atrasos/saídas: R$ ${fmt(descAtrasos)}  ·  Desc. pendentes (${summary.pending}): R$ ${fmt(descPendentes)}`),
+          12,
+          afterY
+        );
+        afterY += 5;
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
-        doc.text(safe(`Salário base: R$ ${base.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`), 12, afterY);
-        doc.text(safe(`Desconto estimado: R$ ${desconto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`), pw / 2 - 30, afterY);
-        doc.text(safe(`Líquido estimado: R$ ${liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`), pw - 14, afterY, { align: 'right' });
+        doc.text(safe(`Salário base: R$ ${fmt(base)}`), 12, afterY);
+        doc.text(safe(`Desconto estimado: R$ ${fmt(desconto)}`), pw / 2 - 30, afterY);
+        doc.text(safe(`Líquido estimado: R$ ${fmt(liquido)}`), pw - 14, afterY, { align: 'right' });
         afterY += 8;
+        if (summary.pending > 0) {
+          doc.setTextColor(180, 30, 30);
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'italic');
+          doc.text(safe(`⚠ Existem ${summary.pending} dia(s) pendente(s) de ajuste — desconto provisório, regularize antes do fechamento.`), 12, afterY);
+          afterY += 5;
+        }
       }
 
       // QR + assinatura + persistir validação
