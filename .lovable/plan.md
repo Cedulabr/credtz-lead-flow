@@ -1,70 +1,156 @@
-## Objetivo
 
-No módulo **Admin → Financeiro → Pagamento de Comissão**, ao clicar em **"Lançar Todas"**, abrir um diálogo de configuração onde o admin escolhe **como** a comissão será calculada para o lote inteiro, e adicionar um **filtro de Produto** para permitir lançar em massa por categoria (Portabilidade, Margem, Refinanciamento, Cartão, etc.).
+# Evolução Corporativa do Módulo de Controle de Ponto
 
-## Mudanças
+Entrega em **3 fases priorizadas**, com regras trabalhistas, motor de inconsistências, novo PDF UTF-8 e dashboard de RH nível Convenia/Tangerino/Pontotel.
 
-### 1. Novo filtro: Produto
-Adicionar `productFilter` ao lado dos filtros existentes (Empresa, Banco, Funcionário, Mês). As opções serão geradas dinamicamente a partir do campo `tipo_operacao` das propostas pendentes (Portabilidade, Margem Livre, Refinanciamento, Cartão Benefício, Cartão Consignado, Novo, etc.). O filtro entra na lógica de `filteredProposals`.
+Decisões já alinhadas:
+- Registros antigos: **reprocessamento silencioso** (sem marcar pendentes em massa).
+- Reabertura de período fechado: **Admin e Gestor da empresa** (com log).
 
-### 2. Botão "Lançar Todas" abre um diálogo de configuração
-Hoje o botão chama `handlePostAll` direto, usando a regra cadastrada em `commission_rules` para cada proposta. A mudança:
+---
 
-- Botão passa a abrir um novo diálogo `BulkCommissionDialog`.
-- O diálogo mostra: total de propostas filtradas, breakdown por produto/banco, e os controles abaixo.
+## FASE 1 — Núcleo Confiável (juridicamente seguro)
 
-### 3. Controles do diálogo de lote
-Mesma lógica do diálogo individual já existente, aplicada ao lote inteiro:
+### 1.1 Motor de Validação de Batidas (`timeClockValidation.ts`)
+Função pura que recebe as batidas do dia + jornada e retorna `{ status, inconsistencies[], metrics | null }`.
 
-- **Tipo de comissão**: `percentual` ou `valor_fixo` (radio).
-- **Base de cálculo**: `parcela`, `saldo_devedor`, `bruto`, `liquido` (radio).
-- **Valor**: input único (% ou R$ conforme o tipo).
-- **Modo de aplicação** (radio adicional):
-  - **Aplicar a todas** — usa o valor digitado em todas as propostas filtradas.
-  - **Usar regra cadastrada quando existir** — fallback para `commission_rules` por banco/produto/nível e usa o valor digitado só onde não houver regra (comportamento atual aprimorado).
-- **Pré-visualização**: mostra valor total estimado em R$ com base na configuração escolhida, antes de confirmar.
+Regras bloqueantes (não calcula horas, marca dia como `PENDENTE_AJUSTE`):
+- saída < entrada
+- `pausa_fim` < `pausa_inicio`
+- número de `pausa_fim` ≠ `pausa_inicio` (pausa aberta)
+- pausa > 4h sem justificativa
+- batidas duplicadas (mesmo tipo no mesmo minuto)
+- horários inválidos / fora de 00:00–23:59
+- entrada sem saída em dia já encerrado (D-1 fechado)
+- saída sem entrada
+- jornada > 12h (CLT) sem justificativa
+- horários invertidos / fora de ordem cronológica
 
-### 4. Processamento em lote
-Substituir a lógica interna de `handlePostAll`:
+### 1.2 Novo Motor de Cálculo (`timeClockCalculations.ts` reescrito)
+Calcula **somente** quando o dia é válido. Saídas separadas:
+- horas trabalhadas, horas previstas, horas extras
+- atraso, saída antecipada
+- pausas (total + por intervalo)
+- saldo do dia para banco de horas
+- faltas (nenhuma batida em dia útil)
+- horas justificadas / abonadas
 
-- Para cada proposta filtrada, calcular `baseValue` conforme `commissionBase` (reaproveitar `getBaseValueByMode`).
-- Calcular `amount` e `percentage` conforme `commissionMode` e o valor digitado (reaproveitar `getDialogCommissionValues`).
-- Inserir em `commissions` com `status='pago'` e `televendas_id` (mantém deduplicação atual).
-- Toast final com sucesso/falha + refresh.
+Regras:
+- Intervalo subtraído automaticamente.
+- Dias `PENDENTE_AJUSTE` **não entram** em banco, extras, descontos ou totais até aprovação.
+- Feriados → status próprio (roxo); trabalho em feriado vira extra 100%.
 
-## Detalhes técnicos
+### 1.3 Status visual por dia (badges)
+- 🟢 VERDE — jornada correta
+- 🟡 AMARELO — observação (atraso/saída antecipada dentro tolerância)
+- 🔴 VERMELHO — inconsistência grave (PENDENTE_AJUSTE)
+- 🔵 AZUL — justificado/abonado
+- ⚫ CINZA — falta
+- 🟣 ROXO — feriado
 
-**Arquivo único alterado**: `src/components/admin/CommissionPayment.tsx`
+Aplicado em `MyHistory`, `ManagerDashboard` e PDF.
 
-- Adicionar estado: `productFilter`, `bulkDialogOpen`, `bulkMode`, `bulkBase`, `bulkInput`, `bulkApplyMode` ('forced' | 'rule_first'), `bulkPosting`.
-- `uniqueProducts = useMemo(...)` derivado de `proposals.map(p => p.tipo_operacao)`.
-- Adicionar `<Select>` "Produto" na barra de filtros (linha junto com Funcionário/Mês).
-- Incluir `matchProduct` em `filteredProposals`.
-- Trocar `onClick={handlePostAll}` por `onClick={() => setBulkDialogOpen(true)}`.
-- Criar `<Dialog>` de bulk config com mesmos componentes UI já usados (`RadioGroup`, `Input`, `Select`).
-- Função `executeBulkPost()`:
-  ```ts
-  for (const p of filteredProposals) {
-    let amount, percentage, baseValue;
-    if (bulkApplyMode === 'rule_first') {
-      const r = calculateCommission(p);
-      if (r.rule) ({ amount, percentage, baseValue } = r);
-      else ({ amount, percentage, baseValue } = computeFromBulkInputs(p));
-    } else {
-      ({ amount, percentage, baseValue } = computeFromBulkInputs(p));
-    }
-    await supabase.from('commissions').insert({ ... });
-  }
-  ```
-- `computeFromBulkInputs(p)` é uma versão de `getDialogCommissionValues` que recebe `bulkMode`, `bulkBase`, `bulkInput`.
+### 1.4 PDF Profissional UTF-8 (`TimeClockPDF.tsx` reescrito)
+- Migra geração para **jsPDF + jspdf-autotable** com fonte embutida que suporta acentos (Roboto-Regular.ttf via `addFileToVFS`/`addFont`) — elimina os `#ó� �P�e�n�d`.
+- Cabeçalho: logo, empresa, colaborador, cargo, CPF, período, jornada contratada.
+- Tabela: Data | Dia | Entrada | Saída | Intervalo | Trabalhadas | Atraso | Extra | Banco | Status | Observações.
+- Rodapé totalizador: trabalhado, previsto, extras, banco, atrasos, faltas, justificadas, desconto estimado.
+- Paginação `Página X de Y`, data/hora de geração, hash SHA-256 do conteúdo, espaço para assinaturas (colaborador / gestor).
+- Linhas vermelhas para dias `PENDENTE_AJUSTE`.
 
-**Sem mudanças de banco** — usa as colunas já existentes em `commissions` (`commission_amount`, `commission_percentage`, `credit_value`).
+### 1.5 Migração SQL (Fase 1)
+- Coluna `daily_status` em `time_clocks` (enum: ok, observacao, pendente_ajuste, justificado, falta, feriado).
+- Tabela `time_clock_day_summary` (cache por user_id+data: minutos trabalhados, extras, banco, atraso, saída antecipada, status, inconsistências jsonb).
+- Trigger que recalcula a linha de resumo a cada insert/update/delete em `time_clocks`.
+- Função `recalc_user_day(user_id, date)` (SECURITY DEFINER) usada pelo trigger e pelo job de reprocessamento silencioso de histórico.
 
-**Sem mudanças no diálogo individual** — continua funcionando exatamente como hoje.
+---
 
-## Resultado para o usuário
+## FASE 2 — Dashboard RH + Fluxo de Ajuste
 
-- Filtro de Produto disponível para selecionar e lançar em massa "todas as Portabilidades", "todas as Margens", "todos os Refinanciamentos", "todos os Cartões".
-- Ao clicar em "Lançar Todas (N)", abre diálogo perguntando: tipo (%/R$), base (parcela/saldo devedor/bruto/líquido), valor, e se respeita a regra cadastrada quando existir.
-- Vê o total estimado antes de confirmar.
-- Confirma e lança tudo de uma vez com a configuração escolhida.
+### 2.1 Dashboard RH (`HRDashboard.tsx`)
+Cards e gráficos (Recharts) escopados por `company_id`:
+- Total de atrasos (mês) + ranking top 10
+- Faltas no mês
+- Saldo de banco de horas por colaborador
+- Colaboradores com pendências (PENDENTE_AJUSTE)
+- Inconsistências por tipo
+- Horas extras pagas vs banco
+- Métrica mensal comparativa
+
+### 2.2 Filtros avançados (componente reutilizável)
+Período, colaborador, status, atrasos, faltas, inconsistências, extras, banco. Reaproveitado em Histórico, Dashboard, PDF e Excel.
+
+### 2.3 Exportação Excel
+Mesmas colunas do PDF + abas de totais por colaborador (usa `xlsx`).
+
+### 2.4 Fluxo de Ajuste de Ponto
+- Tabela `time_clock_adjustment_requests` (user_id, company_id, clock_date, motivo, comprovante_url, status, manager_id, manager_note, created_at, decided_at).
+- Bucket privado `time-clock-attachments` com Signed URL 1h (segue padrão do projeto).
+- Tela colaborador: solicitar ajuste, anexar comprovante, ver histórico.
+- Tela gestor: aprovar/reprovar com observação; aprovação cria/edita batidas e dispara `recalc_user_day`.
+- Notificação push reaproveitando sistema existente.
+
+---
+
+## FASE 3 — Auditoria, Fechamento e Validação Documental
+
+### 3.1 Trava de fechamento de período
+- Tabela `time_clock_closures` (company_id, period_month, closed_at, closed_by, reopened_at?, reopened_by?, reason).
+- Após fechado: edições de batidas bloqueadas via RLS + trigger.
+- Reabertura permitida para **Admin e Gestor** da empresa, com motivo obrigatório e log.
+
+### 3.2 Log de Auditoria expandido
+- `time_clock_logs` já existe — adicionar `change_reason`, `field_changed`, `previous_value`, `new_value` por campo.
+- Tela "Histórico de Alterações" por dia (quem, quando, o quê, por quê).
+
+### 3.3 Validação documental do PDF
+- Hash SHA-256 do PDF gravado em `time_clock_pdf_validations` (hash, user_id, period, generated_by, generated_at).
+- QRCode no rodapé apontando para `/validar-ponto/:hash` que confirma autenticidade.
+
+### 3.4 Performance
+- Índices: `(user_id, clock_date)`, `(company_id, clock_date)`, `(daily_status)`.
+- Paginação server-side em Histórico e Dashboard via range queries.
+
+---
+
+## Detalhes Técnicos
+
+**Stack mantida**: React + TS + Tailwind + shadcn + Supabase. Sem novas libs além de `jspdf`, `jspdf-autotable`, `xlsx`, `qrcode` (todas leves).
+
+**Timezone**: Tudo persistido em `America/Sao_Paulo` usando `date-fns-tz`. Cálculos sempre em minutos desde 00:00 local; nunca `new Date(string)` sem normalizar.
+
+**Reprocessamento silencioso de histórico**: migração roda `SELECT recalc_user_day(user_id, clock_date) FROM (SELECT DISTINCT user_id, clock_date FROM time_clocks) t;` em background — popula `time_clock_day_summary` sem alterar batidas originais.
+
+**RLS**: 
+- Colaborador vê só seus dias e ajustes.
+- Gestor vê company_id (via `has_role_safe` + `user_companies`).
+- Admin vê tudo.
+- Edição bloqueada em períodos com `time_clock_closures` ativo (sem `reopened_at`).
+
+**Arquivos principais a criar/alterar**:
+```text
+src/components/TimeClock/
+  ├─ index.tsx                     (nova aba "RH")
+  ├─ engine/
+  │   ├─ validation.ts             (motor inconsistências)
+  │   ├─ calculations.ts           (cálculo refatorado)
+  │   └─ statusBadges.tsx
+  ├─ pdf/
+  │   ├─ TimeClockPDF.tsx          (reescrito, jsPDF + Roboto)
+  │   └─ pdfHelpers.ts
+  ├─ excel/ExportTimeClockExcel.ts
+  ├─ HRDashboard.tsx               (Fase 2)
+  ├─ AdjustmentRequest.tsx         (Fase 2)
+  ├─ AdjustmentReview.tsx          (Fase 2)
+  ├─ ClosurePanel.tsx              (Fase 3)
+  └─ AuditTrail.tsx                (Fase 3)
+supabase/migrations/               (3 migrações, uma por fase)
+```
+
+---
+
+## Resultado Esperado
+Módulo confiável juridicamente, com cálculos auditáveis, PDF oficial sem encoding quebrado, dashboard de RH e fluxo completo de ajuste/fechamento — pronto para uso empresarial real.
+
+Posso começar pela **Fase 1** assim que aprovar.
