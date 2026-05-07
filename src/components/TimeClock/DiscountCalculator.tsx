@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, eachDayOfInterval, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calculateTotalBreakMinutes, parseTimeToMinutes, formatMinutesToHM } from '@/lib/timeClockCalculations';
+import { getBrazilianHolidays } from './brazilianHolidays';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
 
