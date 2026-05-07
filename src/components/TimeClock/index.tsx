@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, History, Settings as SettingsIcon, CalendarClock, FileText, LayoutDashboard, Timer, DollarSign, CalendarOff, Calculator, ShieldAlert, Pencil, ClipboardCheck, BarChart3 } from 'lucide-react';
+import { Clock, History, Settings as SettingsIcon, CalendarClock, FileText, LayoutDashboard, Timer, DollarSign, CalendarOff, Calculator, ShieldAlert, Pencil, ClipboardCheck, BarChart3, Lock, ScrollText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ClockButton } from './ClockButton';
@@ -17,6 +17,8 @@ import { AuditDashboard } from './AuditDashboard';
 import { AdjustmentRequest } from './AdjustmentRequest';
 import { AdjustmentReview } from './AdjustmentReview';
 import { HRDashboard } from './HRDashboard';
+import { ClosurePanel } from './ClosurePanel';
+import { AuditTrail } from './AuditTrail';
 import { BlockedAccess } from '@/components/BlockedAccess';
 import { Loader2 } from 'lucide-react';
 
