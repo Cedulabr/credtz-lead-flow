@@ -34,10 +34,16 @@ interface TimeClockPDFProps {
   companyCNPJ?: string;
 }
 
-/** Normaliza para NFC e remove caracteres de controle invisíveis que quebram encoding em jsPDF. */
+/** Normaliza para NFC, remove caracteres de controle e ruído de mojibake antigo. */
 const safe = (v: unknown): string => {
   if (v === null || v === undefined) return '';
-  return String(v).normalize('NFC').replace(/[\u0000-\u001F\u007F]/g, '');
+  let s = String(v).normalize('NFC');
+  // Remove controle, replacement char e zero-width
+  s = s.replace(/[\u0000-\u001F\u007F\uFFFD\u200B-\u200F\u2028-\u202F\u2060]/g, '');
+  // Detecta mojibake tipo "#ó" ou letras isoladas separadas por espaço (ex.: "d e l a y")
+  if (/^#?[^\sa-zA-Z0-9]{1,3}\s*$/.test(s.trim())) return '';
+  if (/^([a-zA-Z]\s){2,}[a-zA-Z]?$/.test(s.trim())) return '';
+  return s;
 };
 
 const dayNamesShort: Record<number, string> = {
