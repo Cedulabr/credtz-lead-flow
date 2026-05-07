@@ -1,90 +1,83 @@
-## Melhorias no Módulo Controle de Ponto — Iteração 2
+## Problema
 
-Baseado no feedback da última auditoria (nota 8/10), as correções restantes são:
+Hoje a tabela `employee_salaries` guarda **um único salário ativo por colaborador**. Quando o colaborador recebe aumento, o `SalaryManager` faz `UPDATE` no registro atual, e tanto o `TimeClockPDF` (folha individual) quanto o `DiscountCalculator` (fechamento) leem `base_salary WHERE is_active=true`. Resultado: folhas antigas (jan, fev, mar...) passam a usar o salário novo, distorcendo descontos, banco de horas e PDFs históricos.
 
----
+## Objetivo
 
-### 1. UTF-8 ponta-a-ponta no PDF
+Salário com **vigência por data**. Cada folha (mês de referência) deve usar o salário que estava vigente naquele período, não o atual.
 
-**Problema:** Mesmo após sanitização, fonte padrão do jsPDF (Helvetica) é WinAnsi — não suporta Unicode pleno, causando glitches em acentos e símbolos.
+## Mudanças
 
-**Correção em `TimeClockPDF.tsx`:**
-- Embutir fonte Unicode (Inter ou Roboto) via `doc.addFileToVFS` + `doc.addFont` (TTF base64).
-- Definir `doc.setFont('Inter')` global.
-- Forçar `doc.setLanguage('pt-BR')` e metadados `Producer/Creator` em UTF-8.
-- Header HTTP do download: `application/pdf; charset=utf-8`.
+### 1. Banco de dados (migration)
 
-### 2. Modo de Desconto configurável (eliminar punição dupla)
+Adicionar histórico vigente em `employee_salaries`:
 
-**Problema:** Hoje o sistema desconta falta em dinheiro **e** joga banco negativo — punição dupla.
+- `effective_from date NOT NULL DEFAULT current_date` — início da vigência
+- `effective_to date NULL` — fim da vigência (NULL = vigente)
+- Remover unique antiga `(user_id, company_id)` e criar índice parcial:
+  `UNIQUE (user_id, company_id) WHERE effective_to IS NULL` (garante 1 vigente por colaborador/empresa)
+- Backfill: `UPDATE employee_salaries SET effective_from = COALESCE(effective_from, created_at::date)`
 
-**Correção:**
-- Nova coluna em `hour_bank_settings`: `discount_mode` enum (`financeiro`, `banco`, `misto`), default `financeiro`.
-- UI em `HourBankSettings.tsx`: RadioGroup com 3 opções e descrição de cada modo.
-- `DiscountCalculator.tsx` e `TimeClockPDF.tsx` consultam `discount_mode`:
-  - **financeiro:** desconta faltas/atrasos em R$, banco ignora faltas (só conta extras/compensações voluntárias).
-  - **banco:** zera desconto financeiro de faltas/atrasos, joga tudo no banco negativo (compensável).
-  - **misto:** atrasos no banco, faltas no financeiro.
-- Engine `timeClockEngine.ts` recebe `discountMode` e ajusta `bankBalanceMinutes` em `falta` conforme modo.
+Função RPC `get_salary_at(p_user_id uuid, p_company_id uuid, p_date date)`:
+- Retorna a linha de salário cuja vigência cobre `p_date` (`effective_from <= p_date AND (effective_to IS NULL OR effective_to >= p_date)`).
+- `SECURITY DEFINER`, `search_path=public`, com checagem de role (admin/gestor da empresa ou próprio colaborador).
 
-### 3. Status granulares (substituir "Observação" genérico)
+### 2. SalaryManager.tsx — registrar aumento sem perder histórico
 
-**Correção em `timeClockEngine.ts`:**
-- Substituir status único `observacao` por sub-tipos via novo campo `subStatus`:
-  - `atraso_leve` (≤ 15 min)
-  - `atraso_critico` (> 15 min)
-  - `saida_antecipada`
-  - `saida_antecipada_grave` (> 50% jornada não cumprida — caso 20/04)
-  - `jornada_incompleta`
-  - `registro_incompleto`
-  - `banco_positivo`
-  - `hora_extra`
-- `dayStatusLabels` e `dayStatusColor` ganham entradas para cada subtipo.
-- PDF e UI (`MyTimeClock`, `HRDashboard`) exibem o subtipo no lugar de "Observação".
+Substituir o fluxo atual de "Editar" por dois fluxos distintos:
 
-### 4. Validação em tempo real ao adicionar/editar registros
+- **Corrigir salário atual** (ex.: erro de digitação) — `UPDATE` direto na linha vigente, sem criar histórico. Botão secundário "Corrigir valor".
+- **Registrar aumento / mudança** — botão primário "Novo aumento":
+  1. Pede `novo_salario`, `novo_cargo`, `data_vigencia` (default: 1º dia do mês seguinte).
+  2. `UPDATE` na linha vigente: `effective_to = data_vigencia - 1 day`, `is_active = false`.
+  3. `INSERT` nova linha com `effective_from = data_vigencia`, `is_active = true`.
+  4. Tudo dentro de uma transação (RPC `register_salary_change`).
 
-**Correção:**
-- Nos componentes de marcação (`AdjustmentRequest.tsx`, modal de marcação manual): rodar `evaluateDay` no onChange e mostrar **alerta contextual abaixo do form**:
-  - "⚠️ Esta marcação resultará em desconto de R$ X (atraso de Y min)"
-  - "⛔ Sem saída registrada — dia ficará pendente e bloqueará fechamento"
-- Banner amarelo persistente no `HRDashboard` listando os dias do mês corrente que **causarão desconto**, com link direto para resolução.
+Adicionar aba/seção **"Histórico de salários"** no card de cada colaborador (drawer ou expand row) listando todas as vigências (`effective_from → effective_to`, salário, cargo, quem registrou).
 
-### 5. Reforço no `ClosurePanel`
+### 3. DiscountCalculator.tsx — usar salário vigente no mês de referência
 
-- Hoje bloqueia `pendente_ajuste`. Adicionar:
-  - Bloquear também `registro_incompleto` e `saida_antecipada_grave` sem justificativa.
-  - Tabela preview pré-fechamento mostrando: dia, sub-status, minutos, valor a descontar, ação requerida.
-  - Botão "Notificar colaborador" envia push/email ao usuário com lista de pendências.
+Em vez de buscar `is_active=true`, buscar para cada colaborador o salário cuja vigência cobre o `referenceMonth` (último dia do mês). Estratégia:
 
-### 6. Caso 20/04 (saída antecipada grave)
+- Substituir o fetch único por chamada à nova RPC `get_salaries_at(p_user_ids uuid[], p_company_id uuid, p_date date)` que devolve um map `user_id → base_salary` para a data.
+- Toda a matemática de `valor/hora`, descontos e banco passa a usar esse valor histórico.
 
-Coberto pela mudança 3 — `subStatus: 'saida_antecipada_grave'` quando `workedMinutes < expectedMinutes * 0.5`. Cor laranja distinta de saída antecipada normal.
+### 4. TimeClockPDF.tsx — folha histórica fiel
 
----
+Trocar o `select('*').eq('is_active', true)` por `get_salary_at(userId, companyId, lastDayOfReferenceMonth)`. Cabeçalho do PDF passa a exibir:
 
-### Arquivos a alterar
+- "Salário base vigente em {mês/ano}: R$ X"
+- Se houve mudança no mês, mostrar nota: "Salário alterado em DD/MM/AAAA: R$ antigo → R$ novo" (informativo).
+
+Para o cálculo de descontos do PDF, usar o salário do **último dia do mês** (compatível com a folha do mês). Se quiser ser mais preciso por dia, podemos prorratear (fora do escopo agora — confirmar se quer).
+
+### 5. types.ts (TimeClock)
+
+Adicionar `effective_from`, `effective_to` à interface `SalaryRecord` no `SalaryManager` (não há tipo central exportado).
+
+## Arquivos afetados
 
 ```text
-supabase/migrations/<new>.sql        (discount_mode enum + coluna)
-src/lib/timeClockEngine.ts           (subStatus + lógica modo desconto)
-src/components/TimeClock/
-  HourBankSettings.tsx               (RadioGroup modo desconto)
-  DiscountCalculator.tsx             (consume modo)
-  TimeClockPDF.tsx                   (fonte Unicode + modo + subStatus)
-  ClosurePanel.tsx                   (bloqueios extras + preview)
-  HRDashboard.tsx                    (banner riscos)
-  AdjustmentRequest.tsx              (validação live)
-  MyTimeClock.tsx (se existir)       (subStatus na UI)
+supabase/migrations/<novo>.sql            (schema + RPCs)
+src/components/TimeClock/SalaryManager.tsx (UI: aumento vs correção + histórico)
+src/components/TimeClock/DiscountCalculator.tsx (RPC histórica)
+src/components/TimeClock/TimeClockPDF.tsx  (RPC histórica + nota de mudança)
 ```
 
-### Validação esperada
+## Validação
 
-- PDF abre em qualquer leitor sem mojibake (testar Adobe + Chrome + macOS Preview).
-- Configurando "modo financeiro": Alana/Abr — banco final = 0 para faltas; desconto = R$ 316; sem dupla penalidade.
-- Configurando "modo banco": desconto faltas = R$ 0; banco = -36h; alertas claros.
-- 20/04 mostra "Saída Antecipada Grave" laranja, não "Observação".
-- Tentar fechar Abril com 28/04 pendente → diálogo lista exatamente o problema + valor de desconto.
-- Editar marcação ao vivo dispara aviso em <300ms.
+1. Cadastrar João com R$ 1.500 em 01/01.
+2. Registrar aumento para R$ 2.000 com vigência 01/04.
+3. Gerar PDF de março → mostra R$ 1.500.
+4. Gerar PDF de abril → mostra R$ 2.000.
+5. `DiscountCalculator` para março calcula valor/hora sobre 1.500; abril sobre 2.000.
+6. Histórico do colaborador exibe duas linhas com vigências corretas.
 
-Posso seguir com a migration de `discount_mode` e implementar?
+## Pergunta antes de implementar
+
+No mês em que ocorre o aumento (ex.: aumento dia 15/04), você quer:
+
+- (A) Usar o salário **do último dia do mês** para a folha inteira (mais simples, é o que a maioria dos SaaS faz quando o aumento vale "do mês"), ou
+- (B) **Prorratear**: dias 1–14 com salário antigo, 15–30 com novo (mais justo, mais código).
+
+Confirmando isso eu mando a migration para aprovação e sigo com o código.
