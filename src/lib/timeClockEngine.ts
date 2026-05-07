@@ -14,6 +14,19 @@ export type DayStatus =
   | 'folga'
   | 'sem_jornada';
 
+export type DaySubStatus =
+  | 'atraso_leve'
+  | 'atraso_critico'
+  | 'saida_antecipada'
+  | 'saida_antecipada_grave'
+  | 'jornada_incompleta'
+  | 'registro_incompleto'
+  | 'banco_positivo'
+  | 'hora_extra'
+  | null;
+
+export type DiscountMode = 'financeiro' | 'banco' | 'misto';
+
 export interface ClockRecord {
   clock_type: 'entrada' | 'pausa_inicio' | 'pausa_fim' | 'saida';
   clock_time: string;
@@ -47,6 +60,7 @@ export interface Inconsistency {
 
 export interface DayResult {
   status: DayStatus;
+  subStatus: DaySubStatus;
   inconsistencies: Inconsistency[];
   expectedMinutes: number;
   workedMinutes: number;
@@ -82,6 +96,28 @@ export const dayStatusLabels: Record<DayStatus, string> = {
   feriado: 'Feriado',
   folga: 'Folga',
   sem_jornada: 'Sem Jornada',
+};
+
+export const subStatusLabels: Record<Exclude<DaySubStatus, null>, string> = {
+  atraso_leve: 'Atraso Leve',
+  atraso_critico: 'Atraso Crítico',
+  saida_antecipada: 'Saída Antecipada',
+  saida_antecipada_grave: 'Saída Antecipada Grave',
+  jornada_incompleta: 'Jornada Incompleta',
+  registro_incompleto: 'Registro Incompleto',
+  banco_positivo: 'Banco Positivo',
+  hora_extra: 'Hora Extra',
+};
+
+export const subStatusColor: Record<Exclude<DaySubStatus, null>, { bg: string; text: string; border: string; pdfRgb: [number, number, number] }> = {
+  atraso_leve:             { bg: 'bg-yellow-50',   text: 'text-yellow-700',   border: 'border-yellow-200',   pdfRgb: [254, 252, 232] },
+  atraso_critico:          { bg: 'bg-orange-100',  text: 'text-orange-800',   border: 'border-orange-300',   pdfRgb: [255, 237, 213] },
+  saida_antecipada:        { bg: 'bg-amber-100',   text: 'text-amber-800',    border: 'border-amber-300',    pdfRgb: [254, 243, 199] },
+  saida_antecipada_grave:  { bg: 'bg-orange-200',  text: 'text-orange-900',   border: 'border-orange-400',   pdfRgb: [254, 215, 170] },
+  jornada_incompleta:      { bg: 'bg-orange-100',  text: 'text-orange-800',   border: 'border-orange-300',   pdfRgb: [255, 237, 213] },
+  registro_incompleto:     { bg: 'bg-red-100',     text: 'text-red-800',      border: 'border-red-300',      pdfRgb: [254, 226, 226] },
+  banco_positivo:          { bg: 'bg-green-50',    text: 'text-green-700',    border: 'border-green-200',    pdfRgb: [240, 253, 244] },
+  hora_extra:              { bg: 'bg-emerald-100', text: 'text-emerald-800',  border: 'border-emerald-300',  pdfRgb: [209, 250, 229] },
 };
 
 export const dayStatusColor: Record<DayStatus, { bg: string; text: string; border: string; pdfRgb: [number, number, number] }> = {
@@ -124,12 +160,18 @@ export function formatHM(minutes: number): string {
 
 /**
  * Avalia o dia: detecta inconsistências e calcula somente quando válido.
+ *
+ * @param discountMode controla como faltas afetam o banco de horas:
+ *   - 'financeiro' (padrão): faltas zeram o banco (descontadas em folha)
+ *   - 'banco': faltas geram banco negativo (compensáveis)
+ *   - 'misto': atrasos no banco, faltas zeram o banco
  */
 export function evaluateDay(
   records: ClockRecord[],
   schedule: DaySchedule | null,
   dayOfWeek: number,
-  isHoliday = false
+  isHoliday = false,
+  discountMode: DiscountMode = 'financeiro'
 ): DayResult {
   const sched = schedule ?? DEFAULT_SCHEDULE;
   const isWorkDay = sched.work_days?.includes(dayOfWeek) ?? [1, 2, 3, 4, 5].includes(dayOfWeek);
@@ -138,6 +180,7 @@ export function evaluateDay(
   const incons: Inconsistency[] = [];
   const empty: DayResult = {
     status: 'sem_jornada',
+    subStatus: null,
     inconsistencies: incons,
     expectedMinutes,
     workedMinutes: 0,
@@ -153,7 +196,9 @@ export function evaluateDay(
   if (!records || records.length === 0) {
     if (isHoliday) return { ...empty, status: 'feriado' };
     if (!isWorkDay) return { ...empty, status: 'folga' };
-    return { ...empty, status: 'falta', bankBalanceMinutes: -expectedMinutes };
+    // Falta: no modo 'banco' joga no banco negativo (compensável). Demais modos zeram (será descontada em folha).
+    const bankOnAbsence = discountMode === 'banco' ? -expectedMinutes : 0;
+    return { ...empty, status: 'falta', bankBalanceMinutes: bankOnAbsence };
   }
 
   const entries = records.filter(r => r.clock_type === 'entrada');
@@ -167,12 +212,10 @@ export function evaluateDay(
   if (exits.length > 1) incons.push({ code: 'SAIDA_DUPLICADA', severity: 'high', message: inconsistencyLabels.SAIDA_DUPLICADA });
   if (pInicios.length !== pFins.length) incons.push({ code: 'PAUSA_INCOMPLETA', severity: 'high', message: inconsistencyLabels.PAUSA_INCOMPLETA });
   if (entries.length === 0 && exits.length > 0) incons.push({ code: 'SAIDA_SEM_ENTRADA', severity: 'high', message: inconsistencyLabels.SAIDA_SEM_ENTRADA });
-  // Entrada sem saída em dia útil já encerrado: pendência crítica (não pode ser tratado como OK)
   if (entries.length >= 1 && exits.length === 0 && isWorkDay && !isHoliday) {
     incons.push({ code: 'ENTRADA_SEM_SAIDA', severity: 'high', message: inconsistencyLabels.ENTRADA_SEM_SAIDA });
   }
 
-  // Duplicatas exatas (mesmo tipo, mesmo minuto)
   const seen = new Set<string>();
   for (const r of records) {
     const key = `${r.clock_type}@${Math.floor(timeToMinutes(r.clock_time))}`;
@@ -199,7 +242,6 @@ export function evaluateDay(
     if (exitMinute <= entryMinute) {
       incons.push({ code: 'SAIDA_ANTES_ENTRADA', severity: 'high', message: inconsistencyLabels.SAIDA_ANTES_ENTRADA });
     } else {
-      // Pausas pareadas
       for (let i = 0; i < pInicios.length; i++) {
         const ini = timeToMinutes(pInicios[i].clock_time);
         const fim = timeToMinutes(pFins[i].clock_time);
@@ -232,29 +274,47 @@ export function evaluateDay(
 
   const hasHigh = incons.some(i => i.severity === 'high');
   let status: DayStatus;
+  let subStatus: DaySubStatus = null;
 
   if (isHoliday) {
     status = workedMinutes > 0 && !hasHigh ? 'ok' : 'feriado';
-    // Feriado nunca gera banco negativo nem desconto
     if (status === 'feriado') {
       workedMinutes = 0;
       overtimeMinutes = 0;
       bankBalance = 0;
       delayMinutes = 0;
       earlyExitMinutes = 0;
+    } else if (overtimeMinutes > 0) {
+      subStatus = 'hora_extra';
     }
   } else if (hasHigh) {
     status = 'pendente_ajuste';
+    subStatus = 'registro_incompleto';
     workedMinutes = 0;
     overtimeMinutes = 0;
     bankBalance = 0;
   } else if (delayMinutes > 0 || earlyExitMinutes > 0 || incons.length > 0) {
     status = 'observacao';
+    // Classificar sub-status mais informativo
+    const halfJornada = expectedMinutes / 2;
+    if (workedMinutes > 0 && expectedMinutes > 0 && workedMinutes < halfJornada) {
+      subStatus = 'saida_antecipada_grave';
+    } else if (earlyExitMinutes > 30) {
+      subStatus = 'saida_antecipada';
+    } else if (delayMinutes > 15) {
+      subStatus = 'atraso_critico';
+    } else if (delayMinutes > 0) {
+      subStatus = 'atraso_leve';
+    } else if (workedMinutes > 0 && workedMinutes < expectedMinutes) {
+      subStatus = 'jornada_incompleta';
+    }
   } else if (workedMinutes === 0 && !isWorkDay) {
     status = 'folga';
     bankBalance = 0;
   } else {
     status = 'ok';
+    if (overtimeMinutes > 0) subStatus = 'hora_extra';
+    else if (bankBalance > 0) subStatus = 'banco_positivo';
   }
 
   // Folga nunca gera banco negativo
@@ -262,8 +322,18 @@ export function evaluateDay(
     bankBalance = 0;
   }
 
+  // Aplicar modo de desconto para evitar dupla penalidade em atrasos/saídas antecipadas
+  // No modo 'financeiro', atrasos/saídas antecipadas são descontados em folha:
+  //   o banco não deve ficar negativo só por causa deles (worked < expected porque chegou tarde).
+  if (discountMode === 'financeiro' && bankBalance < 0 && (delayMinutes > 0 || earlyExitMinutes > 0)) {
+    // Zera a parte negativa correspondente aos atrasos/saídas (já será cobrada em $)
+    bankBalance = Math.max(bankBalance + (delayMinutes + earlyExitMinutes), bankBalance);
+    if (bankBalance > 0) bankBalance = 0;
+  }
+
   return {
     status,
+    subStatus,
     inconsistencies: incons,
     expectedMinutes,
     workedMinutes,
