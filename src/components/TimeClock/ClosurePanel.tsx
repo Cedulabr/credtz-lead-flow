@@ -306,6 +306,44 @@ export function ClosurePanel() {
         </CardContent>
       </Card>
 
+      <Dialog open={!!pendingPreview} onOpenChange={(o) => { if (!o) { setPendingPreview(null); setForceClose(false); } }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-500" /> Pendências encontradas
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Existem <strong>{pendingPreview?.length || 0}</strong> dia(s) com inconsistências críticas no período. Recomenda-se regularizar antes do fechamento (ex.: solicitar ajuste de batidas faltantes).
+            </p>
+            <div className="max-h-72 overflow-y-auto border rounded-lg divide-y">
+              {(pendingPreview || []).map((p, i) => (
+                <div key={i} className="p-2 text-xs flex justify-between gap-2">
+                  <div>
+                    <div className="font-medium">{p.user}</div>
+                    <div className="text-muted-foreground">{p.reason}</div>
+                  </div>
+                  <Badge variant="destructive">{p.date}</Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setPendingPreview(null); setForceClose(false); }}>
+              Cancelar e revisar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => { setForceClose(true); setPendingPreview(null); setTimeout(() => closePeriod(), 50); }}
+              disabled={busy}
+            >
+              Fechar mesmo assim
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!reopenTarget} onOpenChange={(o) => !o && setReopenTarget(null)}>
         <DialogContent>
           <DialogHeader>
