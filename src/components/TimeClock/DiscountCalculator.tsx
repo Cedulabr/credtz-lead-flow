@@ -83,7 +83,7 @@ export function DiscountCalculator() {
 
     const [profilesRes, salariesRes, schedulesRes, recordsRes, dayOffsRes, justRes, hbSettingsRes] = await Promise.all([
       supabase.from('profiles').select('id, name, email').in('id', userIds).eq('is_active', true),
-      supabase.from('employee_salaries').select('*').in('user_id', userIds).eq('is_active', true),
+      (supabase as any).rpc('get_salaries_at', { p_user_ids: userIds, p_company_id: selectedCompanyId, p_date: endDate }),
       supabase.from('time_clock_schedules').select('*').in('user_id', userIds).eq('is_active', true),
       supabase.from('time_clock').select('*').in('user_id', userIds).gte('clock_date', startDate).lte('clock_date', endDate).order('clock_time', { ascending: true }),
       supabase.from('time_clock_day_offs').select('*').in('user_id', userIds).gte('off_date', startDate).lte('off_date', endDate),
