@@ -355,16 +355,21 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         }).length || 22;
         const valorHora = base / (dailyHours * businessDays);
         const valorDia = valorHora * dailyHours;
-        const descAtrasos = ((summary.delay + summary.earlyExit) / 60) * valorHora;
-        const descFaltas = summary.absences * valorDia;
-        const descPendentes = summary.pending * valorDia;
+        const descAtrasosBruto = ((summary.delay + summary.earlyExit) / 60) * valorHora;
+        const descFaltasBruto = summary.absences * valorDia;
+        const descPendentesBruto = summary.pending * valorDia;
+        // Aplicar modo de desconto
+        const descAtrasos = discountMode === 'banco' ? 0 : descAtrasosBruto;
+        const descFaltas = discountMode === 'banco' ? 0 : descFaltasBruto;
+        const descPendentes = discountMode === 'banco' ? 0 : descPendentesBruto;
         const desconto = descAtrasos + descFaltas + descPendentes;
         const liquido = Math.max(0, base - desconto);
         const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const modoLabel = discountMode === 'financeiro' ? 'Financeiro' : discountMode === 'banco' ? 'Banco' : 'Misto';
         doc.setTextColor(...NAVY);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
-        doc.text(safe(`Valor/hora: R$ ${fmt(valorHora)}  ·  Valor/dia: R$ ${fmt(valorDia)}  ·  Dias úteis: ${businessDays}`), 12, afterY);
+        doc.text(safe(`Modo de desconto: ${modoLabel}  ·  Valor/hora: R$ ${fmt(valorHora)}  ·  Valor/dia: R$ ${fmt(valorDia)}  ·  Dias úteis: ${businessDays}`), 12, afterY);
         afterY += 5;
         doc.text(
           safe(`Desc. faltas (${summary.absences}): R$ ${fmt(descFaltas)}  ·  Desc. atrasos/saídas: R$ ${fmt(descAtrasos)}  ·  Desc. pendentes (${summary.pending}): R$ ${fmt(descPendentes)}`),
@@ -383,6 +388,13 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           doc.setFontSize(7);
           doc.setFont('helvetica', 'italic');
           doc.text(safe(`⚠ Existem ${summary.pending} dia(s) pendente(s) de ajuste — desconto provisório, regularize antes do fechamento.`), 12, afterY);
+          afterY += 5;
+        }
+        if (discountMode === 'banco') {
+          doc.setTextColor(180, 30, 30);
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'italic');
+          doc.text(safe(`Modo Banco ativo: faltas e atrasos não geram desconto financeiro — saldo será compensado via banco de horas.`), 12, afterY);
           afterY += 5;
         }
       }
