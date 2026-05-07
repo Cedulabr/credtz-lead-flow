@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Save, Loader2, Settings } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Save, Loader2, Settings, Wallet, Banknote, Layers } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import type { HourBankSettings as HBSettings } from './types';
+import type { HourBankSettings as HBSettings, DiscountMode } from './types';
 
 export function HourBankSettingsPanel() {
   const { toast } = useToast();
