@@ -19,8 +19,11 @@ import {
   formatHM,
   dayStatusLabels,
   dayStatusColor,
+  subStatusLabels,
+  subStatusColor,
   type DayResult,
   type DaySchedule,
+  type DiscountMode,
 } from '@/lib/timeClockEngine';
 import { getBrazilianHolidays } from './brazilianHolidays';
 
