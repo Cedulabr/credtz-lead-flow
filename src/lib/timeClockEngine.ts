@@ -33,6 +33,7 @@ export interface Inconsistency {
     | 'SAIDA_DUPLICADA'
     | 'PAUSA_INCOMPLETA'
     | 'SAIDA_SEM_ENTRADA'
+    | 'ENTRADA_SEM_SAIDA'
     | 'SAIDA_ANTES_ENTRADA'
     | 'PAUSA_INVERTIDA'
     | 'PAUSA_EXCESSIVA'
