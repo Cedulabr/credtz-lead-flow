@@ -288,13 +288,15 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           if (data.section !== 'body') return;
           const r = dayResults[data.row.index];
           if (!r) return;
-          const color = dayStatusColor[r.result.status].pdfRgb;
+          const baseColor = r.result.subStatus
+            ? subStatusColor[r.result.subStatus].pdfRgb
+            : dayStatusColor[r.result.status].pdfRgb;
           if (data.column.index === 9) {
-            data.cell.styles.fillColor = color;
+            data.cell.styles.fillColor = baseColor;
             data.cell.styles.textColor = [30, 30, 30];
           }
           if (r.result.status === 'pendente_ajuste') {
-            data.cell.styles.fillColor = color;
+            data.cell.styles.fillColor = baseColor;
             data.cell.styles.textColor = [127, 29, 29];
           }
         },
