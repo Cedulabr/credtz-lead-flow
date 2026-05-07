@@ -259,7 +259,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           result.delayMinutes > 0 ? formatHM(result.delayMinutes) : '-',
           result.overtimeMinutes > 0 ? formatHM(result.overtimeMinutes) : '-',
           result.bankBalanceMinutes !== 0 ? formatHM(result.bankBalanceMinutes) : '-',
-          dayStatusLabels[result.status],
+          result.subStatus ? subStatusLabels[result.subStatus] : dayStatusLabels[result.status],
           safe(obs).slice(0, 60),
         ];
       });
