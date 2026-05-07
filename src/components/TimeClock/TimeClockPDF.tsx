@@ -191,7 +191,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           .filter((r: any) => r.clock_date === dateStr)
           .map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
         const isHoliday = holidaySet.has(dateStr);
-        const result = evaluateDay(dayRecords, sched, day.getDay(), isHoliday);
+        const result = evaluateDay(dayRecords, sched, day.getDay(), isHoliday, discountMode);
         const off = dayOffMap[dateStr];
         const just = justifications.find((j: any) => j.reference_date === dateStr);
         let obs = '';
