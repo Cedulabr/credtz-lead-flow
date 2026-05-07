@@ -193,6 +193,12 @@ export function TimeClock() {
             <TabsContent value="audit">
               <AuditDashboard />
             </TabsContent>
+            <TabsContent value="closure">
+              <ClosurePanel />
+            </TabsContent>
+            <TabsContent value="trail">
+              <AuditTrail />
+            </TabsContent>
           </>
         )}
       </Tabs>
