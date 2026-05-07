@@ -161,6 +161,8 @@ export interface HourBankEntry {
   created_at: string;
 }
 
+export type DiscountMode = 'financeiro' | 'banco' | 'misto';
+
 export interface HourBankSettings {
   id: string;
   company_id: string | null;
@@ -169,6 +171,7 @@ export interface HourBankSettings {
   max_bank_balance_minutes: number;
   allow_negative_discount: boolean;
   overtime_multiplier: number;
+  discount_mode: DiscountMode;
   created_at: string;
   updated_at: string;
 }
