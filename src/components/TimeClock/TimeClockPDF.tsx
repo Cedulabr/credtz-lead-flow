@@ -148,7 +148,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           .gte('reference_date', startDate).lte('reference_date', endDate),
         supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).maybeSingle(),
         supabase.from('profiles').select('name, email, cpf, role').eq('id', userId).maybeSingle(),
-        supabase.from('employee_salaries').select('*').eq('user_id', userId).eq('is_active', true).maybeSingle(),
+        (supabase as any).rpc('get_salary_at', { p_user_id: userId, p_company_id: null, p_date: endDate }),
         supabase.from('time_clock_day_offs').select('off_date, off_type').eq('user_id', userId)
           .gte('off_date', startDate).lte('off_date', endDate),
         (supabase as any).from("brazilian_holidays").select('holiday_date').gte('holiday_date', startDate).lte('holiday_date', endDate),

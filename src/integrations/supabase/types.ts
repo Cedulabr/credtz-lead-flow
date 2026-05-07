@@ -3873,6 +3873,8 @@ export type Database = {
           cargo: string | null
           company_id: string | null
           created_at: string | null
+          effective_from: string
+          effective_to: string | null
           id: string
           is_active: boolean | null
           updated_at: string | null
@@ -3883,6 +3885,8 @@ export type Database = {
           cargo?: string | null
           company_id?: string | null
           created_at?: string | null
+          effective_from?: string
+          effective_to?: string | null
           id?: string
           is_active?: boolean | null
           updated_at?: string | null
@@ -3893,6 +3897,8 @@ export type Database = {
           cargo?: string | null
           company_id?: string | null
           created_at?: string | null
+          effective_from?: string
+          effective_to?: string | null
           id?: string
           is_active?: boolean | null
           updated_at?: string | null
@@ -10357,6 +10363,35 @@ export type Database = {
           name: string
         }[]
       }
+      get_salaries_at: {
+        Args: { p_company_id: string; p_date: string; p_user_ids: string[] }
+        Returns: {
+          base_salary: number
+          cargo: string
+          user_id: string
+        }[]
+      }
+      get_salary_at: {
+        Args: { p_company_id: string; p_date: string; p_user_id: string }
+        Returns: {
+          base_salary: number
+          cargo: string | null
+          company_id: string | null
+          created_at: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          is_active: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "employee_salaries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_televendas_sales_ranking: {
         Args: { p_company_id: string; p_end_date: string; p_start_date: string }
         Returns: {
@@ -10478,6 +10513,33 @@ export type Database = {
       recalc_user_day: {
         Args: { _date: string; _user_id: string }
         Returns: undefined
+      }
+      register_salary_change: {
+        Args: {
+          p_company_id: string
+          p_effective_from: string
+          p_new_cargo: string
+          p_new_salary: number
+          p_user_id: string
+        }
+        Returns: {
+          base_salary: number
+          cargo: string | null
+          company_id: string | null
+          created_at: string | null
+          effective_from: string
+          effective_to: string | null
+          id: string
+          is_active: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "employee_salaries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       release_expired_blacklisted_leads: { Args: never; Returns: Json }
       remove_baseoff_duplicates: { Args: never; Returns: number }
