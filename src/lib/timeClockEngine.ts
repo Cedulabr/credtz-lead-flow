@@ -8,6 +8,7 @@ export type DayStatus =
   | 'ok'
   | 'observacao'
   | 'pendente_ajuste'
+  | 'ajuste_parcial'
   | 'justificado'
   | 'falta'
   | 'feriado'
