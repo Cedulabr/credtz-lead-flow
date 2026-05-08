@@ -111,18 +111,20 @@ export function computePayrollRow(
   const valorHora = user.salary > 0 ? user.salary / (user.dailyHours * businessDays) : 0;
   const valorDia = valorHora * user.dailyHours;
 
+  // Apenas faltas reais "consomem" minutos esperados — pendências/ajustes parciais
+  // continuam contabilizando a diferença real como horas negativas (sem dia integral).
   const negativeMinutes = Math.max(
     0,
-    summary.expected - summary.worked - (summary.absences + summary.pending) * user.dailyHours * 60
+    summary.expected - summary.worked - summary.absences * user.dailyHours * 60
   );
 
   let discountNegativeHours = 0;
   let discountAbsences = 0;
   if (discountMode === 'financeiro') {
     discountNegativeHours = (negativeMinutes / 60) * valorHora;
-    discountAbsences = (summary.absences + summary.pending) * valorDia;
+    discountAbsences = summary.absences * valorDia;
   } else if (discountMode === 'misto') {
-    discountAbsences = (summary.absences + summary.pending) * valorDia;
+    discountAbsences = summary.absences * valorDia;
   }
   const totalDiscount = discountNegativeHours + discountAbsences;
   const netEstimated = Math.max(0, user.salary - totalDiscount);
@@ -136,6 +138,7 @@ export function computePayrollRow(
     negativeMinutes,
     absences: summary.absences,
     pending: summary.pending,
+    partialPending: summary.partialPending,
     dayOffs: summary.dayOffs,
     holidays: summary.holidays,
     delayMinutes: summary.delay,
