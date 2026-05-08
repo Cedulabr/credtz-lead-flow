@@ -322,17 +322,18 @@ export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
     return sorted;
   }, [pendings, filterUserId, filterProblem, sortMode]);
 
-  const allVisibleSelected = filteredPendings.length > 0 &&
-    filteredPendings.every(p => selected.has(`${p.user_id}|${p.date}|${p.problem}`));
+  const actionable = filteredPendings.filter(p => !p.blocked);
+  const allVisibleSelected = actionable.length > 0 &&
+    actionable.every(p => selected.has(`${p.user_id}|${p.date}|${p.problem}`));
 
   const toggleAll = () => {
     if (allVisibleSelected) {
       const keep = new Set(selected);
-      filteredPendings.forEach(p => keep.delete(`${p.user_id}|${p.date}|${p.problem}`));
+      actionable.forEach(p => keep.delete(`${p.user_id}|${p.date}|${p.problem}`));
       setSelected(keep);
     } else {
       const next = new Set(selected);
-      filteredPendings.forEach(p => next.add(`${p.user_id}|${p.date}|${p.problem}`));
+      actionable.forEach(p => next.add(`${p.user_id}|${p.date}|${p.problem}`));
       setSelected(next);
     }
   };
