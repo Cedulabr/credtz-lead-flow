@@ -247,7 +247,8 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         const fmtTime = (r: any) => {
           if (!r) return '-';
           const t = r.clock_time;
-          return t.includes('T') ? format(parseISO(t), 'HH:mm') : String(t).slice(0, 5);
+          const hhmm = t.includes('T') ? format(parseISO(t), 'HH:mm') : String(t).slice(0, 5);
+          return r.status === 'ajustado' ? `${hhmm}*` : hhmm;
         };
         return [
           format(date, 'dd/MM/yyyy'),
@@ -397,6 +398,15 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           doc.text(safe(`Modo Banco ativo: faltas e atrasos não geram desconto financeiro — saldo será compensado via banco de horas.`), 12, afterY);
           afterY += 5;
         }
+      }
+
+      // Legenda de batidas ajustadas
+      if (records.some((r: any) => r.status === 'ajustado')) {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(7);
+        doc.setTextColor(80, 80, 80);
+        doc.text(safe('* Batida ajustada por gestor/administrador via solicitação aprovada.'), 12, afterY);
+        afterY += 5;
       }
 
       // QR + assinatura + persistir validação
