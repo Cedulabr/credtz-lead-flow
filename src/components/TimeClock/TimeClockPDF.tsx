@@ -247,7 +247,8 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         const fmtTime = (r: any) => {
           if (!r) return '-';
           const t = r.clock_time;
-          return t.includes('T') ? format(parseISO(t), 'HH:mm') : String(t).slice(0, 5);
+          const hhmm = t.includes('T') ? format(parseISO(t), 'HH:mm') : String(t).slice(0, 5);
+          return r.status === 'ajustado' ? `${hhmm}*` : hhmm;
         };
         return [
           format(date, 'dd/MM/yyyy'),
