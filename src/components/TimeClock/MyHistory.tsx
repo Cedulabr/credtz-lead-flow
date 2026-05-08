@@ -20,6 +20,20 @@ interface MyHistoryProps {
   isAdmin?: boolean;
 }
 
+interface DayOff {
+  user_id: string;
+  off_date: string;
+  off_type: string;
+  is_partial_day: boolean | null;
+}
+
+interface Justification {
+  user_id: string;
+  reference_date: string;
+  justification_type: string;
+  status: string;
+}
+
 interface DailyGroup {
   date: string;
   records: TimeClock[];
@@ -28,6 +42,8 @@ interface DailyGroup {
   delayMinutes: number;
   status: TimeClockStatus;
   userName?: string;
+  overrideLabel?: string;
+  overrideTone?: string;
 }
 
 export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps) {
@@ -37,6 +53,8 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
   const [loading, setLoading] = useState(false);
   const [companyData, setCompanyData] = useState<{ name: string; cnpj: string | null }>({ name: '', cnpj: null });
   const [schedules, setSchedules] = useState<Record<string, DaySchedule>>({});
+  const [daysOff, setDaysOff] = useState<DayOff[]>([]);
+  const [justifications, setJustifications] = useState<Justification[]>([]);
 
   // Admin filters
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
@@ -173,29 +191,48 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
   const loadHistory = async () => {
     setLoading(true);
 
-    if (isAdmin && selectedUserId === 'all') {
-      const targetUserIds = companyUsers.map(u => u.id);
+    const targetUserIds = isAdmin && selectedUserId === 'all'
+      ? companyUsers.map(u => u.id)
+      : [activeUserId].filter(Boolean) as string[];
 
-      if (targetUserIds.length === 0) {
-        setHistory([]);
-        setLoading(false);
-        return;
-      }
-
-      const { data } = await supabase
-        .from('time_clock')
-        .select('*')
-        .in('user_id', targetUserIds)
-        .gte('clock_date', startDate)
-        .lte('clock_date', endDate)
-        .order('clock_date', { ascending: false })
-        .order('clock_time', { ascending: true });
-
-      setHistory(data || []);
-    } else {
-      const data = await getUserHistory(startDate, endDate);
-      setHistory(data);
+    if (targetUserIds.length === 0) {
+      setHistory([]);
+      setDaysOff([]);
+      setJustifications([]);
+      setLoading(false);
+      return;
     }
+
+    const [historyRes, daysOffRes, justRes] = await Promise.all([
+      isAdmin && selectedUserId === 'all'
+        ? supabase
+            .from('time_clock')
+            .select('*')
+            .in('user_id', targetUserIds)
+            .gte('clock_date', startDate)
+            .lte('clock_date', endDate)
+            .order('clock_date', { ascending: false })
+            .order('clock_time', { ascending: true })
+            .then(r => ({ data: r.data || [] }))
+        : getUserHistory(startDate, endDate).then(d => ({ data: d })),
+      supabase
+        .from('time_clock_day_offs')
+        .select('user_id, off_date, off_type, is_partial_day')
+        .in('user_id', targetUserIds)
+        .gte('off_date', startDate)
+        .lte('off_date', endDate),
+      supabase
+        .from('time_clock_justifications')
+        .select('user_id, reference_date, justification_type, status')
+        .in('user_id', targetUserIds)
+        .gte('reference_date', startDate)
+        .lte('reference_date', endDate)
+        .eq('status', 'approved'),
+    ]);
+
+    setHistory((historyRes as any).data || []);
+    setDaysOff((daysOffRes.data as DayOff[]) || []);
+    setJustifications((justRes.data as Justification[]) || []);
     setLoading(false);
   };
 
@@ -207,24 +244,46 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
 
   const showAllUsers = isAdmin && selectedUserId === 'all';
 
-  const groupByDate = (): DailyGroup[] => {
-    const groupKey = (record: TimeClock) =>
-      showAllUsers ? `${record.clock_date}__${record.user_id}` : record.clock_date;
+  const offTypeLabels: Record<string, string> = {
+    folga: 'Folga', ferias: 'Férias', atestado: 'Atestado',
+    licenca: 'Licença', feriado: 'Feriado', outro: 'Folga',
+  };
+  const justTypeLabels: Record<string, string> = {
+    medical: 'Atestado', personal: 'Pessoal', vacation: 'Férias',
+    sick_leave: 'Licença Médica', other: 'Justificado',
+  };
 
-    const groups: Record<string, TimeClock[]> = {};
+  const groupByDate = (): DailyGroup[] => {
+    const groupKey = (userId: string, date: string) =>
+      showAllUsers ? `${date}__${userId}` : date;
+
+    const groups: Record<string, { date: string; userId: string; records: TimeClock[] }> = {};
+
     history.forEach((record) => {
-      const key = groupKey(record);
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(record);
+      const key = groupKey(record.user_id, record.clock_date);
+      if (!groups[key]) groups[key] = { date: record.clock_date, userId: record.user_id, records: [] };
+      groups[key].records.push(record);
     });
 
-    return Object.entries(groups).map(([key, records]) => {
-      const date = records[0].clock_date;
-      const recordUserId = records[0].user_id;
-      const dayOfWeek = new Date(date + 'T12:00:00').getDay();
-      const userSchedule = schedules[recordUserId] || null;
+    // Inject virtual groups for day-offs / justifications when no clock records exist
+    const ensureVirtual = (userId: string, date: string) => {
+      const key = groupKey(userId, date);
+      if (!groups[key]) groups[key] = { date, userId, records: [] };
+    };
+    daysOff.forEach(d => ensureVirtual(d.user_id, d.off_date));
+    justifications.forEach(j => ensureVirtual(j.user_id, j.reference_date));
 
-      const metrics = calculateDayMetrics(records, userSchedule, dayOfWeek);
+    const dayOffMap = new Map<string, DayOff>();
+    daysOff.forEach(d => dayOffMap.set(`${d.user_id}__${d.off_date}`, d));
+    const justMap = new Map<string, Justification>();
+    justifications.forEach(j => justMap.set(`${j.user_id}__${j.reference_date}`, j));
+
+    return Object.values(groups).map(({ date, userId, records }) => {
+      const dayOfWeek = new Date(date + 'T12:00:00').getDay();
+      const userSchedule = schedules[userId] || null;
+      const metrics = records.length > 0
+        ? calculateDayMetrics(records, userSchedule, dayOfWeek)
+        : { workedMinutes: 0, breakMinutes: 0, delayMinutes: 0 };
 
       let status: TimeClockStatus = 'pendente';
       const entrada = records.find(r => r.clock_type === 'entrada');
@@ -235,6 +294,24 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
         status = 'incompleto';
       }
 
+      // Override por folga / justificativa
+      const off = dayOffMap.get(`${userId}__${date}`);
+      const just = justMap.get(`${userId}__${date}`);
+      let overrideLabel: string | undefined;
+      let overrideTone: string | undefined;
+      if (off && !off.is_partial_day) {
+        overrideLabel = offTypeLabels[off.off_type] || 'Folga';
+        overrideTone = 'bg-purple-100 text-purple-800';
+        status = 'completo';
+      } else if (just && records.length === 0) {
+        overrideLabel = justTypeLabels[just.justification_type] || 'Justificado';
+        overrideTone = 'bg-blue-100 text-blue-800';
+        status = 'completo';
+      } else if (off && off.is_partial_day) {
+        overrideLabel = `${offTypeLabels[off.off_type] || 'Folga'} parcial`;
+        overrideTone = 'bg-purple-50 text-purple-700';
+      }
+
       return {
         date,
         records,
@@ -242,7 +319,9 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
         breakMinutes: metrics.breakMinutes,
         delayMinutes: metrics.delayMinutes,
         status,
-        userName: showAllUsers ? (userNameMap[recordUserId] || 'Desconhecido') : undefined,
+        userName: showAllUsers ? (userNameMap[userId] || 'Desconhecido') : undefined,
+        overrideLabel,
+        overrideTone,
       };
     }).sort((a, b) => b.date.localeCompare(a.date));
   };
@@ -388,9 +467,15 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
                       </TableCell>
                       <TableCell>{formatMinutesToHM(group.totalMinutes)}</TableCell>
                       <TableCell>
-                        <Badge className={statusColors[group.status]}>
-                          {statusLabels[group.status]}
-                        </Badge>
+                        {group.overrideLabel ? (
+                          <Badge className={group.overrideTone || 'bg-purple-100 text-purple-800'}>
+                            {group.overrideLabel}
+                          </Badge>
+                        ) : (
+                          <Badge className={statusColors[group.status]}>
+                            {statusLabels[group.status]}
+                          </Badge>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
