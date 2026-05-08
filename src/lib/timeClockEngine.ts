@@ -23,7 +23,23 @@ export type DaySubStatus =
   | 'registro_incompleto'
   | 'banco_positivo'
   | 'hora_extra'
+  | 'folga_parcial'
   | null;
+
+export type DayOffType = 'folga' | 'dsr' | 'escala_off' | 'ferias' | 'atestado';
+
+export interface DayOffContext {
+  type: DayOffType;
+  isPartial?: boolean;
+  partialMinutes?: number;
+}
+
+export interface DayContext {
+  isHoliday?: boolean;
+  dayOff?: DayOffContext | null;
+  justified?: boolean;
+  minBreakMinutes?: number;
+}
 
 export type DiscountMode = 'financeiro' | 'banco' | 'misto';
 
