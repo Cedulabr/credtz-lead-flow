@@ -102,6 +102,7 @@ export const inconsistencyLabels: Record<Inconsistency['code'], string> = {
   JORNADA_EXCESSIVA: 'Jornada acima de 12 horas',
   BATIDA_DUPLICADA: 'Batidas duplicadas no mesmo minuto',
   HORARIO_INVALIDO: 'Horário fora do intervalo válido',
+  INTERVALO_INVALIDO: 'Intervalo de pausa abaixo do mínimo legal',
 };
 
 export const dayStatusLabels: Record<DayStatus, string> = {
@@ -124,6 +125,7 @@ export const subStatusLabels: Record<Exclude<DaySubStatus, null>, string> = {
   registro_incompleto: 'Registro Incompleto',
   banco_positivo: 'Banco Positivo',
   hora_extra: 'Hora Extra',
+  folga_parcial: 'Folga Parcial',
 };
 
 export const subStatusColor: Record<Exclude<DaySubStatus, null>, { bg: string; text: string; border: string; pdfRgb: [number, number, number] }> = {
@@ -135,6 +137,7 @@ export const subStatusColor: Record<Exclude<DaySubStatus, null>, { bg: string; t
   registro_incompleto:     { bg: 'bg-red-100',     text: 'text-red-800',      border: 'border-red-300',      pdfRgb: [254, 226, 226] },
   banco_positivo:          { bg: 'bg-green-50',    text: 'text-green-700',    border: 'border-green-200',    pdfRgb: [240, 253, 244] },
   hora_extra:              { bg: 'bg-emerald-100', text: 'text-emerald-800',  border: 'border-emerald-300',  pdfRgb: [209, 250, 229] },
+  folga_parcial:           { bg: 'bg-slate-100',   text: 'text-slate-700',    border: 'border-slate-300',    pdfRgb: [241, 245, 249] },
 };
 
 export const dayStatusColor: Record<DayStatus, { bg: string; text: string; border: string; pdfRgb: [number, number, number] }> = {
