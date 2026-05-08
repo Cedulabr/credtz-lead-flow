@@ -152,6 +152,7 @@ export const dayStatusColor: Record<DayStatus, { bg: string; text: string; borde
   ok:               { bg: 'bg-green-100',  text: 'text-green-800',  border: 'border-green-300',  pdfRgb: [220, 252, 231] },
   observacao:       { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300', pdfRgb: [254, 249, 195] },
   pendente_ajuste:  { bg: 'bg-red-100',    text: 'text-red-800',    border: 'border-red-300',    pdfRgb: [254, 226, 226] },
+  ajuste_parcial:   { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300', pdfRgb: [255, 237, 213] },
   justificado:      { bg: 'bg-blue-100',   text: 'text-blue-800',   border: 'border-blue-300',   pdfRgb: [219, 234, 254] },
   falta:            { bg: 'bg-gray-200',   text: 'text-gray-800',   border: 'border-gray-300',   pdfRgb: [229, 231, 235] },
   feriado:          { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300', pdfRgb: [243, 232, 255] },
