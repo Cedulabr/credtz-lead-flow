@@ -247,8 +247,6 @@ export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
             justified: justSet.has(k),
           });
           if (result.status !== 'pendente_ajuste' && result.status !== 'ajuste_parcial') continue;
-          // Skip blocked rows entirely so the panel only surfaces actionable items
-          if (isBlocked) continue;
 
           const types = new Set(recs.map(r => r.clock_type));
           const inicios = recs.filter(r => r.clock_type === 'pausa_inicio').length;
