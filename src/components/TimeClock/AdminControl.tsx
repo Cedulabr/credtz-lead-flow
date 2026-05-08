@@ -33,6 +33,7 @@ export function AdminControl() {
   const [loading, setLoading] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<TimeClock | null>(null);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [photoSignedUrl, setPhotoSignedUrl] = useState<string | null>(null);
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [adjustReason, setAdjustReason] = useState('');
   const [adjustTime, setAdjustTime] = useState('');
