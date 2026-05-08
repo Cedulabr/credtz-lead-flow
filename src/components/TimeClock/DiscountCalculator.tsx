@@ -179,15 +179,17 @@ export function DiscountCalculator() {
       const valorHora = salary > 0 ? salary / (Number(dailyHours) * businessDays) : 0;
       const valorDia = valorHora * Number(dailyHours);
 
-      const negativeMinutes = Math.max(0, summary.expected - summary.worked - (summary.absences + summary.pending) * Number(dailyHours) * 60);
+      // Apenas faltas reais consomem dia integral; pendências/ajustes parciais
+      // são contabilizados como horas negativas reais (sem penalização integral).
+      const negativeMinutes = Math.max(0, summary.expected - summary.worked - summary.absences * Number(dailyHours) * 60);
 
       let discountNegativeHours = 0;
       let discountAbsences = 0;
       if (discountMode === 'financeiro') {
         discountNegativeHours = (negativeMinutes / 60) * valorHora;
-        discountAbsences = (summary.absences + summary.pending) * valorDia;
+        discountAbsences = summary.absences * valorDia;
       } else if (discountMode === 'misto') {
-        discountAbsences = (summary.absences + summary.pending) * valorDia;
+        discountAbsences = summary.absences * valorDia;
       }
       const totalDiscount = discountNegativeHours + discountAbsences;
       const netEstimated = Math.max(0, salary - totalDiscount);
@@ -199,7 +201,7 @@ export function DiscountCalculator() {
         expectedMinutes: summary.expected,
         workedMinutes: summary.worked,
         negativeMinutes,
-        absences: summary.absences + summary.pending,
+        absences: summary.absences,
         dayOffs: summary.dayOffs,
         discountNegativeHours,
         discountAbsences,
