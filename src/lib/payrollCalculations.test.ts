@@ -179,8 +179,25 @@ describe('computePayrollRow', () => {
     expect(row.pending).toBe(1);
   });
 
+  // Helper: gera batidas normais 09-17 nos demais dias úteis (exceto o dia em teste)
+  const fillRest = (excludeDate: string) => {
+    const allWorkDays = [
+      '2026-04-01','2026-04-02','2026-04-03','2026-04-06','2026-04-07',
+      '2026-04-08','2026-04-09','2026-04-10','2026-04-13','2026-04-14',
+      '2026-04-15','2026-04-16','2026-04-17','2026-04-20','2026-04-22',
+      '2026-04-23','2026-04-24','2026-04-27','2026-04-28','2026-04-29','2026-04-30',
+    ];
+    const recs: any[] = [];
+    allWorkDays.filter(d => d !== excludeDate).forEach(d => {
+      recs.push({ clock_date: d, clock_type: 'entrada', clock_time: '09:00:00' });
+      recs.push({ clock_date: d, clock_type: 'saida', clock_time: '17:00:00' });
+    });
+    return recs;
+  };
+
   it('pausa de 1 minuto em dia útil gera AJUSTE PARCIAL (sem desconto integral)', () => {
     const records = [
+      ...fillRest('2026-04-24'),
       { clock_date: '2026-04-24', clock_type: 'entrada', clock_time: '09:00:00' },
       { clock_date: '2026-04-24', clock_type: 'pausa_inicio', clock_time: '12:00:00' },
       { clock_date: '2026-04-24', clock_type: 'pausa_fim', clock_time: '12:01:00' },
@@ -190,17 +207,16 @@ describe('computePayrollRow', () => {
       { ...baseUser, records, dayOffs: [], approvedJustifications: [] },
       periodOpts
     );
-    // não deve cair como pendência integral nem como falta
     expect(row.pending).toBe(0);
     expect(row.partialPending).toBeGreaterThanOrEqual(1);
-    // worked deve ser preservado (~479 min)
     expect(row.workedMinutes).toBeGreaterThanOrEqual(470);
-    // sem desconto integral por dia
+    expect(row.absences).toBe(0);
     expect(row.discountAbsences).toBe(0);
   });
 
   it('entrada sem saída em dia útil gera PENDENTE_AJUSTE (sem desconto integral)', () => {
     const records = [
+      ...fillRest('2026-04-24'),
       { clock_date: '2026-04-24', clock_type: 'entrada', clock_time: '09:00:00' },
     ];
     const row = computePayrollRow(
@@ -208,15 +224,15 @@ describe('computePayrollRow', () => {
       periodOpts
     );
     expect(row.pending).toBeGreaterThanOrEqual(1);
-    expect(row.workedMinutes).toBe(0);
-    // não desconta dia inteiro como falta
+    expect(row.absences).toBe(0);
     expect(row.discountAbsences).toBe(0);
-    // mas as horas faltantes do dia entram em horas negativas
+    // diferença de horas vira negative (~ jornada do dia)
     expect(row.negativeMinutes).toBeGreaterThanOrEqual(480);
   });
 
   it('entrada duplicada com saída válida preserva horas trabalhadas', () => {
     const records = [
+      ...fillRest('2026-04-24'),
       { clock_date: '2026-04-24', clock_type: 'entrada', clock_time: '09:00:00' },
       { clock_date: '2026-04-24', clock_type: 'entrada', clock_time: '09:05:00' },
       { clock_date: '2026-04-24', clock_type: 'saida', clock_time: '17:00:00' },
@@ -227,6 +243,7 @@ describe('computePayrollRow', () => {
     );
     expect(row.partialPending).toBeGreaterThanOrEqual(1);
     expect(row.workedMinutes).toBeGreaterThan(0);
+    expect(row.absences).toBe(0);
     expect(row.discountAbsences).toBe(0);
   });
 
