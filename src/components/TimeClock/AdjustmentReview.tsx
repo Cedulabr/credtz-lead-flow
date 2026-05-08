@@ -53,6 +53,7 @@ type PendingRow = {
   suggestedTime: string; // HH:MM
   records: ClockRecord[];
   inconsText: string;
+  blocked?: boolean;
 };
 
 const PROBLEM_LABEL: Record<PendingRow['problem'], string> = {
@@ -116,7 +117,7 @@ export function AdjustmentReview() {
 
     const ids = Array.from(new Set((data || []).map((d: any) => d.user_id)));
     if (ids.length) {
-      const { data: profs } = await (supabase as any).rpc('get_profiles_by_ids', { _user_ids: ids });
+      const { data: profs } = await (supabase as any).rpc('get_profiles_by_ids', { user_ids: ids });
       const map: Record<string, string> = {};
       (profs || []).forEach((p: any) => { map[p.id] = p.name || p.email || p.id; });
       setProfileMap(map);
@@ -147,7 +148,7 @@ export function AdjustmentReview() {
         }
         userIds = Array.from(new Set(userIds));
         if (!userIds.length) { setUsers([]); return; }
-        const { data: profs } = await (supabase as any).rpc('get_profiles_by_ids', { _user_ids: userIds });
+        const { data: profs } = await (supabase as any).rpc('get_profiles_by_ids', { user_ids: userIds });
         const list = (profs || []).map((p: any) => ({
           id: p.id,
           name: p.name || p.email || p.id,
