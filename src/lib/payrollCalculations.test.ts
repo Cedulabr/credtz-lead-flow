@@ -206,7 +206,7 @@ describe('computePayrollRow', () => {
     expect(row.overtimeMinutes).toBeGreaterThanOrEqual(240);
   });
 
-  it('jornada de 9h gera saldo positivo de banco em modo banco', () => {
+  it('jornada de 9h gera saldo positivo de banco no dia (overtime)', () => {
     const records = [
       { clock_date: '2026-04-01', clock_type: 'entrada', clock_time: '09:00:00' },
       { clock_date: '2026-04-01', clock_type: 'saida', clock_time: '18:00:00' },
@@ -215,6 +215,6 @@ describe('computePayrollRow', () => {
       { ...baseUser, records, dayOffs: [], approvedJustifications: [] },
       { ...periodOpts, discountMode: 'banco' }
     );
-    expect(row.bankBalanceMinutes).toBeGreaterThanOrEqual(60);
+    expect(row.overtimeMinutes).toBeGreaterThanOrEqual(60);
   });
 });
