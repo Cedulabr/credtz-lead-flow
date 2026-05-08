@@ -384,11 +384,17 @@ export function AdminControl() {
             </DialogDescription>
           </DialogHeader>
           {selectedRecord?.photo_url && (
-            <img
-              src={selectedRecord.photo_url}
-              alt="Foto do ponto"
-              className="w-full rounded-lg"
-            />
+            photoSignedUrl ? (
+              <img
+                src={photoSignedUrl}
+                alt="Foto do ponto"
+                className="w-full rounded-lg"
+              />
+            ) : (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            )
           )}
           {selectedRecord?.latitude && selectedRecord?.longitude && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
