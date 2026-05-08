@@ -253,7 +253,7 @@ export function AdjustmentReview() {
           const ds = format(day, 'yyyy-MM-dd');
           if (ds > todayStr) continue;
           const k = `${u.id}|${ds}`;
-          if (blockedSet.has(k)) continue;
+          const isBlocked = blockedSet.has(k);
           const recs = recordsByUserDate[k] || [];
           const dow = day.getDay();
           const off = dayOffMap.get(k);
@@ -303,6 +303,7 @@ export function AdjustmentReview() {
             suggestedTime,
             records: recs,
             inconsText: result.inconsistencies.map(i => i.message).join(' • '),
+            blocked: isBlocked,
           });
         }
       }
@@ -335,17 +336,18 @@ export function AdjustmentReview() {
     return sorted;
   }, [pendings, filterUserId, filterProblem, sortMode]);
 
-  const allVisibleSelected = filteredPendings.length > 0 &&
-    filteredPendings.every(p => selected.has(`${p.user_id}|${p.date}|${p.problem}`));
+  const actionablePendings = filteredPendings.filter(p => !p.blocked);
+  const allVisibleSelected = actionablePendings.length > 0 &&
+    actionablePendings.every(p => selected.has(`${p.user_id}|${p.date}|${p.problem}`));
 
   const toggleAll = () => {
     if (allVisibleSelected) {
       const keep = new Set(selected);
-      filteredPendings.forEach(p => keep.delete(`${p.user_id}|${p.date}|${p.problem}`));
+      actionablePendings.forEach(p => keep.delete(`${p.user_id}|${p.date}|${p.problem}`));
       setSelected(keep);
     } else {
       const next = new Set(selected);
-      filteredPendings.forEach(p => next.add(`${p.user_id}|${p.date}|${p.problem}`));
+      actionablePendings.forEach(p => next.add(`${p.user_id}|${p.date}|${p.problem}`));
       setSelected(next);
     }
   };
