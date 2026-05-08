@@ -20,6 +20,20 @@ interface MyHistoryProps {
   isAdmin?: boolean;
 }
 
+interface DayOff {
+  user_id: string;
+  off_date: string;
+  off_type: string;
+  is_partial_day: boolean | null;
+}
+
+interface Justification {
+  user_id: string;
+  reference_date: string;
+  justification_type: string;
+  status: string;
+}
+
 interface DailyGroup {
   date: string;
   records: TimeClock[];
@@ -28,6 +42,8 @@ interface DailyGroup {
   delayMinutes: number;
   status: TimeClockStatus;
   userName?: string;
+  overrideLabel?: string;
+  overrideTone?: string;
 }
 
 export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps) {
