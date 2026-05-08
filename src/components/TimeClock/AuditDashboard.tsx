@@ -35,6 +35,8 @@ export function AuditDashboard() {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [photoLoading, setPhotoLoading] = useState(false);
   
   // Re-audit state
   const [reauditing, setReauditing] = useState(false);
