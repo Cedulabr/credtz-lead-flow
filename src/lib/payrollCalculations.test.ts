@@ -53,7 +53,7 @@ describe('computePayrollRow', () => {
       periodOpts
     );
 
-    expect(row.dayOffs).toBe(3);
+    expect(row.dayOffs).toBe(4); // 3 full + 1 parcial
     // 17 dias úteis × 8h = 8160 min, + 20/04 reduzido (480-240=240): total 8400
     expect(row.expectedMinutes).toBe(17 * 480 + 240);
     // worked: 17*8h*60 + 3h*60 = 8340
