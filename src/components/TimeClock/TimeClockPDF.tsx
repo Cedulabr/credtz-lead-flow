@@ -350,7 +350,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       doc.setFont('helvetica', 'normal');
       const cells = [
         [`Trabalhado: ${workedH}`, `Previsto: ${expectedH}`, `Extras: ${overtimeH}`, `Banco: ${bankH}`],
-        [`Atrasos: ${delayH}`, `Saídas Antec.: ${earlyH}`, `Faltas: ${summary.absences}`, `Pendentes: ${summary.pending}`],
+        [`Atrasos: ${delayH}`, `Saídas Antec.: ${earlyH}`, `Faltas: ${summary.absences}`, `Pendentes RH: ${summary.pending} · Ajustes parciais: ${(summary as any).partialPending || 0}`],
       ];
       cells.forEach((line, li) => {
         line.forEach((cell, ci) => {
