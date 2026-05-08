@@ -149,7 +149,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).maybeSingle(),
         supabase.from('profiles').select('name, email, cpf, role').eq('id', userId).maybeSingle(),
         (supabase as any).rpc('get_salary_at', { p_user_id: userId, p_company_id: null, p_date: endDate }),
-        supabase.from('time_clock_day_offs').select('off_date, off_type').eq('user_id', userId)
+        supabase.from('time_clock_day_offs').select('off_date, off_type, is_partial_day, start_time, end_time').eq('user_id', userId)
           .gte('off_date', startDate).lte('off_date', endDate),
         (supabase as any).from("brazilian_holidays").select('holiday_date').gte('holiday_date', startDate).lte('holiday_date', endDate),
         (supabase as any).from('hour_bank_settings').select('discount_mode').limit(1).maybeSingle(),
@@ -161,18 +161,19 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const schedule = scheduleRes.data as any;
       const profile = profileRes.data as any;
       const salary = salaryRes.data as any;
-      const dayOffMap: Record<string, string> = {};
-      (dayOffsRes.data || []).forEach((d: any) => { dayOffMap[d.off_date] = d.off_type; });
+      const dayOffMap: Record<string, any> = {};
+      (dayOffsRes.data || []).forEach((d: any) => { dayOffMap[d.off_date] = d; });
       const holidaySet = new Set<string>((holidaysRes.data || []).map((h: any) => h.holiday_date));
-      // Fundir feriados nacionais calculados (Meeus/Jones/Butcher) — cobrir feriados ausentes do DB
       const periodYear = parseISO(startDate).getFullYear();
       getBrazilianHolidays(periodYear).forEach(h => {
         if (h.date >= startDate && h.date <= endDate) holidaySet.add(h.date);
       });
-      // Day offs marcados como 'feriado' também contam
-      Object.entries(dayOffMap).forEach(([date, type]) => {
-        if (type === 'feriado') holidaySet.add(date);
+      Object.entries(dayOffMap).forEach(([date, d]: [string, any]) => {
+        if (d.off_type === 'feriado') holidaySet.add(date);
       });
+      const justifiedSet = new Set<string>(
+        justifications.filter((j: any) => j.status === 'approved').map((j: any) => j.reference_date)
+      );
 
       const sched: DaySchedule | null = schedule
         ? {
@@ -184,18 +185,36 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           }
         : null;
 
+      const buildDayContext = (dateStr: string) => {
+        const off = dayOffMap[dateStr];
+        let dayOff: any = null;
+        if (off && off.off_type !== 'feriado') {
+          let partialMinutes = 0;
+          if (off.is_partial_day && off.start_time && off.end_time) {
+            const [sh, sm] = String(off.start_time).split(':').map(Number);
+            const [eh, em] = String(off.end_time).split(':').map(Number);
+            partialMinutes = Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+          }
+          dayOff = { type: off.off_type, isPartial: !!off.is_partial_day, partialMinutes };
+        }
+        return {
+          isHoliday: holidaySet.has(dateStr),
+          dayOff,
+          justified: justifiedSet.has(dateStr),
+        };
+      };
+
       const days = eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) });
       const dayResults: { date: Date; result: DayResult; obs: string }[] = days.map((day) => {
         const dateStr = format(day, 'yyyy-MM-dd');
         const dayRecords = records
           .filter((r: any) => r.clock_date === dateStr)
           .map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
-        const isHoliday = holidaySet.has(dateStr);
-        const result = evaluateDay(dayRecords, sched, day.getDay(), isHoliday, discountMode);
+        const result = evaluateDay(dayRecords, sched, day.getDay(), buildDayContext(dateStr), discountMode);
         const off = dayOffMap[dateStr];
         const just = justifications.find((j: any) => j.reference_date === dateStr);
         let obs = '';
-        if (off) obs = off.toUpperCase();
+        if (off) obs = String(off.off_type).toUpperCase() + (off.is_partial_day ? ' (PARCIAL)' : '');
         else if (just) obs = `${(just as any).status === 'approved' ? '✓' : (just as any).status === 'rejected' ? '✗' : '⏳'} ${(just as any).justification_type}`;
         else if (result.inconsistencies.length > 0) obs = result.inconsistencies.map(i => i.message).join(' • ');
         return { date: day, result, obs };
