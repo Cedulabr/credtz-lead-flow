@@ -573,7 +573,17 @@ export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
           {pendingsLoading ? (
             <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : filteredPendings.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-6 text-center">Nenhuma pendência encontrada no período. ✓</p>
+            <div className="py-6 text-center space-y-2">
+              <p className="text-sm text-muted-foreground">Nenhuma pendência encontrada no período. ✓</p>
+              {pendings.length > 0 && (filterUserId !== 'all' || filterProblem !== 'all') && (
+                <div className="text-xs text-muted-foreground">
+                  Há {pendings.length} pendência(s) ocultas pelos filtros.{' '}
+                  <button className="underline" onClick={() => { setFilterUserId('all'); setFilterProblem('all'); }}>
+                    Limpar filtros
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="space-y-2">
               {filteredPendings.map((p) => {
