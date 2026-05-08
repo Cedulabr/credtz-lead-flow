@@ -191,29 +191,48 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
   const loadHistory = async () => {
     setLoading(true);
 
-    if (isAdmin && selectedUserId === 'all') {
-      const targetUserIds = companyUsers.map(u => u.id);
+    const targetUserIds = isAdmin && selectedUserId === 'all'
+      ? companyUsers.map(u => u.id)
+      : [activeUserId].filter(Boolean) as string[];
 
-      if (targetUserIds.length === 0) {
-        setHistory([]);
-        setLoading(false);
-        return;
-      }
-
-      const { data } = await supabase
-        .from('time_clock')
-        .select('*')
-        .in('user_id', targetUserIds)
-        .gte('clock_date', startDate)
-        .lte('clock_date', endDate)
-        .order('clock_date', { ascending: false })
-        .order('clock_time', { ascending: true });
-
-      setHistory(data || []);
-    } else {
-      const data = await getUserHistory(startDate, endDate);
-      setHistory(data);
+    if (targetUserIds.length === 0) {
+      setHistory([]);
+      setDaysOff([]);
+      setJustifications([]);
+      setLoading(false);
+      return;
     }
+
+    const [historyRes, daysOffRes, justRes] = await Promise.all([
+      isAdmin && selectedUserId === 'all'
+        ? supabase
+            .from('time_clock')
+            .select('*')
+            .in('user_id', targetUserIds)
+            .gte('clock_date', startDate)
+            .lte('clock_date', endDate)
+            .order('clock_date', { ascending: false })
+            .order('clock_time', { ascending: true })
+            .then(r => ({ data: r.data || [] }))
+        : getUserHistory(startDate, endDate).then(d => ({ data: d })),
+      supabase
+        .from('time_clock_day_offs')
+        .select('user_id, off_date, off_type, is_partial_day')
+        .in('user_id', targetUserIds)
+        .gte('off_date', startDate)
+        .lte('off_date', endDate),
+      supabase
+        .from('time_clock_justifications')
+        .select('user_id, reference_date, justification_type, status')
+        .in('user_id', targetUserIds)
+        .gte('reference_date', startDate)
+        .lte('reference_date', endDate)
+        .eq('status', 'approved'),
+    ]);
+
+    setHistory((historyRes as any).data || []);
+    setDaysOff((daysOffRes.data as DayOff[]) || []);
+    setJustifications((justRes.data as Justification[]) || []);
     setLoading(false);
   };
 
