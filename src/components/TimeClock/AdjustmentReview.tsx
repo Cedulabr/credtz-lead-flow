@@ -609,7 +609,7 @@ export function AdjustmentReview() {
                   return (
                     <div key={key} className={`border rounded-lg p-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between ${tone}`}>
                       <div className="flex items-start gap-3 min-w-0 flex-1">
-                        <Checkbox checked={isSel} onCheckedChange={() => toggleOne(key)} className="mt-1" />
+                        <Checkbox checked={isSel} onCheckedChange={() => toggleOne(key)} disabled={p.blocked} className="mt-1" />
                         <div className="min-w-0 space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-semibold">{p.user_name}</span>
@@ -623,6 +623,7 @@ export function AdjustmentReview() {
                             {p.suggestedTime && (
                               <Badge variant="outline">sugerido: {p.suggestedTime}</Badge>
                             )}
+                            {p.blocked && <Badge variant="outline">solicitação já existe</Badge>}
                           </div>
                           {p.inconsText && (
                             <p className="text-xs text-muted-foreground line-clamp-2">{p.inconsText}</p>
@@ -635,7 +636,7 @@ export function AdjustmentReview() {
                         </div>
                       </div>
                       <div className="flex shrink-0">
-                        <Button size="sm" variant="outline" onClick={() => startAdjustmentFromPending(p)}>
+                        <Button size="sm" variant="outline" onClick={() => startAdjustmentFromPending(p)} disabled={p.blocked}>
                           <Wand2 className="h-3 w-3 mr-1" />Lançar
                         </Button>
                       </div>
