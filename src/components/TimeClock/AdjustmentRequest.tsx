@@ -70,6 +70,7 @@ interface PendingRow {
   suggestedType: string;
   suggestedTime: string;
   reasonText: string;
+  blocked?: boolean;
 }
 
 export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
