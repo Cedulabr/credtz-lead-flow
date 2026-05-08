@@ -400,6 +400,15 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         }
       }
 
+      // Legenda de batidas ajustadas
+      if (records.some((r: any) => r.status === 'ajustado')) {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(7);
+        doc.setTextColor(80, 80, 80);
+        doc.text(safe('* Batida ajustada por gestor/administrador via solicitação aprovada.'), 12, afterY);
+        afterY += 5;
+      }
+
       // QR + assinatura + persistir validação
       const docHash = await sha256(JSON.stringify({ userId, period: selectedMonth, days: dayResults.length, summary }));
       try {
