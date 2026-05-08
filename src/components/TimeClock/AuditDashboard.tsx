@@ -827,6 +827,21 @@ export function AuditDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={photoOpen} onOpenChange={setPhotoOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Foto do Registro</DialogTitle>
+          </DialogHeader>
+          {photoLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : selectedPhoto ? (
+            <img src={selectedPhoto} alt="Registro" className="w-full rounded-lg" />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
