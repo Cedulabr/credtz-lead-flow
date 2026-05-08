@@ -53,6 +53,8 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
   const [loading, setLoading] = useState(false);
   const [companyData, setCompanyData] = useState<{ name: string; cnpj: string | null }>({ name: '', cnpj: null });
   const [schedules, setSchedules] = useState<Record<string, DaySchedule>>({});
+  const [daysOff, setDaysOff] = useState<DayOff[]>([]);
+  const [justifications, setJustifications] = useState<Justification[]>([]);
 
   // Admin filters
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
