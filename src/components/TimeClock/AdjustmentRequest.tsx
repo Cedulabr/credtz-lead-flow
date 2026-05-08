@@ -70,6 +70,7 @@ interface PendingRow {
   suggestedType: string;
   suggestedTime: string;
   reasonText: string;
+  blocked?: boolean;
 }
 
 export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
@@ -247,8 +248,6 @@ export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
             justified: justSet.has(k),
           });
           if (result.status !== 'pendente_ajuste' && result.status !== 'ajuste_parcial') continue;
-          // Skip blocked rows entirely so the panel only surfaces actionable items
-          if (isBlocked) continue;
 
           const types = new Set(recs.map(r => r.clock_type));
           const inicios = recs.filter(r => r.clock_type === 'pausa_inicio').length;
@@ -292,6 +291,7 @@ export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
             suggestedType,
             suggestedTime,
             reasonText,
+            blocked: isBlocked,
           });
         }
       }
@@ -322,17 +322,18 @@ export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
     return sorted;
   }, [pendings, filterUserId, filterProblem, sortMode]);
 
-  const allVisibleSelected = filteredPendings.length > 0 &&
-    filteredPendings.every(p => selected.has(`${p.user_id}|${p.date}|${p.problem}`));
+  const actionable = filteredPendings.filter(p => !p.blocked);
+  const allVisibleSelected = actionable.length > 0 &&
+    actionable.every(p => selected.has(`${p.user_id}|${p.date}|${p.problem}`));
 
   const toggleAll = () => {
     if (allVisibleSelected) {
       const keep = new Set(selected);
-      filteredPendings.forEach(p => keep.delete(`${p.user_id}|${p.date}|${p.problem}`));
+      actionable.forEach(p => keep.delete(`${p.user_id}|${p.date}|${p.problem}`));
       setSelected(keep);
     } else {
       const next = new Set(selected);
-      filteredPendings.forEach(p => next.add(`${p.user_id}|${p.date}|${p.problem}`));
+      actionable.forEach(p => next.add(`${p.user_id}|${p.date}|${p.problem}`));
       setSelected(next);
     }
   };
@@ -572,7 +573,17 @@ export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
           {pendingsLoading ? (
             <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : filteredPendings.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-6 text-center">Nenhuma pendência encontrada no período. ✓</p>
+            <div className="py-6 text-center space-y-2">
+              <p className="text-sm text-muted-foreground">Nenhuma pendência encontrada no período. ✓</p>
+              {pendings.length > 0 && (filterUserId !== 'all' || filterProblem !== 'all') && (
+                <div className="text-xs text-muted-foreground">
+                  Há {pendings.length} pendência(s) ocultas pelos filtros.{' '}
+                  <button className="underline" onClick={() => { setFilterUserId('all'); setFilterProblem('all'); }}>
+                    Limpar filtros
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="space-y-2">
               {filteredPendings.map((p) => {
@@ -589,6 +600,7 @@ export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
                         <Checkbox
                           checked={isChecked}
                           onCheckedChange={() => toggleOne(key)}
+                          disabled={p.blocked}
                           className="mt-1"
                         />
                       )}
@@ -604,6 +616,7 @@ export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
                             {p.result.status === 'pendente_ajuste' ? 'Pendente' : 'Ajuste parcial'}
                           </Badge>
                           <Badge variant="outline">{p.problemLabel}</Badge>
+                          {p.blocked && <Badge variant="outline">solicitação já existe</Badge>}
                         </div>
                         {incons && (
                           <p className="text-xs text-muted-foreground line-clamp-2">{incons}</p>
@@ -616,7 +629,7 @@ export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
                       </div>
                     </div>
                     <div className="flex shrink-0">
-                      <Button size="sm" onClick={() => startAdjustment(p)}>
+                      <Button size="sm" onClick={() => startAdjustment(p)} disabled={p.blocked}>
                         <Wand2 className="h-3 w-3 mr-1" />Lançar ajuste
                       </Button>
                     </div>
