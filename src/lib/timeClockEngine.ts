@@ -237,7 +237,6 @@ export function evaluateDay(
 
   // === PRIORIDADE 1: FERIADO ===
   if (isHoliday) {
-    // Trabalho em feriado é hora extra integral, mas nunca gera falta/atraso/desconto.
     if (records && records.length > 0) {
       const worked = computeWorkedMinutes(records);
       return {
@@ -246,15 +245,16 @@ export function evaluateDay(
         subStatus: worked > 0 ? 'hora_extra' : null,
         workedMinutes: worked,
         overtimeMinutes: worked,
+        bankBalanceMinutes: worked,
         expectedMinutes: 0,
+        wasHoliday: true,
       };
     }
-    return { ...empty, status: 'feriado', expectedMinutes: 0 };
+    return { ...empty, status: 'feriado', expectedMinutes: 0, wasHoliday: true };
   }
 
   // === PRIORIDADE 2: FOLGA / DSR / ESCALA OFF / FÉRIAS / ATESTADO (full-day) ===
   if (dayOff && !isPartialOff) {
-    // Mesmo com batidas residuais, NÃO gera falta/desconto/pendência.
     const worked = records && records.length > 0 ? computeWorkedMinutes(records) : 0;
     return {
       ...empty,
@@ -262,25 +262,25 @@ export function evaluateDay(
       subStatus: null,
       expectedMinutes: 0,
       workedMinutes: worked,
-      // Trabalho em folga vai integralmente para banco positivo (compensação).
       overtimeMinutes: worked,
       bankBalanceMinutes: worked,
+      wasDayOff: true,
     };
   }
 
   // === PRIORIDADE 3: JUSTIFICATIVA APROVADA sem registros ===
   if (justified && (!records || records.length === 0)) {
-    return { ...empty, status: 'justificado', expectedMinutes: 0 };
+    return { ...empty, status: 'justificado', expectedMinutes: 0, wasJustified: true };
   }
 
   // === PRIORIDADE 4: FOLGA PARCIAL com expected zerado pela cobertura total ===
   if (isPartialOff && expectedMinutes === 0) {
-    return { ...empty, status: 'folga', subStatus: 'folga_parcial', expectedMinutes: 0 };
+    return { ...empty, status: 'folga', subStatus: 'folga_parcial', expectedMinutes: 0, wasDayOff: true };
   }
 
   // === Sem registros em dia útil ===
   if (!records || records.length === 0) {
-    if (!isWorkDay) return { ...empty, status: 'folga' };
+    if (!isWorkDay) return { ...empty, status: 'sem_jornada' };
     const bankOnAbsence = discountMode === 'banco' ? -expectedMinutes : 0;
     return { ...empty, status: 'falta', bankBalanceMinutes: bankOnAbsence };
   }
