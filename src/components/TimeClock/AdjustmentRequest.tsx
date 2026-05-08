@@ -151,7 +151,7 @@ export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
         }
         userIds = Array.from(new Set(userIds));
         if (!userIds.length) { setUsers([]); return; }
-        const { data: profs } = await (supabase as any).rpc('get_profiles_by_ids', { _user_ids: userIds });
+        const { data: profs } = await (supabase as any).rpc('get_profiles_by_ids', { user_ids: userIds });
         const list = (profs || []).map((p: any) => ({
           id: p.id,
           name: p.name || p.email || p.id,
