@@ -589,6 +589,7 @@ export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
                         <Checkbox
                           checked={isChecked}
                           onCheckedChange={() => toggleOne(key)}
+                          disabled={p.blocked}
                           className="mt-1"
                         />
                       )}
@@ -604,6 +605,7 @@ export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
                             {p.result.status === 'pendente_ajuste' ? 'Pendente' : 'Ajuste parcial'}
                           </Badge>
                           <Badge variant="outline">{p.problemLabel}</Badge>
+                          {p.blocked && <Badge variant="outline">solicitação já existe</Badge>}
                         </div>
                         {incons && (
                           <p className="text-xs text-muted-foreground line-clamp-2">{incons}</p>
@@ -616,7 +618,7 @@ export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
                       </div>
                     </div>
                     <div className="flex shrink-0">
-                      <Button size="sm" onClick={() => startAdjustment(p)}>
+                      <Button size="sm" onClick={() => startAdjustment(p)} disabled={p.blocked}>
                         <Wand2 className="h-3 w-3 mr-1" />Lançar ajuste
                       </Button>
                     </div>
