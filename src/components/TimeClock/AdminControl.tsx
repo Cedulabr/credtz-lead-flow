@@ -332,9 +332,17 @@ export function AdminControl() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => {
+                              onClick={async () => {
                                 setSelectedRecord(record);
+                                setPhotoSignedUrl(null);
                                 setShowPhotoModal(true);
+                                const url = await resolveTimeClockPhotoUrl(record.photo_url);
+                                if (!url) {
+                                  toast.error('Não foi possível abrir a foto');
+                                  setShowPhotoModal(false);
+                                  return;
+                                }
+                                setPhotoSignedUrl(url);
                               }}
                             >
                               <Image className="h-4 w-4" />
