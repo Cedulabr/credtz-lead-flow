@@ -88,7 +88,7 @@ describe('computePayrollRow', () => {
       periodOpts
     );
     expect(rowJust.absences).toBe(0);
-    expect(rowJust.totalDiscount).toBe(0);
+    expect(rowJust.discountAbsences).toBe(0);
   });
 
   it('folga parcial cobrindo 8h zera o dia e conta como folga', () => {
