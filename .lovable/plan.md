@@ -1,63 +1,54 @@
-## Diagnóstico
+# Diagnóstico
 
-Investiguei direto no banco com a Alana (id `8642cf4a…`) e identifiquei o motivo real de a folha não refletir folgas, justificativas nem ajustes:
+Verifiquei o banco de dados:
 
-1. **`recalc_user_day` está falhando em silêncio.**
-   A função referencia `public.brazilian_holidays`, que **não existe** neste projeto. Os logs do Postgres confirmam: `relation "public.brazilian_holidays" does not exist`. Como o corpo termina com `EXCEPTION WHEN OTHERS THEN RAISE NOTICE`, o erro é engolido e o `INSERT` no `time_clock_day_summary` nunca acontece.
-   Resultado: a tabela `time_clock_day_summary` está **com 0 linhas em todo o sistema**, mesmo com triggers ativos em `time_clock`, `time_clock_day_offs`, `time_clock_justifications` e `time_clock_adjustment_requests`. Tudo que depende dela (Painel de Risco, HRDashboard, banco de horas) mostra dados desatualizados.
+- A solicitação aprovada de **27/04 às 09:22 (Adicionar entrada)** **não pertence à Alana Rodrigues**. O `user_id` da solicitação (`a8a1af22…`) é do usuário **Cedula BR** (`cedulabr@gmail.com`), e o registro foi inserido corretamente no ponto dele.
+- A Alana (`8642cf4a…`) **não tem nenhuma solicitação de ajuste** no mês de 04/2026. Por isso o espelho mensal dela continua mostrando a entrada original (12:51) em 27/04.
 
-2. **`recalc_user_day` não lê folgas nem justificativas.**
-   Mesmo quando voltar a funcionar, a versão atual não consulta `time_clock_day_offs` nem `time_clock_justifications` — então o status nunca vira `folga` / `justificado` / `feriado` por essas tabelas. Confirmei rodando manualmente: para 10/04 da Alana (folga lançada) o status final continuaria `falta`.
+A causa raiz é o **fluxo de ajustes**: hoje o formulário `AdjustmentRequest` só permite que o próprio colaborador crie pedidos para si (`user_id = auth.uid()`). Não existe caminho para admin/gestor lançar ajuste em nome de outro colaborador. Quando você abriu a tela e criou o ajuste, ele foi atribuído ao usuário logado (Cedula BR), e foi exatamente esse ponto que mudou — não o da Alana.
 
-3. **Folga parcial não é tratada na folha (`DiscountCalculator.tsx`).**
-   Hoje, qualquer registro em `time_clock_day_offs` faz o dia inteiro ser pulado (zera expected). Para o caso da Alana em 20/04 (folga 12:00–16:00, parcial), o sistema ignora a jornada cheia em vez de subtrair só as 4h da folga parcial.
+O trigger `tg_apply_adjustment_request` e o `recalc_user_day` estão funcionando: registro entra em `time_clock` com `status='ajustado'` e o `time_clock_day_summary` é recalculado. O `TimeClockPDF` (Espelho de Ponto) e o `MyHistory` lêem `time_clock` sem filtro de status, então registros ajustados aparecem normalmente — desde que pertençam ao colaborador correto.
 
-4. **Justificativas “aparecem” na folha, mas como o status calculado é `falta`,** elas só evitam o desconto da falta inteira; não acertam o status nas telas analíticas (que dependem do summary).
+# Plano
 
-5. **Os ajustes da Alana de 27/04** (entrada para 09:00) e a folga de 28/04 estão aplicados na base (entrada às 09:51 BRT, folga registrada), mas como `time_clock_day_summary` está vazio, nenhuma view derivada se atualizou.
+## 1. Lançamento administrativo de ajustes
 
-## Plano
+Adicionar em `AdjustmentReview` (aba "Revisão de Ajustes") um botão **"Lançar ajuste"** disponível para `admin` e `gestor`:
 
-### 1. Backend — migration única
+- Modal com seleção de **colaborador** (lista filtrada por empresa do gestor / todas para admin), data, tipo (`add_entry`, `add_exit`, `add_break_start`, `add_break_end`, `edit_entry`, `edit_exit`, `edit_break_start`, `edit_break_end`, `remove_record`), horário proposto e motivo.
+- Para tipos `edit_*` / `remove_record`, listar batidas existentes do dia para escolher `target_record_id`.
+- Insere em `time_clock_adjustment_requests` já com `status='approved'`, `reviewed_by=auth.uid()`, `reviewed_at=now()`, `reason="Lançamento administrativo: <motivo>"`.
+- O trigger existente `tg_apply_adjustment_request` cuida da inserção/edição em `time_clock`, do log e do `recalc_user_day`.
 
-a) **Reescrever `recalc_user_day`** mantendo a assinatura atual e a chamada via triggers, com estas mudanças:
-- Remover a leitura de `public.brazilian_holidays`. Usar como única fonte de feriado o registro `time_clock_day_offs` com `off_type = 'feriado'` (já existe esse padrão no projeto).
-- Carregar para o dia/usuário:
-  - `time_clock_day_offs` (full-day e partial-day).
-  - `time_clock_justifications` com `status = 'approved'` cobrindo a `reference_date`.
-- Aplicar prioridade de status: `feriado` → `folga`/`ferias` → `justificado` → `falta` → calculado (`pendente_ajuste` / `observacao` / `ok`).
-- Para folga full-day: zerar expected, worked, delay, early_exit, bank.
-- Para folga **parcial** (`is_partial_day=true`): subtrair `(end_time − start_time)` de `expected_minutes`; recalcular `bank_balance` com esse expected reduzido; não gerar `delay`/`early_exit` no intervalo de folga.
-- Para justificativa cobrindo o dia inteiro e sem batidas: status `justificado`, `bank_balance = 0`.
-- Trocar `EXCEPTION WHEN OTHERS` por tratamento que **loga o erro real** (`RAISE WARNING` com `SQLERRM`) sem suprimir o `INSERT` quando a falha for em uma sub-rotina opcional.
+## 2. Permissão no banco
 
-b) **Backfill imediato** rodando `recalc_user_day` para o conjunto:
-```text
-SELECT DISTINCT user_id, clock_date FROM time_clock
-UNION SELECT user_id, off_date FROM time_clock_day_offs
-UNION SELECT user_id, reference_date FROM time_clock_justifications WHERE status='approved'
-```
-Isso popula `time_clock_day_summary` para todo histórico relevante, incluindo Alana.
+Atualizar a policy `adj_insert_*` em `time_clock_adjustment_requests` para permitir `INSERT` quando o autor é admin (`has_role_safe(auth.uid(),'admin')`) ou gestor da mesma empresa do colaborador alvo. Hoje só permite `auth.uid() = user_id`.
 
-### 2. Frontend — apenas `DiscountCalculator.tsx`
+## 3. Ajustes manuais já lançados (limpeza)
 
-c) Diferenciar folga full-day x partial:
-- Carregar `is_partial_day`, `start_time`, `end_time`, `off_type` dos `day_offs`.
-- Se `is_partial_day = true`: manter o dia em `expectedMinutes`, mas subtrair os minutos cobertos pela folga parcial. Não contar o dia em `dayOffCount`.
-- Se full-day (`folga`, `ferias`, `feriado`): comportamento atual (skip).
-- Sem mudança em justificativas (já tratadas).
+Os ajustes de 27/04 e 28/04 que ficaram no usuário Cedula BR podem ser:
 
-### 3. Validação
+- Cancelados (status → `cancelled`) e os registros `time_clock` correspondentes removidos manualmente, **ou**
+- Mantidos como histórico — fica a critério do usuário.
 
-- Após o backfill, `time_clock_day_summary` deve ter linhas para Alana em 10/04, 12/04, 13/04 (`folga`), 20/04 (`observacao`/`ok` com expected reduzido), 21/04 (`feriado`), 27/04 (calculado normal) e 28/04 (`folga`).
-- Painel de Risco e HRDashboard passam a refletir essas datas.
-- `DiscountCalculator` mostra desconto de 20/04 considerando jornada de 6h − 4h de folga parcial = 2h esperadas naquele dia.
-- Logs do Postgres deixam de registrar `relation "public.brazilian_holidays" does not exist`.
+Após confirmar, posso criar uma migração de limpeza pontual.
 
-### Detalhes técnicos
+## 4. Visibilidade do tipo "ajustado" no espelho mensal
 
-Arquivos afetados:
-- Nova migration com `CREATE OR REPLACE FUNCTION public.recalc_user_day(...)` + bloco `DO` de backfill.
-- `src/components/TimeClock/DiscountCalculator.tsx` (somente o `forEach(day => ...)` no método `calculate`).
+O PDF já lê o campo `status='ajustado'`. Vou exibir uma marca visual ("A" sobrescrito ou cor diferente na coluna Entrada/Saída) para deixar claro que aquela batida é fruto de ajuste — útil para auditoria.
 
-Sem mudança em triggers (eles já existem e estão ativos), em `useTimeClock.ts`, no PDF, ou em outras telas que já leem direto de `day_offs`/`justifications`.
+## 5. Verificação
+
+Após implementar:
+
+- Lançar ajuste de teste para Alana (entrada 09:00 em 27/04).
+- Conferir `time_clock` (registro novo `status='ajustado'`).
+- Conferir `time_clock_day_summary` (recalc com expected/worked corretos).
+- Gerar Espelho Mensal de Alana e validar que a batida aparece com a marcação de ajuste.
+
+# Detalhes técnicos
+
+- Arquivo principal: `src/components/TimeClock/AdjustmentReview.tsx` (adicionar dialog "Lançar ajuste").
+- Reaproveitar `get_profiles_by_ids` + lista de `user_companies` para listar colaboradores conforme escopo do gestor.
+- Migração: novas policies `adj_insert_admin` e `adj_insert_gestor`.
+- `TimeClockPDF.tsx`: anotar registros `status='ajustado'` na linha da tabela mensal (asterisco + legenda no rodapé da página).
