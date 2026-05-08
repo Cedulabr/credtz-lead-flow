@@ -111,8 +111,8 @@ describe('computePayrollRow', () => {
       { ...baseUser, records: [], dayOffs: [], approvedJustifications: [] },
       periodOpts
     );
-    // 21 dias úteis - 1 feriado = 20 dias de falta
-    expect(row.absences).toBe(20);
+    // 22 dias úteis em abril/2026 - 1 feriado = 21 dias de falta
+    expect(row.absences).toBe(21);
     expect(row.discountAbsences).toBeGreaterThan(0);
   });
 });
