@@ -37,6 +37,7 @@ export interface PayrollResultRow {
   negativeMinutes: number;
   absences: number;
   pending: number;
+  partialPending: number;
   dayOffs: number;
   holidays: number;
   delayMinutes: number;
