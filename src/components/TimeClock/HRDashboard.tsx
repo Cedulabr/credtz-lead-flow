@@ -63,7 +63,7 @@ export function HRDashboard() {
     const { data: ucs } = await supabase.from('user_companies').select('user_id').eq('company_id', companyId).eq('is_active', true);
     const ids = (ucs || []).map((u: any) => u.user_id);
     if (!ids.length) return;
-    const { data: profs } = await (supabase as any).rpc('get_profiles_by_ids', { _user_ids: ids });
+    const { data: profs } = await (supabase as any).rpc('get_profiles_by_ids', { user_ids: ids });
     setUsers((profs || []).map((p: any) => ({ id: p.id, name: p.name || p.email || p.id })));
   };
 

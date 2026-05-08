@@ -53,6 +53,7 @@ type PendingRow = {
   suggestedTime: string; // HH:MM
   records: ClockRecord[];
   inconsText: string;
+  blocked?: boolean;
 };
 
 const PROBLEM_LABEL: Record<PendingRow['problem'], string> = {
@@ -116,7 +117,7 @@ export function AdjustmentReview() {
 
     const ids = Array.from(new Set((data || []).map((d: any) => d.user_id)));
     if (ids.length) {
-      const { data: profs } = await (supabase as any).rpc('get_profiles_by_ids', { _user_ids: ids });
+      const { data: profs } = await (supabase as any).rpc('get_profiles_by_ids', { user_ids: ids });
       const map: Record<string, string> = {};
       (profs || []).forEach((p: any) => { map[p.id] = p.name || p.email || p.id; });
       setProfileMap(map);
@@ -147,7 +148,7 @@ export function AdjustmentReview() {
         }
         userIds = Array.from(new Set(userIds));
         if (!userIds.length) { setUsers([]); return; }
-        const { data: profs } = await (supabase as any).rpc('get_profiles_by_ids', { _user_ids: userIds });
+        const { data: profs } = await (supabase as any).rpc('get_profiles_by_ids', { user_ids: userIds });
         const list = (profs || []).map((p: any) => ({
           id: p.id,
           name: p.name || p.email || p.id,
@@ -252,7 +253,7 @@ export function AdjustmentReview() {
           const ds = format(day, 'yyyy-MM-dd');
           if (ds > todayStr) continue;
           const k = `${u.id}|${ds}`;
-          if (blockedSet.has(k)) continue;
+          const isBlocked = blockedSet.has(k);
           const recs = recordsByUserDate[k] || [];
           const dow = day.getDay();
           const off = dayOffMap.get(k);
@@ -302,6 +303,7 @@ export function AdjustmentReview() {
             suggestedTime,
             records: recs,
             inconsText: result.inconsistencies.map(i => i.message).join(' • '),
+            blocked: isBlocked,
           });
         }
       }
@@ -334,17 +336,18 @@ export function AdjustmentReview() {
     return sorted;
   }, [pendings, filterUserId, filterProblem, sortMode]);
 
-  const allVisibleSelected = filteredPendings.length > 0 &&
-    filteredPendings.every(p => selected.has(`${p.user_id}|${p.date}|${p.problem}`));
+  const actionablePendings = filteredPendings.filter(p => !p.blocked);
+  const allVisibleSelected = actionablePendings.length > 0 &&
+    actionablePendings.every(p => selected.has(`${p.user_id}|${p.date}|${p.problem}`));
 
   const toggleAll = () => {
     if (allVisibleSelected) {
       const keep = new Set(selected);
-      filteredPendings.forEach(p => keep.delete(`${p.user_id}|${p.date}|${p.problem}`));
+      actionablePendings.forEach(p => keep.delete(`${p.user_id}|${p.date}|${p.problem}`));
       setSelected(keep);
     } else {
       const next = new Set(selected);
-      filteredPendings.forEach(p => next.add(`${p.user_id}|${p.date}|${p.problem}`));
+      actionablePendings.forEach(p => next.add(`${p.user_id}|${p.date}|${p.problem}`));
       setSelected(next);
     }
   };
@@ -367,7 +370,7 @@ export function AdjustmentReview() {
 
   const submitBulk = async () => {
     if (!user) return;
-    const rows = filteredPendings.filter(p => selected.has(`${p.user_id}|${p.date}|${p.problem}`));
+    const rows = filteredPendings.filter(p => !p.blocked && selected.has(`${p.user_id}|${p.date}|${p.problem}`));
     if (!rows.length) return toast.error('Nenhuma pendência selecionada');
     if (!bulkReason.trim()) return toast.error('Informe o motivo');
 
@@ -568,7 +571,7 @@ export function AdjustmentReview() {
               <div className="flex items-center gap-2">
                 <Checkbox checked={allVisibleSelected} onCheckedChange={toggleAll} id="sel-all" />
                 <Label htmlFor="sel-all" className="text-sm cursor-pointer">
-                  Selecionar todas visíveis ({filteredPendings.length})
+                  Selecionar todas visíveis ({actionablePendings.length})
                 </Label>
               </div>
               <Button
@@ -584,7 +587,17 @@ export function AdjustmentReview() {
             {pendingsLoading ? (
               <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
             ) : filteredPendings.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">Nenhuma pendência encontrada no período. ✓</p>
+              <div className="py-6 text-center space-y-2">
+                <p className="text-sm text-muted-foreground">Nenhuma pendência encontrada no período. ✓</p>
+                {pendings.length > 0 && (filterUserId !== 'all' || filterProblem !== 'all') && (
+                  <div className="text-xs text-muted-foreground">
+                    Há {pendings.length} pendência(s) ocultas pelos filtros.{' '}
+                    <button className="underline" onClick={() => { setFilterUserId('all'); setFilterProblem('all'); }}>
+                      Limpar filtros
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="space-y-2">
                 {filteredPendings.map((p) => {
@@ -596,7 +609,7 @@ export function AdjustmentReview() {
                   return (
                     <div key={key} className={`border rounded-lg p-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between ${tone}`}>
                       <div className="flex items-start gap-3 min-w-0 flex-1">
-                        <Checkbox checked={isSel} onCheckedChange={() => toggleOne(key)} className="mt-1" />
+                        <Checkbox checked={isSel} onCheckedChange={() => toggleOne(key)} disabled={p.blocked} className="mt-1" />
                         <div className="min-w-0 space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-semibold">{p.user_name}</span>
@@ -610,6 +623,7 @@ export function AdjustmentReview() {
                             {p.suggestedTime && (
                               <Badge variant="outline">sugerido: {p.suggestedTime}</Badge>
                             )}
+                            {p.blocked && <Badge variant="outline">solicitação já existe</Badge>}
                           </div>
                           {p.inconsText && (
                             <p className="text-xs text-muted-foreground line-clamp-2">{p.inconsText}</p>
@@ -622,7 +636,7 @@ export function AdjustmentReview() {
                         </div>
                       </div>
                       <div className="flex shrink-0">
-                        <Button size="sm" variant="outline" onClick={() => startAdjustmentFromPending(p)}>
+                        <Button size="sm" variant="outline" onClick={() => startAdjustmentFromPending(p)} disabled={p.blocked}>
                           <Wand2 className="h-3 w-3 mr-1" />Lançar
                         </Button>
                       </div>
