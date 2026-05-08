@@ -18,6 +18,8 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { JustificationManager } from './JustificationManager';
 import { parseTimeToMinutes, hasActiveBreak, type DaySchedule } from '@/lib/timeClockCalculations';
+import { resolveTimeClockPhotoUrl } from './photoUrl';
+import { toast } from 'sonner';
 
 interface DailyOverview {
   user_id: string;
