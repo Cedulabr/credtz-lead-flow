@@ -1,55 +1,63 @@
 ## Diagnóstico
 
-Investigando o módulo de Ponto encontrei três causas que explicam o sintoma "lanço folga/ajuste e o histórico não atualiza":
+Investiguei direto no banco com a Alana (id `8642cf4a…`) e identifiquei o motivo real de a folha não refletir folgas, justificativas nem ajustes:
 
-1. **Folgas (`time_clock_day_offs`) não entram no histórico.**
-   Os componentes `MyHistory.tsx`, `AdminControl.tsx` e `ManagerDashboard.tsx` montam a tabela do histórico exclusivamente a partir das batidas em `time_clock`. Quando você lança uma folga num dia sem batidas, esse dia simplesmente não aparece — e quando há batidas, a folga é ignorada no status/cálculo (continua como "falta" ou "incompleto").
+1. **`recalc_user_day` está falhando em silêncio.**
+   A função referencia `public.brazilian_holidays`, que **não existe** neste projeto. Os logs do Postgres confirmam: `relation "public.brazilian_holidays" does not exist`. Como o corpo termina com `EXCEPTION WHEN OTHERS THEN RAISE NOTICE`, o erro é engolido e o `INSERT` no `time_clock_day_summary` nunca acontece.
+   Resultado: a tabela `time_clock_day_summary` está **com 0 linhas em todo o sistema**, mesmo com triggers ativos em `time_clock`, `time_clock_day_offs`, `time_clock_justifications` e `time_clock_adjustment_requests`. Tudo que depende dela (Painel de Risco, HRDashboard, banco de horas) mostra dados desatualizados.
 
-2. **Justificativas (`time_clock_justifications`) também são ignoradas** nas mesmas telas. Hoje só o PDF e o `DiscountCalculator` consultam essa tabela, então o histórico nunca muda para "justificado".
+2. **`recalc_user_day` não lê folgas nem justificativas.**
+   Mesmo quando voltar a funcionar, a versão atual não consulta `time_clock_day_offs` nem `time_clock_justifications` — então o status nunca vira `folga` / `justificado` / `feriado` por essas tabelas. Confirmei rodando manualmente: para 10/04 da Alana (folga lançada) o status final continuaria `falta`.
 
-3. **Ajustes aprovados não são aplicados ao ponto.**
-   Em `AdjustmentReview.tsx`, aprovar uma solicitação só atualiza `time_clock_adjustment_requests.status = 'approved'`. Não existe trigger nem chamada que altere `time_clock` ou que rode `recalc_user_day` — apesar do toast dizer "dia recalculado". A função `recalc_user_day` existe no banco mas está órfã.
+3. **Folga parcial não é tratada na folha (`DiscountCalculator.tsx`).**
+   Hoje, qualquer registro em `time_clock_day_offs` faz o dia inteiro ser pulado (zera expected). Para o caso da Alana em 20/04 (folga 12:00–16:00, parcial), o sistema ignora a jornada cheia em vez de subtrair só as 4h da folga parcial.
 
-   Confirmado por `information_schema.triggers`: nenhum trigger em `time_clock*` hoje.
+4. **Justificativas “aparecem” na folha, mas como o status calculado é `falta`,** elas só evitam o desconto da falta inteira; não acertam o status nas telas analíticas (que dependem do summary).
+
+5. **Os ajustes da Alana de 27/04** (entrada para 09:00) e a folga de 28/04 estão aplicados na base (entrada às 09:51 BRT, folga registrada), mas como `time_clock_day_summary` está vazio, nenhuma view derivada se atualizou.
 
 ## Plano
 
-### 1. Backend (migrations)
+### 1. Backend — migration única
 
-a) **Aplicar ajustes automaticamente quando aprovados**
-   - Criar trigger `AFTER UPDATE` em `time_clock_adjustment_requests` que, ao mudar `status` para `approved`, executa a operação correspondente:
-     - `inclusion` → INSERT em `time_clock` com o tipo/horário pedidos.
-     - `correction` → UPDATE do registro em `time_clock` (`clock_time`, `status='ajustado'`).
-     - `exclusion` → DELETE do registro alvo.
-   - Após qualquer um dos três, chamar `recalc_user_day(user_id, data)` e gravar log em `time_clock_logs`.
+a) **Reescrever `recalc_user_day`** mantendo a assinatura atual e a chamada via triggers, com estas mudanças:
+- Remover a leitura de `public.brazilian_holidays`. Usar como única fonte de feriado o registro `time_clock_day_offs` com `off_type = 'feriado'` (já existe esse padrão no projeto).
+- Carregar para o dia/usuário:
+  - `time_clock_day_offs` (full-day e partial-day).
+  - `time_clock_justifications` com `status = 'approved'` cobrindo a `reference_date`.
+- Aplicar prioridade de status: `feriado` → `folga`/`ferias` → `justificado` → `falta` → calculado (`pendente_ajuste` / `observacao` / `ok`).
+- Para folga full-day: zerar expected, worked, delay, early_exit, bank.
+- Para folga **parcial** (`is_partial_day=true`): subtrair `(end_time − start_time)` de `expected_minutes`; recalcular `bank_balance` com esse expected reduzido; não gerar `delay`/`early_exit` no intervalo de folga.
+- Para justificativa cobrindo o dia inteiro e sem batidas: status `justificado`, `bank_balance = 0`.
+- Trocar `EXCEPTION WHEN OTHERS` por tratamento que **loga o erro real** (`RAISE WARNING` com `SQLERRM`) sem suprimir o `INSERT` quando a falha for em uma sub-rotina opcional.
 
-b) **Recalcular ao mexer em folgas e justificativas**
-   - Trigger `AFTER INSERT/UPDATE/DELETE` em `time_clock_day_offs` chamando `recalc_user_day`.
-   - Trigger equivalente em `time_clock_justifications` (apenas quando `status='approved'`).
+b) **Backfill imediato** rodando `recalc_user_day` para o conjunto:
+```text
+SELECT DISTINCT user_id, clock_date FROM time_clock
+UNION SELECT user_id, off_date FROM time_clock_day_offs
+UNION SELECT user_id, reference_date FROM time_clock_justifications WHERE status='approved'
+```
+Isso popula `time_clock_day_summary` para todo histórico relevante, incluindo Alana.
 
-c) **Trigger geral em `time_clock`** (`AFTER INSERT/UPDATE/DELETE`) chamando `recalc_user_day`, usando `tg_time_clock_recalc` que já existe.
+### 2. Frontend — apenas `DiscountCalculator.tsx`
 
-d) **Estender `recalc_user_day`** para considerar:
-   - Se existir folga em `time_clock_day_offs` para o dia → status `folga` (zera expected/atrasos).
-   - Se existir justificativa aprovada cobrindo o dia → status `justificado` em vez de `falta`.
-
-### 2. Frontend (somente leitura, sem mudar regra de negócio)
-
-e) **`MyHistory.tsx`, `AdminControl.tsx`, `ManagerDashboard.tsx`**
-   - Buscar em paralelo, no mesmo período, `time_clock_day_offs` e `time_clock_justifications` (status approved) para os usuários exibidos.
-   - No agrupamento por dia, criar "linhas virtuais" para dias que só têm folga ou justificativa (sem batidas), exibindo o tipo (Folga/Férias/Atestado/Justificado) e zerando colunas de horário.
-   - Quando o dia tem batidas + folga/justificativa, sobrescrever o status final usando a mesma prioridade do `recalc_user_day` (folga > justificado > status calculado).
-   - Re-fetch automático (já existe `loadHistory`/`loadRecords` no `useEffect`); apenas garantir que o `DayOffManager` e o `AdjustmentReview` disparem um refresh global via evento ou via `queryClient.invalidateQueries` quando aplicável.
+c) Diferenciar folga full-day x partial:
+- Carregar `is_partial_day`, `start_time`, `end_time`, `off_type` dos `day_offs`.
+- Se `is_partial_day = true`: manter o dia em `expectedMinutes`, mas subtrair os minutos cobertos pela folga parcial. Não contar o dia em `dayOffCount`.
+- Se full-day (`folga`, `ferias`, `feriado`): comportamento atual (skip).
+- Sem mudança em justificativas (já tratadas).
 
 ### 3. Validação
 
-- Lançar uma folga em dia sem batida → o dia aparece no histórico com badge "Folga" e não conta como falta.
-- Lançar uma justificativa aprovada → status muda para "Justificado".
-- Aprovar um ajuste de inclusão/correção/exclusão → o registro em `time_clock` é alterado e o histórico/PDF refletem imediatamente.
-- Conferir `time_clock_day_summary` para o usuário/dia para garantir que `recalc_user_day` rodou.
+- Após o backfill, `time_clock_day_summary` deve ter linhas para Alana em 10/04, 12/04, 13/04 (`folga`), 20/04 (`observacao`/`ok` com expected reduzido), 21/04 (`feriado`), 27/04 (calculado normal) e 28/04 (`folga`).
+- Painel de Risco e HRDashboard passam a refletir essas datas.
+- `DiscountCalculator` mostra desconto de 20/04 considerando jornada de 6h − 4h de folga parcial = 2h esperadas naquele dia.
+- Logs do Postgres deixam de registrar `relation "public.brazilian_holidays" does not exist`.
 
 ### Detalhes técnicos
 
-- Arquivos afetados: `src/components/TimeClock/MyHistory.tsx`, `AdminControl.tsx`, `ManagerDashboard.tsx`, `AdjustmentReview.tsx`, `DayOffManager.tsx`, e migration nova com 4 triggers + atualização de `recalc_user_day`.
-- Sem alteração em `useTimeClock.ts` além de, opcionalmente, expor `recalcDay`.
-- Nada muda no PDF (ele já lê folgas/justificativas).
+Arquivos afetados:
+- Nova migration com `CREATE OR REPLACE FUNCTION public.recalc_user_day(...)` + bloco `DO` de backfill.
+- `src/components/TimeClock/DiscountCalculator.tsx` (somente o `forEach(day => ...)` no método `calculate`).
+
+Sem mudança em triggers (eles já existem e estão ativos), em `useTimeClock.ts`, no PDF, ou em outras telas que já leem direto de `day_offs`/`justifications`.
