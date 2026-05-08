@@ -465,12 +465,13 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
   const generateDailyPDF = async () => {
     setLoading(true);
     try {
-      const [recordsRes, justRes, scheduleRes, profileRes, holidayRes] = await Promise.all([
+      const [recordsRes, justRes, scheduleRes, profileRes, holidayRes, dayOffRes] = await Promise.all([
         supabase.from('time_clock').select('*').eq('user_id', userId).eq('clock_date', selectedDate).order('clock_time'),
         supabase.from('time_clock_justifications').select('*').eq('user_id', userId).eq('reference_date', selectedDate),
         supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).maybeSingle(),
         supabase.from('profiles').select('name, cpf, role').eq('id', userId).maybeSingle(),
         (supabase as any).from("brazilian_holidays").select('holiday_date').eq('holiday_date', selectedDate).maybeSingle(),
+        supabase.from('time_clock_day_offs').select('off_date, off_type, is_partial_day, start_time, end_time').eq('user_id', userId).eq('off_date', selectedDate).maybeSingle(),
       ]);
 
       const records = (recordsRes.data || []).map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
@@ -483,10 +484,21 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         work_days: schedule.work_days ?? [1, 2, 3, 4, 5],
       } : null;
       const day = parseISO(selectedDate);
-      // Considera feriado se vem do DB OU dos feriados nacionais calculados
       const nationalHolidays = new Set(getBrazilianHolidays(day.getFullYear()).map(h => h.date));
-      const isHoliday = !!holidayRes.data || nationalHolidays.has(selectedDate);
-      const result = evaluateDay(records, sched, day.getDay(), isHoliday);
+      const off = dayOffRes?.data as any;
+      const isHoliday = !!holidayRes.data || nationalHolidays.has(selectedDate) || off?.off_type === 'feriado';
+      let dayOff: any = null;
+      if (off && off.off_type !== 'feriado') {
+        let partialMinutes = 0;
+        if (off.is_partial_day && off.start_time && off.end_time) {
+          const [sh, sm] = String(off.start_time).split(':').map(Number);
+          const [eh, em] = String(off.end_time).split(':').map(Number);
+          partialMinutes = Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+        }
+        dayOff = { type: off.off_type, isPartial: !!off.is_partial_day, partialMinutes };
+      }
+      const justified = !!(justRes.data || []).find((j: any) => j.status === 'approved');
+      const result = evaluateDay(records, sched, day.getDay(), { isHoliday, dayOff, justified });
 
       const doc = new jsPDF();
       const pw = doc.internal.pageSize.getWidth();
