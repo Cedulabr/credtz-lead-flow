@@ -2250,6 +2250,248 @@ export type Database = {
           },
         ]
       }
+      chatbot_edges: {
+        Row: {
+          created_at: string
+          flow_id: string
+          id: string
+          label: string | null
+          source: string
+          source_handle: string | null
+          target: string
+          target_handle: string | null
+        }
+        Insert: {
+          created_at?: string
+          flow_id: string
+          id?: string
+          label?: string | null
+          source: string
+          source_handle?: string | null
+          target: string
+          target_handle?: string | null
+        }
+        Update: {
+          created_at?: string
+          flow_id?: string
+          id?: string
+          label?: string | null
+          source?: string
+          source_handle?: string | null
+          target?: string
+          target_handle?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chatbot_edges_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "chatbot_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chatbot_flows: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          instance_id: string | null
+          name: string
+          status: Database["public"]["Enums"]["chatbot_flow_status"]
+          trigger_config: Json
+          trigger_type: Database["public"]["Enums"]["chatbot_trigger_type"]
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          instance_id?: string | null
+          name: string
+          status?: Database["public"]["Enums"]["chatbot_flow_status"]
+          trigger_config?: Json
+          trigger_type?: Database["public"]["Enums"]["chatbot_trigger_type"]
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          instance_id?: string | null
+          name?: string
+          status?: Database["public"]["Enums"]["chatbot_flow_status"]
+          trigger_config?: Json
+          trigger_type?: Database["public"]["Enums"]["chatbot_trigger_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      chatbot_logs: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          node_id: string | null
+          payload: Json
+          run_id: string
+          type: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          node_id?: string | null
+          payload?: Json
+          run_id: string
+          type: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          node_id?: string | null
+          payload?: Json
+          run_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chatbot_logs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "chatbot_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chatbot_nodes: {
+        Row: {
+          created_at: string
+          data: Json
+          flow_id: string
+          id: string
+          position: Json
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          flow_id: string
+          id?: string
+          position?: Json
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          flow_id?: string
+          id?: string
+          position?: Json
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chatbot_nodes_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "chatbot_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chatbot_runs: {
+        Row: {
+          company_id: string
+          contact_phone: string | null
+          conversation_id: string | null
+          current_node_id: string | null
+          error: string | null
+          finished_at: string | null
+          flow_id: string
+          id: string
+          resume_at: string | null
+          started_at: string
+          status: Database["public"]["Enums"]["chatbot_run_status"]
+          updated_at: string
+          variables: Json
+        }
+        Insert: {
+          company_id: string
+          contact_phone?: string | null
+          conversation_id?: string | null
+          current_node_id?: string | null
+          error?: string | null
+          finished_at?: string | null
+          flow_id: string
+          id?: string
+          resume_at?: string | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["chatbot_run_status"]
+          updated_at?: string
+          variables?: Json
+        }
+        Update: {
+          company_id?: string
+          contact_phone?: string | null
+          conversation_id?: string | null
+          current_node_id?: string | null
+          error?: string | null
+          finished_at?: string | null
+          flow_id?: string
+          id?: string
+          resume_at?: string | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["chatbot_run_status"]
+          updated_at?: string
+          variables?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chatbot_runs_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "chatbot_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chatbot_variables: {
+        Row: {
+          company_id: string
+          created_at: string
+          default_value: string | null
+          description: string | null
+          id: string
+          key: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          default_value?: string | null
+          description?: string | null
+          id?: string
+          key: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          default_value?: string | null
+          description?: string | null
+          id?: string
+          key?: string
+        }
+        Relationships: []
+      }
       checklist_items: {
         Row: {
           checked: boolean
@@ -5495,6 +5737,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      media_files: {
+        Row: {
+          company_id: string | null
+          conversation_id: string | null
+          created_at: string
+          id: string
+          kind: string | null
+          mime_type: string | null
+          object_key: string
+          original_name: string | null
+          public_url: string
+          size_bytes: number | null
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string | null
+          mime_type?: string | null
+          object_key: string
+          original_name?: string | null
+          public_url: string
+          size_bytes?: number | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string | null
+          mime_type?: string | null
+          object_key?: string
+          original_name?: string | null
+          public_url?: string
+          size_bytes?: number | null
+          user_id?: string
+        }
+        Relationships: []
       }
       note_folders: {
         Row: {
@@ -9560,6 +9844,7 @@ export type Database = {
           daily_limit: number
           delivered_count: number
           failed_count: number
+          flow_id: string | null
           id: string
           instance_id: string
           instance_ids: string[]
@@ -9597,6 +9882,7 @@ export type Database = {
           daily_limit?: number
           delivered_count?: number
           failed_count?: number
+          flow_id?: string | null
           id?: string
           instance_id: string
           instance_ids?: string[]
@@ -9634,6 +9920,7 @@ export type Database = {
           daily_limit?: number
           delivered_count?: number
           failed_count?: number
+          flow_id?: string | null
           id?: string
           instance_id?: string
           instance_ids?: string[]
@@ -9668,6 +9955,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_campaigns_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "chatbot_flows"
             referencedColumns: ["id"]
           },
           {
@@ -10668,6 +10962,7 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
+      user_can_access_flow: { Args: { _flow_id: string }; Returns: boolean }
       user_in_same_company: {
         Args: { target_user_id: string }
         Returns: boolean
@@ -10700,6 +10995,19 @@ export type Database = {
         | "justify_absence"
         | "other"
       app_role: "admin" | "partner"
+      chatbot_flow_status: "draft" | "active" | "paused"
+      chatbot_run_status:
+        | "running"
+        | "waiting"
+        | "completed"
+        | "failed"
+        | "cancelled"
+      chatbot_trigger_type:
+        | "keyword"
+        | "any_message"
+        | "first_interaction"
+        | "campaign"
+        | "manual"
       collaborative_access_type: "admin" | "operator" | "readonly"
       collaborative_link_category:
         | "banco"
@@ -10869,6 +11177,21 @@ export const Constants = {
         "other",
       ],
       app_role: ["admin", "partner"],
+      chatbot_flow_status: ["draft", "active", "paused"],
+      chatbot_run_status: [
+        "running",
+        "waiting",
+        "completed",
+        "failed",
+        "cancelled",
+      ],
+      chatbot_trigger_type: [
+        "keyword",
+        "any_message",
+        "first_interaction",
+        "campaign",
+        "manual",
+      ],
       collaborative_access_type: ["admin", "operator", "readonly"],
       collaborative_link_category: [
         "banco",
