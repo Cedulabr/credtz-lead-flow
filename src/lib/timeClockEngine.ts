@@ -68,7 +68,8 @@ export interface Inconsistency {
     | 'PAUSA_EXCESSIVA'
     | 'JORNADA_EXCESSIVA'
     | 'BATIDA_DUPLICADA'
-    | 'HORARIO_INVALIDO';
+    | 'HORARIO_INVALIDO'
+    | 'INTERVALO_INVALIDO';
   severity: 'high' | 'medium' | 'low';
   message: string;
   minutes?: number;
