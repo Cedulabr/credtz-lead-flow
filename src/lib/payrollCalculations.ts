@@ -85,14 +85,15 @@ export function computePayrollRow(
       const dateStr = format(d, 'yyyy-MM-dd');
       const off = offByDate[dateStr];
       let dayOff: { type: DayOffType; isPartial?: boolean; partialMinutes?: number } | null = null;
-      if (off && off.off_type && off.off_type !== 'feriado') {
+      if (off && off.off_type !== 'feriado') {
         let partialMinutes = 0;
         if (off.is_partial_day && off.start_time && off.end_time) {
           const [sh, sm] = String(off.start_time).split(':').map(Number);
           const [eh, em] = String(off.end_time).split(':').map(Number);
           partialMinutes = Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
         }
-        dayOff = { type: off.off_type as DayOffType, isPartial: !!off.is_partial_day, partialMinutes };
+        const type = (off.off_type as DayOffType) || 'folga';
+        dayOff = { type, isPartial: !!off.is_partial_day, partialMinutes };
       }
       const dayRecords = user.records
         .filter(r => r.clock_date === dateStr)
