@@ -455,16 +455,18 @@ export function summarizePeriod(days: DayResult[]) {
       acc.worked += d.workedMinutes;
       acc.overtime += d.overtimeMinutes;
       acc.bank += d.bankBalanceMinutes;
-      // Atrasos/saídas antecipadas só contam em dia útil (não folga/feriado/justificado)
-      if (d.status !== 'feriado' && d.status !== 'folga' && d.status !== 'justificado') {
+      const isHolidayDay = d.wasHoliday || d.status === 'feriado';
+      const isOffDay = d.wasDayOff || (d.status === 'folga');
+      const isJustifiedDay = d.wasJustified || d.status === 'justificado';
+      if (!isHolidayDay && !isOffDay && !isJustifiedDay) {
         acc.delay += d.delayMinutes;
         acc.earlyExit += d.earlyExitMinutes;
       }
       if (d.status === 'falta') acc.absences += 1;
       if (d.status === 'pendente_ajuste') acc.pending += 1;
-      if (d.status === 'justificado') acc.justified += 1;
-      if (d.status === 'feriado') acc.holidays += 1;
-      if (d.status === 'folga') acc.dayOffs += 1;
+      if (isJustifiedDay) acc.justified += 1;
+      if (isHolidayDay) acc.holidays += 1;
+      if (isOffDay) acc.dayOffs += 1;
       return acc;
     },
     { expected: 0, worked: 0, delay: 0, earlyExit: 0, overtime: 0, bank: 0, absences: 0, pending: 0, justified: 0, holidays: 0, dayOffs: 0 }
