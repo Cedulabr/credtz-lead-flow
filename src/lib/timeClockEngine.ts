@@ -88,6 +88,12 @@ export interface DayResult {
   bankBalanceMinutes: number;
   entryMinute: number | null;
   exitMinute: number | null;
+  /** Marca se o dia caiu em feriado (mesmo que tenha trabalhado). */
+  wasHoliday?: boolean;
+  /** Marca se o dia tinha day_off explícito (folga/dsr/escala_off/ferias/atestado). */
+  wasDayOff?: boolean;
+  /** Marca se o dia foi coberto por justificativa aprovada. */
+  wasJustified?: boolean;
 }
 
 export const inconsistencyLabels: Record<Inconsistency['code'], string> = {
