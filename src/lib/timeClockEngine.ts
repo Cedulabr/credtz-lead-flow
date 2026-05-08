@@ -478,12 +478,13 @@ export function summarizePeriod(days: DayResult[]) {
       }
       if (d.status === 'falta') acc.absences += 1;
       if (d.status === 'pendente_ajuste') acc.pending += 1;
+      if (d.status === 'ajuste_parcial') acc.partialPending += 1;
       if (isJustifiedDay) acc.justified += 1;
       if (isHolidayDay) acc.holidays += 1;
       if (isOffDay) acc.dayOffs += 1;
       return acc;
     },
-    { expected: 0, worked: 0, delay: 0, earlyExit: 0, overtime: 0, bank: 0, absences: 0, pending: 0, justified: 0, holidays: 0, dayOffs: 0 }
+    { expected: 0, worked: 0, delay: 0, earlyExit: 0, overtime: 0, bank: 0, absences: 0, pending: 0, partialPending: 0, justified: 0, holidays: 0, dayOffs: 0 }
   );
 }
 
