@@ -68,11 +68,11 @@ describe('computePayrollRow', () => {
       { ...baseUser, records: [], dayOffs: [], approvedJustifications: [] },
       { ...periodOpts, holidays: ['2026-04-01', '2026-04-21'] }
     );
-    // 21 dias úteis - 2 feriados = 19 → 19*8h*60
-    expect(row.expectedMinutes).toBe(19 * 480);
+    // 22 dias úteis em abril/2026 - 2 feriados = 20 → 20*8h*60
+    expect(row.expectedMinutes).toBe(20 * 480);
   });
 
-  it('justificativa aprovada evita falta', () => {
+  it('justificativa aprovada evita contar falta (mas mantém horas esperadas)', () => {
     const rowJust = computePayrollRow(
       {
         ...baseUser,
