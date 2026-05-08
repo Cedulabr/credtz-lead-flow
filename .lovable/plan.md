@@ -1,67 +1,72 @@
-## Objetivo
+## Problema
 
-Melhorar o painel "Lançar ajuste" (em `AdjustmentReview.tsx`, usado por admin/gestor) para mostrar e tratar em massa as pendências do mês de qualquer colaborador, com filtros, ordenação e lançamento em lote.
+No painel **Solicitar Ajuste → Pendências do mês**, hoje só aparecem pendências do próprio usuário logado (filtro fixo `eq('user_id', user.id)`). Por isso colaboradoras como Jamile e os demais funcionários da empresa não aparecem, mesmo tendo 4+ registros incompletos. Também não há filtro por colaborador nem botão de lançar ajustes em lote.
 
-## Diagnóstico
+A correção fica restrita ao componente `src/components/TimeClock/AdjustmentRequest.tsx` (frontend / apresentação) — sem mexer em regras de cálculo, RLS ou tabelas.
 
-- Hoje o painel "Pendências do mês" só existe em `AdjustmentRequest.tsx` (visão do próprio colaborador). O diálogo "Lançar ajuste" do admin não carrega pendências — por isso o "campo novo" parece vazio.
-- Não há filtro por colaborador, nem por tipo de pendência, nem ação em lote.
+## O que vai mudar
 
-## Mudanças (somente em `src/components/TimeClock/AdjustmentReview.tsx`)
+### 1. Detectar papel do usuário logado
+- Importar `useAuth` (já importado) e calcular `canManage = isAdmin || isGestor`.
+- Para `gestor`, carregar a lista de `user_ids` da mesma empresa via `user_companies` (mesmo padrão usado em `AdjustmentReview.tsx`).
+- Para `admin`, considerar todos os colaboradores ativos.
+- Para usuário comum, manter o comportamento atual (só o próprio `user.id`).
 
-### 1. Novo bloco "Pendências do mês" dentro do diálogo "Lançar ajuste"
+### 2. Carregar pendências de todos os colaboradores visíveis
+Quando `canManage = true`:
+- Trocar a query de `time_clock` para usar `.in('user_id', visibleIds)` no intervalo do mês.
+- Buscar em paralelo:
+  - `time_clock_schedules` ativos (`.in('user_id', visibleIds)`) para ter a jornada de cada um.
+  - `time_clock_day_offs` no período `.in('user_id', visibleIds)`.
+  - `time_clock_justifications` aprovadas no período `.in('user_id', visibleIds)`.
+  - Nomes via RPC `get_profiles_by_ids(visibleIds)` (padrão Two-Step Profile Fetch já usado no projeto).
+- Agrupar registros por `user_id + clock_date` e rodar `evaluateDay` para cada combinação, mantendo apenas `pendente_ajuste` ou `ajuste_parcial`.
 
-- Carregar registros de `time_clock` do mês selecionado para todos os colaboradores visíveis (admin: todos; gestor: `companyUserIds`).
-- Rodar `evaluateDay` (de `src/lib/timeClockEngine.ts`) por usuário/dia para identificar dias com `pendente_ajuste` ou `ajuste_parcial`.
-- Excluir datas que já tenham solicitação `pending` ou `approved` (consultar `time_clock_adjustment_requests`).
-- Listar cada pendência como linha: colaborador · data · tipo de problema (sem entrada / sem saída / pausa desbalanceada / parcial) · ação rápida.
-
-### 2. Filtros e ordenação
-
-- Filtro por **colaborador** (Select com a mesma lista `users` já carregada).
-- Filtro por **tipo de pendência**:
-  - Sem entrada
-  - Sem saída
-  - Pausa incompleta/desbalanceada
-  - Ajuste parcial (outros)
-- Filtro por **período** (date range, padrão mês atual).
-- Ordenação: por colaborador (A→Z), data (mais antiga/recente), severidade (faltas de entrada/saída primeiro). Padrão: severidade desc + data asc, agrupando por colaborador.
-
-### 3. Ação rápida "Lançar"
-
-- Botão por linha que abre o formulário de criação já pré-preenchido (user_id, data, tipo sugerido, motivo padrão "Ajuste lançado pela gestão — registro incompleto").
-- Mantém o fluxo atual de `submitCreate` (insert em `time_clock_adjustment_requests` com `status='approved'`).
-
-### 4. Lançamento em lote
-
-- Checkbox por linha + checkbox "selecionar todos visíveis" (respeita filtros).
-- Botão "Lançar ajustes selecionados" abre um diálogo de confirmação com:
-  - Campo único de **horário sugerido** por tipo (entrada padrão, saída padrão) — opcional; se vazio, mantém o turno padrão do colaborador (se não houver, usar 08:00 entrada / 18:00 saída como fallback configurável).
-  - Campo único de **motivo** aplicado a todos.
-- Submete em lote via `insert([...])` único na tabela `time_clock_adjustment_requests` com `status='approved'`, `reviewed_by=user.id`.
-- Mostra toast com contagem de sucessos/erros e recarrega lista.
-
-### 5. Detalhes técnicos
-
-```text
-Estado novo:
-  pendingMonth: Array<{ user_id, name, date, type, severity, suggestedAdjType, suggestedTime }>
-  pendFilters: { userId, type, from, to, sort }
-  pendSelected: Set<string> // chaves "userId|date|type"
-
-Fluxo:
-  loadPending() -> busca time_clock por intervalo, agrupa por user/date,
-                   roda evaluateDay, monta linhas + remove já solicitadas.
-  bulkSubmit()  -> mapeia seleção em payloads e faz insert único.
+Estrutura por linha:
 ```
+{ user_id, user_name, date, result, records, missingTypes,
+  suggestedType, reasonText, severity, problemKind }
+```
+Onde `problemKind` ∈ `entrada` | `saida` | `pausa` | `outro` e `severity` (1=entrada/saída, 2=pausa, 3=outro) — mesmas regras já usadas em `AdjustmentReview`.
 
-- Tipo derivado do problema:
-  - Falta `entrada` → `add_entry` (severity 1)
-  - Falta `saida` → `add_exit` (severity 1)
-  - Pausa desbalanceada → `add_break_start` ou `add_break_end` (severity 2)
-  - Outros parciais → `other` (severity 3)
+### 3. Filtros e ordenação
+Acima da lista, adicionar (somente quando `canManage`):
+- **Colaborador** (`Select`) — opção "Todos" + lista vinda do RPC.
+- **Tipo de problema** — Todos / Falta de entrada / Falta de saída / Pausa desbalanceada / Outro.
+- **De / Até** — já existem.
+- **Ordenar por** — Severidade (padrão), Nome, Data.
+
+### 4. Bloqueio inteligente de duplicidade
+Hoje `blockedDates` só considera as solicitações do próprio usuário. Passar a buscar `time_clock_adjustment_requests` com `.in('user_id', visibleIds)` no período e construir `blockedKeys = Set("user_id|clock_date")`. A linha fica desabilitada se a chave existir com status `pending` ou `approved`.
+
+### 5. "Lançar ajuste" individual
+Hoje o botão abre o dialog pré-preenchido só para o próprio user. Adicionar `target_user_id` quando admin/gestor, e enviar o `INSERT` com:
+- `user_id = target_user_id` (não `user.id`)
+- `company_id = companyId`
+- `status = 'approved'` e `reviewed_by = user.id` (mesmo padrão do AdjustmentReview, evita pedir aprovação para si mesmo)
+Para usuário comum sem `canManage`, manter `status = 'pending'`.
+
+### 6. Lançamento em lote
+Quando `canManage`:
+- Checkbox por linha + "Selecionar todas visíveis".
+- Botão **"Lançar em lote"** abre dialog com:
+  - Horários padrão por tipo (entrada, saída, início pausa, fim pausa) — fallback para a `entry_time/exit_time` da jornada de cada colaborador caso o campo fique vazio.
+  - Motivo único aplicado a todos.
+- Cria `INSERT` único em `time_clock_adjustment_requests` com `status='approved'` e `reviewed_by=user.id`.
+- Toast com contagem de sucesso/erro e refresh do painel + lista de solicitações.
+
+### 7. Para usuário comum
+Tudo permanece como hoje: só vê o próprio painel, sem filtro de colaborador nem botão de lote, e novas solicitações continuam saindo como `pending`.
+
+## Detalhes técnicos
+
+- Estados novos: `visibleUsers`, `filterUserId`, `filterProblem`, `sortBy`, `selected: Set<string>`, `bulkOpen`, `bulkEntry/Exit/PauseIni/PauseFim`, `bulkReason`.
+- Reaproveitar lógica de `severity`, `problemKind` e `suggestedType` já desenvolvida em `AdjustmentReview.tsx` para manter consistência.
+- Performance: limitar a janela ao período selecionado (default mês corrente). Usar `Promise.all` para consultas independentes. Ignorar dias futuros (`> hoje`).
+- RLS: como `gestor`/`admin` já têm permissão de SELECT em `time_clock`, `time_clock_schedules`, `time_clock_day_offs`, `time_clock_justifications` e `time_clock_adjustment_requests` para sua empresa, não há mudanças de policy.
 
 ## Fora do escopo
 
-- Não altera `AdjustmentRequest.tsx` (visão do colaborador), `timeClockEngine.ts`, nem regras de cálculo/discount.
-- Não cria novas tabelas — usa as existentes (`time_clock`, `time_clock_adjustment_requests`, `user_companies`, `profiles` via RPC `get_profiles_by_ids`).
+- Não alterar `timeClockEngine.ts`, lógica financeira ou regras de desconto.
+- Não duplicar para `AdjustmentReview.tsx` (já tem essa funcionalidade).
+- Sem novas tabelas/migrations.
