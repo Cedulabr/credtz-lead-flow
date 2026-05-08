@@ -370,7 +370,7 @@ export function AdjustmentReview() {
 
   const submitBulk = async () => {
     if (!user) return;
-    const rows = filteredPendings.filter(p => selected.has(`${p.user_id}|${p.date}|${p.problem}`));
+    const rows = filteredPendings.filter(p => !p.blocked && selected.has(`${p.user_id}|${p.date}|${p.problem}`));
     if (!rows.length) return toast.error('Nenhuma pendência selecionada');
     if (!bulkReason.trim()) return toast.error('Informe o motivo');
 
@@ -571,7 +571,7 @@ export function AdjustmentReview() {
               <div className="flex items-center gap-2">
                 <Checkbox checked={allVisibleSelected} onCheckedChange={toggleAll} id="sel-all" />
                 <Label htmlFor="sel-all" className="text-sm cursor-pointer">
-                  Selecionar todas visíveis ({filteredPendings.length})
+                  Selecionar todas visíveis ({actionablePendings.length})
                 </Label>
               </div>
               <Button
@@ -587,7 +587,17 @@ export function AdjustmentReview() {
             {pendingsLoading ? (
               <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
             ) : filteredPendings.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">Nenhuma pendência encontrada no período. ✓</p>
+              <div className="py-6 text-center space-y-2">
+                <p className="text-sm text-muted-foreground">Nenhuma pendência encontrada no período. ✓</p>
+                {pendings.length > 0 && (filterUserId !== 'all' || filterProblem !== 'all') && (
+                  <div className="text-xs text-muted-foreground">
+                    Há {pendings.length} pendência(s) ocultas pelos filtros.{' '}
+                    <button className="underline" onClick={() => { setFilterUserId('all'); setFilterProblem('all'); }}>
+                      Limpar filtros
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="space-y-2">
                 {filteredPendings.map((p) => {
