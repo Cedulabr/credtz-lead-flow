@@ -116,6 +116,7 @@ export const dayStatusLabels: Record<DayStatus, string> = {
   ok: 'OK',
   observacao: 'Observação',
   pendente_ajuste: 'Pendente de Ajuste',
+  ajuste_parcial: 'Ajuste Parcial',
   justificado: 'Justificado',
   falta: 'Falta',
   feriado: 'Feriado',
