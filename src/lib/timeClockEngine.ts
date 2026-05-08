@@ -367,15 +367,26 @@ export function evaluateDay(
   }
 
   const hasHigh = incons.some(i => i.severity === 'high');
+  // Códigos de inconsistência que IMPEDEM cálculo de horas (sem par entrada+saída válido)
+  const HARD_CODES: Inconsistency['code'][] = [
+    'ENTRADA_SEM_SAIDA', 'SAIDA_SEM_ENTRADA', 'SAIDA_ANTES_ENTRADA',
+  ];
+  const hasHardError = incons.some(i => HARD_CODES.includes(i.code));
   let status: DayStatus;
   let subStatus: DaySubStatus = null;
 
-  if (hasHigh) {
+  if (hasHigh && hasHardError) {
+    // Pendência DURA — não há como calcular horas
     status = 'pendente_ajuste';
     subStatus = 'registro_incompleto';
     workedMinutes = 0;
     overtimeMinutes = 0;
     bankBalance = 0;
+  } else if (hasHigh) {
+    // Inconsistência grave mas existe par entrada+saída válido:
+    // mantém horas trabalhadas; RH ajusta sem desconto integral
+    status = 'ajuste_parcial';
+    subStatus = 'registro_incompleto';
   } else if (delayMinutes > 0 || earlyExitMinutes > 0 || incons.length > 0) {
     status = 'observacao';
     const halfJornada = expectedMinutes / 2;
