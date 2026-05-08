@@ -467,9 +467,15 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
                       </TableCell>
                       <TableCell>{formatMinutesToHM(group.totalMinutes)}</TableCell>
                       <TableCell>
-                        <Badge className={statusColors[group.status]}>
-                          {statusLabels[group.status]}
-                        </Badge>
+                        {group.overrideLabel ? (
+                          <Badge className={group.overrideTone || 'bg-purple-100 text-purple-800'}>
+                            {group.overrideLabel}
+                          </Badge>
+                        ) : (
+                          <Badge className={statusColors[group.status]}>
+                            {statusLabels[group.status]}
+                          </Badge>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
