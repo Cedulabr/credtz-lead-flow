@@ -156,6 +156,8 @@ export function DiscountCalculator() {
       let pendingDays = 0; // dias com entrada sem saída em dia útil passado
       let businessDays = 0; // para valor/dia dinâmico
 
+      const userPartialOffs = partialOffMinutesByUser[uid] || {};
+
       days.forEach(day => {
         if (day > now) return;
         const dateStr = format(day, 'yyyy-MM-dd');
@@ -164,17 +166,24 @@ export function DiscountCalculator() {
         const isHoliday = holidaySet.has(dateStr);
 
         if (!isWorkDay) return;
-
-        // Feriado: não conta como expected nem como falta
         if (isHoliday) return;
 
-        // Folga programada: não conta como expected
+        // Folga full-day: pula o dia
         if (userDayOffs.has(dateStr)) {
           dayOffCount++;
           return;
         }
 
-        expectedMinutes += dailyHours * 60;
+        // Folga parcial: reduz expected pelo intervalo coberto
+        const partialOff = userPartialOffs[dateStr] || 0;
+        const dailyExpected = Math.max(0, dailyHours * 60 - partialOff);
+        if (dailyExpected === 0) {
+          // Folga parcial cobriu o dia inteiro
+          if (partialOff > 0) dayOffCount++;
+          return;
+        }
+
+        expectedMinutes += dailyExpected;
         businessDays++;
 
         const dayRecords = userRecords.filter(r => r.clock_date === dateStr);
@@ -187,7 +196,6 @@ export function DiscountCalculator() {
           const breakMin = calculateTotalBreakMinutes(dayRecords);
           workedMinutes += Math.max(0, exitMin - entryMin - breakMin);
         } else if (entry && !exit) {
-          // Entrada sem saída: pendência → desconta como dia
           if (!userJustifications.has(dateStr)) pendingDays++;
         } else if (!entry) {
           if (!userJustifications.has(dateStr)) absences++;
