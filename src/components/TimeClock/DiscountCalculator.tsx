@@ -12,7 +12,8 @@ import { useGestorCompany } from '@/hooks/useGestorCompany';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, eachDayOfInterval, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { calculateTotalBreakMinutes, parseTimeToMinutes, formatMinutesToHM } from '@/lib/timeClockCalculations';
+import { formatMinutesToHM } from '@/lib/timeClockCalculations';
+import { evaluateDay, summarizePeriod, type DaySchedule, type DiscountMode, type DayOffType } from '@/lib/timeClockEngine';
 import { getBrazilianHolidays } from './brazilianHolidays';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -105,21 +106,11 @@ export function DiscountCalculator() {
       recordsByUser[r.user_id].push(r);
     });
 
-    // Folgas full-day → set por usuário; folgas parciais → minutos por usuário/data
-    const dayOffsByUser: Record<string, Set<string>> = {};
-    const partialOffMinutesByUser: Record<string, Record<string, number>> = {};
+    // Map de folgas por usuário/data (objeto bruto, com tipo e parcial)
+    const dayOffByUser: Record<string, Record<string, any>> = {};
     dayOffsRes.data?.forEach((d: any) => {
-      if (d.is_partial_day && d.start_time && d.end_time) {
-        const [sh, sm] = String(d.start_time).split(':').map(Number);
-        const [eh, em] = String(d.end_time).split(':').map(Number);
-        const mins = Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
-        if (!partialOffMinutesByUser[d.user_id]) partialOffMinutesByUser[d.user_id] = {};
-        partialOffMinutesByUser[d.user_id][d.off_date] =
-          (partialOffMinutesByUser[d.user_id][d.off_date] || 0) + mins;
-      } else {
-        if (!dayOffsByUser[d.user_id]) dayOffsByUser[d.user_id] = new Set();
-        dayOffsByUser[d.user_id].add(d.off_date);
-      }
+      if (!dayOffByUser[d.user_id]) dayOffByUser[d.user_id] = {};
+      dayOffByUser[d.user_id][d.off_date] = d;
     });
 
     const justByUser: Record<string, Set<string>> = {};
@@ -131,7 +122,7 @@ export function DiscountCalculator() {
     const days = eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) });
     const now = new Date();
 
-    // Feriados nacionais para o ano do período (cobre feriados ausentes do DB local)
+    // Feriados (DB + nacionais calculados)
     const periodYear = parseISO(startDate).getFullYear();
     const holidaySet = new Set(
       getBrazilianHolidays(periodYear)
@@ -146,82 +137,58 @@ export function DiscountCalculator() {
       const workDays = schedule?.work_days || [1, 2, 3, 4, 5];
       const dailyHours = schedule?.daily_hours || 8;
       const userRecords = recordsByUser[uid] || [];
-      const userDayOffs = dayOffsByUser[uid] || new Set();
-      const userJustifications = justByUser[uid] || new Set();
+      const userOffs = dayOffByUser[uid] || {};
+      const userJusts = justByUser[uid] || new Set<string>();
 
-      let expectedMinutes = 0;
-      let workedMinutes = 0;
-      let absences = 0;
-      let dayOffCount = 0;
-      let pendingDays = 0; // dias com entrada sem saída em dia útil passado
-      let businessDays = 0; // para valor/dia dinâmico
+      const sched: DaySchedule | null = schedule ? {
+        entry_time: schedule.entry_time,
+        exit_time: schedule.exit_time,
+        daily_hours: Number(dailyHours),
+        tolerance_minutes: schedule.tolerance_minutes ?? 10,
+        work_days: workDays,
+      } : null;
 
-      const userPartialOffs = partialOffMinutesByUser[uid] || {};
+      const dayResults = days
+        .filter(day => day <= now)
+        .map(day => {
+          const dateStr = format(day, 'yyyy-MM-dd');
+          const off = userOffs[dateStr];
+          let dayOff: { type: DayOffType; isPartial?: boolean; partialMinutes?: number } | null = null;
+          if (off && off.off_type !== 'feriado') {
+            let partialMinutes = 0;
+            if (off.is_partial_day && off.start_time && off.end_time) {
+              const [sh, sm] = String(off.start_time).split(':').map(Number);
+              const [eh, em] = String(off.end_time).split(':').map(Number);
+              partialMinutes = Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+            }
+            dayOff = { type: off.off_type, isPartial: !!off.is_partial_day, partialMinutes };
+          }
+          const isHoliday = holidaySet.has(dateStr) || off?.off_type === 'feriado';
+          const dayRecords = userRecords
+            .filter((r: any) => r.clock_date === dateStr)
+            .map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
+          return evaluateDay(dayRecords as any, sched, day.getDay(), {
+            isHoliday,
+            dayOff,
+            justified: userJusts.has(dateStr),
+          }, discountMode as DiscountMode);
+        });
 
-      days.forEach(day => {
-        if (day > now) return;
-        const dateStr = format(day, 'yyyy-MM-dd');
-        const dayOfWeek = day.getDay();
-        const isWorkDay = workDays.includes(dayOfWeek);
-        const isHoliday = holidaySet.has(dateStr);
+      const summary = summarizePeriod(dayResults);
+      const businessDays = dayResults.filter(d => d.expectedMinutes > 0).length || 22;
+      const valorHora = salary > 0 ? salary / (Number(dailyHours) * businessDays) : 0;
+      const valorDia = valorHora * Number(dailyHours);
 
-        if (!isWorkDay) return;
-        if (isHoliday) return;
+      const negativeMinutes = Math.max(0, summary.expected - summary.worked - (summary.absences + summary.pending) * Number(dailyHours) * 60);
 
-        // Folga full-day: pula o dia
-        if (userDayOffs.has(dateStr)) {
-          dayOffCount++;
-          return;
-        }
-
-        // Folga parcial: reduz expected pelo intervalo coberto
-        const partialOff = userPartialOffs[dateStr] || 0;
-        const dailyExpected = Math.max(0, dailyHours * 60 - partialOff);
-        if (dailyExpected === 0) {
-          // Folga parcial cobriu o dia inteiro
-          if (partialOff > 0) dayOffCount++;
-          return;
-        }
-
-        expectedMinutes += dailyExpected;
-        businessDays++;
-
-        const dayRecords = userRecords.filter(r => r.clock_date === dateStr);
-        const entry = dayRecords.find(r => r.clock_type === 'entrada');
-        const exit = dayRecords.find(r => r.clock_type === 'saida');
-
-        if (entry && exit) {
-          const entryMin = parseTimeToMinutes(entry.clock_time);
-          const exitMin = parseTimeToMinutes(exit.clock_time);
-          const breakMin = calculateTotalBreakMinutes(dayRecords);
-          workedMinutes += Math.max(0, exitMin - entryMin - breakMin);
-        } else if (entry && !exit) {
-          if (!userJustifications.has(dateStr)) pendingDays++;
-        } else if (!entry) {
-          if (!userJustifications.has(dateStr)) absences++;
-        }
-      });
-
-      // Fórmula trabalhista coerente com a jornada do colaborador
-      const effectiveBusinessDays = businessDays || 22;
-      const valorHora = salary > 0 ? salary / (dailyHours * effectiveBusinessDays) : 0;
-      const valorDia = valorHora * dailyHours;
-      const negativeMinutes = Math.max(0, expectedMinutes - workedMinutes - (absences + pendingDays) * dailyHours * 60);
-
-      // Modo de desconto: evita dupla penalidade
-      // financeiro: desconta tudo em folha
-      // banco: tudo vai para banco negativo (sem desconto financeiro)
-      // misto: faltas em folha, atrasos/horas negativas no banco
       let discountNegativeHours = 0;
       let discountAbsences = 0;
       if (discountMode === 'financeiro') {
         discountNegativeHours = (negativeMinutes / 60) * valorHora;
-        discountAbsences = (absences + pendingDays) * valorDia;
+        discountAbsences = (summary.absences + summary.pending) * valorDia;
       } else if (discountMode === 'misto') {
-        discountAbsences = (absences + pendingDays) * valorDia;
-        // horas negativas vão para o banco — não descontam
+        discountAbsences = (summary.absences + summary.pending) * valorDia;
       }
-      // discountMode === 'banco' → ambos zero
       const totalDiscount = discountNegativeHours + discountAbsences;
       const netEstimated = Math.max(0, salary - totalDiscount);
 
@@ -229,11 +196,11 @@ export function DiscountCalculator() {
         userId: uid,
         userName: profile.name || profile.email?.split('@')[0] || 'Sem nome',
         salary,
-        expectedMinutes,
-        workedMinutes,
+        expectedMinutes: summary.expected,
+        workedMinutes: summary.worked,
         negativeMinutes,
-        absences: absences + pendingDays,
-        dayOffs: dayOffCount,
+        absences: summary.absences + summary.pending,
+        dayOffs: summary.dayOffs,
         discountNegativeHours,
         discountAbsences,
         totalDiscount,

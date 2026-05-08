@@ -149,7 +149,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).maybeSingle(),
         supabase.from('profiles').select('name, email, cpf, role').eq('id', userId).maybeSingle(),
         (supabase as any).rpc('get_salary_at', { p_user_id: userId, p_company_id: null, p_date: endDate }),
-        supabase.from('time_clock_day_offs').select('off_date, off_type').eq('user_id', userId)
+        supabase.from('time_clock_day_offs').select('off_date, off_type, is_partial_day, start_time, end_time').eq('user_id', userId)
           .gte('off_date', startDate).lte('off_date', endDate),
         (supabase as any).from("brazilian_holidays").select('holiday_date').gte('holiday_date', startDate).lte('holiday_date', endDate),
         (supabase as any).from('hour_bank_settings').select('discount_mode').limit(1).maybeSingle(),
@@ -161,18 +161,19 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const schedule = scheduleRes.data as any;
       const profile = profileRes.data as any;
       const salary = salaryRes.data as any;
-      const dayOffMap: Record<string, string> = {};
-      (dayOffsRes.data || []).forEach((d: any) => { dayOffMap[d.off_date] = d.off_type; });
+      const dayOffMap: Record<string, any> = {};
+      (dayOffsRes.data || []).forEach((d: any) => { dayOffMap[d.off_date] = d; });
       const holidaySet = new Set<string>((holidaysRes.data || []).map((h: any) => h.holiday_date));
-      // Fundir feriados nacionais calculados (Meeus/Jones/Butcher) — cobrir feriados ausentes do DB
       const periodYear = parseISO(startDate).getFullYear();
       getBrazilianHolidays(periodYear).forEach(h => {
         if (h.date >= startDate && h.date <= endDate) holidaySet.add(h.date);
       });
-      // Day offs marcados como 'feriado' também contam
-      Object.entries(dayOffMap).forEach(([date, type]) => {
-        if (type === 'feriado') holidaySet.add(date);
+      Object.entries(dayOffMap).forEach(([date, d]: [string, any]) => {
+        if (d.off_type === 'feriado') holidaySet.add(date);
       });
+      const justifiedSet = new Set<string>(
+        justifications.filter((j: any) => j.status === 'approved').map((j: any) => j.reference_date)
+      );
 
       const sched: DaySchedule | null = schedule
         ? {
@@ -184,18 +185,36 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           }
         : null;
 
+      const buildDayContext = (dateStr: string) => {
+        const off = dayOffMap[dateStr];
+        let dayOff: any = null;
+        if (off && off.off_type !== 'feriado') {
+          let partialMinutes = 0;
+          if (off.is_partial_day && off.start_time && off.end_time) {
+            const [sh, sm] = String(off.start_time).split(':').map(Number);
+            const [eh, em] = String(off.end_time).split(':').map(Number);
+            partialMinutes = Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+          }
+          dayOff = { type: off.off_type, isPartial: !!off.is_partial_day, partialMinutes };
+        }
+        return {
+          isHoliday: holidaySet.has(dateStr),
+          dayOff,
+          justified: justifiedSet.has(dateStr),
+        };
+      };
+
       const days = eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) });
       const dayResults: { date: Date; result: DayResult; obs: string }[] = days.map((day) => {
         const dateStr = format(day, 'yyyy-MM-dd');
         const dayRecords = records
           .filter((r: any) => r.clock_date === dateStr)
           .map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
-        const isHoliday = holidaySet.has(dateStr);
-        const result = evaluateDay(dayRecords, sched, day.getDay(), isHoliday, discountMode);
+        const result = evaluateDay(dayRecords, sched, day.getDay(), buildDayContext(dateStr), discountMode);
         const off = dayOffMap[dateStr];
         const just = justifications.find((j: any) => j.reference_date === dateStr);
         let obs = '';
-        if (off) obs = off.toUpperCase();
+        if (off) obs = String(off.off_type).toUpperCase() + (off.is_partial_day ? ' (PARCIAL)' : '');
         else if (just) obs = `${(just as any).status === 'approved' ? '✓' : (just as any).status === 'rejected' ? '✗' : '⏳'} ${(just as any).justification_type}`;
         else if (result.inconsistencies.length > 0) obs = result.inconsistencies.map(i => i.message).join(' • ');
         return { date: day, result, obs };
@@ -446,12 +465,13 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
   const generateDailyPDF = async () => {
     setLoading(true);
     try {
-      const [recordsRes, justRes, scheduleRes, profileRes, holidayRes] = await Promise.all([
+      const [recordsRes, justRes, scheduleRes, profileRes, holidayRes, dayOffRes] = await Promise.all([
         supabase.from('time_clock').select('*').eq('user_id', userId).eq('clock_date', selectedDate).order('clock_time'),
         supabase.from('time_clock_justifications').select('*').eq('user_id', userId).eq('reference_date', selectedDate),
         supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).maybeSingle(),
         supabase.from('profiles').select('name, cpf, role').eq('id', userId).maybeSingle(),
         (supabase as any).from("brazilian_holidays").select('holiday_date').eq('holiday_date', selectedDate).maybeSingle(),
+        supabase.from('time_clock_day_offs').select('off_date, off_type, is_partial_day, start_time, end_time').eq('user_id', userId).eq('off_date', selectedDate).maybeSingle(),
       ]);
 
       const records = (recordsRes.data || []).map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
@@ -464,10 +484,21 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         work_days: schedule.work_days ?? [1, 2, 3, 4, 5],
       } : null;
       const day = parseISO(selectedDate);
-      // Considera feriado se vem do DB OU dos feriados nacionais calculados
       const nationalHolidays = new Set(getBrazilianHolidays(day.getFullYear()).map(h => h.date));
-      const isHoliday = !!holidayRes.data || nationalHolidays.has(selectedDate);
-      const result = evaluateDay(records, sched, day.getDay(), isHoliday);
+      const off = dayOffRes?.data as any;
+      const isHoliday = !!holidayRes.data || nationalHolidays.has(selectedDate) || off?.off_type === 'feriado';
+      let dayOff: any = null;
+      if (off && off.off_type !== 'feriado') {
+        let partialMinutes = 0;
+        if (off.is_partial_day && off.start_time && off.end_time) {
+          const [sh, sm] = String(off.start_time).split(':').map(Number);
+          const [eh, em] = String(off.end_time).split(':').map(Number);
+          partialMinutes = Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+        }
+        dayOff = { type: off.off_type, isPartial: !!off.is_partial_day, partialMinutes };
+      }
+      const justified = !!(justRes.data || []).find((j: any) => j.status === 'approved');
+      const result = evaluateDay(records, sched, day.getDay(), { isHoliday, dayOff, justified });
 
       const doc = new jsPDF();
       const pw = doc.internal.pageSize.getWidth();
@@ -562,7 +593,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         supabase.from('time_clock').select('*').eq('user_id', userId).gte('clock_date', startDate).lte('clock_date', endDate).order('clock_date').order('clock_time'),
         supabase.from('time_clock_schedules').select('*').eq('user_id', userId).eq('is_active', true).maybeSingle(),
         (supabase as any).from("brazilian_holidays").select('holiday_date').gte('holiday_date', startDate).lte('holiday_date', endDate),
-        supabase.from('time_clock_day_offs').select('off_date, off_type').eq('user_id', userId).gte('off_date', startDate).lte('off_date', endDate),
+        supabase.from('time_clock_day_offs').select('off_date, off_type, is_partial_day, start_time, end_time').eq('user_id', userId).gte('off_date', startDate).lte('off_date', endDate),
         supabase.from('time_clock_justifications').select('*').eq('user_id', userId).gte('reference_date', startDate).lte('reference_date', endDate),
       ]);
       const records = recordsRes.data || [];
@@ -572,12 +603,15 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       getBrazilianHolidays(periodYear).forEach(h => {
         if (h.date >= startDate && h.date <= endDate) holidaySet.add(h.date);
       });
-      const dayOffMap: Record<string, string> = {};
-      (dayOffsRes.data || []).forEach((d: any) => { dayOffMap[d.off_date] = d.off_type; });
-      Object.entries(dayOffMap).forEach(([date, type]) => {
-        if (type === 'feriado') holidaySet.add(date);
+      const dayOffMap: Record<string, any> = {};
+      (dayOffsRes.data || []).forEach((d: any) => { dayOffMap[d.off_date] = d; });
+      Object.entries(dayOffMap).forEach(([date, d]: [string, any]) => {
+        if (d.off_type === 'feriado') holidaySet.add(date);
       });
       const justifications = justRes.data || [];
+      const justifiedSet = new Set<string>(
+        justifications.filter((j: any) => j.status === 'approved').map((j: any) => j.reference_date)
+      );
 
       const sched: DaySchedule | null = schedule ? {
         entry_time: schedule.entry_time, exit_time: schedule.exit_time,
@@ -586,11 +620,26 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         work_days: schedule.work_days ?? [1, 2, 3, 4, 5],
       } : null;
 
+      const buildCtx = (ds: string) => {
+        const off = dayOffMap[ds];
+        let dayOff: any = null;
+        if (off && off.off_type !== 'feriado') {
+          let partialMinutes = 0;
+          if (off.is_partial_day && off.start_time && off.end_time) {
+            const [sh, sm] = String(off.start_time).split(':').map(Number);
+            const [eh, em] = String(off.end_time).split(':').map(Number);
+            partialMinutes = Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+          }
+          dayOff = { type: off.off_type, isPartial: !!off.is_partial_day, partialMinutes };
+        }
+        return { isHoliday: holidaySet.has(ds), dayOff, justified: justifiedSet.has(ds) };
+      };
+
       const days = eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) });
       const rows: any[] = days.map(day => {
         const ds = format(day, 'yyyy-MM-dd');
         const dayRecords = records.filter((r: any) => r.clock_date === ds).map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
-        const result = evaluateDay(dayRecords, sched, day.getDay(), holidaySet.has(ds));
+        const result = evaluateDay(dayRecords, sched, day.getDay(), buildCtx(ds));
         const fmtTime = (type: string) => {
           const r = records.find((x: any) => x.clock_date === ds && x.clock_type === type);
           if (!r) return '';
@@ -614,7 +663,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           'Extra': formatHM(result.overtimeMinutes),
           'Banco': formatHM(result.bankBalanceMinutes),
           'Status': dayStatusLabels[result.status],
-          'Folga/Tipo': off ? off.toUpperCase() : '',
+          'Folga/Tipo': off ? String(off.off_type).toUpperCase() + (off.is_partial_day ? ' (PARCIAL)' : '') : '',
           'Justificativa': just ? `[${(just as any).status}] ${(just as any).justification_type}` : '',
           'Inconsistências': result.inconsistencies.map(i => i.message).join(' | '),
         };
@@ -623,7 +672,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       const summary = summarizePeriod(days.map(day => {
         const ds = format(day, 'yyyy-MM-dd');
         const dayRecords = records.filter((r: any) => r.clock_date === ds).map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
-        return evaluateDay(dayRecords, sched, day.getDay(), holidaySet.has(ds));
+        return evaluateDay(dayRecords, sched, day.getDay(), buildCtx(ds));
       }));
 
       const totals = [

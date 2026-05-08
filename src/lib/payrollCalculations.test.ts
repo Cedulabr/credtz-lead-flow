@@ -53,7 +53,7 @@ describe('computePayrollRow', () => {
       periodOpts
     );
 
-    expect(row.dayOffs).toBe(3);
+    expect(row.dayOffs).toBe(4); // 3 full + 1 parcial
     // 17 dias úteis × 8h = 8160 min, + 20/04 reduzido (480-240=240): total 8400
     expect(row.expectedMinutes).toBe(17 * 480 + 240);
     // worked: 17*8h*60 + 3h*60 = 8340
@@ -111,8 +111,110 @@ describe('computePayrollRow', () => {
       { ...baseUser, records: [], dayOffs: [], approvedJustifications: [] },
       periodOpts
     );
-    // 22 dias úteis em abril/2026 - 1 feriado = 21 dias de falta
     expect(row.absences).toBe(21);
     expect(row.discountAbsences).toBeGreaterThan(0);
+  });
+
+  it('cenário Alana real: folga + falta — só 29/04 e 30/04 são faltas', () => {
+    const trabalhados = [
+      '2026-04-01','2026-04-02','2026-04-03','2026-04-06','2026-04-07',
+      '2026-04-08','2026-04-09','2026-04-14','2026-04-15','2026-04-16',
+      '2026-04-17','2026-04-22','2026-04-23','2026-04-24','2026-04-27',
+    ];
+    const records: any[] = [];
+    trabalhados.forEach(d => {
+      records.push({ clock_date: d, clock_type: 'entrada', clock_time: '09:00:00' });
+      records.push({ clock_date: d, clock_type: 'saida', clock_time: '17:00:00' });
+    });
+    const row = computePayrollRow(
+      {
+        ...baseUser,
+        salary: 1200,
+        records,
+        dayOffs: [
+          { off_date: '2026-04-10', off_type: 'folga' },
+          { off_date: '2026-04-13', off_type: 'folga' },
+          { off_date: '2026-04-20', off_type: 'folga' },
+          { off_date: '2026-04-28', off_type: 'folga' },
+        ],
+        approvedJustifications: [],
+      },
+      periodOpts
+    );
+    expect(row.absences).toBe(2);
+    expect(row.discountAbsences).toBeGreaterThan(0);
+    expect(row.netEstimated).toBeGreaterThan(900);
+  });
+
+  it('folga full-day com batidas residuais NÃO gera pendência', () => {
+    const row = computePayrollRow(
+      {
+        ...baseUser,
+        records: [
+          { clock_date: '2026-04-10', clock_type: 'entrada', clock_time: '09:00:00' },
+        ],
+        dayOffs: [{ off_date: '2026-04-10', off_type: 'folga' }],
+        approvedJustifications: [],
+      },
+      periodOpts
+    );
+    expect(row.dayOffs).toBeGreaterThanOrEqual(1);
+    expect(row.pending).toBe(0);
+  });
+
+  it('registro incompleto em folga é ignorado, em dia útil vira pendência', () => {
+    const recs = [
+      { clock_date: '2026-04-01', clock_type: 'entrada', clock_time: '09:00:00' },
+      { clock_date: '2026-04-10', clock_type: 'entrada', clock_time: '09:00:00' },
+    ];
+    const row = computePayrollRow(
+      {
+        ...baseUser,
+        records: recs,
+        dayOffs: [{ off_date: '2026-04-10', off_type: 'folga' }],
+        approvedJustifications: [],
+      },
+      periodOpts
+    );
+    expect(row.pending).toBe(1);
+  });
+
+  it('pausa de 1 minuto em dia útil gera pendência (intervalo inválido)', () => {
+    const records = [
+      { clock_date: '2026-04-24', clock_type: 'entrada', clock_time: '09:00:00' },
+      { clock_date: '2026-04-24', clock_type: 'pausa_inicio', clock_time: '12:00:00' },
+      { clock_date: '2026-04-24', clock_type: 'pausa_fim', clock_time: '12:01:00' },
+      { clock_date: '2026-04-24', clock_type: 'saida', clock_time: '17:00:00' },
+    ];
+    const row = computePayrollRow(
+      { ...baseUser, records, dayOffs: [], approvedJustifications: [] },
+      periodOpts
+    );
+    expect(row.pending).toBeGreaterThanOrEqual(1);
+  });
+
+  it('feriado com trabalho contabiliza hora extra, não falta', () => {
+    const records = [
+      { clock_date: '2026-04-21', clock_type: 'entrada', clock_time: '09:00:00' },
+      { clock_date: '2026-04-21', clock_type: 'saida', clock_time: '13:00:00' },
+    ];
+    const row = computePayrollRow(
+      { ...baseUser, records, dayOffs: [], approvedJustifications: [] },
+      periodOpts
+    );
+    expect(row.holidays).toBe(1);
+    expect(row.overtimeMinutes).toBeGreaterThanOrEqual(240);
+  });
+
+  it('jornada de 9h gera saldo positivo de banco no dia (overtime)', () => {
+    const records = [
+      { clock_date: '2026-04-01', clock_type: 'entrada', clock_time: '09:00:00' },
+      { clock_date: '2026-04-01', clock_type: 'saida', clock_time: '18:00:00' },
+    ];
+    const row = computePayrollRow(
+      { ...baseUser, records, dayOffs: [], approvedJustifications: [] },
+      { ...periodOpts, discountMode: 'banco' }
+    );
+    expect(row.overtimeMinutes).toBeGreaterThanOrEqual(60);
   });
 });

@@ -1,54 +1,105 @@
-# Diagnóstico
+## Diagnóstico
 
-Verifiquei o banco de dados:
+A lógica de cálculo do espelho de ponto vive principalmente em `src/lib/timeClockEngine.ts` (função `evaluateDay` + `summarizePeriod`) e é consumida por `TimeClockPDF.tsx`, `ClosurePanel.tsx`, `DiscountCalculator.tsx` e `MyHistory.tsx`. Hoje ela só recebe `isHoliday` — **não recebe folga/DSR/escala OFF**. Resultado:
 
-- A solicitação aprovada de **27/04 às 09:22 (Adicionar entrada)** **não pertence à Alana Rodrigues**. O `user_id` da solicitação (`a8a1af22…`) é do usuário **Cedula BR** (`cedulabr@gmail.com`), e o registro foi inserido corretamente no ponto dele.
-- A Alana (`8642cf4a…`) **não tem nenhuma solicitação de ajuste** no mês de 04/2026. Por isso o espelho mensal dela continua mostrando a entrada original (12:51) em 27/04.
+- Dias com `time_clock_day_offs` (folga, dsr, escala_off, ferias, atestado) entram na engine como dia útil normal e geram `falta`, `pendente_ajuste`, `saida_antecipada_grave`, etc.
+- `summarizePeriod` soma esses dias em `absences` / `pending`.
+- O PDF (`TimeClockPDF.tsx`) mostra o status da engine na coluna "Status" e calcula `descFaltas` / `descPendentes` em cima desse total inflado, mesmo já tendo o rótulo "FOLGA" na coluna observações.
+- Só o tipo `feriado` é mesclado no `holidaySet` (linha 173-175). Os demais tipos passam batido.
+- `DiscountCalculator.tsx` trata `dayOffsByUser` corretamente, mas `pendingDays` ainda é incrementado em dias com folga parcial mal coberta; e o módulo do PDF ignora esse cálculo paralelo.
+- `evaluateDay` não valida intervalo mínimo (ex.: 24/04 com pausa de 1 min) e não impede status conflitantes.
 
-A causa raiz é o **fluxo de ajustes**: hoje o formulário `AdjustmentRequest` só permite que o próprio colaborador crie pedidos para si (`user_id = auth.uid()`). Não existe caminho para admin/gestor lançar ajuste em nome de outro colaborador. Quando você abriu a tela e criou o ajuste, ele foi atribuído ao usuário logado (Cedula BR), e foi exatamente esse ponto que mudou — não o da Alana.
+## Mudanças
 
-O trigger `tg_apply_adjustment_request` e o `recalc_user_day` estão funcionando: registro entra em `time_clock` com `status='ajustado'` e o `time_clock_day_summary` é recalculado. O `TimeClockPDF` (Espelho de Ponto) e o `MyHistory` lêem `time_clock` sem filtro de status, então registros ajustados aparecem normalmente — desde que pertençam ao colaborador correto.
+### 1. `src/lib/timeClockEngine.ts` — engine com prioridade de status
+- Nova assinatura: `evaluateDay(records, schedule, dayOfWeek, { isHoliday, dayOff, justified, minBreakMinutes }, discountMode)`.
+  - `dayOff?: { type: 'folga' | 'dsr' | 'escala_off' | 'ferias' | 'atestado'; isPartial?: boolean; partialMinutes?: number }`.
+  - `justified?: boolean` (justificativa aprovada).
+- Pipeline de prioridade (do mais alto ao mais baixo):
+  1. `feriado` → status `feriado`, zera tudo (worked/over/bank/delay/early), nunca gera falta/pendente/desconto.
+  2. `dayOff` full-day → status `folga` (sub-rotulo via `dayOff.type`), zera tudo. Se houver registros no dia, expõe apenas como observação informativa, nunca como inconsistência financeira.
+  3. `dayOff` parcial → reduz `expectedMinutes` (`max(0, daily*60 - partialMinutes)`); só avalia atrasos/saídas/falta se `expectedMinutes > 0` E houver janela útil restante.
+  4. `justified` sem registros → status `justificado`, zera deltas.
+  5. Demais regras atuais (falta, pendente_ajuste, observação, ok).
+- Adicionar `MIN_BREAK_MINUTES` (ex.: 5) e novo código `INTERVALO_INVALIDO` em `Inconsistency['code']` quando uma pausa < limite — sinaliza `severity: 'high'` (vira `pendente_ajuste`).
+- Validação de status conflitantes: garantir que `status='falta'` nunca coexiste com `dayOff` ou `feriado`; `subStatus` só preenche quando `status` permite.
+- `summarizePeriod`: passar a ignorar `feriado`, `folga` e `justificado` em `absences`/`pending`/`delay`/`earlyExit`. Adicionar contadores `holidays` e `dayOffs` no retorno para uso no PDF.
 
-# Plano
+### 2. `src/components/TimeClock/TimeClockPDF.tsx`
+- Construir `dayOffMap` com objeto `{ type, is_partial_day, start_time, end_time }` (já vem de `time_clock_day_offs`; ampliar select).
+- Construir `justSet` com apenas justificativas `status='approved'`.
+- Trocar chamada de `evaluateDay(...)` para passar o novo objeto de contexto (`dayOff`, `isHoliday`, `justified`).
+- Coluna **Status**: priorizar `dayOffLabel` quando presente (FOLGA/DSR/ESCALA OFF/FERIADO/JUSTIFICADO) com cor própria; só cair no `subStatus` quando o dia é útil.
+- Bloco **TOTALIZADORES**: ler `summary` ajustado (faltas/pendentes já excluem folgas).
+- Bloco **Desconto estimado**:
+  - `descFaltas = summary.absences * valorDia` (já corrigido pela engine).
+  - `descPendentes = summary.pending * valorDia` (idem).
+  - `descAtrasos` segue (`summary.delay + summary.earlyExit`), também já zerados em folga.
+- Repetir os ajustes na geração diária (`generateDailyPDF`) e no PDF do gestor (linhas ~561-626).
 
-## 1. Lançamento administrativo de ajustes
+### 3. `src/components/TimeClock/ClosurePanel.tsx`
+- Buscar `time_clock_day_offs` (já busca) e `time_clock_justifications` no mesmo `Promise.all`; passar `dayOff` + `justified` para `evaluateDay`. Garante que o painel de fechamento não trave por folga marcada como pendente.
 
-Adicionar em `AdjustmentReview` (aba "Revisão de Ajustes") um botão **"Lançar ajuste"** disponível para `admin` e `gestor`:
+### 4. `src/components/TimeClock/DiscountCalculator.tsx`
+- Eliminar o cálculo paralelo: usar `evaluateDay` + `summarizePeriod` (mesma fonte da verdade do PDF) por usuário, garantindo que dashboard e PDF batam.
+- Pendências só contam quando `expectedMinutes > 0` e não há `dayOff`/`justified`.
 
-- Modal com seleção de **colaborador** (lista filtrada por empresa do gestor / todas para admin), data, tipo (`add_entry`, `add_exit`, `add_break_start`, `add_break_end`, `edit_entry`, `edit_exit`, `edit_break_start`, `edit_break_end`, `remove_record`), horário proposto e motivo.
-- Para tipos `edit_*` / `remove_record`, listar batidas existentes do dia para escolher `target_record_id`.
-- Insere em `time_clock_adjustment_requests` já com `status='approved'`, `reviewed_by=auth.uid()`, `reviewed_at=now()`, `reason="Lançamento administrativo: <motivo>"`.
-- O trigger existente `tg_apply_adjustment_request` cuida da inserção/edição em `time_clock`, do log e do `recalc_user_day`.
+### 5. `src/lib/payrollCalculations.ts`
+- Refatorar `computePayrollRow` para delegar a `evaluateDay`, eliminando lógica duplicada e mantendo o tipo público para os testes.
 
-## 2. Permissão no banco
+### 6. Testes — `src/lib/payrollCalculations.test.ts`
+Adicionar cenários cobrindo:
+- Folga full-day sem batidas → `absences=0`, `dayOffs=1`, desconto = 0.
+- Folga full-day **com** batidas residuais → status folga, desconto = 0, sem pendência.
+- Folga parcial cobrindo metade do turno → `expectedMinutes` reduzido proporcionalmente.
+- Feriado nacional + escala OFF → status feriado, sem desconto.
+- Justificativa aprovada substitui falta.
+- Falta real (dia útil sem folga/justificativa) → 1 absence, desconto = `valorDia`.
+- Registro incompleto em dia útil → pendente. Em folga → ignorado.
+- Pausa de 1 min → `INTERVALO_INVALIDO` + status `pendente_ajuste`.
+- Banco de horas: jornada 9h em dia de 8h → +60 min de banco; dia com atraso só desconta financeiro (modo financeiro).
+- Hora extra em sábado de escala 6h.
+- Cenário replicando 10/04 e 13/04 do Alana (folga + falta) → desconto final = R$ 120 (apenas 29/04 e 30/04), líquido > R$ 930.
 
-Atualizar a policy `adj_insert_*` em `time_clock_adjustment_requests` para permitir `INSERT` quando o autor é admin (`has_role_safe(auth.uid(),'admin')`) ou gestor da mesma empresa do colaborador alvo. Hoje só permite `auth.uid() = user_id`.
+### 7. Recalcular registros existentes
+- Após o deploy, disparar `recalc_user_day` (RPC já existente) para o período afetado dos colaboradores (ou criar migração que rode `SELECT recalc_user_day(user_id, dia)` para o mês 04/2026 de todos os usuários com folga registrada). Isso atualiza `time_clock_daily_summary` e qualquer view dependente do banco.
 
-## 3. Ajustes manuais já lançados (limpeza)
+## Detalhes técnicos relevantes
 
-Os ajustes de 27/04 e 28/04 que ficaram no usuário Cedula BR podem ser:
+```ts
+// nova interface
+export interface DayContext {
+  isHoliday?: boolean;
+  dayOff?: {
+    type: 'folga' | 'dsr' | 'escala_off' | 'ferias' | 'atestado';
+    isPartial?: boolean;
+    partialMinutes?: number;
+  };
+  justified?: boolean;
+  minBreakMinutes?: number; // default 5
+}
 
-- Cancelados (status → `cancelled`) e os registros `time_clock` correspondentes removidos manualmente, **ou**
-- Mantidos como histórico — fica a critério do usuário.
+export function evaluateDay(
+  records: ClockRecord[],
+  schedule: DaySchedule | null,
+  dayOfWeek: number,
+  ctx: DayContext = {},
+  discountMode: DiscountMode = 'financeiro'
+): DayResult
+```
 
-Após confirmar, posso criar uma migração de limpeza pontual.
+Ordem de aplicação dentro de `evaluateDay`:
 
-## 4. Visibilidade do tipo "ajustado" no espelho mensal
+```text
+feriado  >  dayOff(full)  >  justificado(sem registros)
+        >  dayOff(parcial)  >  validações de inconsistência
+        >  cálculo normal (atraso / saída antecipada / banco)
+```
 
-O PDF já lê o campo `status='ajustado'`. Vou exibir uma marca visual ("A" sobrescrito ou cor diferente na coluna Entrada/Saída) para deixar claro que aquela batida é fruto de ajuste — útil para auditoria.
+`summarizePeriod` passa a ignorar `status ∈ { 'feriado', 'folga', 'justificado' }` para `absences`/`pending`/`delay`/`earlyExit`, mas continua somando `worked`/`overtime`/`bank` (caso o colaborador tenha trabalhado mesmo assim).
 
-## 5. Verificação
+## Itens fora de escopo
 
-Após implementar:
-
-- Lançar ajuste de teste para Alana (entrada 09:00 em 27/04).
-- Conferir `time_clock` (registro novo `status='ajustado'`).
-- Conferir `time_clock_day_summary` (recalc com expected/worked corretos).
-- Gerar Espelho Mensal de Alana e validar que a batida aparece com a marcação de ajuste.
-
-# Detalhes técnicos
-
-- Arquivo principal: `src/components/TimeClock/AdjustmentReview.tsx` (adicionar dialog "Lançar ajuste").
-- Reaproveitar `get_profiles_by_ids` + lista de `user_companies` para listar colaboradores conforme escopo do gestor.
-- Migração: novas policies `adj_insert_admin` e `adj_insert_gestor`.
-- `TimeClockPDF.tsx`: anotar registros `status='ajustado'` na linha da tabela mensal (asterisco + legenda no rodapé da página).
+- Mudar a UX da tela de DayOffManager / JustificationManager.
+- Alterar o RPC `recalc_user_day` no banco (apenas chamamos no script de recomputação).
+- Mexer em RLS ou novas tabelas.

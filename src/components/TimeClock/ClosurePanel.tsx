@@ -79,19 +79,25 @@ export function ClosurePanel() {
       .eq('is_active', true);
     const userIds = (ucUsers || []).map((u: any) => u.user_id);
     if (userIds.length === 0) return [];
-    const [recRes, schedRes, profRes, holRes, offRes] = await Promise.all([
+    const [recRes, schedRes, profRes, holRes, offRes, justRes] = await Promise.all([
       supabase.from('time_clock').select('user_id, clock_date, clock_type, clock_time')
         .in('user_id', userIds).gte('clock_date', startDate).lte('clock_date', endDate),
       supabase.from('time_clock_schedules').select('*').in('user_id', userIds).eq('is_active', true),
       supabase.from('profiles').select('id, name, email').in('id', userIds),
       (supabase as any).from('brazilian_holidays').select('holiday_date').gte('holiday_date', startDate).lte('holiday_date', endDate),
-      supabase.from('time_clock_day_offs').select('user_id, off_date, off_type').in('user_id', userIds).gte('off_date', startDate).lte('off_date', endDate),
+      supabase.from('time_clock_day_offs').select('user_id, off_date, off_type, is_partial_day, start_time, end_time').in('user_id', userIds).gte('off_date', startDate).lte('off_date', endDate),
+      supabase.from('time_clock_justifications').select('user_id, reference_date, status').in('user_id', userIds).gte('reference_date', startDate).lte('reference_date', endDate),
     ]);
     const holidaySet = new Set<string>((holRes.data || []).map((h: any) => h.holiday_date));
     getBrazilianHolidays(parseISO(startDate).getFullYear()).forEach(h => {
       if (h.date >= startDate && h.date <= endDate) holidaySet.add(h.date);
     });
     (offRes.data || []).forEach((o: any) => { if (o.off_type === 'feriado') holidaySet.add(o.off_date); });
+    const offByUserDate: Record<string, any> = {};
+    (offRes.data || []).forEach((o: any) => { offByUserDate[`${o.user_id}__${o.off_date}`] = o; });
+    const justSet = new Set<string>(
+      (justRes.data || []).filter((j: any) => j.status === 'approved').map((j: any) => `${j.user_id}__${j.reference_date}`)
+    );
     const schedByUser: Record<string, any> = {};
     (schedRes.data || []).forEach((s: any) => { schedByUser[s.user_id] = s; });
     const profByUser: Record<string, any> = {};
@@ -112,7 +118,22 @@ export function ClosurePanel() {
         const dateStr = format(d, 'yyyy-MM-dd');
         const dayRecs = (recRes.data || []).filter((r: any) => r.user_id === uid && r.clock_date === dateStr)
           .map((r: any) => ({ clock_type: r.clock_type, clock_time: r.clock_time }));
-        const result = evaluateDay(dayRecs as any, ds, d.getDay(), holidaySet.has(dateStr));
+        const off = offByUserDate[`${uid}__${dateStr}`];
+        let dayOff: any = null;
+        if (off && off.off_type !== 'feriado') {
+          let partialMinutes = 0;
+          if (off.is_partial_day && off.start_time && off.end_time) {
+            const [sh, sm] = String(off.start_time).split(':').map(Number);
+            const [eh, em] = String(off.end_time).split(':').map(Number);
+            partialMinutes = Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+          }
+          dayOff = { type: off.off_type, isPartial: !!off.is_partial_day, partialMinutes };
+        }
+        const result = evaluateDay(dayRecs as any, ds, d.getDay(), {
+          isHoliday: holidaySet.has(dateStr),
+          dayOff,
+          justified: justSet.has(`${uid}__${dateStr}`),
+        });
         if (result.status === 'pendente_ajuste') {
           pendings.push({
             user: profByUser[uid]?.name || profByUser[uid]?.email || uid.slice(0, 8),

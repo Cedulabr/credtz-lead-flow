@@ -23,7 +23,23 @@ export type DaySubStatus =
   | 'registro_incompleto'
   | 'banco_positivo'
   | 'hora_extra'
+  | 'folga_parcial'
   | null;
+
+export type DayOffType = 'folga' | 'dsr' | 'escala_off' | 'ferias' | 'atestado';
+
+export interface DayOffContext {
+  type: DayOffType;
+  isPartial?: boolean;
+  partialMinutes?: number;
+}
+
+export interface DayContext {
+  isHoliday?: boolean;
+  dayOff?: DayOffContext | null;
+  justified?: boolean;
+  minBreakMinutes?: number;
+}
 
 export type DiscountMode = 'financeiro' | 'banco' | 'misto';
 
@@ -52,7 +68,8 @@ export interface Inconsistency {
     | 'PAUSA_EXCESSIVA'
     | 'JORNADA_EXCESSIVA'
     | 'BATIDA_DUPLICADA'
-    | 'HORARIO_INVALIDO';
+    | 'HORARIO_INVALIDO'
+    | 'INTERVALO_INVALIDO';
   severity: 'high' | 'medium' | 'low';
   message: string;
   minutes?: number;
@@ -71,6 +88,12 @@ export interface DayResult {
   bankBalanceMinutes: number;
   entryMinute: number | null;
   exitMinute: number | null;
+  /** Marca se o dia caiu em feriado (mesmo que tenha trabalhado). */
+  wasHoliday?: boolean;
+  /** Marca se o dia tinha day_off explícito (folga/dsr/escala_off/ferias/atestado). */
+  wasDayOff?: boolean;
+  /** Marca se o dia foi coberto por justificativa aprovada. */
+  wasJustified?: boolean;
 }
 
 export const inconsistencyLabels: Record<Inconsistency['code'], string> = {
@@ -85,6 +108,7 @@ export const inconsistencyLabels: Record<Inconsistency['code'], string> = {
   JORNADA_EXCESSIVA: 'Jornada acima de 12 horas',
   BATIDA_DUPLICADA: 'Batidas duplicadas no mesmo minuto',
   HORARIO_INVALIDO: 'Horário fora do intervalo válido',
+  INTERVALO_INVALIDO: 'Intervalo de pausa abaixo do mínimo legal',
 };
 
 export const dayStatusLabels: Record<DayStatus, string> = {
@@ -107,6 +131,7 @@ export const subStatusLabels: Record<Exclude<DaySubStatus, null>, string> = {
   registro_incompleto: 'Registro Incompleto',
   banco_positivo: 'Banco Positivo',
   hora_extra: 'Hora Extra',
+  folga_parcial: 'Folga Parcial',
 };
 
 export const subStatusColor: Record<Exclude<DaySubStatus, null>, { bg: string; text: string; border: string; pdfRgb: [number, number, number] }> = {
@@ -118,6 +143,7 @@ export const subStatusColor: Record<Exclude<DaySubStatus, null>, { bg: string; t
   registro_incompleto:     { bg: 'bg-red-100',     text: 'text-red-800',      border: 'border-red-300',      pdfRgb: [254, 226, 226] },
   banco_positivo:          { bg: 'bg-green-50',    text: 'text-green-700',    border: 'border-green-200',    pdfRgb: [240, 253, 244] },
   hora_extra:              { bg: 'bg-emerald-100', text: 'text-emerald-800',  border: 'border-emerald-300',  pdfRgb: [209, 250, 229] },
+  folga_parcial:           { bg: 'bg-slate-100',   text: 'text-slate-700',    border: 'border-slate-300',    pdfRgb: [241, 245, 249] },
 };
 
 export const dayStatusColor: Record<DayStatus, { bg: string; text: string; border: string; pdfRgb: [number, number, number] }> = {
@@ -161,27 +187,43 @@ export function formatHM(minutes: number): string {
 /**
  * Avalia o dia: detecta inconsistências e calcula somente quando válido.
  *
- * @param discountMode controla como faltas afetam o banco de horas:
- *   - 'financeiro' (padrão): faltas zeram o banco (descontadas em folha)
- *   - 'banco': faltas geram banco negativo (compensáveis)
- *   - 'misto': atrasos no banco, faltas zeram o banco
+ * Prioridade de status (do maior para o menor):
+ *   feriado > folga (full) > justificado(sem registros) > folga parcial >
+ *   inconsistência grave (pendente_ajuste) > observação > falta > ok
+ *
+ * @param ctxOrHoliday por compatibilidade aceita `boolean` (= isHoliday) ou DayContext.
  */
+const DEFAULT_MIN_BREAK = 5; // minutos — abaixo disso a pausa é inválida
+
 export function evaluateDay(
   records: ClockRecord[],
   schedule: DaySchedule | null,
   dayOfWeek: number,
-  isHoliday = false,
+  ctxOrHoliday: boolean | DayContext = false,
   discountMode: DiscountMode = 'financeiro'
 ): DayResult {
+  const ctx: DayContext = typeof ctxOrHoliday === 'boolean' ? { isHoliday: ctxOrHoliday } : (ctxOrHoliday || {});
+  const isHoliday = !!ctx.isHoliday;
+  const dayOff = ctx.dayOff || null;
+  const justified = !!ctx.justified;
+  const minBreakMinutes = ctx.minBreakMinutes ?? DEFAULT_MIN_BREAK;
+
   const sched = schedule ?? DEFAULT_SCHEDULE;
   const isWorkDay = sched.work_days?.includes(dayOfWeek) ?? [1, 2, 3, 4, 5].includes(dayOfWeek);
-  const expectedMinutes = isWorkDay && !isHoliday ? Math.round((sched.daily_hours || 0) * 60) : 0;
 
-  const incons: Inconsistency[] = [];
+  // expectedMinutes base (antes de ajustes por folga parcial)
+  let expectedMinutes = isWorkDay && !isHoliday ? Math.round((sched.daily_hours || 0) * 60) : 0;
+
+  // Folga parcial: reduz a jornada esperada
+  const isPartialOff = !!(dayOff && dayOff.isPartial);
+  if (isPartialOff && dayOff && dayOff.partialMinutes && dayOff.partialMinutes > 0) {
+    expectedMinutes = Math.max(0, expectedMinutes - dayOff.partialMinutes);
+  }
+
   const empty: DayResult = {
     status: 'sem_jornada',
     subStatus: null,
-    inconsistencies: incons,
+    inconsistencies: [],
     expectedMinutes,
     workedMinutes: 0,
     breakMinutes: 0,
@@ -193,14 +235,58 @@ export function evaluateDay(
     exitMinute: null,
   };
 
+  // === PRIORIDADE 1: FERIADO ===
+  if (isHoliday) {
+    if (records && records.length > 0) {
+      const worked = computeWorkedMinutes(records);
+      return {
+        ...empty,
+        status: worked > 0 ? 'ok' : 'feriado',
+        subStatus: worked > 0 ? 'hora_extra' : null,
+        workedMinutes: worked,
+        overtimeMinutes: worked,
+        bankBalanceMinutes: worked,
+        expectedMinutes: 0,
+        wasHoliday: true,
+      };
+    }
+    return { ...empty, status: 'feriado', expectedMinutes: 0, wasHoliday: true };
+  }
+
+  // === PRIORIDADE 2: FOLGA / DSR / ESCALA OFF / FÉRIAS / ATESTADO (full-day) ===
+  if (dayOff && !isPartialOff) {
+    const worked = records && records.length > 0 ? computeWorkedMinutes(records) : 0;
+    return {
+      ...empty,
+      status: 'folga',
+      subStatus: null,
+      expectedMinutes: 0,
+      workedMinutes: worked,
+      overtimeMinutes: worked,
+      bankBalanceMinutes: worked,
+      wasDayOff: true,
+    };
+  }
+
+  // === PRIORIDADE 3: JUSTIFICATIVA APROVADA sem registros ===
+  if (justified && (!records || records.length === 0)) {
+    return { ...empty, status: 'justificado', expectedMinutes: 0, wasJustified: true };
+  }
+
+  // === PRIORIDADE 4: FOLGA PARCIAL com expected zerado pela cobertura total ===
+  if (isPartialOff && expectedMinutes === 0) {
+    return { ...empty, status: 'folga', subStatus: 'folga_parcial', expectedMinutes: 0, wasDayOff: true };
+  }
+
+  // === Sem registros em dia útil ===
   if (!records || records.length === 0) {
-    if (isHoliday) return { ...empty, status: 'feriado' };
-    if (!isWorkDay) return { ...empty, status: 'folga' };
-    // Falta: no modo 'banco' joga no banco negativo (compensável). Demais modos zeram (será descontada em folha).
+    if (!isWorkDay) return { ...empty, status: 'sem_jornada' };
     const bankOnAbsence = discountMode === 'banco' ? -expectedMinutes : 0;
     return { ...empty, status: 'falta', bankBalanceMinutes: bankOnAbsence };
   }
 
+  // ====== A partir daqui: dia útil normal (ou folga parcial com janela útil) ======
+  const incons: Inconsistency[] = [];
   const entries = records.filter(r => r.clock_type === 'entrada');
   const exits = records.filter(r => r.clock_type === 'saida');
   const pInicios = records.filter(r => r.clock_type === 'pausa_inicio')
@@ -212,7 +298,7 @@ export function evaluateDay(
   if (exits.length > 1) incons.push({ code: 'SAIDA_DUPLICADA', severity: 'high', message: inconsistencyLabels.SAIDA_DUPLICADA });
   if (pInicios.length !== pFins.length) incons.push({ code: 'PAUSA_INCOMPLETA', severity: 'high', message: inconsistencyLabels.PAUSA_INCOMPLETA });
   if (entries.length === 0 && exits.length > 0) incons.push({ code: 'SAIDA_SEM_ENTRADA', severity: 'high', message: inconsistencyLabels.SAIDA_SEM_ENTRADA });
-  if (entries.length >= 1 && exits.length === 0 && isWorkDay && !isHoliday) {
+  if (entries.length >= 1 && exits.length === 0 && isWorkDay) {
     incons.push({ code: 'ENTRADA_SEM_SAIDA', severity: 'high', message: inconsistencyLabels.ENTRADA_SEM_SAIDA });
   }
 
@@ -248,7 +334,11 @@ export function evaluateDay(
         if (fim < ini) {
           incons.push({ code: 'PAUSA_INVERTIDA', severity: 'high', message: inconsistencyLabels.PAUSA_INVERTIDA });
         } else {
-          breakMinutes += fim - ini;
+          const dur = fim - ini;
+          if (dur > 0 && dur < minBreakMinutes) {
+            incons.push({ code: 'INTERVALO_INVALIDO', severity: 'high', message: inconsistencyLabels.INTERVALO_INVALIDO, minutes: dur });
+          }
+          breakMinutes += dur;
         }
       }
       if (breakMinutes > 240) {
@@ -265,7 +355,8 @@ export function evaluateDay(
         const schedExit = timeToMinutes(sched.exit_time);
         const tol = sched.tolerance_minutes ?? 10;
         delayMinutes = Math.max(0, entryMinute - schedEntry - tol);
-        earlyExitMinutes = Math.max(0, schedExit - exitMinute - tol);
+        // Em folga parcial, não cobramos saída antecipada se o expected reduziu
+        earlyExitMinutes = isPartialOff ? 0 : Math.max(0, schedExit - exitMinute - tol);
         overtimeMinutes = Math.max(0, workedMinutes - expectedMinutes);
         bankBalance = workedMinutes - expectedMinutes;
       }
@@ -276,18 +367,7 @@ export function evaluateDay(
   let status: DayStatus;
   let subStatus: DaySubStatus = null;
 
-  if (isHoliday) {
-    status = workedMinutes > 0 && !hasHigh ? 'ok' : 'feriado';
-    if (status === 'feriado') {
-      workedMinutes = 0;
-      overtimeMinutes = 0;
-      bankBalance = 0;
-      delayMinutes = 0;
-      earlyExitMinutes = 0;
-    } else if (overtimeMinutes > 0) {
-      subStatus = 'hora_extra';
-    }
-  } else if (hasHigh) {
+  if (hasHigh) {
     status = 'pendente_ajuste';
     subStatus = 'registro_incompleto';
     workedMinutes = 0;
@@ -295,7 +375,6 @@ export function evaluateDay(
     bankBalance = 0;
   } else if (delayMinutes > 0 || earlyExitMinutes > 0 || incons.length > 0) {
     status = 'observacao';
-    // Classificar sub-status mais informativo
     const halfJornada = expectedMinutes / 2;
     if (workedMinutes > 0 && expectedMinutes > 0 && workedMinutes < halfJornada) {
       subStatus = 'saida_antecipada_grave';
@@ -309,7 +388,7 @@ export function evaluateDay(
       subStatus = 'jornada_incompleta';
     }
   } else if (workedMinutes === 0 && !isWorkDay) {
-    status = 'folga';
+    status = 'sem_jornada';
     bankBalance = 0;
   } else {
     status = 'ok';
@@ -317,16 +396,11 @@ export function evaluateDay(
     else if (bankBalance > 0) subStatus = 'banco_positivo';
   }
 
-  // Folga nunca gera banco negativo
-  if (!isWorkDay && status !== 'ok') {
-    bankBalance = 0;
-  }
+  if (isPartialOff && status === 'ok') subStatus = 'folga_parcial';
 
-  // Aplicar modo de desconto para evitar dupla penalidade em atrasos/saídas antecipadas
-  // No modo 'financeiro', atrasos/saídas antecipadas são descontados em folha:
-  //   o banco não deve ficar negativo só por causa deles (worked < expected porque chegou tarde).
+  if (!isWorkDay && status !== 'ok') bankBalance = 0;
+
   if (discountMode === 'financeiro' && bankBalance < 0 && (delayMinutes > 0 || earlyExitMinutes > 0)) {
-    // Zera a parte negativa correspondente aos atrasos/saídas (já será cobrada em $)
     bankBalance = Math.max(bankBalance + (delayMinutes + earlyExitMinutes), bankBalance);
     if (bankBalance > 0) bankBalance = 0;
   }
@@ -344,26 +418,58 @@ export function evaluateDay(
     bankBalanceMinutes: bankBalance,
     entryMinute,
     exitMinute,
+    wasDayOff: isPartialOff || undefined,
   };
 }
 
 /**
+ * Computa minutos trabalhados a partir de batidas, ignorando inconsistências.
+ * Usado em casos especiais (feriado/folga com trabalho).
+ */
+function computeWorkedMinutes(records: ClockRecord[]): number {
+  const entry = records.find(r => r.clock_type === 'entrada');
+  const exit = records.find(r => r.clock_type === 'saida');
+  if (!entry || !exit) return 0;
+  const e = timeToMinutes(entry.clock_time);
+  const x = timeToMinutes(exit.clock_time);
+  if (x <= e) return 0;
+  const pIni = records.filter(r => r.clock_type === 'pausa_inicio').sort((a, b) => a.clock_time.localeCompare(b.clock_time));
+  const pFim = records.filter(r => r.clock_type === 'pausa_fim').sort((a, b) => a.clock_time.localeCompare(b.clock_time));
+  let brk = 0;
+  for (let i = 0; i < Math.min(pIni.length, pFim.length); i++) {
+    const a = timeToMinutes(pIni[i].clock_time);
+    const b = timeToMinutes(pFim[i].clock_time);
+    if (b > a) brk += b - a;
+  }
+  return Math.max(0, x - e - brk);
+}
+
+/**
  * Resume um período (mês) somando dias válidos.
+ * Faltas/pendências/atrasos só são contadas em dias úteis sem folga/feriado/justificativa.
  */
 export function summarizePeriod(days: DayResult[]) {
   return days.reduce(
     (acc, d) => {
       acc.expected += d.expectedMinutes;
       acc.worked += d.workedMinutes;
-      acc.delay += d.delayMinutes;
-      acc.earlyExit += d.earlyExitMinutes;
       acc.overtime += d.overtimeMinutes;
       acc.bank += d.bankBalanceMinutes;
+      const isHolidayDay = d.wasHoliday || d.status === 'feriado';
+      const isOffDay = d.wasDayOff || (d.status === 'folga');
+      const isJustifiedDay = d.wasJustified || d.status === 'justificado';
+      if (!isHolidayDay && !isOffDay && !isJustifiedDay) {
+        acc.delay += d.delayMinutes;
+        acc.earlyExit += d.earlyExitMinutes;
+      }
       if (d.status === 'falta') acc.absences += 1;
       if (d.status === 'pendente_ajuste') acc.pending += 1;
-      if (d.status === 'justificado') acc.justified += 1;
+      if (isJustifiedDay) acc.justified += 1;
+      if (isHolidayDay) acc.holidays += 1;
+      if (isOffDay) acc.dayOffs += 1;
       return acc;
     },
-    { expected: 0, worked: 0, delay: 0, earlyExit: 0, overtime: 0, bank: 0, absences: 0, pending: 0, justified: 0 }
+    { expected: 0, worked: 0, delay: 0, earlyExit: 0, overtime: 0, bank: 0, absences: 0, pending: 0, justified: 0, holidays: 0, dayOffs: 0 }
   );
 }
+
