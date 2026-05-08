@@ -350,7 +350,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
       doc.setFont('helvetica', 'normal');
       const cells = [
         [`Trabalhado: ${workedH}`, `Previsto: ${expectedH}`, `Extras: ${overtimeH}`, `Banco: ${bankH}`],
-        [`Atrasos: ${delayH}`, `Saídas Antec.: ${earlyH}`, `Faltas: ${summary.absences}`, `Pendentes: ${summary.pending}`],
+        [`Atrasos: ${delayH}`, `Saídas Antec.: ${earlyH}`, `Faltas: ${summary.absences}`, `Pendentes RH: ${summary.pending} · Ajustes parciais: ${(summary as any).partialPending || 0}`],
       ];
       cells.forEach((line, li) => {
         line.forEach((cell, ci) => {
@@ -360,14 +360,12 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
 
       afterY += 28;
 
-      // Desconto estimado — fórmula trabalhista completa
-      // hora = salário / (jornada_diária × dias_úteis_mês)
-      // dia  = hora × jornada_diária
-      // desconto = faltas×dia + pendentes×dia + (atrasos+saídas_antecipadas)/60 × hora
+      // Desconto estimado — apenas FALTAS REAIS geram desconto integral.
+      // Pendências (RH) e Ajustes Parciais NÃO descontam dia integral; entram apenas
+      // como horas negativas (diferença real entre previsto e trabalhado).
       if (salary?.base_salary) {
         const base = Number(salary.base_salary);
         const dailyHours = sched?.daily_hours || 8;
-        // Dias úteis do mês baseados em work_days, descontando feriados
         const workDays = sched?.work_days || [1, 2, 3, 4, 5];
         const businessDays = days.filter(d => {
           const ds = format(d, 'yyyy-MM-dd');
@@ -375,14 +373,17 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         }).length || 22;
         const valorHora = base / (dailyHours * businessDays);
         const valorDia = valorHora * dailyHours;
-        const descAtrasosBruto = ((summary.delay + summary.earlyExit) / 60) * valorHora;
+
+        // Horas negativas reais: previsto - trabalhado, descontando dias de falta integral.
+        const negativeMin = Math.max(
+          0,
+          summary.expected - summary.worked - summary.absences * dailyHours * 60
+        );
+        const descNegativasBruto = (negativeMin / 60) * valorHora;
         const descFaltasBruto = summary.absences * valorDia;
-        const descPendentesBruto = summary.pending * valorDia;
-        // Aplicar modo de desconto
-        const descAtrasos = discountMode === 'banco' ? 0 : descAtrasosBruto;
+        const descNegativas = discountMode === 'banco' ? 0 : descNegativasBruto;
         const descFaltas = discountMode === 'banco' ? 0 : descFaltasBruto;
-        const descPendentes = discountMode === 'banco' ? 0 : descPendentesBruto;
-        const desconto = descAtrasos + descFaltas + descPendentes;
+        const desconto = descNegativas + descFaltas;
         const liquido = Math.max(0, base - desconto);
         const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const modoLabel = discountMode === 'financeiro' ? 'Financeiro' : discountMode === 'banco' ? 'Banco' : 'Misto';
@@ -392,7 +393,7 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         doc.text(safe(`Modo de desconto: ${modoLabel}  ·  Valor/hora: R$ ${fmt(valorHora)}  ·  Valor/dia: R$ ${fmt(valorDia)}  ·  Dias úteis: ${businessDays}`), 12, afterY);
         afterY += 5;
         doc.text(
-          safe(`Desc. faltas (${summary.absences}): R$ ${fmt(descFaltas)}  ·  Desc. atrasos/saídas: R$ ${fmt(descAtrasos)}  ·  Desc. pendentes (${summary.pending}): R$ ${fmt(descPendentes)}`),
+          safe(`Desc. faltas integrais (${summary.absences}): R$ ${fmt(descFaltas)}  ·  Desc. horas negativas (${formatHM(negativeMin)}): R$ ${fmt(descNegativas)}`),
           12,
           afterY
         );
@@ -403,11 +404,12 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         doc.text(safe(`Desconto estimado: R$ ${fmt(desconto)}`), pw / 2 - 30, afterY);
         doc.text(safe(`Líquido estimado: R$ ${fmt(liquido)}`), pw - 14, afterY, { align: 'right' });
         afterY += 8;
-        if (summary.pending > 0) {
+        const partial = (summary as any).partialPending || 0;
+        if (summary.pending > 0 || partial > 0) {
           doc.setTextColor(180, 30, 30);
           doc.setFontSize(7);
           doc.setFont('helvetica', 'italic');
-          doc.text(safe(`⚠ Existem ${summary.pending} dia(s) pendente(s) de ajuste — desconto provisório, regularize antes do fechamento.`), 12, afterY);
+          doc.text(safe(`⚠ ${summary.pending} dia(s) pendente(s) de ajuste pelo RH e ${partial} dia(s) com ajuste parcial — não geram desconto integral, apenas horas negativas reais.`), 12, afterY);
           afterY += 5;
         }
         if (discountMode === 'banco') {
@@ -683,7 +685,8 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         { Métrica: 'Atrasos', Valor: formatHM(summary.delay) },
         { Métrica: 'Saídas Antecipadas', Valor: formatHM(summary.earlyExit) },
         { Métrica: 'Faltas', Valor: summary.absences },
-        { Métrica: 'Dias Pendentes', Valor: summary.pending },
+        { Métrica: 'Pendentes RH (sem horas)', Valor: summary.pending },
+        { Métrica: 'Ajustes Parciais (com horas)', Valor: (summary as any).partialPending || 0 },
         { Métrica: 'Justificados', Valor: summary.justified },
       ];
 

@@ -8,6 +8,7 @@ export type DayStatus =
   | 'ok'
   | 'observacao'
   | 'pendente_ajuste'
+  | 'ajuste_parcial'
   | 'justificado'
   | 'falta'
   | 'feriado'
@@ -115,6 +116,7 @@ export const dayStatusLabels: Record<DayStatus, string> = {
   ok: 'OK',
   observacao: 'Observação',
   pendente_ajuste: 'Pendente de Ajuste',
+  ajuste_parcial: 'Ajuste Parcial',
   justificado: 'Justificado',
   falta: 'Falta',
   feriado: 'Feriado',
@@ -150,6 +152,7 @@ export const dayStatusColor: Record<DayStatus, { bg: string; text: string; borde
   ok:               { bg: 'bg-green-100',  text: 'text-green-800',  border: 'border-green-300',  pdfRgb: [220, 252, 231] },
   observacao:       { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300', pdfRgb: [254, 249, 195] },
   pendente_ajuste:  { bg: 'bg-red-100',    text: 'text-red-800',    border: 'border-red-300',    pdfRgb: [254, 226, 226] },
+  ajuste_parcial:   { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300', pdfRgb: [255, 237, 213] },
   justificado:      { bg: 'bg-blue-100',   text: 'text-blue-800',   border: 'border-blue-300',   pdfRgb: [219, 234, 254] },
   falta:            { bg: 'bg-gray-200',   text: 'text-gray-800',   border: 'border-gray-300',   pdfRgb: [229, 231, 235] },
   feriado:          { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300', pdfRgb: [243, 232, 255] },
@@ -364,15 +367,41 @@ export function evaluateDay(
   }
 
   const hasHigh = incons.some(i => i.severity === 'high');
+  // Códigos de inconsistência que IMPEDEM cálculo de horas (sem par entrada+saída válido)
+  const HARD_CODES: Inconsistency['code'][] = [
+    'ENTRADA_SEM_SAIDA', 'SAIDA_SEM_ENTRADA', 'SAIDA_ANTES_ENTRADA',
+  ];
+  const hasHardError = incons.some(i => HARD_CODES.includes(i.code));
   let status: DayStatus;
   let subStatus: DaySubStatus = null;
 
-  if (hasHigh) {
+  if (hasHigh && hasHardError) {
+    // Pendência DURA — não há como calcular horas
     status = 'pendente_ajuste';
     subStatus = 'registro_incompleto';
     workedMinutes = 0;
     overtimeMinutes = 0;
     bankBalance = 0;
+  } else if (hasHigh) {
+    // Inconsistência grave mas existe par entrada+saída identificável:
+    // mantém horas trabalhadas; RH ajusta sem desconto integral.
+    status = 'ajuste_parcial';
+    subStatus = 'registro_incompleto';
+    // Se workedMinutes não foi calculado (ex.: ENTRADA_DUPLICADA bloqueou o ramo "single pair"),
+    // estima a partir da entrada mais cedo + saída mais tarde.
+    if (workedMinutes === 0 && entries.length > 0 && exits.length > 0) {
+      const earliestEntry = entries.reduce((min, e) => Math.min(min, timeToMinutes(e.clock_time)), Infinity);
+      const latestExit = exits.reduce((max, e) => Math.max(max, timeToMinutes(e.clock_time)), -Infinity);
+      if (latestExit > earliestEntry) {
+        entryMinute = earliestEntry;
+        exitMinute = latestExit;
+        workedMinutes = Math.max(0, latestExit - earliestEntry - breakMinutes);
+        if (expectedMinutes > 0) {
+          overtimeMinutes = Math.max(0, workedMinutes - expectedMinutes);
+          bankBalance = workedMinutes - expectedMinutes;
+        }
+      }
+    }
   } else if (delayMinutes > 0 || earlyExitMinutes > 0 || incons.length > 0) {
     status = 'observacao';
     const halfJornada = expectedMinutes / 2;
@@ -464,12 +493,13 @@ export function summarizePeriod(days: DayResult[]) {
       }
       if (d.status === 'falta') acc.absences += 1;
       if (d.status === 'pendente_ajuste') acc.pending += 1;
+      if (d.status === 'ajuste_parcial') acc.partialPending += 1;
       if (isJustifiedDay) acc.justified += 1;
       if (isHolidayDay) acc.holidays += 1;
       if (isOffDay) acc.dayOffs += 1;
       return acc;
     },
-    { expected: 0, worked: 0, delay: 0, earlyExit: 0, overtime: 0, bank: 0, absences: 0, pending: 0, justified: 0, holidays: 0, dayOffs: 0 }
+    { expected: 0, worked: 0, delay: 0, earlyExit: 0, overtime: 0, bank: 0, absences: 0, pending: 0, partialPending: 0, justified: 0, holidays: 0, dayOffs: 0 }
   );
 }
 
