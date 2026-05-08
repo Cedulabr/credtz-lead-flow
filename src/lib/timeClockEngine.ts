@@ -388,7 +388,7 @@ export function evaluateDay(
       subStatus = 'jornada_incompleta';
     }
   } else if (workedMinutes === 0 && !isWorkDay) {
-    status = 'folga';
+    status = 'sem_jornada';
     bankBalance = 0;
   } else {
     status = 'ok';
@@ -418,6 +418,7 @@ export function evaluateDay(
     bankBalanceMinutes: bankBalance,
     entryMinute,
     exitMinute,
+    wasDayOff: isPartialOff || undefined,
   };
 }
 
