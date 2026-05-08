@@ -383,10 +383,25 @@ export function evaluateDay(
     overtimeMinutes = 0;
     bankBalance = 0;
   } else if (hasHigh) {
-    // Inconsistência grave mas existe par entrada+saída válido:
-    // mantém horas trabalhadas; RH ajusta sem desconto integral
+    // Inconsistência grave mas existe par entrada+saída identificável:
+    // mantém horas trabalhadas; RH ajusta sem desconto integral.
     status = 'ajuste_parcial';
     subStatus = 'registro_incompleto';
+    // Se workedMinutes não foi calculado (ex.: ENTRADA_DUPLICADA bloqueou o ramo "single pair"),
+    // estima a partir da entrada mais cedo + saída mais tarde.
+    if (workedMinutes === 0 && entries.length > 0 && exits.length > 0) {
+      const earliestEntry = entries.reduce((min, e) => Math.min(min, timeToMinutes(e.clock_time)), Infinity);
+      const latestExit = exits.reduce((max, e) => Math.max(max, timeToMinutes(e.clock_time)), -Infinity);
+      if (latestExit > earliestEntry) {
+        entryMinute = earliestEntry;
+        exitMinute = latestExit;
+        workedMinutes = Math.max(0, latestExit - earliestEntry - breakMinutes);
+        if (expectedMinutes > 0) {
+          overtimeMinutes = Math.max(0, workedMinutes - expectedMinutes);
+          bankBalance = workedMinutes - expectedMinutes;
+        }
+      }
+    }
   } else if (delayMinutes > 0 || earlyExitMinutes > 0 || incons.length > 0) {
     status = 'observacao';
     const halfJornada = expectedMinutes / 2;
