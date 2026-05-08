@@ -15,6 +15,8 @@ import { clockTypeLabels, statusLabels, statusColors, type TimeClock, type TimeC
 import { format, startOfMonth, endOfMonth, parseISO, differenceInMinutes, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import jsPDF from 'jspdf';
+import { resolveTimeClockPhotoUrl } from './photoUrl';
+import { toast } from 'sonner';
 
 interface UserProfile {
   id: string;
