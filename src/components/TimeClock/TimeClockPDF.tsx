@@ -685,7 +685,8 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
         { Métrica: 'Atrasos', Valor: formatHM(summary.delay) },
         { Métrica: 'Saídas Antecipadas', Valor: formatHM(summary.earlyExit) },
         { Métrica: 'Faltas', Valor: summary.absences },
-        { Métrica: 'Dias Pendentes', Valor: summary.pending },
+        { Métrica: 'Pendentes RH (sem horas)', Valor: summary.pending },
+        { Métrica: 'Ajustes Parciais (com horas)', Valor: (summary as any).partialPending || 0 },
         { Métrica: 'Justificados', Valor: summary.justified },
       ];
 
