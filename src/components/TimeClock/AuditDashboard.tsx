@@ -22,6 +22,8 @@ import { useAuditEngine } from './useAuditEngine';
 import { useFaceDetection } from './useFaceDetection';
 import { clockTypeLabels, type TimeClock, type AuditStatus, type AuditFlag } from './types';
 import { useToast } from '@/hooks/use-toast';
+import { resolveTimeClockPhotoUrl } from './photoUrl';
+import { toast as sonnerToast } from 'sonner';
 
 interface AuditRecord extends TimeClock {
   user_name?: string;
