@@ -15,6 +15,8 @@ import { clockTypeLabels, statusLabels, statusColors, type TimeClock, type TimeC
 import { format, startOfMonth, endOfMonth, parseISO, differenceInMinutes, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import jsPDF from 'jspdf';
+import { resolveTimeClockPhotoUrl } from './photoUrl';
+import { toast } from 'sonner';
 
 interface UserProfile {
   id: string;
@@ -31,6 +33,7 @@ export function AdminControl() {
   const [loading, setLoading] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<TimeClock | null>(null);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [photoSignedUrl, setPhotoSignedUrl] = useState<string | null>(null);
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [adjustReason, setAdjustReason] = useState('');
   const [adjustTime, setAdjustTime] = useState('');
@@ -329,9 +332,17 @@ export function AdminControl() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => {
+                              onClick={async () => {
                                 setSelectedRecord(record);
+                                setPhotoSignedUrl(null);
                                 setShowPhotoModal(true);
+                                const url = await resolveTimeClockPhotoUrl(record.photo_url);
+                                if (!url) {
+                                  toast.error('Não foi possível abrir a foto');
+                                  setShowPhotoModal(false);
+                                  return;
+                                }
+                                setPhotoSignedUrl(url);
                               }}
                             >
                               <Image className="h-4 w-4" />
@@ -373,11 +384,17 @@ export function AdminControl() {
             </DialogDescription>
           </DialogHeader>
           {selectedRecord?.photo_url && (
-            <img
-              src={selectedRecord.photo_url}
-              alt="Foto do ponto"
-              className="w-full rounded-lg"
-            />
+            photoSignedUrl ? (
+              <img
+                src={photoSignedUrl}
+                alt="Foto do ponto"
+                className="w-full rounded-lg"
+              />
+            ) : (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            )
           )}
           {selectedRecord?.latitude && selectedRecord?.longitude && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">

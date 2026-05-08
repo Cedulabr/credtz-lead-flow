@@ -18,6 +18,8 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { JustificationManager } from './JustificationManager';
 import { parseTimeToMinutes, hasActiveBreak, type DaySchedule } from '@/lib/timeClockCalculations';
+import { resolveTimeClockPhotoUrl } from './photoUrl';
+import { toast } from 'sonner';
 
 interface DailyOverview {
   user_id: string;
@@ -469,11 +471,18 @@ export function ManagerDashboard() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => setSelectedPhoto({
-                                  url: record.photo_url!,
-                                  name: record.user_name,
-                                  time: formatTime(record.entry_time),
-                                })}
+                                onClick={async () => {
+                                  const url = await resolveTimeClockPhotoUrl(record.photo_url);
+                                  if (!url) {
+                                    toast.error('Não foi possível abrir a foto');
+                                    return;
+                                  }
+                                  setSelectedPhoto({
+                                    url,
+                                    name: record.user_name,
+                                    time: formatTime(record.entry_time),
+                                  });
+                                }}
                               >
                                 <Image className="h-4 w-4" />
                               </Button>
