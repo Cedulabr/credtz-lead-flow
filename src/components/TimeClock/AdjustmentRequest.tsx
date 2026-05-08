@@ -290,6 +290,7 @@ export function AdjustmentRequest({ companyId }: AdjustmentRequestProps) {
             suggestedType,
             suggestedTime,
             reasonText,
+            blocked: isBlocked,
           });
         }
       }
