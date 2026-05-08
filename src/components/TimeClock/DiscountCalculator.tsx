@@ -105,10 +105,21 @@ export function DiscountCalculator() {
       recordsByUser[r.user_id].push(r);
     });
 
+    // Folgas full-day → set por usuário; folgas parciais → minutos por usuário/data
     const dayOffsByUser: Record<string, Set<string>> = {};
+    const partialOffMinutesByUser: Record<string, Record<string, number>> = {};
     dayOffsRes.data?.forEach((d: any) => {
-      if (!dayOffsByUser[d.user_id]) dayOffsByUser[d.user_id] = new Set();
-      dayOffsByUser[d.user_id].add(d.off_date);
+      if (d.is_partial_day && d.start_time && d.end_time) {
+        const [sh, sm] = String(d.start_time).split(':').map(Number);
+        const [eh, em] = String(d.end_time).split(':').map(Number);
+        const mins = Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+        if (!partialOffMinutesByUser[d.user_id]) partialOffMinutesByUser[d.user_id] = {};
+        partialOffMinutesByUser[d.user_id][d.off_date] =
+          (partialOffMinutesByUser[d.user_id][d.off_date] || 0) + mins;
+      } else {
+        if (!dayOffsByUser[d.user_id]) dayOffsByUser[d.user_id] = new Set();
+        dayOffsByUser[d.user_id].add(d.off_date);
+      }
     });
 
     const justByUser: Record<string, Set<string>> = {};
