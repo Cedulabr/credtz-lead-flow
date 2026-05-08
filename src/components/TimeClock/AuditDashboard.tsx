@@ -22,6 +22,8 @@ import { useAuditEngine } from './useAuditEngine';
 import { useFaceDetection } from './useFaceDetection';
 import { clockTypeLabels, type TimeClock, type AuditStatus, type AuditFlag } from './types';
 import { useToast } from '@/hooks/use-toast';
+import { resolveTimeClockPhotoUrl } from './photoUrl';
+import { toast as sonnerToast } from 'sonner';
 
 interface AuditRecord extends TimeClock {
   user_name?: string;
@@ -33,6 +35,8 @@ export function AuditDashboard() {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [photoLoading, setPhotoLoading] = useState(false);
   
   // Re-audit state
   const [reauditing, setReauditing] = useState(false);
@@ -675,23 +679,25 @@ export function AuditDashboard() {
                             </TableCell>
                             <TableCell>
                               {record.photo_url ? (
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button variant="ghost" size="sm">
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent>
-                                    <DialogHeader>
-                                      <DialogTitle>Foto do Registro</DialogTitle>
-                                    </DialogHeader>
-                                    <img 
-                                      src={record.photo_url} 
-                                      alt="Registro" 
-                                      className="w-full rounded-lg"
-                                    />
-                                  </DialogContent>
-                                </Dialog>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={async () => {
+                                    setSelectedPhoto(null);
+                                    setPhotoLoading(true);
+                                    setPhotoOpen(true);
+                                    const url = await resolveTimeClockPhotoUrl(record.photo_url);
+                                    setPhotoLoading(false);
+                                    if (!url) {
+                                      setPhotoOpen(false);
+                                      sonnerToast.error('Não foi possível abrir a foto');
+                                      return;
+                                    }
+                                    setSelectedPhoto(url);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
                               ) : (
                                 <span className="text-xs text-muted-foreground">—</span>
                               )}
@@ -821,6 +827,21 @@ export function AuditDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={photoOpen} onOpenChange={setPhotoOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Foto do Registro</DialogTitle>
+          </DialogHeader>
+          {photoLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : selectedPhoto ? (
+            <img src={selectedPhoto} alt="Registro" className="w-full rounded-lg" />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
