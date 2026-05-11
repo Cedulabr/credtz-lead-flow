@@ -506,13 +506,26 @@ export function AdjustmentReview() {
     const { error } = await (supabase as any)
       .from('time_clock_adjustment_requests')
       .insert(payload);
+    if (error) { setCreating(false); return toast.error(error.message); }
+
+    // Se este lançamento é uma reaplicação, cancela o ajuste antigo de tipo "Outro"
+    if (reapplySource?.id) {
+      await (supabase as any)
+        .from('time_clock_adjustment_requests')
+        .update({ status: 'cancelled', review_notes: 'Substituído por reaplicação com tipo correto' })
+        .eq('id', reapplySource.id);
+      setReapplySource(null);
+    }
+
     setCreating(false);
-    if (error) return toast.error(error.message);
     toast.success('Ajuste lançado e aplicado ao ponto do colaborador');
     setCreateOpen(false);
     resetCreateForm();
     load();
     if (filter === 'pendings') loadPendings();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('time-clock:refresh'));
+    }
   };
 
   const canCreate = isAdmin || isGestor;
