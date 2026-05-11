@@ -608,6 +608,145 @@ export function AdjustmentReview() {
     setCreateOpen(true);
   };
 
+  // ===== Editar / Excluir ajuste já aprovado =====
+  const [editing, setEditing] = useState<any>(null);
+  const [editType, setEditType] = useState<string>('add_entry');
+  const [editTime, setEditTime] = useState<string>('');
+  const [editReason, setEditReason] = useState<string>('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState<any>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  const openEdit = (r: any) => {
+    setEditing(r);
+    setEditType(r.adjustment_type);
+    setEditTime(r.proposed_time ? r.proposed_time.slice(0, 5) : '');
+    setEditReason(r.reason || '');
+  };
+
+  // Localiza o registro em time_clock criado por um ajuste add_* via notes "ajuste #<id>"
+  const findRecordFromAdjustment = async (r: any) => {
+    const { data } = await (supabase as any)
+      .from('time_clock')
+      .select('id, clock_time, clock_type')
+      .eq('user_id', r.user_id)
+      .eq('clock_date', r.clock_date)
+      .ilike('notes', `%ajuste #${r.id}%`)
+      .maybeSingle();
+    return data;
+  };
+
+  const submitEdit = async () => {
+    if (!editing || !user) return;
+    if (editType === 'other') return toast.error('Tipo "Outro" não é editável. Use Reaplicar.');
+    const needsTime = editType.startsWith('add_') || editType.startsWith('edit_');
+    if (needsTime && !editTime) return toast.error('Informe o horário');
+    if (!editReason.trim()) return toast.error('Informe o motivo');
+    setEditSubmitting(true);
+    try {
+      const sameType = editType === editing.adjustment_type;
+      if (sameType && editType.startsWith('add_')) {
+        const linked = await findRecordFromAdjustment(editing);
+        if (linked) {
+          const newTs = `${editing.clock_date} ${editTime}:00`;
+          const { error: e1 } = await (supabase as any)
+            .from('time_clock')
+            .update({ clock_time: newTs, status: 'ajustado' })
+            .eq('id', linked.id);
+          if (e1) throw e1;
+        }
+        const { error: e2 } = await (supabase as any)
+          .from('time_clock_adjustment_requests')
+          .update({
+            proposed_time: editTime,
+            reason: editReason.trim(),
+            review_notes: 'Ajuste editado pela gestão',
+            reviewed_by: user.id,
+            reviewed_at: new Date().toISOString(),
+          })
+          .eq('id', editing.id);
+        if (e2) throw e2;
+      } else {
+        if (editing.adjustment_type?.startsWith('add_')) {
+          const linked = await findRecordFromAdjustment(editing);
+          if (linked) {
+            await (supabase as any).from('time_clock').delete().eq('id', linked.id);
+          }
+        }
+        await (supabase as any)
+          .from('time_clock_adjustment_requests')
+          .update({ status: 'cancelled', review_notes: 'Substituído por edição' })
+          .eq('id', editing.id);
+        const { error: eIns } = await (supabase as any)
+          .from('time_clock_adjustment_requests')
+          .insert({
+            user_id: editing.user_id,
+            company_id: editing.company_id,
+            clock_date: editing.clock_date,
+            adjustment_type: editType,
+            proposed_time: needsTime ? editTime : null,
+            target_record_id: editType.startsWith('edit_') || editType === 'remove_record'
+              ? editing.target_record_id : null,
+            reason: editReason.trim(),
+            status: 'approved',
+            reviewed_by: user.id,
+            reviewed_at: new Date().toISOString(),
+            review_notes: 'Edição do ajuste anterior',
+          });
+        if (eIns) throw eIns;
+      }
+      await (supabase as any).rpc('recalc_user_day', { _user_id: editing.user_id, _date: editing.clock_date });
+      toast.success('Ajuste atualizado');
+      setEditing(null);
+      load();
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('time-clock:refresh'));
+    } catch (e: any) {
+      toast.error(e.message || 'Falha ao editar ajuste');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  const submitDelete = async () => {
+    if (!deleting || !user) return;
+    setDeleteSubmitting(true);
+    try {
+      if (deleting.adjustment_type?.startsWith('add_')) {
+        const linked = await findRecordFromAdjustment(deleting);
+        if (linked) {
+          await (supabase as any).from('time_clock').delete().eq('id', linked.id);
+          await (supabase as any).from('time_clock_logs').insert({
+            time_clock_id: linked.id,
+            action: 'deletion',
+            performed_by: user.id,
+            reason: `Exclusão do ajuste #${deleting.id}`,
+            old_values: { clock_time: linked.clock_time, clock_type: linked.clock_type },
+            new_values: null,
+          });
+        }
+      }
+      const { error } = await (supabase as any)
+        .from('time_clock_adjustment_requests')
+        .update({
+          status: 'cancelled',
+          review_notes: 'Excluído pela gestão',
+          reviewed_by: user.id,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', deleting.id);
+      if (error) throw error;
+      await (supabase as any).rpc('recalc_user_day', { _user_id: deleting.user_id, _date: deleting.clock_date });
+      toast.success('Ajuste excluído');
+      setDeleting(null);
+      load();
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('time-clock:refresh'));
+    } catch (e: any) {
+      toast.error(e.message || 'Falha ao excluir ajuste');
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
+
   const openAttachment = async (path: string) => {
     const { data, error } = await supabase.storage
       .from('time-clock-attachments')
