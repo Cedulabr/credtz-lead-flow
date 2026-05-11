@@ -443,6 +443,25 @@ export function AdjustmentReview() {
     if (error) return toast.error(error.message);
     toast.success(status === 'approved' ? 'Solicitação aprovada e dia recalculado' : 'Solicitação rejeitada');
     setReviewing(null); setReviewNotes(''); load();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('time-clock:refresh'));
+    }
+  };
+
+  // Reaplica um ajuste antigo aprovado com tipo "Outro" — abre o modal já
+  // pré-preenchido para o gestor escolher o tipo correto. Após o novo ajuste
+  // ser inserido (a trigger aplicará em time_clock), o registro original
+  // é marcado como 'cancelled'.
+  const [reapplySource, setReapplySource] = useState<any>(null);
+  const reapplyOther = (r: any) => {
+    setReapplySource(r);
+    setNewUserId(r.user_id);
+    setNewDate(r.clock_date);
+    setNewType('add_entry');
+    setNewTime('');
+    setNewReason(`Reaplicação do ajuste anterior — ${r.reason || 'sem motivo'}`);
+    setNewTargetId('');
+    setCreateOpen(true);
   };
 
   const openAttachment = async (path: string) => {
