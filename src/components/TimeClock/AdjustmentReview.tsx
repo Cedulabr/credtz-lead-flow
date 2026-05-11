@@ -885,6 +885,11 @@ export function AdjustmentReview() {
               {r.status === 'pending' && (
                 <Button size="sm" onClick={() => { setReviewing(r); setReviewNotes(''); }}>Revisar</Button>
               )}
+              {r.status === 'approved' && r.adjustment_type === 'other' && (isAdmin || isGestor) && (
+                <Button size="sm" variant="outline" onClick={() => reapplyOther(r)} title="Reaplicar com tipo correto para refletir em Meu Histórico">
+                  <Wand2 className="h-3 w-3 mr-1" />Reaplicar
+                </Button>
+              )}
             </div>
           </div>
         ))}
