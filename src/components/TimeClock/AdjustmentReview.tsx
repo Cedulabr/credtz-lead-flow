@@ -1125,6 +1125,89 @@ export function AdjustmentReview() {
         </DialogContent>
       </Dialog>
 
+      {/* Editar ajuste aprovado */}
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Editar ajuste lançado</DialogTitle></DialogHeader>
+          {editing && (
+            <div className="space-y-3 py-2">
+              <div className="text-xs text-muted-foreground">
+                Colaborador: <strong>{profileMap[editing.user_id]}</strong> · Data:{' '}
+                <strong>{format(new Date(editing.clock_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })}</strong>
+              </div>
+              <div className="space-y-1">
+                <Label>Tipo</Label>
+                <Select value={editType} onValueChange={setEditType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ADJ_TYPES_FORM.map(t => (
+                      <SelectItem key={t} value={t}>{TYPE_LABELS[t]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {(editType.startsWith('add_') || editType.startsWith('edit_')) && (
+                <div className="space-y-1">
+                  <Label>Horário</Label>
+                  <Input type="time" value={editTime} onChange={(e) => setEditTime(e.target.value)} />
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label>Motivo</Label>
+                <Textarea rows={3} value={editReason} onChange={(e) => setEditReason(e.target.value)} />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                A alteração refletirá imediatamente no ponto do colaborador e o dia será recalculado.
+              </p>
+            </div>
+          )}
+          <DialogFooter className="sticky bottom-0 bg-background pt-3">
+            <Button variant="outline" onClick={() => setEditing(null)} disabled={editSubmitting}>Cancelar</Button>
+            <Button onClick={submitEdit} disabled={editSubmitting}>
+              {editSubmitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
+              Salvar alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Excluir ajuste aprovado */}
+      <Dialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Excluir ajuste lançado</DialogTitle></DialogHeader>
+          {deleting && (
+            <div className="space-y-2 py-2 text-sm">
+              <p>
+                Deseja realmente excluir o ajuste de <strong>{profileMap[deleting.user_id]}</strong> em{' '}
+                <strong>{format(new Date(deleting.clock_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })}</strong>?
+              </p>
+              <p className="text-muted-foreground text-xs">
+                Tipo: {TYPE_LABELS[deleting.adjustment_type]}
+                {deleting.proposed_time && ` · ${deleting.proposed_time.slice(0, 5)}`}
+              </p>
+              {deleting.adjustment_type?.startsWith('add_') && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                  A batida correspondente será removida do ponto do colaborador e o dia recalculado.
+                </p>
+              )}
+              {deleting.adjustment_type?.startsWith('edit_') && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                  Atenção: este ajuste editou um registro existente. A exclusão apenas cancela a solicitação;
+                  o horário modificado permanece no ponto. Use "Editar" se quiser alterar o horário.
+                </p>
+              )}
+            </div>
+          )}
+          <DialogFooter className="sticky bottom-0 bg-background pt-3">
+            <Button variant="outline" onClick={() => setDeleting(null)} disabled={deleteSubmitting}>Cancelar</Button>
+            <Button variant="destructive" onClick={submitDelete} disabled={deleteSubmitting}>
+              {deleteSubmitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
+              Excluir ajuste
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Bulk dialog */}
       <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
         <DialogContent className="max-w-lg">
