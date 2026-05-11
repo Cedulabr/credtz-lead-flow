@@ -1,46 +1,44 @@
-## Problema
+## Causa raiz
 
-Em **Revisar Ajustes → Pendências do mês**, ao clicar em "Lançar ajuste" (individual ou em lote) para uma pendência do tipo **Ajuste parcial**, o registro é gravado em `time_clock_adjustment_requests` com `adjustment_type = 'other'` e `status = 'approved'`.
+O PDF (espelho de ponto) lê direto da tabela `time_clock` e usa `evaluateDay()`, que marca `Registro Incompleto` quando faltam batidas (entrada sem saída, pausa incompleta, etc.). O problema é que vários ajustes aprovados **nunca chegaram a inserir/atualizar** linhas em `time_clock`. Confirmado em produção (abril/2026):
 
-A trigger do banco (`tg_apply_adjustment_request`) só aplica mudanças em `time_clock` quando o tipo é `add_entry|add_exit|add_break_start|add_break_end|edit_*|remove_record`. Para `other` ela retorna sem inserir nada — por isso o **Meu Histórico** continua mostrando o dia incompleto, mesmo aparecendo "Aprovada" em "Todas".
+- **`adjustment_type = 'other'`** → o trigger `tg_apply_adjustment_request` não trata esse tipo, então a aprovação grava só em `time_clock_adjustment_requests` e **não toca em `time_clock`**. Há 4+ pendências da Jamile aprovadas como `other`.
+- **`edit_entry` / `edit_exit` / `edit_break_*` com `target_record_id IS NULL`** → o trigger só executa o `UPDATE` quando existe `target_record_id`. Hoje vários ajustes foram aprovados sem alvo (porque a pendência era "faltava entrada", e o frontend marcou como `edit_entry` em vez de `add_entry`). Resultado: nada foi gravado em `time_clock`. Exemplo: usuário `a8a1af22…` em 2026-04-07 e 2026-04-28 — o `edit_entry` 09:00 foi aprovado, mas só existe na tabela de requests; `time_clock` continua sem `entrada` → "Registro Incompleto".
 
-A imagem confirma: várias linhas "Jamily Silva · Outro 29/04/2026 — Ajuste parcial" foram aprovadas, mas o ponto da Jamile não foi alterado.
+## Correções
 
-## O que vou alterar
+### 1. Trigger `tg_apply_adjustment_request` (migration SQL)
 
-Arquivo único: `src/components/TimeClock/AdjustmentReview.tsx`.
+Tornar o trigger tolerante aos dois casos acima:
 
-### 1. Detecção do tipo sugerido (`loadPendings`)
-Quando o problema é `parcial`, inferir uma ação concreta a partir das batidas existentes em vez de cair em `'other'`:
-- Falta `entrada` → `add_entry` (horário da escala).
-- Falta `saida` → `add_exit` (horário da escala).
-- `pausa_inicio` sem par → `add_break_end` (`lunch_end` da escala ou `+1h` da pausa).
-- `pausa_fim` sem par → `add_break_start` (`lunch_start` ou `−1h` do retorno).
-- Caso ainda não seja classificável, marcar `suggestedType = 'other'` e **bloquear** a linha de ações em lote, exigindo abrir o modal individual e escolher o tipo.
+- **Para `edit_*` com `target_record_id` nulo**:
+  - tentar localizar uma linha em `time_clock` por `(user_id, clock_date, clock_type)` correspondente e fazer `UPDATE`;
+  - se não existir nenhuma linha do tipo, fazer `INSERT` (mesmo caminho do `add_*`), com `notes = 'Ajuste #id (auto-fallback edit→add)'`.
+- **Para `other`**:
+  - se `proposed_time IS NOT NULL` e o motivo/`notes` indica claramente um tipo (ex.: contém "entrada", "saída", "pausa"), inferir e inserir;
+  - caso contrário, **rejeitar a aprovação** lançando `RAISE EXCEPTION` com mensagem clara ("Ajuste tipo Outro precisa ser convertido em add_entry/add_exit/etc antes de aprovar"). Isso impede silêncio e força a UI a converter.
 
-### 2. Bloqueio defensivo no envio
-- `submitBulk`: filtrar fora linhas com `suggestedType === 'other'` e mostrar aviso ("Selecione manualmente o tipo destas pendências").
-- `openCreateFromPending`: se vier `'other'`, abrir o modal já pré-preenchido mas com `newType` vazio para forçar o gestor a escolher (`add_entry`, `add_exit`, etc.).
+Após criar/aplicar o trigger novo, rodar uma rotina única (no próprio migration) para **reaplicar** todos os requests com `status='approved'` cujo efeito ficou faltando: set status para `pending` e voltar para `approved`, disparando o trigger atualizado, OU executar a lógica do trigger inline para esses registros antigos. Limitado ao período `>= 2026-01-01` para segurança.
 
-### 3. Recuperação dos ajustes "Outro" já aprovados
-Adicionar um botão discreto **"Reaplicar ajuste"** nas linhas da aba **Todas** quando `adjustment_type = 'other'` e `status = 'approved'`. Ele:
-1. Abre o modal de criação com os dados pré-preenchidos (data, colaborador, motivo).
-2. Pede ao gestor o tipo correto + horário.
-3. Cria um novo registro com o tipo correto (a trigger aplica em `time_clock`) e marca o antigo como `cancelled` via UPDATE em `time_clock_adjustment_requests`.
+### 2. Frontend `AdjustmentReview.tsx` (defensivo)
 
-Isso resolve as 4 pendências antigas da Jamily mostradas na tela sem mexer no banco manualmente.
+- No `submitCreate` e `submitBulk`, antes de inserir o request:
+  - se `newType` começa com `edit_` e `newTargetId` está vazio, converter automaticamente para o `add_` correspondente (`edit_entry → add_entry`, etc.).
+  - se `newType === 'other'`, bloquear o submit com toast pedindo escolha de tipo concreto (já existe parcialmente — reforçar).
+- Mesma proteção no fluxo de aprovação (`decide` para `approved`): se o request veio com `edit_*`+target nulo, atualizar o registro para `add_*` antes de marcar como `approved` (assim o trigger novo aplica corretamente).
 
-### 4. Refresh cruzado
-Após `submitBulk`, `submitCreate` e `decide`, disparar um evento global (`window.dispatchEvent(new CustomEvent('time-clock:refresh'))`). Em `MyHistory.tsx` adiciono um listener que chama `loadHistory()` para garantir que a tela do colaborador atualize sem precisar trocar de aba.
+### 3. Frontend `AdjustmentRequest.tsx` (origem da pendência)
 
-## Detalhes técnicos
+Garantir que o `suggestedType` gerado a partir de uma pendência "faltando entrada/saída/pausa" sempre devolva `add_*` (nunca `edit_*` sem target). Hoje já tende a isso, mas confirmar no `loadPendings` e nas variantes de `parcial`.
 
-- A trigger `tg_apply_adjustment_request` e a função `recalc_user_day` permanecem inalteradas — o bug está 100% no front, que escolhia um `adjustment_type` que a trigger ignora.
-- Nenhuma migration nova é necessária.
-- Sem mudança em RLS, lógica de negócio de cálculo, ou em outros módulos.
+### 4. Verificação
 
-## Fora do escopo
+Após o fix:
+- abrir "Pendências do mês" → aprovar uma pendência teste → conferir que aparece nova linha em `time_clock` com `status='ajustado'`;
+- gerar o PDF do mês para o mesmo usuário → o dia deve sair como "Completo / Ajustado", não mais "Registro Incompleto";
+- rodar query: `SELECT count(*) FROM time_clock_adjustment_requests r WHERE r.status='approved' AND NOT EXISTS (SELECT 1 FROM time_clock t WHERE t.user_id=r.user_id AND t.clock_date=r.clock_date AND t.notes LIKE '%'||r.id::text||'%') AND r.adjustment_type IN ('add_entry','add_exit','add_break_start','add_break_end');` → deve retornar 0.
 
-- Não vou tocar em backend/SQL.
-- Não vou re-arquitetar o fluxo de aprovação (continua auto-aprovado para gestor/admin).
-- Não vou alterar `Meu Histórico` além do listener de refresh.
+## Fora de escopo
+
+- Mudanças em UI de relatórios, layout do PDF, regras de cálculo de horas/banco.
+- Mudanças em RLS, autenticação, outros módulos.
