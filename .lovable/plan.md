@@ -1,44 +1,60 @@
-## Causa raiz
+## Objetivo
 
-O PDF (espelho de ponto) lê direto da tabela `time_clock` e usa `evaluateDay()`, que marca `Registro Incompleto` quando faltam batidas (entrada sem saída, pausa incompleta, etc.). O problema é que vários ajustes aprovados **nunca chegaram a inserir/atualizar** linhas em `time_clock`. Confirmado em produção (abril/2026):
+Adicionar, na aba **"Pendências do mês"** do card **Revisão de Ajustes**, ações rápidas (1 clique) para resolver os problemas mais comuns que hoje deixam o dia como **"Registro Incompleto"**, sem precisar abrir o modal manual e digitar tudo de novo.
 
-- **`adjustment_type = 'other'`** → o trigger `tg_apply_adjustment_request` não trata esse tipo, então a aprovação grava só em `time_clock_adjustment_requests` e **não toca em `time_clock`**. Há 4+ pendências da Jamile aprovadas como `other`.
-- **`edit_entry` / `edit_exit` / `edit_break_*` com `target_record_id IS NULL`** → o trigger só executa o `UPDATE` quando existe `target_record_id`. Hoje vários ajustes foram aprovados sem alvo (porque a pendência era "faltava entrada", e o frontend marcou como `edit_entry` em vez de `add_entry`). Resultado: nada foi gravado em `time_clock`. Exemplo: usuário `a8a1af22…` em 2026-04-07 e 2026-04-28 — o `edit_entry` 09:00 foi aprovado, mas só existe na tabela de requests; `time_clock` continua sem `entrada` → "Registro Incompleto".
+## Problemas tratados
 
-## Correções
+A engine (`timeClockEngine.ts`) já detecta esses códigos. Vamos mapear cada um a uma ação rápida:
 
-### 1. Trigger `tg_apply_adjustment_request` (migration SQL)
+| Inconsistência detectada | Ação rápida sugerida |
+|---|---|
+| `ENTRADA_DUPLICADA` / `SAIDA_DUPLICADA` / `BATIDA_DUPLICADA` | **Remover batida duplicada** — mantém a 1ª (entrada) ou a última (saída) e remove as demais |
+| `ENTRADA_SEM_SAIDA` | **Adicionar saída** — pré-preenche com `exit_time` da escala |
+| `SAIDA_SEM_ENTRADA` | **Adicionar entrada** — pré-preenche com `entry_time` da escala |
+| `PAUSA_INCOMPLETA` (início sem fim) | **Adicionar fim de pausa** — pré-preenche com `pausa_inicio + 1h` ou horário padrão da escala |
+| `PAUSA_INCOMPLETA` (fim sem início) | **Adicionar início de pausa** — pré-preenche com `pausa_fim - 1h` |
+| `SAIDA_ANTES_ENTRADA` / `PAUSA_INVERTIDA` | **Inverter horários** dos dois registros envolvidos |
+| Caso não se encaixe | Fallback: abre o modal manual atual |
 
-Tornar o trigger tolerante aos dois casos acima:
+## Mudanças no frontend
 
-- **Para `edit_*` com `target_record_id` nulo**:
-  - tentar localizar uma linha em `time_clock` por `(user_id, clock_date, clock_type)` correspondente e fazer `UPDATE`;
-  - se não existir nenhuma linha do tipo, fazer `INSERT` (mesmo caminho do `add_*`), com `notes = 'Ajuste #id (auto-fallback edit→add)'`.
-- **Para `other`**:
-  - se `proposed_time IS NOT NULL` e o motivo/`notes` indica claramente um tipo (ex.: contém "entrada", "saída", "pausa"), inferir e inserir;
-  - caso contrário, **rejeitar a aprovação** lançando `RAISE EXCEPTION` com mensagem clara ("Ajuste tipo Outro precisa ser convertido em add_entry/add_exit/etc antes de aprovar"). Isso impede silêncio e força a UI a converter.
+### 1. `src/lib/timeClockEngine.ts` (helper puro, sem mudar lógica)
+Exportar uma função utilitária `suggestQuickFixes(records, schedule, evaluation)` que retorna uma lista tipada:
+```ts
+type QuickFix =
+  | { kind: 'remove_duplicate'; recordId: string; clockType: string; time: string; label: string }
+  | { kind: 'add_missing'; clockType: 'entrada'|'saida'|'pausa_inicio'|'pausa_fim'; suggestedTime: string; label: string }
+  | { kind: 'swap_times'; aId: string; bId: string; label: string };
+```
+Sem alterar `evaluateDay` nem cálculos.
 
-Após criar/aplicar o trigger novo, rodar uma rotina única (no próprio migration) para **reaplicar** todos os requests com `status='approved'` cujo efeito ficou faltando: set status para `pending` e voltar para `approved`, disparando o trigger atualizado, OU executar a lógica do trigger inline para esses registros antigos. Limitado ao período `>= 2026-01-01` para segurança.
+### 2. `src/components/TimeClock/AdjustmentReview.tsx`
+- Em cada `PendingRow`, calcular `quickFixes` via `suggestQuickFixes`.
+- Renderizar até 3 botões pequenos por linha, antes do botão "Lançar ajuste":
+  - "Remover entrada duplicada (08:01)"
+  - "Adicionar saída 18:00"
+  - "Adicionar fim de pausa 13:00"
+- Estilo: `variant="outline"` com ícone (`Trash2`, `Plus`, `ArrowLeftRight`) e cor de destaque (amber para remoção, primary para adição).
+- Cada botão chama um handler único `applyQuickFix(row, fix)` que:
+  - **`remove_duplicate`** → `DELETE` direto em `time_clock` pelo `recordId` (mantendo log via `time_clock_logs`) **OU** cria um request `remove_record` já aprovado (decidir abaixo, ver perguntas).
+  - **`add_missing`** → cria request `add_*` com `proposed_time = suggestedTime`, `status='approved'`, `decision_notes='Ajuste rápido'` e dispara o trigger `tg_apply_adjustment_request` que já insere em `time_clock`.
+  - **`swap_times`** → 2 updates em `time_clock` + log.
+- Confirmação rápida via `toast` (sem modal). Em caso de múltiplas correções no mesmo dia, mostrar botão extra **"Resolver tudo"** que aplica todos os fixes em sequência.
 
-### 2. Frontend `AdjustmentReview.tsx` (defensivo)
+### 3. Visualização das batidas do dia (novo accordion)
+Na linha de cada pendência, expandir e mostrar a lista atual de batidas com botão `X` ao lado de cada uma → remove rapidamente. Útil quando há 3+ duplicatas e o auto-fix não cobre.
 
-- No `submitCreate` e `submitBulk`, antes de inserir o request:
-  - se `newType` começa com `edit_` e `newTargetId` está vazio, converter automaticamente para o `add_` correspondente (`edit_entry → add_entry`, etc.).
-  - se `newType === 'other'`, bloquear o submit com toast pedindo escolha de tipo concreto (já existe parcialmente — reforçar).
-- Mesma proteção no fluxo de aprovação (`decide` para `approved`): se o request veio com `edit_*`+target nulo, atualizar o registro para `add_*` antes de marcar como `approved` (assim o trigger novo aplica corretamente).
-
-### 3. Frontend `AdjustmentRequest.tsx` (origem da pendência)
-
-Garantir que o `suggestedType` gerado a partir de uma pendência "faltando entrada/saída/pausa" sempre devolva `add_*` (nunca `edit_*` sem target). Hoje já tende a isso, mas confirmar no `loadPendings` e nas variantes de `parcial`.
-
-### 4. Verificação
-
-Após o fix:
-- abrir "Pendências do mês" → aprovar uma pendência teste → conferir que aparece nova linha em `time_clock` com `status='ajustado'`;
-- gerar o PDF do mês para o mesmo usuário → o dia deve sair como "Completo / Ajustado", não mais "Registro Incompleto";
-- rodar query: `SELECT count(*) FROM time_clock_adjustment_requests r WHERE r.status='approved' AND NOT EXISTS (SELECT 1 FROM time_clock t WHERE t.user_id=r.user_id AND t.clock_date=r.clock_date AND t.notes LIKE '%'||r.id::text||'%') AND r.adjustment_type IN ('add_entry','add_exit','add_break_start','add_break_end');` → deve retornar 0.
+### 4. `MyHistory.tsx`
+Sem mudanças. Continua lendo `time_clock` — após os fixes acima o status muda automaticamente de "Registro Incompleto" para "Completo/Ajustado".
 
 ## Fora de escopo
 
-- Mudanças em UI de relatórios, layout do PDF, regras de cálculo de horas/banco.
-- Mudanças em RLS, autenticação, outros módulos.
+- Mudar o trigger SQL ou a engine de cálculo.
+- Mudar layout do PDF.
+- Mudar o fluxo de pendências do colaborador (`AdjustmentRequest.tsx`).
+
+## Verificação
+
+1. Provocar um dia com entrada duplicada (2 batidas `entrada` no mesmo dia) → aparece botão **"Remover entrada duplicada"** → 1 clique → dia some da lista de pendências e PDF vira "Completo".
+2. Provocar dia com `ENTRADA_SEM_SAIDA` → botão **"Adicionar saída 18:00"** → 1 clique → dia resolvido.
+3. Pausa incompleta → botão de fim de pausa → resolvido.
