@@ -263,7 +263,7 @@ export function AdjustmentReview() {
 
       const [recordsRes, schedulesRes, daysOffRes, justRes, existingReqRes] = await Promise.all([
         supabase.from('time_clock')
-          .select('user_id, clock_date, clock_type, clock_time')
+          .select('id, user_id, clock_date, clock_type, clock_time')
           .in('user_id', ids)
           .gte('clock_date', periodFrom)
           .lte('clock_date', periodTo)
