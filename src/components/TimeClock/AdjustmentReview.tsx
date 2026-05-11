@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Paperclip, Check, X, Plus, AlertTriangle, Wand2, ListChecks, Trash2, Zap } from 'lucide-react';
+import { Loader2, Paperclip, Check, X, Plus, AlertTriangle, Wand2, ListChecks, Trash2, Zap, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -608,6 +608,145 @@ export function AdjustmentReview() {
     setCreateOpen(true);
   };
 
+  // ===== Editar / Excluir ajuste já aprovado =====
+  const [editing, setEditing] = useState<any>(null);
+  const [editType, setEditType] = useState<string>('add_entry');
+  const [editTime, setEditTime] = useState<string>('');
+  const [editReason, setEditReason] = useState<string>('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState<any>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  const openEdit = (r: any) => {
+    setEditing(r);
+    setEditType(r.adjustment_type);
+    setEditTime(r.proposed_time ? r.proposed_time.slice(0, 5) : '');
+    setEditReason(r.reason || '');
+  };
+
+  // Localiza o registro em time_clock criado por um ajuste add_* via notes "ajuste #<id>"
+  const findRecordFromAdjustment = async (r: any) => {
+    const { data } = await (supabase as any)
+      .from('time_clock')
+      .select('id, clock_time, clock_type')
+      .eq('user_id', r.user_id)
+      .eq('clock_date', r.clock_date)
+      .ilike('notes', `%ajuste #${r.id}%`)
+      .maybeSingle();
+    return data;
+  };
+
+  const submitEdit = async () => {
+    if (!editing || !user) return;
+    if (editType === 'other') return toast.error('Tipo "Outro" não é editável. Use Reaplicar.');
+    const needsTime = editType.startsWith('add_') || editType.startsWith('edit_');
+    if (needsTime && !editTime) return toast.error('Informe o horário');
+    if (!editReason.trim()) return toast.error('Informe o motivo');
+    setEditSubmitting(true);
+    try {
+      const sameType = editType === editing.adjustment_type;
+      if (sameType && editType.startsWith('add_')) {
+        const linked = await findRecordFromAdjustment(editing);
+        if (linked) {
+          const newTs = `${editing.clock_date} ${editTime}:00`;
+          const { error: e1 } = await (supabase as any)
+            .from('time_clock')
+            .update({ clock_time: newTs, status: 'ajustado' })
+            .eq('id', linked.id);
+          if (e1) throw e1;
+        }
+        const { error: e2 } = await (supabase as any)
+          .from('time_clock_adjustment_requests')
+          .update({
+            proposed_time: editTime,
+            reason: editReason.trim(),
+            review_notes: 'Ajuste editado pela gestão',
+            reviewed_by: user.id,
+            reviewed_at: new Date().toISOString(),
+          })
+          .eq('id', editing.id);
+        if (e2) throw e2;
+      } else {
+        if (editing.adjustment_type?.startsWith('add_')) {
+          const linked = await findRecordFromAdjustment(editing);
+          if (linked) {
+            await (supabase as any).from('time_clock').delete().eq('id', linked.id);
+          }
+        }
+        await (supabase as any)
+          .from('time_clock_adjustment_requests')
+          .update({ status: 'cancelled', review_notes: 'Substituído por edição' })
+          .eq('id', editing.id);
+        const { error: eIns } = await (supabase as any)
+          .from('time_clock_adjustment_requests')
+          .insert({
+            user_id: editing.user_id,
+            company_id: editing.company_id,
+            clock_date: editing.clock_date,
+            adjustment_type: editType,
+            proposed_time: needsTime ? editTime : null,
+            target_record_id: editType.startsWith('edit_') || editType === 'remove_record'
+              ? editing.target_record_id : null,
+            reason: editReason.trim(),
+            status: 'approved',
+            reviewed_by: user.id,
+            reviewed_at: new Date().toISOString(),
+            review_notes: 'Edição do ajuste anterior',
+          });
+        if (eIns) throw eIns;
+      }
+      await (supabase as any).rpc('recalc_user_day', { _user_id: editing.user_id, _date: editing.clock_date });
+      toast.success('Ajuste atualizado');
+      setEditing(null);
+      load();
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('time-clock:refresh'));
+    } catch (e: any) {
+      toast.error(e.message || 'Falha ao editar ajuste');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  const submitDelete = async () => {
+    if (!deleting || !user) return;
+    setDeleteSubmitting(true);
+    try {
+      if (deleting.adjustment_type?.startsWith('add_')) {
+        const linked = await findRecordFromAdjustment(deleting);
+        if (linked) {
+          await (supabase as any).from('time_clock').delete().eq('id', linked.id);
+          await (supabase as any).from('time_clock_logs').insert({
+            time_clock_id: linked.id,
+            action: 'deletion',
+            performed_by: user.id,
+            reason: `Exclusão do ajuste #${deleting.id}`,
+            old_values: { clock_time: linked.clock_time, clock_type: linked.clock_type },
+            new_values: null,
+          });
+        }
+      }
+      const { error } = await (supabase as any)
+        .from('time_clock_adjustment_requests')
+        .update({
+          status: 'cancelled',
+          review_notes: 'Excluído pela gestão',
+          reviewed_by: user.id,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', deleting.id);
+      if (error) throw error;
+      await (supabase as any).rpc('recalc_user_day', { _user_id: deleting.user_id, _date: deleting.clock_date });
+      toast.success('Ajuste excluído');
+      setDeleting(null);
+      load();
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('time-clock:refresh'));
+    } catch (e: any) {
+      toast.error(e.message || 'Falha ao excluir ajuste');
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
+
   const openAttachment = async (path: string) => {
     const { data, error } = await supabase.storage
       .from('time-clock-attachments')
@@ -986,6 +1125,89 @@ export function AdjustmentReview() {
         </DialogContent>
       </Dialog>
 
+      {/* Editar ajuste aprovado */}
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Editar ajuste lançado</DialogTitle></DialogHeader>
+          {editing && (
+            <div className="space-y-3 py-2">
+              <div className="text-xs text-muted-foreground">
+                Colaborador: <strong>{profileMap[editing.user_id]}</strong> · Data:{' '}
+                <strong>{format(new Date(editing.clock_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })}</strong>
+              </div>
+              <div className="space-y-1">
+                <Label>Tipo</Label>
+                <Select value={editType} onValueChange={setEditType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ADJ_TYPES_FORM.map(t => (
+                      <SelectItem key={t} value={t}>{TYPE_LABELS[t]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {(editType.startsWith('add_') || editType.startsWith('edit_')) && (
+                <div className="space-y-1">
+                  <Label>Horário</Label>
+                  <Input type="time" value={editTime} onChange={(e) => setEditTime(e.target.value)} />
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label>Motivo</Label>
+                <Textarea rows={3} value={editReason} onChange={(e) => setEditReason(e.target.value)} />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                A alteração refletirá imediatamente no ponto do colaborador e o dia será recalculado.
+              </p>
+            </div>
+          )}
+          <DialogFooter className="sticky bottom-0 bg-background pt-3">
+            <Button variant="outline" onClick={() => setEditing(null)} disabled={editSubmitting}>Cancelar</Button>
+            <Button onClick={submitEdit} disabled={editSubmitting}>
+              {editSubmitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
+              Salvar alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Excluir ajuste aprovado */}
+      <Dialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Excluir ajuste lançado</DialogTitle></DialogHeader>
+          {deleting && (
+            <div className="space-y-2 py-2 text-sm">
+              <p>
+                Deseja realmente excluir o ajuste de <strong>{profileMap[deleting.user_id]}</strong> em{' '}
+                <strong>{format(new Date(deleting.clock_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })}</strong>?
+              </p>
+              <p className="text-muted-foreground text-xs">
+                Tipo: {TYPE_LABELS[deleting.adjustment_type]}
+                {deleting.proposed_time && ` · ${deleting.proposed_time.slice(0, 5)}`}
+              </p>
+              {deleting.adjustment_type?.startsWith('add_') && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                  A batida correspondente será removida do ponto do colaborador e o dia recalculado.
+                </p>
+              )}
+              {deleting.adjustment_type?.startsWith('edit_') && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                  Atenção: este ajuste editou um registro existente. A exclusão apenas cancela a solicitação;
+                  o horário modificado permanece no ponto. Use "Editar" se quiser alterar o horário.
+                </p>
+              )}
+            </div>
+          )}
+          <DialogFooter className="sticky bottom-0 bg-background pt-3">
+            <Button variant="outline" onClick={() => setDeleting(null)} disabled={deleteSubmitting}>Cancelar</Button>
+            <Button variant="destructive" onClick={submitDelete} disabled={deleteSubmitting}>
+              {deleteSubmitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
+              Excluir ajuste
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Bulk dialog */}
       <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
         <DialogContent className="max-w-lg">
@@ -1074,6 +1296,22 @@ export function AdjustmentReview() {
                 >
                   <Wand2 className="h-3.5 w-3.5 mr-1" />Reaplicar ajuste
                 </Button>
+              )}
+              {r.status === 'approved' && r.adjustment_type !== 'other' && (isAdmin || isGestor) && (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => openEdit(r)} title="Editar ajuste já lançado">
+                    <Pencil className="h-3.5 w-3.5 mr-1" />Editar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setDeleting(r)}
+                    title="Excluir ajuste e remover seu efeito no ponto"
+                    className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />Excluir
+                  </Button>
+                </>
               )}
             </div>
           </div>
