@@ -2435,6 +2435,35 @@ export type Database = {
           },
         ]
       }
+      chatbot_recent_runs: {
+        Row: {
+          contact_phone: string
+          flow_id: string
+          id: string
+          last_triggered_at: string
+        }
+        Insert: {
+          contact_phone: string
+          flow_id: string
+          id?: string
+          last_triggered_at?: string
+        }
+        Update: {
+          contact_phone?: string
+          flow_id?: string
+          id?: string
+          last_triggered_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chatbot_recent_runs_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "chatbot_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chatbot_runs: {
         Row: {
           company_id: string
@@ -9778,6 +9807,8 @@ export type Database = {
       }
       wa_campaign_recipients: {
         Row: {
+          automation_stop_reason: string | null
+          automation_stopped_at: string | null
           campaign_id: string
           contact_id: string | null
           created_at: string
@@ -9794,12 +9825,15 @@ export type Database = {
           second_message_scheduled_at: string | null
           second_message_sent: boolean
           second_message_sent_at: string | null
+          second_message_triggered_at: string | null
           sent_at: string | null
           sent_via_instance_id: string | null
           status: string
           variables: Json
         }
         Insert: {
+          automation_stop_reason?: string | null
+          automation_stopped_at?: string | null
           campaign_id: string
           contact_id?: string | null
           created_at?: string
@@ -9816,12 +9850,15 @@ export type Database = {
           second_message_scheduled_at?: string | null
           second_message_sent?: boolean
           second_message_sent_at?: string | null
+          second_message_triggered_at?: string | null
           sent_at?: string | null
           sent_via_instance_id?: string | null
           status?: string
           variables?: Json
         }
         Update: {
+          automation_stop_reason?: string | null
+          automation_stopped_at?: string | null
           campaign_id?: string
           contact_id?: string | null
           created_at?: string
@@ -9838,6 +9875,7 @@ export type Database = {
           second_message_scheduled_at?: string | null
           second_message_sent?: boolean
           second_message_sent_at?: string | null
+          second_message_triggered_at?: string | null
           sent_at?: string | null
           sent_via_instance_id?: string | null
           status?: string
@@ -10275,6 +10313,8 @@ export type Database = {
       whatsapp_messages: {
         Row: {
           audio_transcription: string | null
+          automation_ref_id: string | null
+          automation_source: string | null
           client_name: string | null
           conversation_id: string | null
           created_at: string
@@ -10294,6 +10334,8 @@ export type Database = {
         }
         Insert: {
           audio_transcription?: string | null
+          automation_ref_id?: string | null
+          automation_source?: string | null
           client_name?: string | null
           conversation_id?: string | null
           created_at?: string
@@ -10313,6 +10355,8 @@ export type Database = {
         }
         Update: {
           audio_transcription?: string | null
+          automation_ref_id?: string | null
+          automation_source?: string | null
           client_name?: string | null
           conversation_id?: string | null
           created_at?: string
@@ -10575,6 +10619,10 @@ export type Database = {
           user_id: string
           user_name: string
         }[]
+      }
+      conversation_has_active_human: {
+        Args: { _conversation_id: string }
+        Returns: boolean
       }
       count_baseoff_duplicates: { Args: never; Returns: number }
       count_leads_database_duplicates: { Args: never; Returns: number }
