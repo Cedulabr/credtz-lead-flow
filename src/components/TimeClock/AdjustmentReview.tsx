@@ -291,10 +291,10 @@ export function AdjustmentReview() {
           .in('status', ['pending', 'approved']),
       ]);
 
-      const recordsByUserDate: Record<string, ClockRecord[]> = {};
+      const recordsByUserDate: Record<string, ClockRecordFull[]> = {};
       (recordsRes.data || []).forEach((r: any) => {
         const k = `${r.user_id}|${r.clock_date}`;
-        (recordsByUserDate[k] ||= []).push({ clock_type: r.clock_type, clock_time: r.clock_time });
+        (recordsByUserDate[k] ||= []).push({ id: r.id, clock_type: r.clock_type, clock_time: r.clock_time });
       });
       const schedByUser: Record<string, DaySchedule> = {};
       (schedulesRes.data || []).forEach((s: any) => {
