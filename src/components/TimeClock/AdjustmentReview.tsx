@@ -520,6 +520,8 @@ export function AdjustmentReview() {
       await applyQuickFix(p, fix);
     }
   };
+
+  const submitBulk = async () => {
     if (!user) return;
     const allSelected = filteredPendings.filter(p => !p.blocked && selected.has(`${p.user_id}|${p.date}|${p.problem}`));
     const skipped = allSelected.filter(p => p.suggestedType === 'other' || !p.suggestedType);
