@@ -828,11 +828,47 @@ export function AdjustmentReview() {
                               Batidas: {p.records.map(r => `${r.clock_type.replace('_', ' ')} ${r.clock_time.slice(0,5)}`).join(' · ')}
                             </p>
                           )}
+                          {!p.blocked && p.quickFixes.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {p.quickFixes.length > 1 && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => applyAllQuickFixes(p)}
+                                  disabled={!!quickFixBusy}
+                                  className="h-7 px-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  title="Aplica todos os ajustes rápidos sugeridos para este dia"
+                                >
+                                  <Zap className="h-3 w-3 mr-1" />Resolver tudo ({p.quickFixes.length})
+                                </Button>
+                              )}
+                              {p.quickFixes.map((fix, i) => {
+                                const isRemove = fix.kind === 'remove_duplicate';
+                                const isSwap = fix.kind === 'swap_times';
+                                const Icon = isRemove ? Trash2 : isSwap ? Wand2 : Plus;
+                                return (
+                                  <Button
+                                    key={i}
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => applyQuickFix(p, fix)}
+                                    disabled={!!quickFixBusy}
+                                    className={`h-7 px-2 text-xs ${
+                                      isRemove
+                                        ? 'border-amber-400 text-amber-700 hover:bg-amber-50'
+                                        : 'border-primary/40 text-primary hover:bg-primary/5'
+                                    }`}
+                                  >
+                                    <Icon className="h-3 w-3 mr-1" />{fix.label}
+                                  </Button>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex shrink-0">
                         <Button size="sm" variant="outline" onClick={() => startAdjustmentFromPending(p)} disabled={p.blocked}>
-                          <Wand2 className="h-3 w-3 mr-1" />Lançar
+                          <Wand2 className="h-3 w-3 mr-1" />Lançar manual
                         </Button>
                       </div>
                     </div>
