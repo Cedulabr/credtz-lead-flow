@@ -1991,27 +1991,39 @@ export type Database = {
           close_time: string
           company_id: string
           day_of_week: number
+          department_id: string | null
           id: string
+          instance_id: string | null
           is_active: boolean | null
+          name: string | null
           open_time: string
+          scope: string
         }
         Insert: {
           away_message?: string | null
           close_time: string
           company_id: string
           day_of_week: number
+          department_id?: string | null
           id?: string
+          instance_id?: string | null
           is_active?: boolean | null
+          name?: string | null
           open_time: string
+          scope?: string
         }
         Update: {
           away_message?: string | null
           close_time?: string
           company_id?: string
           day_of_week?: number
+          department_id?: string | null
           id?: string
+          instance_id?: string | null
           is_active?: boolean | null
+          name?: string | null
           open_time?: string
+          scope?: string
         }
         Relationships: [
           {
@@ -2019,6 +2031,20 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_hours_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_hours_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
             referencedColumns: ["id"]
           },
         ]
