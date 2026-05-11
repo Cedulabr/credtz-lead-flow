@@ -361,8 +361,17 @@ export function AdjustmentReview() {
   const startAdjustmentFromPending = (p: PendingRow) => {
     setNewUserId(p.user_id);
     setNewDate(p.date);
-    setNewType(p.suggestedType);
-    setNewTime(p.suggestedTime);
+    // Quando o tipo sugerido é genérico ("other"), forçamos o gestor a escolher
+    // um tipo concreto no modal — caso contrário a trigger do banco não aplica
+    // o ajuste em time_clock e Meu Histórico não reflete a mudança.
+    if (p.suggestedType === 'other' || !p.suggestedType) {
+      setNewType('add_entry');
+      setNewTime('');
+      toast.message('Selecione manualmente o tipo de ajuste para esta pendência.');
+    } else {
+      setNewType(p.suggestedType);
+      setNewTime(p.suggestedTime);
+    }
     setNewReason(`Ajuste lançado pela gestão — ${p.problemLabel} em ${format(new Date(p.date + 'T12:00:00'), 'dd/MM/yyyy')}`);
     setNewTargetId('');
     setCreateOpen(true);
@@ -370,8 +379,15 @@ export function AdjustmentReview() {
 
   const submitBulk = async () => {
     if (!user) return;
-    const rows = filteredPendings.filter(p => !p.blocked && selected.has(`${p.user_id}|${p.date}|${p.problem}`));
-    if (!rows.length) return toast.error('Nenhuma pendência selecionada');
+    const allSelected = filteredPendings.filter(p => !p.blocked && selected.has(`${p.user_id}|${p.date}|${p.problem}`));
+    const skipped = allSelected.filter(p => p.suggestedType === 'other' || !p.suggestedType);
+    const rows = allSelected.filter(p => p.suggestedType && p.suggestedType !== 'other');
+    if (!rows.length) {
+      return toast.error('Nenhuma pendência elegível: ajuste tipo "Outro" precisa ser lançado individualmente.');
+    }
+    if (skipped.length) {
+      toast.message(`${skipped.length} pendência(s) ignorada(s) — tipo "Outro" exige lançamento manual.`);
+    }
     if (!bulkReason.trim()) return toast.error('Informe o motivo');
 
     const timeFor = (p: PendingRow): string => {
