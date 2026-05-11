@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Paperclip, Check, X, Plus, AlertTriangle, Wand2, ListChecks } from 'lucide-react';
+import { Loader2, Paperclip, Check, X, Plus, AlertTriangle, Wand2, ListChecks, Trash2, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -40,6 +40,13 @@ const ADJ_TYPES_FORM = [
   'remove_record',
 ];
 
+type ClockRecordFull = ClockRecord & { id: string };
+
+type QuickFix =
+  | { kind: 'remove_duplicate'; recordId: string; clockType: string; time: string; label: string }
+  | { kind: 'add_missing'; adjType: 'add_entry' | 'add_exit' | 'add_break_start' | 'add_break_end'; suggestedTime: string; label: string }
+  | { kind: 'swap_times'; aId: string; bId: string; label: string };
+
 type PendingRow = {
   user_id: string;
   user_name: string;
@@ -48,12 +55,13 @@ type PendingRow = {
   status: 'pendente_ajuste' | 'ajuste_parcial';
   problem: 'sem_entrada' | 'sem_saida' | 'pausa_desbalanceada' | 'parcial';
   problemLabel: string;
-  severity: number; // 1 = falta entrada/saida, 2 = pausa, 3 = outros
+  severity: number;
   suggestedType: string;
-  suggestedTime: string; // HH:MM
-  records: ClockRecord[];
+  suggestedTime: string;
+  records: ClockRecordFull[];
   inconsText: string;
   blocked?: boolean;
+  quickFixes: QuickFix[];
 };
 
 const PROBLEM_LABEL: Record<PendingRow['problem'], string> = {
@@ -62,6 +70,75 @@ const PROBLEM_LABEL: Record<PendingRow['problem'], string> = {
   pausa_desbalanceada: 'Pausa desbalanceada',
   parcial: 'Ajuste parcial',
 };
+
+const TYPE_LABEL_PT: Record<string, string> = {
+  entrada: 'entrada',
+  saida: 'saída',
+  pausa_inicio: 'início de pausa',
+  pausa_fim: 'fim de pausa',
+};
+
+function buildQuickFixes(records: ClockRecordFull[], schedEntry: string, schedExit: string): QuickFix[] {
+  const fixes: QuickFix[] = [];
+  const types = new Set(records.map(r => r.clock_type));
+  const byType = (t: string) => records.filter(r => r.clock_type === t).sort((a, b) => a.clock_time.localeCompare(b.clock_time));
+
+  const dupRules: Array<{ type: string; keep: 'first' | 'last' }> = [
+    { type: 'entrada', keep: 'first' },
+    { type: 'saida', keep: 'last' },
+    { type: 'pausa_inicio', keep: 'first' },
+    { type: 'pausa_fim', keep: 'last' },
+  ];
+  for (const { type, keep } of dupRules) {
+    const list = byType(type);
+    if (list.length > 1) {
+      const toRemove = keep === 'first' ? list.slice(1) : list.slice(0, -1);
+      for (const r of toRemove) {
+        fixes.push({
+          kind: 'remove_duplicate',
+          recordId: r.id,
+          clockType: type,
+          time: r.clock_time.slice(0, 5),
+          label: `Remover ${TYPE_LABEL_PT[type]} duplicada (${r.clock_time.slice(0, 5)})`,
+        });
+      }
+    }
+  }
+
+  if (!types.has('entrada') && (types.has('saida') || types.has('pausa_inicio'))) {
+    const t = (schedEntry || '08:00').slice(0, 5);
+    fixes.push({ kind: 'add_missing', adjType: 'add_entry', suggestedTime: t, label: `Adicionar entrada ${t}` });
+  }
+  if (!types.has('saida') && (types.has('entrada') || types.has('pausa_fim'))) {
+    const t = (schedExit || '18:00').slice(0, 5);
+    fixes.push({ kind: 'add_missing', adjType: 'add_exit', suggestedTime: t, label: `Adicionar saída ${t}` });
+  }
+
+  const inicios = byType('pausa_inicio');
+  const fins = byType('pausa_fim');
+  if (inicios.length > fins.length) {
+    const last = inicios[inicios.length - 1];
+    const [hh, mm] = last.clock_time.split(':').map(Number);
+    const total = hh * 60 + mm + 60;
+    const t = `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+    fixes.push({ kind: 'add_missing', adjType: 'add_break_end', suggestedTime: t, label: `Adicionar fim de pausa ${t}` });
+  }
+  if (fins.length > inicios.length) {
+    const first = fins[0];
+    const [hh, mm] = first.clock_time.split(':').map(Number);
+    const total = Math.max(0, hh * 60 + mm - 60);
+    const t = `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+    fixes.push({ kind: 'add_missing', adjType: 'add_break_start', suggestedTime: t, label: `Adicionar início de pausa ${t}` });
+  }
+
+  const ents = byType('entrada');
+  const exs = byType('saida');
+  if (ents.length === 1 && exs.length === 1 && exs[0].clock_time < ents[0].clock_time) {
+    fixes.push({ kind: 'swap_times', aId: ents[0].id, bId: exs[0].id, label: 'Inverter entrada ↔ saída' });
+  }
+
+  return fixes;
+}
 
 export function AdjustmentReview() {
   const { user } = useAuth();
@@ -186,7 +263,7 @@ export function AdjustmentReview() {
 
       const [recordsRes, schedulesRes, daysOffRes, justRes, existingReqRes] = await Promise.all([
         supabase.from('time_clock')
-          .select('user_id, clock_date, clock_type, clock_time')
+          .select('id, user_id, clock_date, clock_type, clock_time')
           .in('user_id', ids)
           .gte('clock_date', periodFrom)
           .lte('clock_date', periodTo)
@@ -214,10 +291,10 @@ export function AdjustmentReview() {
           .in('status', ['pending', 'approved']),
       ]);
 
-      const recordsByUserDate: Record<string, ClockRecord[]> = {};
+      const recordsByUserDate: Record<string, ClockRecordFull[]> = {};
       (recordsRes.data || []).forEach((r: any) => {
         const k = `${r.user_id}|${r.clock_date}`;
-        (recordsByUserDate[k] ||= []).push({ clock_type: r.clock_type, clock_time: r.clock_time });
+        (recordsByUserDate[k] ||= []).push({ id: r.id, clock_type: r.clock_type, clock_time: r.clock_time });
       });
       const schedByUser: Record<string, DaySchedule> = {};
       (schedulesRes.data || []).forEach((s: any) => {
@@ -304,6 +381,7 @@ export function AdjustmentReview() {
             records: recs,
             inconsText: result.inconsistencies.map(i => i.message).join(' • '),
             blocked: isBlocked,
+            quickFixes: buildQuickFixes(recs, sched?.entry_time || '08:00', sched?.exit_time || '18:00'),
           });
         }
       }
@@ -375,6 +453,72 @@ export function AdjustmentReview() {
     setNewReason(`Ajuste lançado pela gestão — ${p.problemLabel} em ${format(new Date(p.date + 'T12:00:00'), 'dd/MM/yyyy')}`);
     setNewTargetId('');
     setCreateOpen(true);
+  };
+
+  const [quickFixBusy, setQuickFixBusy] = useState<string | null>(null);
+
+  const applyQuickFix = async (p: PendingRow, fix: QuickFix) => {
+    if (!user) return;
+    const key = `${p.user_id}|${p.date}|${fix.kind}|${(fix as any).recordId || (fix as any).adjType || (fix as any).aId || ''}`;
+    setQuickFixBusy(key);
+    try {
+      if (fix.kind === 'remove_duplicate') {
+        const { error } = await (supabase as any).from('time_clock').delete().eq('id', fix.recordId);
+        if (error) throw error;
+        await (supabase as any).from('time_clock_logs').insert({
+          time_clock_id: fix.recordId,
+          action: 'deletion',
+          performed_by: user.id,
+          reason: `Ajuste rápido: ${fix.label}`,
+          old_values: { clock_type: fix.clockType, clock_time: fix.time },
+          new_values: null,
+        });
+        await (supabase as any).rpc('recalc_user_day', { _user_id: p.user_id, _date: p.date });
+      } else if (fix.kind === 'add_missing') {
+        const { error } = await (supabase as any).from('time_clock_adjustment_requests').insert({
+          user_id: p.user_id,
+          company_id: p.company_id,
+          clock_date: p.date,
+          adjustment_type: fix.adjType,
+          proposed_time: fix.suggestedTime,
+          target_record_id: null,
+          reason: `Ajuste rápido pela gestão — ${fix.label}`,
+          status: 'approved',
+          reviewed_by: user.id,
+          reviewed_at: new Date().toISOString(),
+          review_notes: 'Ajuste rápido (1 clique)',
+        });
+        if (error) throw error;
+      } else if (fix.kind === 'swap_times') {
+        const a = p.records.find(r => r.id === fix.aId);
+        const b = p.records.find(r => r.id === fix.bId);
+        if (!a || !b) throw new Error('Registros não encontrados');
+        const { error: e1 } = await (supabase as any).from('time_clock').update({ clock_time: b.clock_time, status: 'ajustado' }).eq('id', a.id);
+        if (e1) throw e1;
+        const { error: e2 } = await (supabase as any).from('time_clock').update({ clock_time: a.clock_time, status: 'ajustado' }).eq('id', b.id);
+        if (e2) throw e2;
+        await (supabase as any).rpc('recalc_user_day', { _user_id: p.user_id, _date: p.date });
+      }
+      toast.success(fix.label + ' aplicado');
+      loadPendings();
+      load();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('time-clock:refresh'));
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || 'Falha ao aplicar ajuste rápido');
+    } finally {
+      setQuickFixBusy(null);
+    }
+  };
+
+  const applyAllQuickFixes = async (p: PendingRow) => {
+    for (const fix of p.quickFixes) {
+      // sequential to avoid conflicts
+      // eslint-disable-next-line no-await-in-loop
+      await applyQuickFix(p, fix);
+    }
   };
 
   const submitBulk = async () => {
@@ -684,11 +828,47 @@ export function AdjustmentReview() {
                               Batidas: {p.records.map(r => `${r.clock_type.replace('_', ' ')} ${r.clock_time.slice(0,5)}`).join(' · ')}
                             </p>
                           )}
+                          {!p.blocked && p.quickFixes.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {p.quickFixes.length > 1 && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => applyAllQuickFixes(p)}
+                                  disabled={!!quickFixBusy}
+                                  className="h-7 px-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  title="Aplica todos os ajustes rápidos sugeridos para este dia"
+                                >
+                                  <Zap className="h-3 w-3 mr-1" />Resolver tudo ({p.quickFixes.length})
+                                </Button>
+                              )}
+                              {p.quickFixes.map((fix, i) => {
+                                const isRemove = fix.kind === 'remove_duplicate';
+                                const isSwap = fix.kind === 'swap_times';
+                                const Icon = isRemove ? Trash2 : isSwap ? Wand2 : Plus;
+                                return (
+                                  <Button
+                                    key={i}
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => applyQuickFix(p, fix)}
+                                    disabled={!!quickFixBusy}
+                                    className={`h-7 px-2 text-xs ${
+                                      isRemove
+                                        ? 'border-amber-400 text-amber-700 hover:bg-amber-50'
+                                        : 'border-primary/40 text-primary hover:bg-primary/5'
+                                    }`}
+                                  >
+                                    <Icon className="h-3 w-3 mr-1" />{fix.label}
+                                  </Button>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex shrink-0">
                         <Button size="sm" variant="outline" onClick={() => startAdjustmentFromPending(p)} disabled={p.blocked}>
-                          <Wand2 className="h-3 w-3 mr-1" />Lançar
+                          <Wand2 className="h-3 w-3 mr-1" />Lançar manual
                         </Button>
                       </div>
                     </div>
