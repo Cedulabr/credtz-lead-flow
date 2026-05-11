@@ -886,8 +886,13 @@ export function AdjustmentReview() {
                 <Button size="sm" onClick={() => { setReviewing(r); setReviewNotes(''); }}>Revisar</Button>
               )}
               {r.status === 'approved' && r.adjustment_type === 'other' && (isAdmin || isGestor) && (
-                <Button size="sm" variant="outline" onClick={() => reapplyOther(r)} title="Reaplicar com tipo correto para refletir em Meu Histórico">
-                  <Wand2 className="h-3 w-3 mr-1" />Reaplicar
+                <Button
+                  size="sm"
+                  onClick={() => reapplyOther(r)}
+                  title="Reaplicar com tipo correto para refletir em Meu Histórico e no espelho de ponto"
+                  className="bg-amber-500 hover:bg-amber-600 text-white shadow-md ring-2 ring-amber-300 animate-pulse"
+                >
+                  <Wand2 className="h-3.5 w-3.5 mr-1" />Reaplicar ajuste
                 </Button>
               )}
             </div>
