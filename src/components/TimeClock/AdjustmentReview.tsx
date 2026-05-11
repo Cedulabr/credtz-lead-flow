@@ -1214,6 +1214,22 @@ export function AdjustmentReview() {
                   <Wand2 className="h-3.5 w-3.5 mr-1" />Reaplicar ajuste
                 </Button>
               )}
+              {r.status === 'approved' && r.adjustment_type !== 'other' && (isAdmin || isGestor) && (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => openEdit(r)} title="Editar ajuste já lançado">
+                    <Pencil className="h-3.5 w-3.5 mr-1" />Editar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setDeleting(r)}
+                    title="Excluir ajuste e remover seu efeito no ponto"
+                    className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />Excluir
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         ))}
