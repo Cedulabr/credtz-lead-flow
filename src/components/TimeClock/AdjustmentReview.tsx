@@ -455,7 +455,71 @@ export function AdjustmentReview() {
     setCreateOpen(true);
   };
 
-  const submitBulk = async () => {
+  const [quickFixBusy, setQuickFixBusy] = useState<string | null>(null);
+
+  const applyQuickFix = async (p: PendingRow, fix: QuickFix) => {
+    if (!user) return;
+    const key = `${p.user_id}|${p.date}|${fix.kind}|${(fix as any).recordId || (fix as any).adjType || (fix as any).aId || ''}`;
+    setQuickFixBusy(key);
+    try {
+      if (fix.kind === 'remove_duplicate') {
+        const { error } = await (supabase as any).from('time_clock').delete().eq('id', fix.recordId);
+        if (error) throw error;
+        await (supabase as any).from('time_clock_logs').insert({
+          time_clock_id: fix.recordId,
+          action: 'deletion',
+          performed_by: user.id,
+          reason: `Ajuste rápido: ${fix.label}`,
+          old_values: { clock_type: fix.clockType, clock_time: fix.time },
+          new_values: null,
+        });
+        await (supabase as any).rpc('recalc_user_day', { _user_id: p.user_id, _date: p.date });
+      } else if (fix.kind === 'add_missing') {
+        const { error } = await (supabase as any).from('time_clock_adjustment_requests').insert({
+          user_id: p.user_id,
+          company_id: p.company_id,
+          clock_date: p.date,
+          adjustment_type: fix.adjType,
+          proposed_time: fix.suggestedTime,
+          target_record_id: null,
+          reason: `Ajuste rápido pela gestão — ${fix.label}`,
+          status: 'approved',
+          reviewed_by: user.id,
+          reviewed_at: new Date().toISOString(),
+          review_notes: 'Ajuste rápido (1 clique)',
+        });
+        if (error) throw error;
+      } else if (fix.kind === 'swap_times') {
+        const a = p.records.find(r => r.id === fix.aId);
+        const b = p.records.find(r => r.id === fix.bId);
+        if (!a || !b) throw new Error('Registros não encontrados');
+        const { error: e1 } = await (supabase as any).from('time_clock').update({ clock_time: b.clock_time, status: 'ajustado' }).eq('id', a.id);
+        if (e1) throw e1;
+        const { error: e2 } = await (supabase as any).from('time_clock').update({ clock_time: a.clock_time, status: 'ajustado' }).eq('id', b.id);
+        if (e2) throw e2;
+        await (supabase as any).rpc('recalc_user_day', { _user_id: p.user_id, _date: p.date });
+      }
+      toast.success(fix.label + ' aplicado');
+      loadPendings();
+      load();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('time-clock:refresh'));
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || 'Falha ao aplicar ajuste rápido');
+    } finally {
+      setQuickFixBusy(null);
+    }
+  };
+
+  const applyAllQuickFixes = async (p: PendingRow) => {
+    for (const fix of p.quickFixes) {
+      // sequential to avoid conflicts
+      // eslint-disable-next-line no-await-in-loop
+      await applyQuickFix(p, fix);
+    }
+  };
     if (!user) return;
     const allSelected = filteredPendings.filter(p => !p.blocked && selected.has(`${p.user_id}|${p.date}|${p.problem}`));
     const skipped = allSelected.filter(p => p.suggestedType === 'other' || !p.suggestedType);
