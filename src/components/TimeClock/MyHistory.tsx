@@ -126,6 +126,13 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
     loadHistory();
   }, [startDate, endDate, activeUserId, selectedUserId, isAdmin]);
 
+  // Atualiza o histórico quando um ajuste é lançado em outra tela
+  useEffect(() => {
+    const handler = () => loadHistory();
+    window.addEventListener('time-clock:refresh', handler);
+    return () => window.removeEventListener('time-clock:refresh', handler);
+  }, [startDate, endDate, activeUserId, selectedUserId, isAdmin]);
+
   useEffect(() => {
     loadCompanyData();
     loadSchedules();
