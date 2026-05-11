@@ -424,6 +424,9 @@ export function AdjustmentReview() {
     setSelected(new Set());
     loadPendings();
     load();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('time-clock:refresh'));
+    }
   };
 
   const decide = async (status: 'approved' | 'rejected') => {
