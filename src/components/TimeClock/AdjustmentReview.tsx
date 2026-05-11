@@ -40,6 +40,13 @@ const ADJ_TYPES_FORM = [
   'remove_record',
 ];
 
+type ClockRecordFull = ClockRecord & { id: string };
+
+type QuickFix =
+  | { kind: 'remove_duplicate'; recordId: string; clockType: string; time: string; label: string }
+  | { kind: 'add_missing'; adjType: 'add_entry' | 'add_exit' | 'add_break_start' | 'add_break_end'; suggestedTime: string; label: string }
+  | { kind: 'swap_times'; aId: string; bId: string; label: string };
+
 type PendingRow = {
   user_id: string;
   user_name: string;
@@ -48,12 +55,13 @@ type PendingRow = {
   status: 'pendente_ajuste' | 'ajuste_parcial';
   problem: 'sem_entrada' | 'sem_saida' | 'pausa_desbalanceada' | 'parcial';
   problemLabel: string;
-  severity: number; // 1 = falta entrada/saida, 2 = pausa, 3 = outros
+  severity: number;
   suggestedType: string;
-  suggestedTime: string; // HH:MM
-  records: ClockRecord[];
+  suggestedTime: string;
+  records: ClockRecordFull[];
   inconsText: string;
   blocked?: boolean;
+  quickFixes: QuickFix[];
 };
 
 const PROBLEM_LABEL: Record<PendingRow['problem'], string> = {
@@ -62,6 +70,75 @@ const PROBLEM_LABEL: Record<PendingRow['problem'], string> = {
   pausa_desbalanceada: 'Pausa desbalanceada',
   parcial: 'Ajuste parcial',
 };
+
+const TYPE_LABEL_PT: Record<string, string> = {
+  entrada: 'entrada',
+  saida: 'saída',
+  pausa_inicio: 'início de pausa',
+  pausa_fim: 'fim de pausa',
+};
+
+function buildQuickFixes(records: ClockRecordFull[], schedEntry: string, schedExit: string): QuickFix[] {
+  const fixes: QuickFix[] = [];
+  const types = new Set(records.map(r => r.clock_type));
+  const byType = (t: string) => records.filter(r => r.clock_type === t).sort((a, b) => a.clock_time.localeCompare(b.clock_time));
+
+  const dupRules: Array<{ type: string; keep: 'first' | 'last' }> = [
+    { type: 'entrada', keep: 'first' },
+    { type: 'saida', keep: 'last' },
+    { type: 'pausa_inicio', keep: 'first' },
+    { type: 'pausa_fim', keep: 'last' },
+  ];
+  for (const { type, keep } of dupRules) {
+    const list = byType(type);
+    if (list.length > 1) {
+      const toRemove = keep === 'first' ? list.slice(1) : list.slice(0, -1);
+      for (const r of toRemove) {
+        fixes.push({
+          kind: 'remove_duplicate',
+          recordId: r.id,
+          clockType: type,
+          time: r.clock_time.slice(0, 5),
+          label: `Remover ${TYPE_LABEL_PT[type]} duplicada (${r.clock_time.slice(0, 5)})`,
+        });
+      }
+    }
+  }
+
+  if (!types.has('entrada') && (types.has('saida') || types.has('pausa_inicio'))) {
+    const t = (schedEntry || '08:00').slice(0, 5);
+    fixes.push({ kind: 'add_missing', adjType: 'add_entry', suggestedTime: t, label: `Adicionar entrada ${t}` });
+  }
+  if (!types.has('saida') && (types.has('entrada') || types.has('pausa_fim'))) {
+    const t = (schedExit || '18:00').slice(0, 5);
+    fixes.push({ kind: 'add_missing', adjType: 'add_exit', suggestedTime: t, label: `Adicionar saída ${t}` });
+  }
+
+  const inicios = byType('pausa_inicio');
+  const fins = byType('pausa_fim');
+  if (inicios.length > fins.length) {
+    const last = inicios[inicios.length - 1];
+    const [hh, mm] = last.clock_time.split(':').map(Number);
+    const total = hh * 60 + mm + 60;
+    const t = `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+    fixes.push({ kind: 'add_missing', adjType: 'add_break_end', suggestedTime: t, label: `Adicionar fim de pausa ${t}` });
+  }
+  if (fins.length > inicios.length) {
+    const first = fins[0];
+    const [hh, mm] = first.clock_time.split(':').map(Number);
+    const total = Math.max(0, hh * 60 + mm - 60);
+    const t = `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+    fixes.push({ kind: 'add_missing', adjType: 'add_break_start', suggestedTime: t, label: `Adicionar início de pausa ${t}` });
+  }
+
+  const ents = byType('entrada');
+  const exs = byType('saida');
+  if (ents.length === 1 && exs.length === 1 && exs[0].clock_time < ents[0].clock_time) {
+    fixes.push({ kind: 'swap_times', aId: ents[0].id, bId: exs[0].id, label: 'Inverter entrada ↔ saída' });
+  }
+
+  return fixes;
+}
 
 export function AdjustmentReview() {
   const { user } = useAuth();
