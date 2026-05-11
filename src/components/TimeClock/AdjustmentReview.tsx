@@ -361,8 +361,17 @@ export function AdjustmentReview() {
   const startAdjustmentFromPending = (p: PendingRow) => {
     setNewUserId(p.user_id);
     setNewDate(p.date);
-    setNewType(p.suggestedType);
-    setNewTime(p.suggestedTime);
+    // Quando o tipo sugerido é genérico ("other"), forçamos o gestor a escolher
+    // um tipo concreto no modal — caso contrário a trigger do banco não aplica
+    // o ajuste em time_clock e Meu Histórico não reflete a mudança.
+    if (p.suggestedType === 'other' || !p.suggestedType) {
+      setNewType('add_entry');
+      setNewTime('');
+      toast.message('Selecione manualmente o tipo de ajuste para esta pendência.');
+    } else {
+      setNewType(p.suggestedType);
+      setNewTime(p.suggestedTime);
+    }
     setNewReason(`Ajuste lançado pela gestão — ${p.problemLabel} em ${format(new Date(p.date + 'T12:00:00'), 'dd/MM/yyyy')}`);
     setNewTargetId('');
     setCreateOpen(true);
@@ -370,8 +379,15 @@ export function AdjustmentReview() {
 
   const submitBulk = async () => {
     if (!user) return;
-    const rows = filteredPendings.filter(p => !p.blocked && selected.has(`${p.user_id}|${p.date}|${p.problem}`));
-    if (!rows.length) return toast.error('Nenhuma pendência selecionada');
+    const allSelected = filteredPendings.filter(p => !p.blocked && selected.has(`${p.user_id}|${p.date}|${p.problem}`));
+    const skipped = allSelected.filter(p => p.suggestedType === 'other' || !p.suggestedType);
+    const rows = allSelected.filter(p => p.suggestedType && p.suggestedType !== 'other');
+    if (!rows.length) {
+      return toast.error('Nenhuma pendência elegível: ajuste tipo "Outro" precisa ser lançado individualmente.');
+    }
+    if (skipped.length) {
+      toast.message(`${skipped.length} pendência(s) ignorada(s) — tipo "Outro" exige lançamento manual.`);
+    }
     if (!bulkReason.trim()) return toast.error('Informe o motivo');
 
     const timeFor = (p: PendingRow): string => {
@@ -408,6 +424,9 @@ export function AdjustmentReview() {
     setSelected(new Set());
     loadPendings();
     load();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('time-clock:refresh'));
+    }
   };
 
   const decide = async (status: 'approved' | 'rejected') => {
@@ -424,6 +443,25 @@ export function AdjustmentReview() {
     if (error) return toast.error(error.message);
     toast.success(status === 'approved' ? 'Solicitação aprovada e dia recalculado' : 'Solicitação rejeitada');
     setReviewing(null); setReviewNotes(''); load();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('time-clock:refresh'));
+    }
+  };
+
+  // Reaplica um ajuste antigo aprovado com tipo "Outro" — abre o modal já
+  // pré-preenchido para o gestor escolher o tipo correto. Após o novo ajuste
+  // ser inserido (a trigger aplicará em time_clock), o registro original
+  // é marcado como 'cancelled'.
+  const [reapplySource, setReapplySource] = useState<any>(null);
+  const reapplyOther = (r: any) => {
+    setReapplySource(r);
+    setNewUserId(r.user_id);
+    setNewDate(r.clock_date);
+    setNewType('add_entry');
+    setNewTime('');
+    setNewReason(`Reaplicação do ajuste anterior — ${r.reason || 'sem motivo'}`);
+    setNewTargetId('');
+    setCreateOpen(true);
   };
 
   const openAttachment = async (path: string) => {
@@ -468,13 +506,26 @@ export function AdjustmentReview() {
     const { error } = await (supabase as any)
       .from('time_clock_adjustment_requests')
       .insert(payload);
+    if (error) { setCreating(false); return toast.error(error.message); }
+
+    // Se este lançamento é uma reaplicação, cancela o ajuste antigo de tipo "Outro"
+    if (reapplySource?.id) {
+      await (supabase as any)
+        .from('time_clock_adjustment_requests')
+        .update({ status: 'cancelled', review_notes: 'Substituído por reaplicação com tipo correto' })
+        .eq('id', reapplySource.id);
+      setReapplySource(null);
+    }
+
     setCreating(false);
-    if (error) return toast.error(error.message);
     toast.success('Ajuste lançado e aplicado ao ponto do colaborador');
     setCreateOpen(false);
     resetCreateForm();
     load();
     if (filter === 'pendings') loadPendings();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('time-clock:refresh'));
+    }
   };
 
   const canCreate = isAdmin || isGestor;
@@ -833,6 +884,11 @@ export function AdjustmentReview() {
               )}
               {r.status === 'pending' && (
                 <Button size="sm" onClick={() => { setReviewing(r); setReviewNotes(''); }}>Revisar</Button>
+              )}
+              {r.status === 'approved' && r.adjustment_type === 'other' && (isAdmin || isGestor) && (
+                <Button size="sm" variant="outline" onClick={() => reapplyOther(r)} title="Reaplicar com tipo correto para refletir em Meu Histórico">
+                  <Wand2 className="h-3 w-3 mr-1" />Reaplicar
+                </Button>
               )}
             </div>
           </div>
