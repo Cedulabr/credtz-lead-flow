@@ -381,6 +381,7 @@ export function AdjustmentReview() {
             records: recs,
             inconsText: result.inconsistencies.map(i => i.message).join(' • '),
             blocked: isBlocked,
+            quickFixes: buildQuickFixes(recs, sched?.entry_time || '08:00', sched?.exit_time || '18:00'),
           });
         }
       }
