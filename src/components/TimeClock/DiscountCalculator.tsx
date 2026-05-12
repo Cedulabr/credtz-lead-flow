@@ -24,6 +24,10 @@ interface DiscountRow {
   userId: string;
   userName: string;
   salary: number;
+  dailyHours: number | null;
+  monthlyHours: number;
+  valorHora: number;
+  scheduleConfigured: boolean;
   expectedMinutes: number;
   workedMinutes: number;
   negativeMinutes: number;
