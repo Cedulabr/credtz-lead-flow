@@ -206,6 +206,16 @@ const clientStatuses = [
     borderColor: "border-purple-200",
     dotColor: "bg-purple-500"
   },
+  {
+    id: "cliente_negativo",
+    label: "Cliente Negativo",
+    icon: XCircle,
+    color: "from-red-600 to-rose-700",
+    textColor: "text-red-800",
+    bgColor: "bg-gradient-to-r from-red-50 to-rose-100",
+    borderColor: "border-red-300",
+    dotColor: "bg-red-600"
+  },
 ];
 
 const rejectionReasons = [
