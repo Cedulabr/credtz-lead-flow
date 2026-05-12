@@ -406,56 +406,102 @@ export function DiscountCalculator() {
               <p>Nenhum colaborador encontrado para esta empresa.</p>
             </div>
           ) : (
-            <div className="rounded-md border overflow-x-auto max-h-[500px] overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Colaborador</TableHead>
-                    <TableHead className="text-right">Salário</TableHead>
-                    <TableHead className="text-right">H. Esperadas</TableHead>
-                    <TableHead className="text-right">H. Trabalhadas</TableHead>
-                    <TableHead className="text-right">H. Negativas</TableHead>
-                    <TableHead className="text-center">Faltas</TableHead>
-                    <TableHead className="text-center">Folgas</TableHead>
-                    <TableHead className="text-right">Desc. Horas</TableHead>
-                    <TableHead className="text-right">Desc. Faltas</TableHead>
-                    <TableHead className="text-right">Total Desc.</TableHead>
-                    <TableHead className="text-right">Líquido Est.</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row) => (
-                    <TableRow key={row.userId}>
-                      <TableCell className="font-medium">{row.userName}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(row.salary)}</TableCell>
-                      <TableCell className="text-right">{formatMinutesToHM(row.expectedMinutes)}</TableCell>
-                      <TableCell className="text-right">{formatMinutesToHM(row.workedMinutes)}</TableCell>
-                      <TableCell className="text-right">
-                        {row.negativeMinutes > 0 ? (
-                          <span className="text-red-600 font-medium">{formatMinutesToHM(row.negativeMinutes)}</span>
-                        ) : (
-                          <span className="text-green-600">0h 0min</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {row.absences > 0 ? (
-                          <Badge variant="destructive">{row.absences}</Badge>
-                        ) : (
-                          <Badge variant="outline">0</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge className="bg-blue-100 text-blue-800">{row.dayOffs}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-red-600">{formatCurrency(row.discountNegativeHours)}</TableCell>
-                      <TableCell className="text-right text-red-600">{formatCurrency(row.discountAbsences)}</TableCell>
-                      <TableCell className="text-right font-bold text-red-700">{formatCurrency(row.totalDiscount)}</TableCell>
-                      <TableCell className="text-right font-bold text-green-700">{formatCurrency(row.netEstimated)}</TableCell>
+            <>
+              {rows.some(r => !r.scheduleConfigured) && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 p-3 flex items-start gap-2 text-sm">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div>
+                    <strong className="text-amber-800 dark:text-amber-300">Atenção:</strong>{' '}
+                    <span className="text-amber-800 dark:text-amber-200">
+                      {rows.filter(r => !r.scheduleConfigured).length} colaborador(es) sem jornada cadastrada.
+                      O desconto de horas negativas <u>não foi calculado</u> para essas linhas.
+                      Cadastre a jornada em <em>Configurações &gt; Jornadas</em> antes de fechar a folha.
+                    </span>
+                  </div>
+                </div>
+              )}
+              <div className="rounded-md border overflow-x-auto max-h-[500px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Colaborador</TableHead>
+                      <TableHead className="text-right">Salário</TableHead>
+                      <TableHead className="text-center">Jornada</TableHead>
+                      <TableHead className="text-right">Valor/h</TableHead>
+                      <TableHead className="text-right">H. Esperadas</TableHead>
+                      <TableHead className="text-right">H. Trabalhadas</TableHead>
+                      <TableHead className="text-right">H. Negativas</TableHead>
+                      <TableHead className="text-center">Faltas</TableHead>
+                      <TableHead className="text-center">Folgas</TableHead>
+                      <TableHead className="text-right">Desc. Horas</TableHead>
+                      <TableHead className="text-right">Desc. Faltas</TableHead>
+                      <TableHead className="text-right">Total Desc.</TableHead>
+                      <TableHead className="text-right">Líquido Est.</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((row) => (
+                      <TableRow key={row.userId} className={!row.scheduleConfigured ? 'bg-amber-50/60 dark:bg-amber-900/10' : ''}>
+                        <TableCell className="font-medium">{row.userName}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(row.salary)}</TableCell>
+                        <TableCell className="text-center">
+                          {row.scheduleConfigured ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className="cursor-help">{row.dailyHours}h/dia</Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Carga mensal: <strong>{row.monthlyHours}h</strong> ({row.dailyHours}h × {Math.round(row.monthlyHours / (row.dailyHours || 1))} dias úteis)
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <Badge variant="outline" className="border-amber-500 text-amber-700 bg-amber-50">
+                              <AlertTriangle className="h-3 w-3 mr-1" /> Não configurada
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {row.scheduleConfigured ? formatCurrency(row.valorHora) : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right">{formatMinutesToHM(row.expectedMinutes)}</TableCell>
+                        <TableCell className="text-right">{formatMinutesToHM(row.workedMinutes)}</TableCell>
+                        <TableCell className="text-right">
+                          {row.negativeMinutes > 0 ? (
+                            <span className="text-red-600 font-medium">{formatMinutesToHM(row.negativeMinutes)}</span>
+                          ) : (
+                            <span className="text-green-600">0h 0min</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {row.absences > 0 ? (
+                            <Badge variant="destructive">{row.absences}</Badge>
+                          ) : (
+                            <Badge variant="outline">0</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge className="bg-blue-100 text-blue-800">{row.dayOffs}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-red-600">
+                          {row.scheduleConfigured ? formatCurrency(row.discountNegativeHours) : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right text-red-600">
+                          {row.scheduleConfigured ? formatCurrency(row.discountAbsences) : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-red-700">
+                          {row.scheduleConfigured ? formatCurrency(row.totalDiscount) : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-green-700">
+                          {row.scheduleConfigured ? formatCurrency(row.netEstimated) : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
