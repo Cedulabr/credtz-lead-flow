@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2, UserCircle, Clock, ChevronRight, ChevronLeft, Target, MessageSquare, MessageCircle, Radar, CreditCard, Mic, ArrowRightLeft, AudioLines, PanelLeftClose, PanelLeftOpen, NotebookPen } from "lucide-react";
+import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2, UserCircle, Clock, ChevronRight, ChevronLeft, Target, MessageSquare, MessageCircle, Radar, CreditCard, Mic, ArrowRightLeft, AudioLines, PanelLeftClose, PanelLeftOpen, NotebookPen, RefreshCcwDot } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,7 @@ const navItems = [
   { id: "my-clients", label: "Meus Clientes", icon: Users, permissionKey: "can_access_meus_clientes" },
   { id: "televendas", label: "Televendas", icon: Phone, permissionKey: "can_access_televendas" },
   { id: "televendas-manage", label: "Gestão Televendas", icon: Settings, permissionKey: "can_access_gestao_televendas" },
+  { id: "reaproveitamento", label: "Reaproveitamento", icon: RefreshCcwDot, permissionKey: "can_access_reaproveitamento" },
   { id: "finances", label: "Finanças", icon: Wallet, permissionKey: "can_access_financas" },
   { id: "documents", label: "Documentos", icon: FileText, permissionKey: "can_access_documentos" },
   { id: "reuse-alerts", label: "Oportunidades", icon: Target, permissionKey: "can_access_alertas" },

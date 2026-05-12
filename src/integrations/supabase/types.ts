@@ -6333,6 +6333,7 @@ export type Database = {
           can_access_portflow: boolean | null
           can_access_premium_leads: boolean | null
           can_access_radar: boolean | null
+          can_access_reaproveitamento: boolean
           can_access_relatorio_desempenho: boolean | null
           can_access_sms: boolean | null
           can_access_tabela_comissoes: boolean | null
@@ -6382,6 +6383,7 @@ export type Database = {
           can_access_portflow?: boolean | null
           can_access_premium_leads?: boolean | null
           can_access_radar?: boolean | null
+          can_access_reaproveitamento?: boolean
           can_access_relatorio_desempenho?: boolean | null
           can_access_sms?: boolean | null
           can_access_tabela_comissoes?: boolean | null
@@ -6431,6 +6433,7 @@ export type Database = {
           can_access_portflow?: boolean | null
           can_access_premium_leads?: boolean | null
           can_access_radar?: boolean | null
+          can_access_reaproveitamento?: boolean
           can_access_relatorio_desempenho?: boolean | null
           can_access_sms?: boolean | null
           can_access_tabela_comissoes?: boolean | null
@@ -7952,6 +7955,7 @@ export type Database = {
           last_sync_by: string | null
           lead_id: string | null
           modulo_origem: string | null
+          motivo_cancelamento: string | null
           motivo_pendencia: string | null
           motivo_pendencia_descricao: string | null
           nome: string
@@ -7959,6 +7963,9 @@ export type Database = {
           parcela: number
           previsao_saldo: string | null
           prioridade_operacional: string
+          reativacao_justificativa: string | null
+          reativacao_score: number | null
+          reativada_em: string | null
           saldo_devedor: number | null
           simulation_data: Json | null
           simulation_file_url: string | null
@@ -7988,6 +7995,7 @@ export type Database = {
           last_sync_by?: string | null
           lead_id?: string | null
           modulo_origem?: string | null
+          motivo_cancelamento?: string | null
           motivo_pendencia?: string | null
           motivo_pendencia_descricao?: string | null
           nome: string
@@ -7995,6 +8003,9 @@ export type Database = {
           parcela: number
           previsao_saldo?: string | null
           prioridade_operacional?: string
+          reativacao_justificativa?: string | null
+          reativacao_score?: number | null
+          reativada_em?: string | null
           saldo_devedor?: number | null
           simulation_data?: Json | null
           simulation_file_url?: string | null
@@ -8024,6 +8035,7 @@ export type Database = {
           last_sync_by?: string | null
           lead_id?: string | null
           modulo_origem?: string | null
+          motivo_cancelamento?: string | null
           motivo_pendencia?: string | null
           motivo_pendencia_descricao?: string | null
           nome?: string
@@ -8031,6 +8043,9 @@ export type Database = {
           parcela?: number
           previsao_saldo?: string | null
           prioridade_operacional?: string
+          reativacao_justificativa?: string | null
+          reativacao_score?: number | null
+          reativada_em?: string | null
           saldo_devedor?: number | null
           simulation_data?: Json | null
           simulation_file_url?: string | null

@@ -369,7 +369,7 @@ export const TelevendasModule = () => {
   };
 
   // Confirm status change with reason and optional date (payment or cancellation)
-  const confirmStatusChange = async (reason: string, dateValue?: string) => {
+  const confirmStatusChange = async (reason: string, dateValue?: string, motivo?: string) => {
     if (!statusChangeModal.televenda) return;
 
     const tv = statusChangeModal.televenda;
@@ -378,12 +378,12 @@ export const TelevendasModule = () => {
     setStatusChangeLoading(true);
     try {
       console.log("Updating status for:", tv.id, "to:", newStatus, "date:", dateValue);
-      
+
       // Build update object
-      const updateData: Record<string, unknown> = { 
-        status: newStatus, 
+      const updateData: Record<string, unknown> = {
+        status: newStatus,
         status_updated_at: new Date().toISOString(),
-        status_updated_by: user?.id 
+        status_updated_by: user?.id
       };
 
       // Auto-sync status_bancario when commercial status reaches a final state
@@ -400,9 +400,13 @@ export const TelevendasModule = () => {
       if (dateValue && isPaymentStatus) {
         updateData.data_pagamento = dateValue;
       }
-      
+
       if (dateValue && isCancellationStatus) {
         updateData.data_cancelamento = dateValue;
+      }
+
+      if (isCancellationStatus && motivo) {
+        updateData.motivo_cancelamento = motivo;
       }
       
       // Update status in televendas table
@@ -432,9 +436,16 @@ export const TelevendasModule = () => {
         // Don't throw - status was already updated
       }
 
-      toast({ 
-        title: "✅ Status atualizado", 
-        description: `Proposta de ${tv.nome} alterada para ${STATUS_CONFIG[newStatus]?.label || newStatus}` 
+      // Trigger reativacao score for canceladas (fire and forget)
+      if (newStatus === "proposta_cancelada") {
+        supabase.functions
+          .invoke("calcular-score-reaproveitamento", { body: { proposta_id: tv.id } })
+          .catch((e) => console.warn("score calc failed", e));
+      }
+
+      toast({
+        title: "✅ Status atualizado",
+        description: `Proposta de ${tv.nome} alterada para ${STATUS_CONFIG[newStatus]?.label || newStatus}`
       });
       
       // Close modal first, then refresh

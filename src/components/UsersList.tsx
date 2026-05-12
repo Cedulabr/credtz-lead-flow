@@ -72,6 +72,7 @@ export function UsersList() {
     { key: "can_access_meus_clientes", label: "Meus Clientes", defaultValue: true },
     { key: "can_access_televendas", label: "Televendas", defaultValue: true },
     { key: "can_access_gestao_televendas", label: "Gestão de Televendas", defaultValue: true },
+    { key: "can_access_reaproveitamento", label: "Reaproveitamento", defaultValue: false },
     { key: "can_access_financas", label: "Finanças", defaultValue: true },
     { key: "can_access_documentos", label: "Documentos", defaultValue: true },
     { key: "can_access_alertas", label: "Alertas de Reaproveitamento", defaultValue: true },

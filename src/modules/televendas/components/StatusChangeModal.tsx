@@ -21,7 +21,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { AlertTriangle, ArrowRight, CheckCircle, Shield, CalendarIcon, XCircle } from "lucide-react";
-import { Televenda, STATUS_CONFIG } from "../types";
+import { Televenda, STATUS_CONFIG, MOTIVO_CANCELAMENTO_OPTIONS } from "../types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 interface StatusChangeModalProps {
@@ -29,7 +30,7 @@ interface StatusChangeModalProps {
   onOpenChange: (open: boolean) => void;
   televenda: Televenda | null;
   newStatus: string;
-  onConfirm: (reason: string, dateValue?: string) => Promise<void>;
+  onConfirm: (reason: string, dateValue?: string, motivo?: string) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -50,6 +51,7 @@ export const StatusChangeModal = ({
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [motivo, setMotivo] = useState<string>("");
 
   // Determine what type of date is needed
   const requiresPaymentDate = PAYMENT_STATUSES.includes(newStatus);
@@ -61,6 +63,7 @@ export const StatusChangeModal = ({
     if (open) {
       setReason("");
       setError("");
+      setMotivo("");
       // Default to today's date for date-required statuses
       if (requiresDate) {
         setSelectedDate(new Date());
@@ -88,15 +91,20 @@ export const StatusChangeModal = ({
       setError("Por favor, informe o motivo da alteração");
       return;
     }
+    if (requiresCancellationDate && !motivo) {
+      setError("Selecione um motivo de cancelamento");
+      return;
+    }
 
     setError("");
     try {
-      const dateStr = selectedDate 
+      const dateStr = selectedDate
         ? format(selectedDate, "yyyy-MM-dd")
         : undefined;
-      await onConfirm(reason.trim(), dateStr);
+      await onConfirm(reason.trim(), dateStr, requiresCancellationDate ? motivo : undefined);
       setReason("");
       setSelectedDate(undefined);
+      setMotivo("");
       // Modal will be closed by parent after successful update
     } catch (error) {
       console.error("Error in confirm:", error);
@@ -220,6 +228,33 @@ export const StatusChangeModal = ({
               </Popover>
               <p className="text-xs text-muted-foreground">
                 {dateHint}
+              </p>
+            </motion.div>
+          )}
+
+          {/* Motivo de cancelamento */}
+          {requiresCancellationDate && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-2"
+            >
+              <Label className="flex items-center gap-2">
+                <XCircle className="h-4 w-4 text-red-600" />
+                Motivo do cancelamento <span className="text-destructive">*</span>
+              </Label>
+              <Select value={motivo} onValueChange={setMotivo}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o motivo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MOTIVO_CANCELAMENTO_OPTIONS.map((m) => (
+                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Usado pelo módulo Reaproveitamento para calcular a chance de retorno.
               </p>
             </motion.div>
           )}

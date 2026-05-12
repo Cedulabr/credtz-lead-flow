@@ -35,7 +35,21 @@ export interface Televenda {
   last_sync_by?: string | null;
   prioridade_operacional?: string;
   updated_at?: string;
+  motivo_cancelamento?: string | null;
+  reativada_em?: string | null;
+  reativacao_score?: number | null;
+  reativacao_justificativa?: string | null;
 }
+
+export const MOTIVO_CANCELAMENTO_OPTIONS = [
+  "Preço",
+  "Sem retorno do cliente",
+  "Concorrente",
+  "Cliente desistiu",
+  "Documentação",
+  "Margem insuficiente",
+  "Outro",
+] as const;
 
 export interface EditHistoryItem {
   id: string;
@@ -98,6 +112,7 @@ export const OPERATOR_STATUSES = [
 export const MANAGER_STATUSES = [
   "proposta_paga",          // Proposta Paga (aprovado pelo gestor)
   "proposta_cancelada",     // Proposta Cancelada
+  "reativada",              // Proposta reaproveitada / reativada
   "exclusao_aprovada",      // Exclusão aprovada pelo gestor
   "exclusao_rejeitada",     // Exclusão rejeitada pelo gestor
   "devolvido",              // Devolvido para operador revisar
@@ -217,6 +232,15 @@ export const STATUS_CONFIG: Record<string, {
     bgColor: "bg-red-500/10 border-red-300",
     isOperational: false,
     isFinal: true,
+  },
+  reativada: {
+    label: "Reativada",
+    shortLabel: "Reativada",
+    emoji: "♻️",
+    color: "text-emerald-700",
+    bgColor: "bg-emerald-500/10 border-emerald-400",
+    isOperational: false,
+    isFinal: false,
   },
   exclusao_aprovada: {
     label: "Exclusão Aprovada",
