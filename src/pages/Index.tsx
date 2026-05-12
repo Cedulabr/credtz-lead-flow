@@ -199,6 +199,7 @@ const Index = () => {
     documents: <LazyClientDocuments />,
     televendas: <div className="p-4"><LazySalesWizard /></div>,
     'televendas-manage': <LazyTelevendasModule />,
+    reaproveitamento: <LazyReaproveitamentoModule />,
     finances: <LazyFinanceKanban />,
     'commission-table': <div className="p-4"><LazyCommissionTable /></div>,
     commissions: <LazyCommissions />,
