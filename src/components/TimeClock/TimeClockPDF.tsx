@@ -360,50 +360,94 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
 
       afterY += 28;
 
-      // Desconto estimado — apenas FALTAS REAIS geram desconto integral.
-      // Pendências (RH) e Ajustes Parciais NÃO descontam dia integral; entram apenas
-      // como horas negativas (diferença real entre previsto e trabalhado).
+      // Memória de cálculo didática — usa explainer único (mesmo da tela).
+      // Sem fallback de 8h: se a jornada não estiver cadastrada, exibimos aviso
+      // amarelo e NÃO calculamos o desconto financeiro.
       if (salary?.base_salary) {
         const base = Number(salary.base_salary);
-        const dailyHours = sched?.daily_hours || 8;
+        const scheduleConfigured = !!sched && Number(sched.daily_hours) > 0;
+        const dailyHours = scheduleConfigured ? Number(sched!.daily_hours) : null;
         const workDays = sched?.work_days || [1, 2, 3, 4, 5];
         const businessDays = days.filter(d => {
           const ds = format(d, 'yyyy-MM-dd');
           return workDays.includes(d.getDay()) && !holidaySet.has(ds);
         }).length || 22;
-        const valorHora = base / (dailyHours * businessDays);
-        const valorDia = valorHora * dailyHours;
 
-        // Horas negativas reais: previsto - trabalhado, descontando dias de falta integral.
         const negativeMin = Math.max(
           0,
-          summary.expected - summary.worked - summary.absences * dailyHours * 60
+          summary.expected - summary.worked - summary.absences * (dailyHours ?? 0) * 60
         );
-        const descNegativasBruto = (negativeMin / 60) * valorHora;
-        const descFaltasBruto = summary.absences * valorDia;
-        const descNegativas = discountMode === 'banco' ? 0 : descNegativasBruto;
-        const descFaltas = discountMode === 'banco' ? 0 : descFaltasBruto;
-        const desconto = descNegativas + descFaltas;
-        const liquido = Math.max(0, base - desconto);
+        const absenceDates = dayResults
+          .filter(d => d.result.status === 'falta')
+          .map(d => format(d.date, 'dd/MM'));
+
+        const { buildPayrollExplanation } = await import('@/lib/payrollExplain');
+        const explain = buildPayrollExplanation({
+          salary: base,
+          dailyHours,
+          businessDays,
+          expectedMinutes: summary.expected,
+          workedMinutes: summary.worked,
+          absenceCount: summary.absences,
+          absenceDates: dayResults.filter(d => d.result.status === 'falta').map(d => format(d.date, 'yyyy-MM-dd')),
+          negativeMinutes: negativeMin,
+          discountMode,
+        });
+
         const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        const modoLabel = discountMode === 'financeiro' ? 'Financeiro' : discountMode === 'banco' ? 'Banco' : 'Misto';
+
+        // Bloco principal (faixa azul didática)
+        if (afterY > doc.internal.pageSize.getHeight() - 80) {
+          doc.addPage('landscape');
+          afterY = 36;
+          drawHeader(doc);
+        }
+
+        doc.setFillColor(245, 247, 252);
+        doc.setDrawColor(...NAVY);
+        doc.rect(8, afterY, pw - 16, 50, 'FD');
         doc.setTextColor(...NAVY);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
-        doc.text(safe(`Modo de desconto: ${modoLabel}  ·  Valor/hora: R$ ${fmt(valorHora)}  ·  Valor/dia: R$ ${fmt(valorDia)}  ·  Dias úteis: ${businessDays}`), 12, afterY);
-        afterY += 5;
-        doc.text(
-          safe(`Desc. faltas integrais (${summary.absences}): R$ ${fmt(descFaltas)}  ·  Desc. horas negativas (${formatHM(negativeMin)}): R$ ${fmt(descNegativas)}`),
-          12,
-          afterY
-        );
-        afterY += 5;
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.text(safe(`Salário base: R$ ${fmt(base)}`), 12, afterY);
-        doc.text(safe(`Desconto estimado: R$ ${fmt(desconto)}`), pw / 2 - 30, afterY);
-        doc.text(safe(`Líquido estimado: R$ ${fmt(liquido)}`), pw - 14, afterY, { align: 'right' });
-        afterY += 8;
+        doc.setFontSize(9);
+        doc.text(safe('COMO SEU DESCONTO FOI CALCULADO'), 12, afterY + 5);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(40, 40, 40);
+
+        if (!explain.scheduleConfigured) {
+          doc.setTextColor(180, 80, 0);
+          doc.setFont('helvetica', 'bold');
+          doc.text(safe('⚠ Sua jornada contratual não está cadastrada — desconto financeiro não calculado.'), 12, afterY + 12);
+          doc.text(safe('Procure o RH para regularizar.'), 12, afterY + 17);
+        } else {
+          doc.text(safe(`• Salário base: R$ ${fmt(base)}`), 12, afterY + 11);
+          doc.text(safe(`• Jornada contratual: ${dailyHours}h por dia · ${businessDays} dias úteis = ${dailyHours! * businessDays}h/mês`), 12, afterY + 16);
+          doc.setFont('helvetica', 'bold');
+          doc.text(safe(`• Valor/hora = R$ ${fmt(base)} ÷ (${dailyHours}h × ${businessDays}) = R$ ${fmt(explain.valorHora)}/h`), 12, afterY + 21);
+          doc.text(safe(`• Valor/dia  = R$ ${fmt(explain.valorHora)}/h × ${dailyHours}h = R$ ${fmt(explain.valorDia)}/dia`), 12, afterY + 26);
+          doc.setFont('helvetica', 'normal');
+
+          // Linha 1: faltas
+          const fLabel = absenceDates.length > 0 ? ` (${absenceDates.slice(0, 8).join(', ')}${absenceDates.length > 8 ? '…' : ''})` : '';
+          doc.text(
+            safe(`Faltas integrais: ${summary.absences} × R$ ${fmt(explain.valorDia)} = R$ ${fmt(explain.discountAbsences)}${fLabel}`),
+            12, afterY + 33
+          );
+          // Linha 2: horas negativas
+          doc.text(
+            safe(`Horas negativas: ${formatHM(negativeMin)} × R$ ${fmt(explain.valorHora)}/h = R$ ${fmt(explain.discountNegativeHours)}`),
+            12, afterY + 38
+          );
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8.5);
+          doc.text(safe(`Total de descontos: R$ ${fmt(explain.totalDiscount)}`), 12, afterY + 45);
+          doc.setTextColor(0, 110, 0);
+          doc.text(safe(`Líquido estimado: R$ ${fmt(explain.netEstimated)}`), pw - 14, afterY + 45, { align: 'right' });
+        }
+        afterY += 56;
+
         const partial = (summary as any).partialPending || 0;
         if (summary.pending > 0 || partial > 0) {
           doc.setTextColor(180, 30, 30);
@@ -416,9 +460,14 @@ export function TimeClockPDF({ userId, userName, companyName = 'Empresa', compan
           doc.setTextColor(180, 30, 30);
           doc.setFontSize(7);
           doc.setFont('helvetica', 'italic');
-          doc.text(safe(`Modo Banco ativo: faltas e atrasos não geram desconto financeiro — saldo será compensado via banco de horas.`), 12, afterY);
+          doc.text(safe('Modo Banco ativo: faltas e atrasos não geram desconto financeiro — saldo será compensado via banco de horas.'), 12, afterY);
           afterY += 5;
         }
+        doc.setTextColor(120, 120, 120);
+        doc.setFontSize(6.5);
+        doc.setFont('helvetica', 'italic');
+        doc.text(safe('* Estimativa. Não inclui INSS, IRRF, vale-transporte, vale-refeição e demais eventos da folha oficial.'), 12, afterY);
+        afterY += 5;
       }
 
       // Legenda de batidas ajustadas
