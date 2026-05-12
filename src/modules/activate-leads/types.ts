@@ -167,6 +167,16 @@ export const ACTIVATE_STATUS_CONFIG: Record<string, {
     dotColor: 'bg-zinc-400',
     order: 11,
   },
+  cliente_negativo: {
+    label: 'Cliente Negativo',
+    emoji: '⛔',
+    color: 'from-red-600 to-rose-700',
+    textColor: 'text-red-800',
+    bgColor: 'bg-red-50',
+    borderColor: 'border-red-300',
+    dotColor: 'bg-red-600',
+    order: 12,
+  },
 };
 
 export const PIPELINE_STATUSES = ['novo', 'em_andamento', 'fechado', 'sem_possibilidade'];
