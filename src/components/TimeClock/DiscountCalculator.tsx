@@ -360,7 +360,7 @@ export function DiscountCalculator() {
                 Calculadora de Descontos
               </CardTitle>
               <CardDescription>
-                Faltas/Pendentes × valor-dia + horas negativas × valor-hora (jornada × dias úteis do mês, descontando feriados)
+                Faltas × valor-dia + horas negativas × valor-hora · Valor-hora = Salário ÷ (Jornada × Dias úteis)
               </CardDescription>
             </div>
             <div className="flex gap-2">
