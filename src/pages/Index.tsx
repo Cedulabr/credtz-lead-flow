@@ -45,6 +45,7 @@ import {
   LazyVoicerModule,
   LazyNotasModule,
   LazyTelefoniaModule,
+  LazyReaproveitamentoModule,
 } from "@/components/LazyComponents";
 
 // ── Types ─────────────────────────────────────────────────────────────
