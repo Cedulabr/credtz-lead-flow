@@ -298,15 +298,18 @@ export function DiscountCalculator() {
     const wsData = rows.map(row => ({
       'Colaborador': row.userName,
       'Salário': row.salary,
+      'Jornada (h/dia)': row.scheduleConfigured ? row.dailyHours : 'Não configurada',
+      'Carga Mensal (h)': row.scheduleConfigured ? row.monthlyHours : '',
+      'Valor/Hora': row.scheduleConfigured ? row.valorHora : '',
       'H. Esperadas': formatMinutesToHM(row.expectedMinutes),
       'H. Trabalhadas': formatMinutesToHM(row.workedMinutes),
       'H. Negativas': formatMinutesToHM(row.negativeMinutes),
       'Faltas': row.absences,
       'Folgas': row.dayOffs,
-      'Desc. Horas Negativas': row.discountNegativeHours,
-      'Desc. Faltas': row.discountAbsences,
-      'Total Descontos': row.totalDiscount,
-      'Líquido Estimado': row.netEstimated,
+      'Desc. Horas Negativas': row.scheduleConfigured ? row.discountNegativeHours : '',
+      'Desc. Faltas': row.scheduleConfigured ? row.discountAbsences : '',
+      'Total Descontos': row.scheduleConfigured ? row.totalDiscount : '',
+      'Líquido Estimado': row.scheduleConfigured ? row.netEstimated : '',
     }));
 
     const ws = XLSX.utils.json_to_sheet(wsData);
