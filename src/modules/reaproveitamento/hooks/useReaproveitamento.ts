@@ -52,12 +52,13 @@ export function useReativarProposta() {
         .eq("id", proposta.id);
       if (error) throw error;
 
-      await supabase.from("televendas_status_history").insert({
+      await supabase.from("televendas_status_history").insert([{
         televendas_id: proposta.id,
         from_status: "proposta_cancelada",
         to_status: "reativada",
+        changed_by: (await supabase.auth.getUser()).data.user?.id ?? "",
         reason: "Reativada via módulo Reaproveitamento",
-      });
+      }]);
 
       return proposta;
     },
