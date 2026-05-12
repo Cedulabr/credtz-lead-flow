@@ -436,9 +436,16 @@ export const TelevendasModule = () => {
         // Don't throw - status was already updated
       }
 
-      toast({ 
-        title: "✅ Status atualizado", 
-        description: `Proposta de ${tv.nome} alterada para ${STATUS_CONFIG[newStatus]?.label || newStatus}` 
+      // Trigger reativacao score for canceladas (fire and forget)
+      if (newStatus === "proposta_cancelada") {
+        supabase.functions
+          .invoke("calcular-score-reaproveitamento", { body: { proposta_id: tv.id } })
+          .catch((e) => console.warn("score calc failed", e));
+      }
+
+      toast({
+        title: "✅ Status atualizado",
+        description: `Proposta de ${tv.nome} alterada para ${STATUS_CONFIG[newStatus]?.label || newStatus}`
       });
       
       // Close modal first, then refresh
