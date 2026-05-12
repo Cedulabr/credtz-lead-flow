@@ -35,7 +35,21 @@ export interface Televenda {
   last_sync_by?: string | null;
   prioridade_operacional?: string;
   updated_at?: string;
+  motivo_cancelamento?: string | null;
+  reativada_em?: string | null;
+  reativacao_score?: number | null;
+  reativacao_justificativa?: string | null;
 }
+
+export const MOTIVO_CANCELAMENTO_OPTIONS = [
+  "Preço",
+  "Sem retorno do cliente",
+  "Concorrente",
+  "Cliente desistiu",
+  "Documentação",
+  "Margem insuficiente",
+  "Outro",
+] as const;
 
 export interface EditHistoryItem {
   id: string;
