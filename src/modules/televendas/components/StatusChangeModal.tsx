@@ -91,15 +91,20 @@ export const StatusChangeModal = ({
       setError("Por favor, informe o motivo da alteração");
       return;
     }
+    if (requiresCancellationDate && !motivo) {
+      setError("Selecione um motivo de cancelamento");
+      return;
+    }
 
     setError("");
     try {
-      const dateStr = selectedDate 
+      const dateStr = selectedDate
         ? format(selectedDate, "yyyy-MM-dd")
         : undefined;
-      await onConfirm(reason.trim(), dateStr);
+      await onConfirm(reason.trim(), dateStr, requiresCancellationDate ? motivo : undefined);
       setReason("");
       setSelectedDate(undefined);
+      setMotivo("");
       // Modal will be closed by parent after successful update
     } catch (error) {
       console.error("Error in confirm:", error);
