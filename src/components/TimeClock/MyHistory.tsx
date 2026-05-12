@@ -356,6 +356,102 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
 
   const groups = groupByDate();
   const showPdf = !showAllUsers;
+  const showBreakdown = !showAllUsers;
+
+  const breakdown = useMemo(() => {
+    if (!showBreakdown) return null;
+    const userSchedule = schedules[activeUserId];
+    if (!userSchedule) {
+      // Sem schedule não dá pra computar nada útil; renderizamos card amarelo igual.
+      return buildPayrollExplanation({
+        salary: baseSalary,
+        dailyHours: null,
+        businessDays: 0,
+        expectedMinutes: 0,
+        workedMinutes: 0,
+        absenceCount: 0,
+        absenceDates: [],
+        negativeMinutes: 0,
+        negativeDays: [],
+        discountMode,
+      });
+    }
+
+    const dayOffMap: Record<string, DayOff> = {};
+    daysOff.forEach(d => { if (d.user_id === activeUserId) dayOffMap[d.off_date] = d; });
+    const justSet = new Set<string>(
+      justifications.filter(j => j.user_id === activeUserId).map(j => j.reference_date)
+    );
+    const periodYear = parseISO(startDate).getFullYear();
+    const holidaySet = new Set<string>(
+      getBrazilianHolidays(periodYear).map(h => h.date).filter(d => d >= startDate && d <= endDate)
+    );
+    Object.entries(dayOffMap).forEach(([date, d]) => {
+      if (d.off_type === 'feriado') holidaySet.add(date);
+    });
+
+    const sched: EngineDaySchedule = {
+      entry_time: userSchedule.entry_time,
+      exit_time: userSchedule.exit_time,
+      daily_hours: userSchedule.daily_hours,
+      tolerance_minutes: userSchedule.tolerance_minutes ?? 10,
+      work_days: userSchedule.work_days || [1, 2, 3, 4, 5],
+    };
+
+    const userRecords = history.filter(r => r.user_id === activeUserId);
+    const days = eachDayOfInterval({ start: parseISO(startDate), end: parseISO(endDate) });
+    const now = new Date();
+    const absenceDates: string[] = [];
+    const negativeDays: NegativeDayDetail[] = [];
+
+    const dayResults = days.filter(d => d <= now).map(day => {
+      const dateStr = format(day, 'yyyy-MM-dd');
+      const off = dayOffMap[dateStr];
+      let dayOff: { type: DayOffType; isPartial?: boolean; partialMinutes?: number } | null = null;
+      if (off && off.off_type !== 'feriado') {
+        dayOff = { type: off.off_type as DayOffType, isPartial: !!off.is_partial_day, partialMinutes: 0 };
+      }
+      const dayRecords = userRecords
+        .filter(r => r.clock_date === dateStr)
+        .map(r => ({ clock_type: r.clock_type as any, clock_time: r.clock_time }));
+      const result = evaluateDay(dayRecords as any, sched, day.getDay(), {
+        isHoliday: holidaySet.has(dateStr),
+        dayOff,
+        justified: justSet.has(dateStr),
+      }, discountMode);
+      if (result.status === 'falta') absenceDates.push(dateStr);
+      if (result.expectedMinutes > 0 && result.workedMinutes > 0 && result.workedMinutes < result.expectedMinutes) {
+        const diff = result.expectedMinutes - result.workedMinutes;
+        negativeDays.push({
+          date: dateStr,
+          minutes: diff,
+          reason: result.delayMinutes > 0 ? 'atraso' : 'jornada_incompleta',
+        });
+      }
+      return result;
+    });
+
+    const summary = summarizePeriod(dayResults);
+    const businessDays = dayResults.filter(d => d.expectedMinutes > 0).length || 22;
+    const negativeMinutes = Math.max(
+      0,
+      summary.expected - summary.worked - summary.absences * (userSchedule.daily_hours || 0) * 60,
+    );
+
+    return buildPayrollExplanation({
+      salary: baseSalary,
+      dailyHours: userSchedule.daily_hours,
+      businessDays,
+      expectedMinutes: summary.expected,
+      workedMinutes: summary.worked,
+      absenceCount: summary.absences,
+      absenceDates,
+      negativeMinutes,
+      negativeDays,
+      discountMode,
+    });
+  }, [showBreakdown, activeUserId, schedules, history, daysOff, justifications, startDate, endDate, baseSalary, discountMode]);
+
 
   return (
     <Card>
