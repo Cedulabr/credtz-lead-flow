@@ -13,6 +13,11 @@ import { TimeClockPDF } from './TimeClockPDF';
 import { useWhitelabel } from '@/hooks/useWhitelabel';
 import { supabase } from '@/integrations/supabase/client';
 import { calculateTotalBreakMinutes, parseTimeToMinutes, calculateDayMetrics, formatMinutesToHM, type DaySchedule } from '@/lib/timeClockCalculations';
+import { evaluateDay, summarizePeriod, type DaySchedule as EngineDaySchedule, type DiscountMode, type DayOffType } from '@/lib/timeClockEngine';
+import { buildPayrollExplanation, type NegativeDayDetail } from '@/lib/payrollExplain';
+import { PayrollBreakdownCard } from './PayrollBreakdownCard';
+import { getBrazilianHolidays } from './brazilianHolidays';
+import { eachDayOfInterval } from 'date-fns';
 
 interface MyHistoryProps {
   userId: string;
