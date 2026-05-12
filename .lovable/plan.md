@@ -1,60 +1,142 @@
-## Objetivo
 
-Adicionar, na aba **"Pendências do mês"** do card **Revisão de Ajustes**, ações rápidas (1 clique) para resolver os problemas mais comuns que hoje deixam o dia como **"Registro Incompleto"**, sem precisar abrir o modal manual e digitar tudo de novo.
+# Módulo Reaproveitamento
 
-## Problemas tratados
+Cria um novo módulo na sidebar para retrabalhar propostas canceladas (status `proposta_cancelada` na tabela `televendas`), com score de IA, KPIs e ação de 1 clique para reativar.
 
-A engine (`timeClockEngine.ts`) já detecta esses códigos. Vamos mapear cada um a uma ação rápida:
+## 1. Banco de dados (migration)
 
-| Inconsistência detectada | Ação rápida sugerida |
-|---|---|
-| `ENTRADA_DUPLICADA` / `SAIDA_DUPLICADA` / `BATIDA_DUPLICADA` | **Remover batida duplicada** — mantém a 1ª (entrada) ou a última (saída) e remove as demais |
-| `ENTRADA_SEM_SAIDA` | **Adicionar saída** — pré-preenche com `exit_time` da escala |
-| `SAIDA_SEM_ENTRADA` | **Adicionar entrada** — pré-preenche com `entry_time` da escala |
-| `PAUSA_INCOMPLETA` (início sem fim) | **Adicionar fim de pausa** — pré-preenche com `pausa_inicio + 1h` ou horário padrão da escala |
-| `PAUSA_INCOMPLETA` (fim sem início) | **Adicionar início de pausa** — pré-preenche com `pausa_fim - 1h` |
-| `SAIDA_ANTES_ENTRADA` / `PAUSA_INVERTIDA` | **Inverter horários** dos dois registros envolvidos |
-| Caso não se encaixe | Fallback: abre o modal manual atual |
+Na tabela `televendas`:
+- `motivo_cancelamento` text NULL
+- `reativada_em` timestamptz NULL
+- `reativacao_score` smallint NULL
+- `reativacao_justificativa` text NULL
+- Novo valor de status permitido: `reativada` (não há CHECK constraint hoje, basta documentar)
 
-## Mudanças no frontend
+Atualizar `STATUS_CONFIG` em `src/modules/televendas/types.ts` com a entrada `reativada` (label "Reativada", emoji ♻️, verde).
 
-### 1. `src/lib/timeClockEngine.ts` (helper puro, sem mudar lógica)
-Exportar uma função utilitária `suggestQuickFixes(records, schedule, evaluation)` que retorna uma lista tipada:
-```ts
-type QuickFix =
-  | { kind: 'remove_duplicate'; recordId: string; clockType: string; time: string; label: string }
-  | { kind: 'add_missing'; clockType: 'entrada'|'saida'|'pausa_inicio'|'pausa_fim'; suggestedTime: string; label: string }
-  | { kind: 'swap_times'; aId: string; bId: string; label: string };
+Permissão dinâmica:
+- Adicionar coluna `can_access_reaproveitamento` boolean default false em `profiles` (segue padrão do registry de permissões).
+
+RLS em `televendas` já existe e isola por `company_id` / `user_id`. Confirmar/garantir que:
+- Admin vê tudo
+- Gestor vê propostas de qualquer usuário cuja `company_id` bata com a sua (via `has_role_safe` + `user_companies`)
+- Operador vê só `user_id = auth.uid()`
+
+Ajustar policy se necessário usando `has_role_safe` (sem recursão).
+
+Lista padrão de motivos (usada no dropdown e no score):
+`Preço`, `Sem retorno do cliente`, `Concorrente`, `Cliente desistiu`, `Documentação`, `Margem insuficiente`, `Outro`.
+
+## 2. Edge Function `calcular-score-reaproveitamento`
+
+Input: `{ proposta_id: uuid }`. Lê a proposta, calcula score 0–100 e atualiza `reativacao_score` + `reativacao_justificativa`.
+
+Fórmula:
 ```
-Sem alterar `evaluateDay` nem cálculos.
+score = w_valor*valor_norm + w_tempo*tempo_norm + w_motivo*motivo_peso
+  valor_norm  = min(troco/10000, 1)                  peso 40
+  tempo_norm  = max(0, 1 - dias_desde_cancel/90)     peso 30
+  motivo_peso = { Preço:1.0, Sem retorno:0.9, Documentação:0.7,
+                  Cliente desistiu:0.5, Margem insuficiente:0.4,
+                  Concorrente:0.2, Outro:0.5 }       peso 30
+```
+Retorna `{ score, justificativa }` (ex.: "Alto valor (R$ 8.500), cancelada há 12 dias por Preço — boa chance de retorno.").
 
-### 2. `src/components/TimeClock/AdjustmentReview.tsx`
-- Em cada `PendingRow`, calcular `quickFixes` via `suggestQuickFixes`.
-- Renderizar até 3 botões pequenos por linha, antes do botão "Lançar ajuste":
-  - "Remover entrada duplicada (08:01)"
-  - "Adicionar saída 18:00"
-  - "Adicionar fim de pausa 13:00"
-- Estilo: `variant="outline"` com ícone (`Trash2`, `Plus`, `ArrowLeftRight`) e cor de destaque (amber para remoção, primary para adição).
-- Cada botão chama um handler único `applyQuickFix(row, fix)` que:
-  - **`remove_duplicate`** → `DELETE` direto em `time_clock` pelo `recordId` (mantendo log via `time_clock_logs`) **OU** cria um request `remove_record` já aprovado (decidir abaixo, ver perguntas).
-  - **`add_missing`** → cria request `add_*` com `proposed_time = suggestedTime`, `status='approved'`, `decision_notes='Ajuste rápido'` e dispara o trigger `tg_apply_adjustment_request` que já insere em `time_clock`.
-  - **`swap_times`** → 2 updates em `time_clock` + log.
-- Confirmação rápida via `toast` (sem modal). Em caso de múltiplas correções no mesmo dia, mostrar botão extra **"Resolver tudo"** que aplica todos os fixes em sequência.
+Trigger after update em `televendas` quando status passa para `proposta_cancelada` chama via `pg_net` o edge function (assíncrono) para preencher score automaticamente. Recalcular também on-demand pelo botão "Recalcular score" no drawer.
 
-### 3. Visualização das batidas do dia (novo accordion)
-Na linha de cada pendência, expandir e mostrar a lista atual de batidas com botão `X` ao lado de cada uma → remove rapidamente. Útil quando há 3+ duplicatas e o auto-fix não cobre.
+## 3. Atualização do fluxo de cancelamento
 
-### 4. `MyHistory.tsx`
-Sem mudanças. Continua lendo `time_clock` — após os fixes acima o status muda automaticamente de "Registro Incompleto" para "Completo/Ajustado".
+`src/modules/televendas/components/StatusChangeModal.tsx` (ou modal equivalente que muda status para `proposta_cancelada`):
+- Quando o novo status for `proposta_cancelada`, exibir Select obrigatório `motivo_cancelamento` com a lista padrão + campo livre para "Outro".
+- Persistir `motivo_cancelamento` e `data_cancelamento` (já existe).
 
-## Fora de escopo
+## 4. Sidebar / Roteamento
 
-- Mudar o trigger SQL ou a engine de cálculo.
-- Mudar layout do PDF.
-- Mudar o fluxo de pendências do colaborador (`AdjustmentRequest.tsx`).
+- `src/components/Navigation.tsx`: novo item "Reaproveitamento" (icon `IconRefreshAlert` do tabler-icons-react ou `RotateCcw` do lucide se tabler não estiver instalado), visível só se `isAdmin || profile.can_access_reaproveitamento`.
+- `src/components/LazyComponents.tsx`: `LazyReaproveitamentoModule`.
+- `src/pages/Index.tsx`: registrar tab `reaproveitamento` em `tabComponents` e em `TAB_PERMISSIONS` com `permission: 'can_access_reaproveitamento'`.
+- Admin painel: adicionar toggle da nova permissão em `src/components/AdminPanel.tsx` (registry de permissões).
 
-## Verificação
+## 5. Novo módulo `src/modules/reaproveitamento/`
 
-1. Provocar um dia com entrada duplicada (2 batidas `entrada` no mesmo dia) → aparece botão **"Remover entrada duplicada"** → 1 clique → dia some da lista de pendências e PDF vira "Completo".
-2. Provocar dia com `ENTRADA_SEM_SAIDA` → botão **"Adicionar saída 18:00"** → 1 clique → dia resolvido.
-3. Pausa incompleta → botão de fim de pausa → resolvido.
+Estrutura:
+```
+ReaproveitamentoModule.tsx        # header + KPIs + filtros + tabs + lista
+hooks/useReaproveitamento.ts      # fetch propostas canceladas + mutations
+hooks/useReativarProposta.ts      # mutation reativar
+components/KpiCards.tsx           # 4 cards
+components/FilterBar.tsx          # busca + motivo + período
+components/ReaproveitamentoTabs.tsx
+components/PropostaCard.tsx       # card com avatar, tags, score bar, ações
+components/ScoreBar.tsx           # barra 64px verde/âmbar/vermelho
+components/PropostaDrawer.tsx     # Sheet com detalhes + reativar
+utils/avatarColor.ts              # cor determinística pelo nome
+types.ts
+index.ts
+```
+
+### Header
+"Reaproveitamento" + ícone refresh-alert + Badge contagem de canceladas.
+
+### KPIs (grid 1/2/4 col)
+1. Total canceladas
+2. Reativadas hoje (`reativada_em::date = today`)
+3. Valor potencial (sum `troco` de canceladas, BRL)
+4. Alta chance de retorno (count `reativacao_score >= 80`)
+
+### Filtros
+- Busca text (nome, cpf, banco, tipo_operacao)
+- Select Motivo (distinct dos dados + "Todos")
+- Select Período: 30/60/90 dias (sobre `data_cancelamento`)
+
+### Tabs
+`Todas | 🔥 Quentes (≥80) | Recentes (≤30d) | Alto valor (≥R$ 5.000)`
+
+### Card de proposta
+- Avatar circular com iniciais, cor determinística (hash do nome → paleta HSL via tokens)
+- Nome (bold) + banco como "company"
+- Tipo operação como produto
+- Tags: dias desde cancelamento, valor BRL, tipo de proposta
+- `motivo_cancelamento` com ícone `AlertCircle`
+- `ScoreBar` 64px (verde ≥80 / âmbar ≥60 / vermelho <60)
+- Borda esquerda 3px verde quando score ≥80 (token `--success`)
+- Botões à direita: **Reativar** (verde primary, ícone refresh) e **Ver proposta** (ghost, ícone eye)
+
+### Reativar
+1. Loading "Reativando..." com Loader2
+2. `update televendas set status='reativada', reativada_em=now() where id=?`
+3. Toast sonner: `Proposta de {nome} reativada! Disponível em Gestão de Televendas.`
+4. Remove card via invalidate query
+5. KPIs recarregam pela mesma query
+
+### Drawer (Sheet à direita)
+Detalhes completos: cliente, banco, tipo, valor, datas (criação/cancelamento), motivo, justificativa do score, histórico (`televendas_status_history` + `televendas_observacoes`). Botão "Reativar proposta" no rodapé sticky.
+
+## 6. Integração com Gestão de Televendas
+
+`src/modules/televendas/types.ts`:
+- Acrescentar `reativada` em `STATUS_CONFIG` (label "Reativada", emoji ♻️, verde, `isFinal:false`).
+
+`src/modules/televendas/views/PropostasView.tsx` (e filtros):
+- Adicionar chip de filtro "Reativadas".
+- `StatusBadge.tsx`: render badge verde + ícone `Recycle` (lucide) para `reativada`.
+- Permitir edição igual às ativas (já é o comportamento padrão pra status não-final).
+
+## 7. Tokens visuais (index.css)
+
+Garantir tokens HSL semânticos:
+- `--success: 152 70% 36%` (≈ #1D9E75) e `--success-foreground`
+- Reuso para borda accent, botão Reativar e barra de score.
+
+## 8. Detalhes técnicos
+
+- Querys via `@tanstack/react-query` com `invalidateQueries(['reaproveitamento'])` e `['televendas']` após reativar.
+- Avatar color: `hsl((hash(nome) % 360), 65%, 55%)`.
+- BRL: `Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' })`.
+- Datas: helper `src/lib/date.ts` para `dias desde cancelamento`.
+- Toda label em PT-BR, código em EN.
+- Mobile-first: KPIs em grid `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`, cards stack vertical no mobile, drawer com footer sticky.
+
+## 9. Memória a salvar após implementação
+
+`mem://features/reaproveitamento/overview` — fórmula do score, lista de motivos, status `reativada`, integração com Gestão de Televendas.
