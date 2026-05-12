@@ -521,6 +521,13 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
           </div>
         </div>
 
+        {showBreakdown && breakdown && !loading && (
+          <PayrollBreakdownCard
+            explanation={breakdown}
+            periodLabel={`${format(parseISO(startDate), 'dd/MM')} a ${format(parseISO(endDate), 'dd/MM/yyyy')}`}
+          />
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
