@@ -29,6 +29,7 @@ const navItems = [
   { id: "my-clients", label: "Meus Clientes", icon: Users, permissionKey: "can_access_meus_clientes" },
   { id: "televendas", label: "Televendas", icon: Phone, permissionKey: "can_access_televendas" },
   { id: "televendas-manage", label: "Gestão Televendas", icon: Settings, permissionKey: "can_access_gestao_televendas" },
+  { id: "reaproveitamento", label: "Reaproveitamento", icon: RefreshCcwDot, permissionKey: "can_access_reaproveitamento" },
   { id: "finances", label: "Finanças", icon: Wallet, permissionKey: "can_access_financas" },
   { id: "documents", label: "Documentos", icon: FileText, permissionKey: "can_access_documentos" },
   { id: "reuse-alerts", label: "Oportunidades", icon: Target, permissionKey: "can_access_alertas" },
