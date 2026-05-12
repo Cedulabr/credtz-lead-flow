@@ -219,6 +219,15 @@ export const STATUS_CONFIG: Record<string, {
     isOperational: false,
     isFinal: true,
   },
+  reativada: {
+    label: "Reativada",
+    shortLabel: "Reativada",
+    emoji: "♻️",
+    color: "text-emerald-700",
+    bgColor: "bg-emerald-500/10 border-emerald-400",
+    isOperational: false,
+    isFinal: false,
+  },
   exclusao_aprovada: {
     label: "Exclusão Aprovada",
     shortLabel: "Excluído",
