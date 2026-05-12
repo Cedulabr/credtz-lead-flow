@@ -143,7 +143,21 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
   useEffect(() => {
     loadCompanyData();
     loadSchedules();
-  }, [activeUserId]);
+    loadSalaryAndMode();
+  }, [activeUserId, endDate]);
+
+  const loadSalaryAndMode = async () => {
+    if (!activeUserId || (isAdmin && selectedUserId === 'all')) {
+      setBaseSalary(0);
+      return;
+    }
+    const [salaryRes, hbRes] = await Promise.all([
+      (supabase as any).rpc('get_salary_at', { p_user_id: activeUserId, p_company_id: null, p_date: endDate }),
+      (supabase as any).from('hour_bank_settings').select('discount_mode').limit(1).maybeSingle(),
+    ]);
+    setBaseSalary(Number(salaryRes?.data?.base_salary) || 0);
+    setDiscountMode(((hbRes?.data?.discount_mode as DiscountMode) || 'financeiro'));
+  };
 
   const loadSchedules = async () => {
     // Load schedules for relevant users
