@@ -51,6 +51,7 @@ export const StatusChangeModal = ({
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [motivo, setMotivo] = useState<string>("");
 
   // Determine what type of date is needed
   const requiresPaymentDate = PAYMENT_STATUSES.includes(newStatus);
