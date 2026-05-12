@@ -98,6 +98,7 @@ export const OPERATOR_STATUSES = [
 export const MANAGER_STATUSES = [
   "proposta_paga",          // Proposta Paga (aprovado pelo gestor)
   "proposta_cancelada",     // Proposta Cancelada
+  "reativada",              // Proposta reaproveitada / reativada
   "exclusao_aprovada",      // Exclusão aprovada pelo gestor
   "exclusao_rejeitada",     // Exclusão rejeitada pelo gestor
   "devolvido",              // Devolvido para operador revisar
