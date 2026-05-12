@@ -28,10 +28,42 @@ export interface PayrollComputeOptions {
   discountMode?: DiscountMode;
 }
 
+export interface PayrollRates {
+  valorHora: number;
+  valorDia: number;
+  monthlyHours: number;
+  /** True quando há jornada cadastrada e parâmetros válidos para calcular o valor/hora. */
+  configured: boolean;
+}
+
+/**
+ * Fórmula CLT padrão para valor-hora e valor-dia a partir do salário base,
+ * jornada contratual e dias úteis do período. Usar SEMPRE essa função em vez
+ * de duplicar a fórmula nas telas — ver `mem://features/time-clock`.
+ */
+export function computeRates(
+  salary: number,
+  dailyHours: number | null | undefined,
+  businessDays: number,
+): PayrollRates {
+  if (!salary || !dailyHours || !businessDays || dailyHours <= 0 || businessDays <= 0) {
+    return { valorHora: 0, valorDia: 0, monthlyHours: 0, configured: false };
+  }
+  const monthlyHours = dailyHours * businessDays;
+  const valorHora = salary / monthlyHours;
+  const valorDia = valorHora * dailyHours;
+  return { valorHora, valorDia, monthlyHours, configured: true };
+}
+
 export interface PayrollResultRow {
   userId: string;
   userName: string;
   salary: number;
+  /** Jornada contratual (h/dia). null quando o colaborador não tem schedule cadastrada. */
+  dailyHours: number | null;
+  monthlyHours: number;
+  valorHora: number;
+  scheduleConfigured: boolean;
   expectedMinutes: number;
   workedMinutes: number;
   negativeMinutes: number;
