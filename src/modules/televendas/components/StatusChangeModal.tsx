@@ -21,7 +21,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { AlertTriangle, ArrowRight, CheckCircle, Shield, CalendarIcon, XCircle } from "lucide-react";
-import { Televenda, STATUS_CONFIG } from "../types";
+import { Televenda, STATUS_CONFIG, MOTIVO_CANCELAMENTO_OPTIONS } from "../types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 interface StatusChangeModalProps {
@@ -29,7 +30,7 @@ interface StatusChangeModalProps {
   onOpenChange: (open: boolean) => void;
   televenda: Televenda | null;
   newStatus: string;
-  onConfirm: (reason: string, dateValue?: string) => Promise<void>;
+  onConfirm: (reason: string, dateValue?: string, motivo?: string) => Promise<void>;
   isLoading?: boolean;
 }
 
