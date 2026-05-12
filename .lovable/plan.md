@@ -1,106 +1,94 @@
 ## Diagnóstico
 
-Você está certo: a matemática da folha está coerente, mas o **valor/hora** está saindo errado para colaboradores cuja jornada real é diferente de 8h/dia (estagiário 6h, meio período, etc.).
+Você está certo. Para um estagiário que recebe R$ 800,00 e cumpre **6h/dia**, o valor/hora correto é:
 
-Fórmula atual (em `DiscountCalculator.tsx`, `payrollCalculations.ts` e `ClosurePanel.tsx`):
+```
+800 ÷ (6h × 20 dias úteis) = 800 ÷ 120 = R$ 6,67/h
+```
+
+E não R$ 5,00/h (que é o resultado de `800 ÷ (8 × 20)`).
+
+A fórmula em `src/lib/payrollCalculations.ts → computeRates()` já está correta — o problema é **o dado de entrada**: o estagiário do espelho analisado tem `time_clock_schedules.daily_hours = 8` (ou não tem schedule cadastrada). Na correção anterior bloqueamos o fallback silencioso de 8h na **Calculadora de Descontos**, mas:
+
+1. O **espelho de ponto do colaborador** (`TimeClockPDF.tsx` + tela `MyHistory.tsx`) ainda **não mostra** a base de cálculo — o colaborador vê só o desconto final, sem entender de onde veio.
+2. O `daily_hours` errado no banco continua existindo para os estagiários — precisa ser ajustado caso a caso no `ScheduleManager`.
+
+## O que vou fazer
+
+### 1. Bloco "Como seu desconto foi calculado" no espelho do colaborador
+
+Adicionar no topo do espelho (tela `MyHistory.tsx` e PDF `TimeClockPDF.tsx`) um card didático em linguagem simples, sem jargão:
 
 ```text
-valorHora = salário / (dailyHours × diasÚteis)
-valorDia  = valorHora × dailyHours   →  = salário / diasÚteis
+┌─ Resumo financeiro do mês ─────────────────────────────────┐
+│  Salário base ............................. R$ 800,00       │
+│  Sua jornada contratual ................... 6h por dia      │
+│  Dias úteis no mês ........................ 20 dias         │
+│                                                              │
+│  Como calculamos seu valor/hora:                            │
+│    R$ 800,00 ÷ (6h × 20 dias) = R$ 6,67/hora                │
+│  Como calculamos seu valor/dia:                             │
+│    R$ 6,67/h × 6h = R$ 40,00/dia                            │
+│                                                              │
+│  Descontos do mês:                                          │
+│  • 7 faltas integrais × R$ 40,00 ......... – R$ 280,00      │
+│      (dias 03, 10, 12, 17, 22, 25, 28)                      │
+│  • 23h29min de horas negativas × R$ 6,67 . – R$ 156,60      │
+│      (somatório de atrasos + saídas antecipadas)            │
+│                                                              │
+│  Total de descontos ...................... – R$ 436,60      │
+│  Líquido estimado a receber .............. R$ 363,40        │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-Observações:
+Princípios:
 
-- `valorDia` independe de `dailyHours` → por isso o desconto por **falta integral** (R$ 40/dia para 800/20) sai certo mesmo com jornada errada.
-- `valorHora` **depende totalmente** de `dailyHours` → por isso o desconto de **horas negativas** sai errado quando a jornada cadastrada não bate com o contrato.
+- Mostrar **a conta** (não só o resultado): "R$ 800 ÷ (6 × 20) = R$ 6,67".
+- Listar **as datas** das faltas e dos atrasos que somaram as horas negativas.
+- Usar tooltips com `?` em "valor/hora", "horas negativas", "dias úteis" explicando cada termo em 1 frase.
+- Quando a jornada não estiver cadastrada, exibir card amarelo "Sua jornada não está configurada — fale com o RH" e **não** mostrar valores de desconto financeiro (igual ao que já fizemos na Calculadora).
 
-Origem do bug: em três pontos do código existe o fallback silencioso `daily_hours || 8`. Quando o colaborador não tem `time_clock_schedules` cadastrada, ou tem cadastrada com `daily_hours = 8` por engano, o sistema calcula `800 / (8×20) = R$ 5,00/h` em vez de `800 / (6×20) = R$ 6,67/h`. É exatamente o caso do espelho que você analisou.
+### 2. Mesma tabela na Calculadora de Descontos
 
-Arquivos afetados:
+Na `DiscountCalculator.tsx`, ao expandir a linha do colaborador, mostrar o mesmo bloco com a memória de cálculo + datas das ocorrências. Isso permite o gestor abrir junto com o colaborador e explicar.
 
-- `src/lib/payrollCalculations.ts` — cálculo central da folha
-- `src/components/TimeClock/DiscountCalculator.tsx` — tela "Calculadora de Descontos"
-- `src/components/TimeClock/Reports.tsx` — relatórios (`s.daily_hours || 8`)
-- `src/components/TimeClock/ClosurePanel.tsx` — pré-validação ao fechar período
-- `src/components/TimeClock/TimeClockPDF.tsx` — espelho de ponto em PDF
+### 3. PDF do espelho
 
-## O que vou corrigir
+Replicar o bloco no `TimeClockPDF.tsx` (jspdf), na primeira página, antes da tabela de batidas. Assim o colaborador que assina o espelho recebe a explicação por escrito.
 
-### 1. Acabar com o fallback silencioso de 8h
+### 4. Lista de auditoria de jornadas divergentes
 
-Trocar `schedule?.daily_hours || 8` por leitura **estrita** da jornada cadastrada. Se o colaborador não tiver `time_clock_schedules` ativa:
+Adicionar no `ScheduleManager.tsx` uma seção "Jornadas a revisar" que lista automaticamente:
 
-- Não calcular desconto de horas negativas para essa linha.
-- Marcar a linha com badge **"Jornada não configurada"** em amarelo.
-- Bloquear export de PDF/Excel até resolver (ou exportar com aviso explícito).
+- Colaboradores ativos **sem** `time_clock_schedules`.
+- Colaboradores com `daily_hours = 8` mas `base_salary ≤ R$ 1.300` (provável estagiário).
+- Colaboradores com salário compatível com meio período mas jornada de 8h.
 
-Isso impede que qualquer colaborador volte a ser calculado com 8h fictícias.
+Cada linha tem botão "Corrigir jornada" que abre o editor já no `daily_hours` do funcionário. **Não vou alterar nenhum dado automaticamente** — só evidenciar.
 
-### 2. Expor a base de cálculo na folha
+### 5. Centralizar o "explicador"
 
-Adicionar na linha do colaborador (e no PDF) três campos visíveis:
-
-- **Jornada contratual** (ex.: 6h/dia)
-- **Carga mensal** (`dailyHours × diasÚteis`, ex.: 120h)
-- **Valor/hora** (ex.: R$ 6,67)
-
-Hoje esses números ficam implícitos — basta um deles estar errado para a folha inteira sair distorcida sem ninguém perceber. Mostrar na UI evita reincidência.
-
-### 3. Atalho de correção rápida
-
-Ao detectar uma jornada divergente (ou ausente), incluir um botão **"Editar jornada"** que abre o `ScheduleManager` já filtrado naquele colaborador, com o campo `daily_hours` em destaque.
-
-### 4. Centralizar a fórmula
-
-Hoje o cálculo `valorHora / valorDia` está duplicado em 2 lugares (`payrollCalculations.ts` e `DiscountCalculator.tsx`). Vou extrair para uma função única em `src/lib/payrollCalculations.ts`:
+Criar `src/lib/payrollExplain.ts` com uma função pura:
 
 ```ts
-export function computeRates(salary: number, dailyHours: number | null, businessDays: number) {
-  if (!salary || !dailyHours || !businessDays) {
-    return { valorHora: 0, valorDia: 0, monthlyHours: 0, configured: false };
-  }
-  const monthlyHours = dailyHours * businessDays;
-  const valorHora = salary / monthlyHours;
-  const valorDia = valorHora * dailyHours;
-  return { valorHora, valorDia, monthlyHours, configured: true };
-}
+export function explainPayroll(row: PayrollResultRow, dates: { absences: string[]; negatives: { date: string; minutes: number }[] }): PayrollExplanation
 ```
 
-Toda a UI/PDF passa a chamar essa função — qualquer ajuste futuro é em um lugar só.
-
-### 5. Auditoria de dados (one-shot)
-
-Não vou alterar dados sem confirmação, mas vou disponibilizar uma query de diagnóstico para você rodar e identificar quem está com jornada divergente:
-
-```sql
--- Colaboradores ativos sem jornada configurada
-select p.id, p.name, p.email
-from profiles p
-left join time_clock_schedules s on s.user_id = p.id and s.is_active
-where p.is_active and s.id is null;
-
--- Colaboradores com daily_hours = 8 mas salário compatível com 6h (suspeita de estagiário)
-select p.name, s.daily_hours, p.salary
-from profiles p
-join time_clock_schedules s on s.user_id = p.id and s.is_active
-where s.daily_hours = 8 and p.salary <= 1200;
-```
+Tanto a tela quanto o PDF consomem o mesmo objeto — garante que valor exibido = valor descontado, sempre.
 
 ## Fora de escopo
 
-- Não vou mudar a fórmula em si (`salário / (jornada × diasÚteis)`) — ela é a padrão CLT e está matematicamente correta.
-- Não vou mexer em CHECK constraints ou triggers do banco.
-- Não vou alterar `daily_hours` de nenhum colaborador automaticamente — apenas evidenciar o problema.
+- Não vou alterar a fórmula (continua `salário ÷ (jornada × dias úteis)` — padrão CLT).
+- Não vou alterar `daily_hours` de ninguém automaticamente — apenas listar suspeitas.
+- Não vou mexer em CHECK constraints, triggers ou no schema do banco.
 
 ## Resultado esperado
 
-Depois da correção, no exemplo do estagiário:
+Para o estagiário do exemplo, depois do gestor corrigir a jornada para 6h no `ScheduleManager`:
 
-- Sistema detecta `daily_hours = 8` (ou ausente) e mostra alerta **antes** de calcular.
-- Após você ajustar para 6h no `ScheduleManager`, a folha recalcula:
-  - Carga mensal: 120h
-  - Valor/hora: R$ 6,67
-  - Desconto 23h29min: ≈ R$ 156,60 (em vez de R$ 117,42)
-  - Líquido estimado: R$ 363,40
+- Espelho mostra: `R$ 800 ÷ (6 × 20) = R$ 6,67/h` e `R$ 40,00/dia` por extenso.
+- Faltas: 7 × R$ 40,00 = **R$ 280,00** (com as 7 datas listadas).
+- Horas negativas: 23,48h × R$ 6,67 ≈ **R$ 156,60** (com cada dia/minutos discriminados).
+- Total: **R$ 436,60** descontado → líquido **R$ 363,40**.
 
-E o mesmo passa a valer para todos os funcionários — qualquer jornada errada fica visível na hora.
+E qualquer colaborador, leigo ou não, consegue ler o próprio espelho e bater a conta na calculadora.
