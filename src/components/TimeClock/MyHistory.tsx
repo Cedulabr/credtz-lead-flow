@@ -60,6 +60,8 @@ export function MyHistory({ userId, userName, isAdmin = false }: MyHistoryProps)
   const [schedules, setSchedules] = useState<Record<string, DaySchedule>>({});
   const [daysOff, setDaysOff] = useState<DayOff[]>([]);
   const [justifications, setJustifications] = useState<Justification[]>([]);
+  const [baseSalary, setBaseSalary] = useState<number>(0);
+  const [discountMode, setDiscountMode] = useState<DiscountMode>('financeiro');
 
   // Admin filters
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
