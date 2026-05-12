@@ -140,7 +140,7 @@ export function computePayrollRow(
 
   const summary = summarizePeriod(dayResults);
   const businessDays = dayResults.filter(d => d.expectedMinutes > 0).length || 22;
-  const scheduleConfigured = !!user.schedule && (user.dailyHours ?? 0) > 0;
+  const scheduleConfigured = (user.dailyHours ?? 0) > 0;
   const rates = computeRates(user.salary, scheduleConfigured ? user.dailyHours : null, businessDays);
 
   // Apenas faltas reais "consomem" minutos esperados — pendências/ajustes parciais
