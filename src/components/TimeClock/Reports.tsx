@@ -75,7 +75,7 @@ export function Reports() {
         exit_time: s.exit_time || '18:00',
         lunch_start: s.lunch_start,
         lunch_end: s.lunch_end,
-        daily_hours: s.daily_hours || 8,
+        daily_hours: Number(s.daily_hours) > 0 ? Number(s.daily_hours) : 8,
         tolerance_minutes: s.tolerance_minutes || 10,
         work_days: s.work_days || [1, 2, 3, 4, 5],
       };
