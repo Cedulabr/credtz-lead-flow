@@ -257,32 +257,36 @@ export function DiscountCalculator() {
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
     doc.text('Colaborador', 14, yPos);
-    doc.text('Salário', 60, yPos);
-    doc.text('H. Esperadas', 85, yPos);
-    doc.text('H. Trabalhadas', 110, yPos);
-    doc.text('H. Negativas', 140, yPos);
-    doc.text('Faltas', 165, yPos);
-    doc.text('Folgas', 180, yPos);
-    doc.text('Desc. Horas', 195, yPos);
-    doc.text('Desc. Faltas', 220, yPos);
-    doc.text('Total Desc.', 245, yPos);
-    doc.text('Líquido Est.', 268, yPos);
+    doc.text('Salário', 55, yPos);
+    doc.text('Jornada', 75, yPos);
+    doc.text('Valor/h', 92, yPos);
+    doc.text('H. Esp.', 108, yPos);
+    doc.text('H. Trab.', 125, yPos);
+    doc.text('H. Neg.', 145, yPos);
+    doc.text('Faltas', 162, yPos);
+    doc.text('Folgas', 175, yPos);
+    doc.text('Desc.H', 190, yPos);
+    doc.text('Desc.F', 210, yPos);
+    doc.text('Total Desc.', 232, yPos);
+    doc.text('Líquido Est.', 258, yPos);
     yPos += 6;
 
     doc.setFont('helvetica', 'normal');
     rows.forEach(row => {
       if (yPos > 190) { doc.addPage('landscape'); yPos = 15; }
-      doc.text(row.userName.substring(0, 25), 14, yPos);
-      doc.text(formatCurrency(row.salary), 60, yPos);
-      doc.text(formatMinutesToHM(row.expectedMinutes), 85, yPos);
-      doc.text(formatMinutesToHM(row.workedMinutes), 110, yPos);
-      doc.text(formatMinutesToHM(row.negativeMinutes), 140, yPos);
-      doc.text(String(row.absences), 165, yPos);
-      doc.text(String(row.dayOffs), 180, yPos);
-      doc.text(formatCurrency(row.discountNegativeHours), 195, yPos);
-      doc.text(formatCurrency(row.discountAbsences), 220, yPos);
-      doc.text(formatCurrency(row.totalDiscount), 245, yPos);
-      doc.text(formatCurrency(row.netEstimated), 268, yPos);
+      doc.text(row.userName.substring(0, 22), 14, yPos);
+      doc.text(formatCurrency(row.salary), 55, yPos);
+      doc.text(row.scheduleConfigured ? `${row.dailyHours}h/dia` : 'N/D', 75, yPos);
+      doc.text(row.scheduleConfigured ? formatCurrency(row.valorHora) : '—', 92, yPos);
+      doc.text(formatMinutesToHM(row.expectedMinutes), 108, yPos);
+      doc.text(formatMinutesToHM(row.workedMinutes), 125, yPos);
+      doc.text(formatMinutesToHM(row.negativeMinutes), 145, yPos);
+      doc.text(String(row.absences), 162, yPos);
+      doc.text(String(row.dayOffs), 175, yPos);
+      doc.text(row.scheduleConfigured ? formatCurrency(row.discountNegativeHours) : '—', 190, yPos);
+      doc.text(row.scheduleConfigured ? formatCurrency(row.discountAbsences) : '—', 210, yPos);
+      doc.text(row.scheduleConfigured ? formatCurrency(row.totalDiscount) : '—', 232, yPos);
+      doc.text(row.scheduleConfigured ? formatCurrency(row.netEstimated) : '—', 258, yPos);
       yPos += 5;
     });
 
