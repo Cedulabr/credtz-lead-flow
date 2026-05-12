@@ -140,16 +140,18 @@ export function DiscountCalculator() {
       const uid = profile.id;
       const salary = salaryMap[uid] || 0;
       const schedule = scheduleMap[uid];
+      const scheduleConfigured = !!schedule && Number(schedule.daily_hours) > 0;
       const workDays = schedule?.work_days || [1, 2, 3, 4, 5];
-      const dailyHours = schedule?.daily_hours || 8;
+      // Sem fallback silencioso de 8h: usamos a jornada cadastrada ou marcamos como não-configurado.
+      const dailyHours = scheduleConfigured ? Number(schedule.daily_hours) : null;
       const userRecords = recordsByUser[uid] || [];
       const userOffs = dayOffByUser[uid] || {};
       const userJusts = justByUser[uid] || new Set<string>();
 
-      const sched: DaySchedule | null = schedule ? {
+      const sched: DaySchedule | null = scheduleConfigured ? {
         entry_time: schedule.entry_time,
         exit_time: schedule.exit_time,
-        daily_hours: Number(dailyHours),
+        daily_hours: dailyHours as number,
         tolerance_minutes: schedule.tolerance_minutes ?? 10,
         work_days: workDays,
       } : null;
@@ -182,20 +184,24 @@ export function DiscountCalculator() {
 
       const summary = summarizePeriod(dayResults);
       const businessDays = dayResults.filter(d => d.expectedMinutes > 0).length || 22;
-      const valorHora = salary > 0 ? salary / (Number(dailyHours) * businessDays) : 0;
-      const valorDia = valorHora * Number(dailyHours);
+      const rates = computeRates(salary, dailyHours, businessDays);
 
       // Apenas faltas reais consomem dia integral; pendências/ajustes parciais
-      // são contabilizados como horas negativas reais (sem penalização integral).
-      const negativeMinutes = Math.max(0, summary.expected - summary.worked - summary.absences * Number(dailyHours) * 60);
+      // são contabilizados como horas negativas reais.
+      const negativeMinutes = Math.max(
+        0,
+        summary.expected - summary.worked - summary.absences * (dailyHours ?? 0) * 60,
+      );
 
       let discountNegativeHours = 0;
       let discountAbsences = 0;
-      if (discountMode === 'financeiro') {
-        discountNegativeHours = (negativeMinutes / 60) * valorHora;
-        discountAbsences = summary.absences * valorDia;
-      } else if (discountMode === 'misto') {
-        discountAbsences = summary.absences * valorDia;
+      if (rates.configured) {
+        if (discountMode === 'financeiro') {
+          discountNegativeHours = (negativeMinutes / 60) * rates.valorHora;
+          discountAbsences = summary.absences * rates.valorDia;
+        } else if (discountMode === 'misto') {
+          discountAbsences = summary.absences * rates.valorDia;
+        }
       }
       const totalDiscount = discountNegativeHours + discountAbsences;
       const netEstimated = Math.max(0, salary - totalDiscount);
@@ -204,6 +210,10 @@ export function DiscountCalculator() {
         userId: uid,
         userName: profile.name || profile.email?.split('@')[0] || 'Sem nome',
         salary,
+        dailyHours,
+        monthlyHours: rates.monthlyHours,
+        valorHora: rates.valorHora,
+        scheduleConfigured: rates.configured,
         expectedMinutes: summary.expected,
         workedMinutes: summary.worked,
         negativeMinutes,
