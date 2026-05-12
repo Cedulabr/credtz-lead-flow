@@ -63,6 +63,7 @@ export const StatusChangeModal = ({
     if (open) {
       setReason("");
       setError("");
+      setMotivo("");
       // Default to today's date for date-required statuses
       if (requiresDate) {
         setSelectedDate(new Date());
