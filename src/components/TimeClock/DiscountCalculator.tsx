@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, Calculator, Loader2, TrendingDown, DollarSign, Clock, XCircle } from 'lucide-react';
+import { Download, Calculator, Loader2, TrendingDown, DollarSign, Clock, XCircle, AlertTriangle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { useGestorCompany } from '@/hooks/useGestorCompany';
 import { useToast } from '@/hooks/use-toast';
@@ -14,6 +15,7 @@ import { format, parseISO, eachDayOfInterval, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatMinutesToHM } from '@/lib/timeClockCalculations';
 import { evaluateDay, summarizePeriod, type DaySchedule, type DiscountMode, type DayOffType } from '@/lib/timeClockEngine';
+import { computeRates } from '@/lib/payrollCalculations';
 import { getBrazilianHolidays } from './brazilianHolidays';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
@@ -22,6 +24,10 @@ interface DiscountRow {
   userId: string;
   userName: string;
   salary: number;
+  dailyHours: number | null;
+  monthlyHours: number;
+  valorHora: number;
+  scheduleConfigured: boolean;
   expectedMinutes: number;
   workedMinutes: number;
   negativeMinutes: number;
@@ -134,16 +140,18 @@ export function DiscountCalculator() {
       const uid = profile.id;
       const salary = salaryMap[uid] || 0;
       const schedule = scheduleMap[uid];
+      const scheduleConfigured = !!schedule && Number(schedule.daily_hours) > 0;
       const workDays = schedule?.work_days || [1, 2, 3, 4, 5];
-      const dailyHours = schedule?.daily_hours || 8;
+      // Sem fallback silencioso de 8h: usamos a jornada cadastrada ou marcamos como não-configurado.
+      const dailyHours = scheduleConfigured ? Number(schedule.daily_hours) : null;
       const userRecords = recordsByUser[uid] || [];
       const userOffs = dayOffByUser[uid] || {};
       const userJusts = justByUser[uid] || new Set<string>();
 
-      const sched: DaySchedule | null = schedule ? {
+      const sched: DaySchedule | null = scheduleConfigured ? {
         entry_time: schedule.entry_time,
         exit_time: schedule.exit_time,
-        daily_hours: Number(dailyHours),
+        daily_hours: dailyHours as number,
         tolerance_minutes: schedule.tolerance_minutes ?? 10,
         work_days: workDays,
       } : null;
@@ -176,20 +184,24 @@ export function DiscountCalculator() {
 
       const summary = summarizePeriod(dayResults);
       const businessDays = dayResults.filter(d => d.expectedMinutes > 0).length || 22;
-      const valorHora = salary > 0 ? salary / (Number(dailyHours) * businessDays) : 0;
-      const valorDia = valorHora * Number(dailyHours);
+      const rates = computeRates(salary, dailyHours, businessDays);
 
       // Apenas faltas reais consomem dia integral; pendências/ajustes parciais
-      // são contabilizados como horas negativas reais (sem penalização integral).
-      const negativeMinutes = Math.max(0, summary.expected - summary.worked - summary.absences * Number(dailyHours) * 60);
+      // são contabilizados como horas negativas reais.
+      const negativeMinutes = Math.max(
+        0,
+        summary.expected - summary.worked - summary.absences * (dailyHours ?? 0) * 60,
+      );
 
       let discountNegativeHours = 0;
       let discountAbsences = 0;
-      if (discountMode === 'financeiro') {
-        discountNegativeHours = (negativeMinutes / 60) * valorHora;
-        discountAbsences = summary.absences * valorDia;
-      } else if (discountMode === 'misto') {
-        discountAbsences = summary.absences * valorDia;
+      if (rates.configured) {
+        if (discountMode === 'financeiro') {
+          discountNegativeHours = (negativeMinutes / 60) * rates.valorHora;
+          discountAbsences = summary.absences * rates.valorDia;
+        } else if (discountMode === 'misto') {
+          discountAbsences = summary.absences * rates.valorDia;
+        }
       }
       const totalDiscount = discountNegativeHours + discountAbsences;
       const netEstimated = Math.max(0, salary - totalDiscount);
@@ -198,6 +210,10 @@ export function DiscountCalculator() {
         userId: uid,
         userName: profile.name || profile.email?.split('@')[0] || 'Sem nome',
         salary,
+        dailyHours,
+        monthlyHours: rates.monthlyHours,
+        valorHora: rates.valorHora,
+        scheduleConfigured: rates.configured,
         expectedMinutes: summary.expected,
         workedMinutes: summary.worked,
         negativeMinutes,
@@ -241,32 +257,36 @@ export function DiscountCalculator() {
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
     doc.text('Colaborador', 14, yPos);
-    doc.text('Salário', 60, yPos);
-    doc.text('H. Esperadas', 85, yPos);
-    doc.text('H. Trabalhadas', 110, yPos);
-    doc.text('H. Negativas', 140, yPos);
-    doc.text('Faltas', 165, yPos);
-    doc.text('Folgas', 180, yPos);
-    doc.text('Desc. Horas', 195, yPos);
-    doc.text('Desc. Faltas', 220, yPos);
-    doc.text('Total Desc.', 245, yPos);
-    doc.text('Líquido Est.', 268, yPos);
+    doc.text('Salário', 55, yPos);
+    doc.text('Jornada', 75, yPos);
+    doc.text('Valor/h', 92, yPos);
+    doc.text('H. Esp.', 108, yPos);
+    doc.text('H. Trab.', 125, yPos);
+    doc.text('H. Neg.', 145, yPos);
+    doc.text('Faltas', 162, yPos);
+    doc.text('Folgas', 175, yPos);
+    doc.text('Desc.H', 190, yPos);
+    doc.text('Desc.F', 210, yPos);
+    doc.text('Total Desc.', 232, yPos);
+    doc.text('Líquido Est.', 258, yPos);
     yPos += 6;
 
     doc.setFont('helvetica', 'normal');
     rows.forEach(row => {
       if (yPos > 190) { doc.addPage('landscape'); yPos = 15; }
-      doc.text(row.userName.substring(0, 25), 14, yPos);
-      doc.text(formatCurrency(row.salary), 60, yPos);
-      doc.text(formatMinutesToHM(row.expectedMinutes), 85, yPos);
-      doc.text(formatMinutesToHM(row.workedMinutes), 110, yPos);
-      doc.text(formatMinutesToHM(row.negativeMinutes), 140, yPos);
-      doc.text(String(row.absences), 165, yPos);
-      doc.text(String(row.dayOffs), 180, yPos);
-      doc.text(formatCurrency(row.discountNegativeHours), 195, yPos);
-      doc.text(formatCurrency(row.discountAbsences), 220, yPos);
-      doc.text(formatCurrency(row.totalDiscount), 245, yPos);
-      doc.text(formatCurrency(row.netEstimated), 268, yPos);
+      doc.text(row.userName.substring(0, 22), 14, yPos);
+      doc.text(formatCurrency(row.salary), 55, yPos);
+      doc.text(row.scheduleConfigured ? `${row.dailyHours}h/dia` : 'N/D', 75, yPos);
+      doc.text(row.scheduleConfigured ? formatCurrency(row.valorHora) : '—', 92, yPos);
+      doc.text(formatMinutesToHM(row.expectedMinutes), 108, yPos);
+      doc.text(formatMinutesToHM(row.workedMinutes), 125, yPos);
+      doc.text(formatMinutesToHM(row.negativeMinutes), 145, yPos);
+      doc.text(String(row.absences), 162, yPos);
+      doc.text(String(row.dayOffs), 175, yPos);
+      doc.text(row.scheduleConfigured ? formatCurrency(row.discountNegativeHours) : '—', 190, yPos);
+      doc.text(row.scheduleConfigured ? formatCurrency(row.discountAbsences) : '—', 210, yPos);
+      doc.text(row.scheduleConfigured ? formatCurrency(row.totalDiscount) : '—', 232, yPos);
+      doc.text(row.scheduleConfigured ? formatCurrency(row.netEstimated) : '—', 258, yPos);
       yPos += 5;
     });
 
@@ -278,15 +298,18 @@ export function DiscountCalculator() {
     const wsData = rows.map(row => ({
       'Colaborador': row.userName,
       'Salário': row.salary,
+      'Jornada (h/dia)': row.scheduleConfigured ? row.dailyHours : 'Não configurada',
+      'Carga Mensal (h)': row.scheduleConfigured ? row.monthlyHours : '',
+      'Valor/Hora': row.scheduleConfigured ? row.valorHora : '',
       'H. Esperadas': formatMinutesToHM(row.expectedMinutes),
       'H. Trabalhadas': formatMinutesToHM(row.workedMinutes),
       'H. Negativas': formatMinutesToHM(row.negativeMinutes),
       'Faltas': row.absences,
       'Folgas': row.dayOffs,
-      'Desc. Horas Negativas': row.discountNegativeHours,
-      'Desc. Faltas': row.discountAbsences,
-      'Total Descontos': row.totalDiscount,
-      'Líquido Estimado': row.netEstimated,
+      'Desc. Horas Negativas': row.scheduleConfigured ? row.discountNegativeHours : '',
+      'Desc. Faltas': row.scheduleConfigured ? row.discountAbsences : '',
+      'Total Descontos': row.scheduleConfigured ? row.totalDiscount : '',
+      'Líquido Estimado': row.scheduleConfigured ? row.netEstimated : '',
     }));
 
     const ws = XLSX.utils.json_to_sheet(wsData);
@@ -344,7 +367,7 @@ export function DiscountCalculator() {
                 Calculadora de Descontos
               </CardTitle>
               <CardDescription>
-                Faltas/Pendentes × valor-dia + horas negativas × valor-hora (jornada × dias úteis do mês, descontando feriados)
+                Faltas × valor-dia + horas negativas × valor-hora · Valor-hora = Salário ÷ (Jornada × Dias úteis)
               </CardDescription>
             </div>
             <div className="flex gap-2">
@@ -390,56 +413,102 @@ export function DiscountCalculator() {
               <p>Nenhum colaborador encontrado para esta empresa.</p>
             </div>
           ) : (
-            <div className="rounded-md border overflow-x-auto max-h-[500px] overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Colaborador</TableHead>
-                    <TableHead className="text-right">Salário</TableHead>
-                    <TableHead className="text-right">H. Esperadas</TableHead>
-                    <TableHead className="text-right">H. Trabalhadas</TableHead>
-                    <TableHead className="text-right">H. Negativas</TableHead>
-                    <TableHead className="text-center">Faltas</TableHead>
-                    <TableHead className="text-center">Folgas</TableHead>
-                    <TableHead className="text-right">Desc. Horas</TableHead>
-                    <TableHead className="text-right">Desc. Faltas</TableHead>
-                    <TableHead className="text-right">Total Desc.</TableHead>
-                    <TableHead className="text-right">Líquido Est.</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row) => (
-                    <TableRow key={row.userId}>
-                      <TableCell className="font-medium">{row.userName}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(row.salary)}</TableCell>
-                      <TableCell className="text-right">{formatMinutesToHM(row.expectedMinutes)}</TableCell>
-                      <TableCell className="text-right">{formatMinutesToHM(row.workedMinutes)}</TableCell>
-                      <TableCell className="text-right">
-                        {row.negativeMinutes > 0 ? (
-                          <span className="text-red-600 font-medium">{formatMinutesToHM(row.negativeMinutes)}</span>
-                        ) : (
-                          <span className="text-green-600">0h 0min</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {row.absences > 0 ? (
-                          <Badge variant="destructive">{row.absences}</Badge>
-                        ) : (
-                          <Badge variant="outline">0</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge className="bg-blue-100 text-blue-800">{row.dayOffs}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-red-600">{formatCurrency(row.discountNegativeHours)}</TableCell>
-                      <TableCell className="text-right text-red-600">{formatCurrency(row.discountAbsences)}</TableCell>
-                      <TableCell className="text-right font-bold text-red-700">{formatCurrency(row.totalDiscount)}</TableCell>
-                      <TableCell className="text-right font-bold text-green-700">{formatCurrency(row.netEstimated)}</TableCell>
+            <>
+              {rows.some(r => !r.scheduleConfigured) && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 p-3 flex items-start gap-2 text-sm">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div>
+                    <strong className="text-amber-800 dark:text-amber-300">Atenção:</strong>{' '}
+                    <span className="text-amber-800 dark:text-amber-200">
+                      {rows.filter(r => !r.scheduleConfigured).length} colaborador(es) sem jornada cadastrada.
+                      O desconto de horas negativas <u>não foi calculado</u> para essas linhas.
+                      Cadastre a jornada em <em>Configurações &gt; Jornadas</em> antes de fechar a folha.
+                    </span>
+                  </div>
+                </div>
+              )}
+              <div className="rounded-md border overflow-x-auto max-h-[500px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Colaborador</TableHead>
+                      <TableHead className="text-right">Salário</TableHead>
+                      <TableHead className="text-center">Jornada</TableHead>
+                      <TableHead className="text-right">Valor/h</TableHead>
+                      <TableHead className="text-right">H. Esperadas</TableHead>
+                      <TableHead className="text-right">H. Trabalhadas</TableHead>
+                      <TableHead className="text-right">H. Negativas</TableHead>
+                      <TableHead className="text-center">Faltas</TableHead>
+                      <TableHead className="text-center">Folgas</TableHead>
+                      <TableHead className="text-right">Desc. Horas</TableHead>
+                      <TableHead className="text-right">Desc. Faltas</TableHead>
+                      <TableHead className="text-right">Total Desc.</TableHead>
+                      <TableHead className="text-right">Líquido Est.</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((row) => (
+                      <TableRow key={row.userId} className={!row.scheduleConfigured ? 'bg-amber-50/60 dark:bg-amber-900/10' : ''}>
+                        <TableCell className="font-medium">{row.userName}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(row.salary)}</TableCell>
+                        <TableCell className="text-center">
+                          {row.scheduleConfigured ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className="cursor-help">{row.dailyHours}h/dia</Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Carga mensal: <strong>{row.monthlyHours}h</strong> ({row.dailyHours}h × {Math.round(row.monthlyHours / (row.dailyHours || 1))} dias úteis)
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <Badge variant="outline" className="border-amber-500 text-amber-700 bg-amber-50">
+                              <AlertTriangle className="h-3 w-3 mr-1" /> Não configurada
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {row.scheduleConfigured ? formatCurrency(row.valorHora) : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right">{formatMinutesToHM(row.expectedMinutes)}</TableCell>
+                        <TableCell className="text-right">{formatMinutesToHM(row.workedMinutes)}</TableCell>
+                        <TableCell className="text-right">
+                          {row.negativeMinutes > 0 ? (
+                            <span className="text-red-600 font-medium">{formatMinutesToHM(row.negativeMinutes)}</span>
+                          ) : (
+                            <span className="text-green-600">0h 0min</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {row.absences > 0 ? (
+                            <Badge variant="destructive">{row.absences}</Badge>
+                          ) : (
+                            <Badge variant="outline">0</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge className="bg-blue-100 text-blue-800">{row.dayOffs}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-red-600">
+                          {row.scheduleConfigured ? formatCurrency(row.discountNegativeHours) : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right text-red-600">
+                          {row.scheduleConfigured ? formatCurrency(row.discountAbsences) : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-red-700">
+                          {row.scheduleConfigured ? formatCurrency(row.totalDiscount) : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-green-700">
+                          {row.scheduleConfigured ? formatCurrency(row.netEstimated) : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

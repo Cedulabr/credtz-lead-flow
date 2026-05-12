@@ -1,142 +1,106 @@
+## Diagnóstico
 
-# Módulo Reaproveitamento
+Você está certo: a matemática da folha está coerente, mas o **valor/hora** está saindo errado para colaboradores cuja jornada real é diferente de 8h/dia (estagiário 6h, meio período, etc.).
 
-Cria um novo módulo na sidebar para retrabalhar propostas canceladas (status `proposta_cancelada` na tabela `televendas`), com score de IA, KPIs e ação de 1 clique para reativar.
+Fórmula atual (em `DiscountCalculator.tsx`, `payrollCalculations.ts` e `ClosurePanel.tsx`):
 
-## 1. Banco de dados (migration)
-
-Na tabela `televendas`:
-- `motivo_cancelamento` text NULL
-- `reativada_em` timestamptz NULL
-- `reativacao_score` smallint NULL
-- `reativacao_justificativa` text NULL
-- Novo valor de status permitido: `reativada` (não há CHECK constraint hoje, basta documentar)
-
-Atualizar `STATUS_CONFIG` em `src/modules/televendas/types.ts` com a entrada `reativada` (label "Reativada", emoji ♻️, verde).
-
-Permissão dinâmica:
-- Adicionar coluna `can_access_reaproveitamento` boolean default false em `profiles` (segue padrão do registry de permissões).
-
-RLS em `televendas` já existe e isola por `company_id` / `user_id`. Confirmar/garantir que:
-- Admin vê tudo
-- Gestor vê propostas de qualquer usuário cuja `company_id` bata com a sua (via `has_role_safe` + `user_companies`)
-- Operador vê só `user_id = auth.uid()`
-
-Ajustar policy se necessário usando `has_role_safe` (sem recursão).
-
-Lista padrão de motivos (usada no dropdown e no score):
-`Preço`, `Sem retorno do cliente`, `Concorrente`, `Cliente desistiu`, `Documentação`, `Margem insuficiente`, `Outro`.
-
-## 2. Edge Function `calcular-score-reaproveitamento`
-
-Input: `{ proposta_id: uuid }`. Lê a proposta, calcula score 0–100 e atualiza `reativacao_score` + `reativacao_justificativa`.
-
-Fórmula:
-```
-score = w_valor*valor_norm + w_tempo*tempo_norm + w_motivo*motivo_peso
-  valor_norm  = min(troco/10000, 1)                  peso 40
-  tempo_norm  = max(0, 1 - dias_desde_cancel/90)     peso 30
-  motivo_peso = { Preço:1.0, Sem retorno:0.9, Documentação:0.7,
-                  Cliente desistiu:0.5, Margem insuficiente:0.4,
-                  Concorrente:0.2, Outro:0.5 }       peso 30
-```
-Retorna `{ score, justificativa }` (ex.: "Alto valor (R$ 8.500), cancelada há 12 dias por Preço — boa chance de retorno.").
-
-Trigger after update em `televendas` quando status passa para `proposta_cancelada` chama via `pg_net` o edge function (assíncrono) para preencher score automaticamente. Recalcular também on-demand pelo botão "Recalcular score" no drawer.
-
-## 3. Atualização do fluxo de cancelamento
-
-`src/modules/televendas/components/StatusChangeModal.tsx` (ou modal equivalente que muda status para `proposta_cancelada`):
-- Quando o novo status for `proposta_cancelada`, exibir Select obrigatório `motivo_cancelamento` com a lista padrão + campo livre para "Outro".
-- Persistir `motivo_cancelamento` e `data_cancelamento` (já existe).
-
-## 4. Sidebar / Roteamento
-
-- `src/components/Navigation.tsx`: novo item "Reaproveitamento" (icon `IconRefreshAlert` do tabler-icons-react ou `RotateCcw` do lucide se tabler não estiver instalado), visível só se `isAdmin || profile.can_access_reaproveitamento`.
-- `src/components/LazyComponents.tsx`: `LazyReaproveitamentoModule`.
-- `src/pages/Index.tsx`: registrar tab `reaproveitamento` em `tabComponents` e em `TAB_PERMISSIONS` com `permission: 'can_access_reaproveitamento'`.
-- Admin painel: adicionar toggle da nova permissão em `src/components/AdminPanel.tsx` (registry de permissões).
-
-## 5. Novo módulo `src/modules/reaproveitamento/`
-
-Estrutura:
-```
-ReaproveitamentoModule.tsx        # header + KPIs + filtros + tabs + lista
-hooks/useReaproveitamento.ts      # fetch propostas canceladas + mutations
-hooks/useReativarProposta.ts      # mutation reativar
-components/KpiCards.tsx           # 4 cards
-components/FilterBar.tsx          # busca + motivo + período
-components/ReaproveitamentoTabs.tsx
-components/PropostaCard.tsx       # card com avatar, tags, score bar, ações
-components/ScoreBar.tsx           # barra 64px verde/âmbar/vermelho
-components/PropostaDrawer.tsx     # Sheet com detalhes + reativar
-utils/avatarColor.ts              # cor determinística pelo nome
-types.ts
-index.ts
+```text
+valorHora = salário / (dailyHours × diasÚteis)
+valorDia  = valorHora × dailyHours   →  = salário / diasÚteis
 ```
 
-### Header
-"Reaproveitamento" + ícone refresh-alert + Badge contagem de canceladas.
+Observações:
 
-### KPIs (grid 1/2/4 col)
-1. Total canceladas
-2. Reativadas hoje (`reativada_em::date = today`)
-3. Valor potencial (sum `troco` de canceladas, BRL)
-4. Alta chance de retorno (count `reativacao_score >= 80`)
+- `valorDia` independe de `dailyHours` → por isso o desconto por **falta integral** (R$ 40/dia para 800/20) sai certo mesmo com jornada errada.
+- `valorHora` **depende totalmente** de `dailyHours` → por isso o desconto de **horas negativas** sai errado quando a jornada cadastrada não bate com o contrato.
 
-### Filtros
-- Busca text (nome, cpf, banco, tipo_operacao)
-- Select Motivo (distinct dos dados + "Todos")
-- Select Período: 30/60/90 dias (sobre `data_cancelamento`)
+Origem do bug: em três pontos do código existe o fallback silencioso `daily_hours || 8`. Quando o colaborador não tem `time_clock_schedules` cadastrada, ou tem cadastrada com `daily_hours = 8` por engano, o sistema calcula `800 / (8×20) = R$ 5,00/h` em vez de `800 / (6×20) = R$ 6,67/h`. É exatamente o caso do espelho que você analisou.
 
-### Tabs
-`Todas | 🔥 Quentes (≥80) | Recentes (≤30d) | Alto valor (≥R$ 5.000)`
+Arquivos afetados:
 
-### Card de proposta
-- Avatar circular com iniciais, cor determinística (hash do nome → paleta HSL via tokens)
-- Nome (bold) + banco como "company"
-- Tipo operação como produto
-- Tags: dias desde cancelamento, valor BRL, tipo de proposta
-- `motivo_cancelamento` com ícone `AlertCircle`
-- `ScoreBar` 64px (verde ≥80 / âmbar ≥60 / vermelho <60)
-- Borda esquerda 3px verde quando score ≥80 (token `--success`)
-- Botões à direita: **Reativar** (verde primary, ícone refresh) e **Ver proposta** (ghost, ícone eye)
+- `src/lib/payrollCalculations.ts` — cálculo central da folha
+- `src/components/TimeClock/DiscountCalculator.tsx` — tela "Calculadora de Descontos"
+- `src/components/TimeClock/Reports.tsx` — relatórios (`s.daily_hours || 8`)
+- `src/components/TimeClock/ClosurePanel.tsx` — pré-validação ao fechar período
+- `src/components/TimeClock/TimeClockPDF.tsx` — espelho de ponto em PDF
 
-### Reativar
-1. Loading "Reativando..." com Loader2
-2. `update televendas set status='reativada', reativada_em=now() where id=?`
-3. Toast sonner: `Proposta de {nome} reativada! Disponível em Gestão de Televendas.`
-4. Remove card via invalidate query
-5. KPIs recarregam pela mesma query
+## O que vou corrigir
 
-### Drawer (Sheet à direita)
-Detalhes completos: cliente, banco, tipo, valor, datas (criação/cancelamento), motivo, justificativa do score, histórico (`televendas_status_history` + `televendas_observacoes`). Botão "Reativar proposta" no rodapé sticky.
+### 1. Acabar com o fallback silencioso de 8h
 
-## 6. Integração com Gestão de Televendas
+Trocar `schedule?.daily_hours || 8` por leitura **estrita** da jornada cadastrada. Se o colaborador não tiver `time_clock_schedules` ativa:
 
-`src/modules/televendas/types.ts`:
-- Acrescentar `reativada` em `STATUS_CONFIG` (label "Reativada", emoji ♻️, verde, `isFinal:false`).
+- Não calcular desconto de horas negativas para essa linha.
+- Marcar a linha com badge **"Jornada não configurada"** em amarelo.
+- Bloquear export de PDF/Excel até resolver (ou exportar com aviso explícito).
 
-`src/modules/televendas/views/PropostasView.tsx` (e filtros):
-- Adicionar chip de filtro "Reativadas".
-- `StatusBadge.tsx`: render badge verde + ícone `Recycle` (lucide) para `reativada`.
-- Permitir edição igual às ativas (já é o comportamento padrão pra status não-final).
+Isso impede que qualquer colaborador volte a ser calculado com 8h fictícias.
 
-## 7. Tokens visuais (index.css)
+### 2. Expor a base de cálculo na folha
 
-Garantir tokens HSL semânticos:
-- `--success: 152 70% 36%` (≈ #1D9E75) e `--success-foreground`
-- Reuso para borda accent, botão Reativar e barra de score.
+Adicionar na linha do colaborador (e no PDF) três campos visíveis:
 
-## 8. Detalhes técnicos
+- **Jornada contratual** (ex.: 6h/dia)
+- **Carga mensal** (`dailyHours × diasÚteis`, ex.: 120h)
+- **Valor/hora** (ex.: R$ 6,67)
 
-- Querys via `@tanstack/react-query` com `invalidateQueries(['reaproveitamento'])` e `['televendas']` após reativar.
-- Avatar color: `hsl((hash(nome) % 360), 65%, 55%)`.
-- BRL: `Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' })`.
-- Datas: helper `src/lib/date.ts` para `dias desde cancelamento`.
-- Toda label em PT-BR, código em EN.
-- Mobile-first: KPIs em grid `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`, cards stack vertical no mobile, drawer com footer sticky.
+Hoje esses números ficam implícitos — basta um deles estar errado para a folha inteira sair distorcida sem ninguém perceber. Mostrar na UI evita reincidência.
 
-## 9. Memória a salvar após implementação
+### 3. Atalho de correção rápida
 
-`mem://features/reaproveitamento/overview` — fórmula do score, lista de motivos, status `reativada`, integração com Gestão de Televendas.
+Ao detectar uma jornada divergente (ou ausente), incluir um botão **"Editar jornada"** que abre o `ScheduleManager` já filtrado naquele colaborador, com o campo `daily_hours` em destaque.
+
+### 4. Centralizar a fórmula
+
+Hoje o cálculo `valorHora / valorDia` está duplicado em 2 lugares (`payrollCalculations.ts` e `DiscountCalculator.tsx`). Vou extrair para uma função única em `src/lib/payrollCalculations.ts`:
+
+```ts
+export function computeRates(salary: number, dailyHours: number | null, businessDays: number) {
+  if (!salary || !dailyHours || !businessDays) {
+    return { valorHora: 0, valorDia: 0, monthlyHours: 0, configured: false };
+  }
+  const monthlyHours = dailyHours * businessDays;
+  const valorHora = salary / monthlyHours;
+  const valorDia = valorHora * dailyHours;
+  return { valorHora, valorDia, monthlyHours, configured: true };
+}
+```
+
+Toda a UI/PDF passa a chamar essa função — qualquer ajuste futuro é em um lugar só.
+
+### 5. Auditoria de dados (one-shot)
+
+Não vou alterar dados sem confirmação, mas vou disponibilizar uma query de diagnóstico para você rodar e identificar quem está com jornada divergente:
+
+```sql
+-- Colaboradores ativos sem jornada configurada
+select p.id, p.name, p.email
+from profiles p
+left join time_clock_schedules s on s.user_id = p.id and s.is_active
+where p.is_active and s.id is null;
+
+-- Colaboradores com daily_hours = 8 mas salário compatível com 6h (suspeita de estagiário)
+select p.name, s.daily_hours, p.salary
+from profiles p
+join time_clock_schedules s on s.user_id = p.id and s.is_active
+where s.daily_hours = 8 and p.salary <= 1200;
+```
+
+## Fora de escopo
+
+- Não vou mudar a fórmula em si (`salário / (jornada × diasÚteis)`) — ela é a padrão CLT e está matematicamente correta.
+- Não vou mexer em CHECK constraints ou triggers do banco.
+- Não vou alterar `daily_hours` de nenhum colaborador automaticamente — apenas evidenciar o problema.
+
+## Resultado esperado
+
+Depois da correção, no exemplo do estagiário:
+
+- Sistema detecta `daily_hours = 8` (ou ausente) e mostra alerta **antes** de calcular.
+- Após você ajustar para 6h no `ScheduleManager`, a folha recalcula:
+  - Carga mensal: 120h
+  - Valor/hora: R$ 6,67
+  - Desconto 23h29min: ≈ R$ 156,60 (em vez de R$ 117,42)
+  - Líquido estimado: R$ 363,40
+
+E o mesmo passa a valer para todos os funcionários — qualquer jornada errada fica visível na hora.
