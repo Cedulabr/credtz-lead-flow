@@ -232,6 +232,33 @@ export const StatusChangeModal = ({
             </motion.div>
           )}
 
+          {/* Motivo de cancelamento */}
+          {requiresCancellationDate && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-2"
+            >
+              <Label className="flex items-center gap-2">
+                <XCircle className="h-4 w-4 text-red-600" />
+                Motivo do cancelamento <span className="text-destructive">*</span>
+              </Label>
+              <Select value={motivo} onValueChange={setMotivo}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o motivo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MOTIVO_CANCELAMENTO_OPTIONS.map((m) => (
+                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Usado pelo módulo Reaproveitamento para calcular a chance de retorno.
+              </p>
+            </motion.div>
+          )}
+
           {/* Reason input */}
           <div className="space-y-2">
             <Label htmlFor="reason" className="flex items-center gap-2">
