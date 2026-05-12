@@ -203,3 +203,4 @@ export const LazyPortFlowModule = withLazyLoading(PortFlowModule, FormSkeleton);
 export const LazyVoicerModule = withLazyLoading(VoicerModule, FormSkeleton);
 export const LazyNotasModule = withLazyLoading(NotasModule, DashboardSkeleton);
 export const LazyTelefoniaModule = withLazyLoading(TelefoniaModule, FormSkeleton);
+export const LazyReaproveitamentoModule = withLazyLoading(ReaproveitamentoModule, TableSkeleton);
