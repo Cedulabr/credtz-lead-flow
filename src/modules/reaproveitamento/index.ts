@@ -1,0 +1,1 @@
+export { ReaproveitamentoModule } from "./ReaproveitamentoModule";
