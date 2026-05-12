@@ -91,6 +91,10 @@ const TAB_PERMISSIONS: Record<string, Pick<TabConfig, 'permission' | 'blockedMes
     permission: 'can_access_gestao_televendas',
     blockedMessage: 'Acesso à Gestão de Televendas bloqueado pelo administrador',
   },
+  reaproveitamento: {
+    permission: 'can_access_reaproveitamento',
+    blockedMessage: 'Acesso ao Reaproveitamento bloqueado pelo administrador',
+  },
   finances: {
     permission: 'can_access_financas',
     blockedMessage: 'Acesso à seção Finanças bloqueado pelo administrador',
