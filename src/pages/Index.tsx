@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWhitelabel } from "@/hooks/useWhitelabel";
 
 // ── Light imports (always loaded) ─────────────────────────────────────
-import { Navigation } from "@/components/Navigation";
+import { SidebarNav } from "@/components/layout/SidebarNav";
 import LoadingAuth from "@/components/LoadingAuth";
 import { BlockedAccess } from "@/components/BlockedAccess";
 import { LoadingFallback } from "@/components/LoadingFallback";
@@ -264,7 +264,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
       <div className="flex flex-col md:flex-row min-h-screen">
-        <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+        <SidebarNav activeTab={activeTab} onTabChange={setActiveTab} />
         <main className="flex-1 w-full max-w-full overflow-x-auto pt-14 pb-20 md:pt-0 md:pb-0">
           <Suspense fallback={<LoadingFallback />}>
             {renderActiveComponent()}
