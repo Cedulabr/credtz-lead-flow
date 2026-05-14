@@ -112,7 +112,7 @@ const SECTIONS: Array<
       { id: "time-clock", label: "Controle de Ponto", icon: Clock, permissionKey: "can_access_controle_ponto" },
       { id: "digitacao", label: "Digitação", icon: Keyboard, permissionKey: "can_access_digitacao" },
       { id: "audios", label: "Áudios", icon: Volume2, permissionKey: "can_access_audios" },
-      { id: "portflow", label: "PortFlow", icon: GitBranch, permissionKey: "can_access_portflow" },
+      { id: "digitacao-agibank", label: "Digitação Agibank", icon: Keyboard, permissionKey: "can_access_portflow" },
       { id: "notas", label: "Notas & Workspace", icon: NotebookPen, permissionKey: "can_access_notas" },
     ],
   },
