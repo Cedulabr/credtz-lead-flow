@@ -303,7 +303,7 @@ export default function DigitacaoAgibank() {
 
   // Simular state
   const [simParcela, setSimParcela] = useState<number | undefined>(undefined);
-  const [simPrazo, setSimPrazo] = useState<Prazo>(84);
+  const [simPrazo, setSimPrazo] = useState<Prazo>(108);
 
   // Digitar state
   const [cpf, setCpf] = useState("");
