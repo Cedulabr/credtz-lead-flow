@@ -15,6 +15,8 @@ import {
   Check,
   X,
   Upload,
+  Sparkles,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,8 +28,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { CurrencyInput } from "@/modules/sales-wizard/components/CurrencyInput";
-import { calcularTroco, formatBRL } from "@/lib/calcularTroco";
+import {
+  calcularTroco,
+  calcularPortabilidade,
+  FATOR_COEFICIENTE_PORTABILIDADE,
+  formatBRL,
+} from "@/lib/calcularTroco";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -207,12 +224,21 @@ function TrocoBox({
   variant,
   parcela,
   prazo,
+  modo = "novo",
+  saldoDevedor = 0,
 }: {
   variant: "blue" | "green";
   parcela: number;
   prazo: number;
+  modo?: "novo" | "portabilidade";
+  saldoDevedor?: number;
 }) {
-  const result = useMemo(() => calcularTroco({ parcela, prazo }), [parcela, prazo]);
+  const isPort = modo === "portabilidade";
+  const novo = useMemo(() => calcularTroco({ parcela, prazo }), [parcela, prazo]);
+  const port = useMemo(
+    () => calcularPortabilidade({ parcela, prazo, saldoDevedor }),
+    [parcela, prazo, saldoDevedor]
+  );
   const colors =
     variant === "blue"
       ? "bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-950/30 dark:border-blue-900 dark:text-blue-100"
@@ -221,18 +247,51 @@ function TrocoBox({
     variant === "blue"
       ? "text-blue-700/80 dark:text-blue-300/80"
       : "text-emerald-700/80 dark:text-emerald-300/80";
+
+  const titulo = isPort
+    ? "Valor liberado ao cliente (taxa 1,65% a.m.)"
+    : variant === "blue"
+    ? "Troco líquido estimado (taxa 1,85% a.m. — já deduzido IOF)"
+    : "Troco líquido estimado (taxa 1,85% — IOF deduzido)";
+
+  const valor = isPort ? port.valorLiberado : novo.troco;
+  const negativo = isPort && valor < 0;
+
   return (
-    <div className={cn("rounded-xl border p-4", colors)}>
-      <p className="text-xs font-medium mb-1">
-        {variant === "blue"
-          ? "Troco líquido estimado (taxa 1,85% a.m. — já deduzido IOF)"
-          : "Troco líquido (taxa 1,85% — IOF deduzido)"}
+    <div
+      className={cn(
+        "rounded-xl border-2 p-5 shadow-sm ring-1 ring-inset",
+        colors,
+        variant === "blue" ? "ring-blue-300/40" : "ring-emerald-300/40"
+      )}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <Sparkles className="h-3.5 w-3.5" />
+        <p className="text-[11px] uppercase tracking-wider font-semibold">
+          Troco estimado
+        </p>
+      </div>
+      <p className="text-xs font-medium mb-1">{titulo}</p>
+      <p
+        className={cn(
+          "text-3xl md:text-4xl font-extrabold tracking-tight",
+          negativo && "text-red-600 dark:text-red-400"
+        )}
+      >
+        {formatBRL(valor)}
       </p>
-      <p className="text-3xl font-bold tracking-tight">
-        {formatBRL(result.troco)}
-      </p>
-      <p className={cn("text-xs mt-1", sub)}>
-        Crédito bruto: {formatBRL(result.valorBruto)} | IOF estimado: {formatBRL(result.iofEstimado)}
+      {isPort ? (
+        <p className={cn("text-xs mt-1", sub)}>
+          Novo valor financiado: {formatBRL(port.novoValorFinanciado)} | Saldo devedor a quitar:{" "}
+          {formatBRL(port.saldoDevedor)} | Fator {prazo}x: {port.fator.toFixed(6)}
+        </p>
+      ) : (
+        <p className={cn("text-xs mt-1", sub)}>
+          Crédito bruto: {formatBRL(novo.valorBruto)} | IOF estimado: {formatBRL(novo.iofEstimado)}
+        </p>
+      )}
+      <p className="text-[11px] mt-2 italic opacity-80">
+        * Valor estimado com base nas taxas vigentes. Sujeito a confirmação do banco.
       </p>
     </div>
   );
@@ -256,8 +315,14 @@ export default function DigitacaoAgibank() {
   const [rgFrente, setRgFrente] = useState<File | null>(null);
   const [rgVerso, setRgVerso] = useState<File | null>(null);
   const [extrato, setExtrato] = useState<File | null>(null);
+  // Portabilidade extra fields
+  const [bancoOriginador, setBancoOriginador] = useState("");
+  const [prazoTotal, setPrazoTotal] = useState<number | undefined>(undefined);
+  const [parcelasAberto, setParcelasAberto] = useState<number | undefined>(undefined);
+  const [saldoDevedor, setSaldoDevedor] = useState<number | undefined>(undefined);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const goSimular = () => {
     setView("simular");
@@ -285,6 +350,12 @@ export default function DigitacaoAgibank() {
     if (!parcela || parcela <= 0) e.parcela = "Informe o valor da parcela";
     if (!rgFrente) e.rgFrente = "Envie o RG (frente)";
     if (!rgVerso) e.rgVerso = "Envie o RG (verso)";
+    if (produto === "portabilidade") {
+      if (!bancoOriginador.trim()) e.bancoOriginador = "Informe o banco originador";
+      if (!prazoTotal || prazoTotal <= 0) e.prazoTotal = "Informe o prazo total";
+      if (!parcelasAberto || parcelasAberto <= 0) e.parcelasAberto = "Informe as parcelas em aberto";
+      if (!saldoDevedor || saldoDevedor <= 0) e.saldoDevedor = "Informe o saldo devedor";
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -300,7 +371,7 @@ export default function DigitacaoAgibank() {
     return path;
   };
 
-  const handleSubmit = async () => {
+  const handleClickEnviar = () => {
     if (!user) {
       toast.error("Faça login para enviar a proposta");
       return;
@@ -309,6 +380,11 @@ export default function DigitacaoAgibank() {
       toast.error("Verifique os campos obrigatórios");
       return;
     }
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    setConfirmOpen(false);
     setSubmitting(true);
     try {
       const [rgFrenteUrl, rgVersoUrl, extratoUrl] = await Promise.all([
@@ -317,30 +393,86 @@ export default function DigitacaoAgibank() {
         extrato ? uploadFile(extrato, "extrato") : Promise.resolve<string | null>(null),
       ]);
 
-      const calc = calcularTroco({ parcela: parcela!, prazo });
+      const isPort = produto === "portabilidade";
+      const calcNovo = calcularTroco({ parcela: parcela!, prazo });
+      const calcPort = isPort
+        ? calcularPortabilidade({ parcela: parcela!, prazo, saldoDevedor: saldoDevedor || 0 })
+        : null;
+      const trocoFinal = isPort ? calcPort!.valorLiberado : calcNovo.troco;
+      const valorBrutoFinal = isPort ? calcPort!.novoValorFinanciado : calcNovo.valorBruto;
 
-      const { error } = await supabase
+      const banco =
+        produto === "novo_emprestimo"
+          ? "Agibank Easyn"
+          : isPort
+          ? bancoOriginador.trim()
+          : "Agibank Easyn";
+
+      const tipoOperacaoMap: Record<string, string> = {
+        novo_emprestimo: "novo",
+        refinanciamento: "refinanciamento",
+        portabilidade: "portabilidade",
+      };
+
+      const observacao = isPort
+        ? `Portabilidade — Banco originador: ${bancoOriginador}; Prazo total: ${prazoTotal}x; Parcelas em aberto: ${parcelasAberto}; Saldo devedor: ${formatBRL(
+            saldoDevedor || 0
+          )}; Fator ${prazo}x: ${calcPort!.fator.toFixed(6)}`
+        : `Origem: Digitação Agibank — ${produto}`;
+
+      // 1) Insert na tabela própria do módulo
+      const { error: errDig } = await supabase
         .from("digitacao_agibank_propostas" as any)
         .insert({
-          user_id: user.id,
+          user_id: user!.id,
           cpf: cpf.replace(/\D/g, ""),
           nome_cliente: nome.trim(),
           telefone: telefone.replace(/\D/g, ""),
           produto,
-          banco: produto === "novo_emprestimo" ? "Agibank Easyn" : null,
+          banco,
           parcela,
           prazo,
-          troco_calculado: calc.troco,
-          valor_bruto: calc.valorBruto,
-          iof_estimado: calc.iofEstimado,
+          troco_calculado: trocoFinal,
+          valor_bruto: valorBrutoFinal,
+          iof_estimado: isPort ? 0 : calcNovo.iofEstimado,
           rg_frente_url: rgFrenteUrl,
           rg_verso_url: rgVersoUrl,
           extrato_url: extratoUrl,
         });
+      if (errDig) throw errDig;
 
-      if (error) throw error;
+      // 2) Buscar company_id do usuário (para isolamento multi-tenant)
+      const { data: uc } = await supabase
+        .from("user_companies")
+        .select("company_id")
+        .eq("user_id", user!.id)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
 
-      toast.success("Proposta enviada com sucesso! Aguarde análise.");
+      // 3) Enviar proposta para Gestão de Televendas
+      const today = new Date().toISOString().slice(0, 10);
+      const { error: errTel } = await supabase.from("televendas").insert({
+        user_id: user!.id,
+        company_id: uc?.company_id ?? null,
+        nome: nome.trim(),
+        cpf: cpf.replace(/\D/g, ""),
+        telefone: telefone.replace(/\D/g, ""),
+        data_venda: today,
+        banco,
+        parcela: parcela!,
+        troco: trocoFinal,
+        saldo_devedor: isPort ? saldoDevedor || 0 : null,
+        tipo_operacao: tipoOperacaoMap[produto!],
+        observacao,
+        modulo_origem: "digitacao_agibank",
+        status: "pendente",
+        status_proposta: "digitada",
+        status_bancario: "aguardando_digitacao",
+      } as any);
+      if (errTel) throw errTel;
+
+      toast.success("Proposta enviada para Gestão de Televendas!");
       // Reset form
       setCpf("");
       setNome("");
@@ -351,6 +483,10 @@ export default function DigitacaoAgibank() {
       setRgFrente(null);
       setRgVerso(null);
       setExtrato(null);
+      setBancoOriginador("");
+      setPrazoTotal(undefined);
+      setParcelasAberto(undefined);
+      setSaldoDevedor(undefined);
       setErrors({});
       goHome();
     } catch (err: any) {
@@ -542,6 +678,77 @@ export default function DigitacaoAgibank() {
               </div>
             )}
 
+            {produto === "portabilidade" && (
+              <div className="rounded-lg border border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-900 p-4 mb-4 space-y-4">
+                <div className="flex items-center gap-2">
+                  <ArrowRightLeft className="h-4 w-4 text-purple-700 dark:text-purple-300" />
+                  <h4 className="text-sm font-semibold text-purple-900 dark:text-purple-100">
+                    Dados do contrato a portar
+                  </h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Banco originador</Label>
+                    <Input
+                      value={bancoOriginador}
+                      onChange={(e) => setBancoOriginador(e.target.value)}
+                      placeholder="Ex.: Banco do Brasil, Itaú..."
+                    />
+                    {errors.bancoOriginador && (
+                      <p className="text-xs text-red-600">{errors.bancoOriginador}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Prazo total do contrato (meses)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={prazoTotal ?? ""}
+                      onChange={(e) =>
+                        setPrazoTotal(e.target.value ? Number(e.target.value) : undefined)
+                      }
+                      placeholder="Ex.: 96"
+                    />
+                    {errors.prazoTotal && (
+                      <p className="text-xs text-red-600">{errors.prazoTotal}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Parcelas em aberto</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={parcelasAberto ?? ""}
+                      onChange={(e) =>
+                        setParcelasAberto(e.target.value ? Number(e.target.value) : undefined)
+                      }
+                      placeholder="Ex.: 72"
+                    />
+                    {errors.parcelasAberto && (
+                      <p className="text-xs text-red-600">{errors.parcelasAberto}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Saldo devedor (R$)</Label>
+                    <CurrencyInput
+                      value={saldoDevedor}
+                      onChange={setSaldoDevedor}
+                      placeholder="0,00"
+                    />
+                    {errors.saldoDevedor && (
+                      <p className="text-xs text-red-600">{errors.saldoDevedor}</p>
+                    )}
+                  </div>
+                </div>
+                <p className="text-[11px] text-purple-800/80 dark:text-purple-200/80">
+                  Cálculo: parcela ÷ fator coeficiente (taxa 1,65% a.m.) − saldo devedor.
+                  Fatores: 108x = {FATOR_COEFICIENTE_PORTABILIDADE[108]} | 96x ={" "}
+                  {FATOR_COEFICIENTE_PORTABILIDADE[96]} | 84x ={" "}
+                  {FATOR_COEFICIENTE_PORTABILIDADE[84]}.
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
               <div className="space-y-1.5">
                 <Label>Valor da parcela (R$)</Label>
@@ -549,7 +756,7 @@ export default function DigitacaoAgibank() {
                 {errors.parcela && <p className="text-xs text-red-600">{errors.parcela}</p>}
               </div>
               <div className="space-y-1.5">
-                <Label>Prazo</Label>
+                <Label>Prazo (novo contrato)</Label>
                 <Select
                   value={String(prazo)}
                   onValueChange={(v) => setPrazo(Number(v) as Prazo)}
@@ -569,7 +776,13 @@ export default function DigitacaoAgibank() {
             </div>
 
             <div className="mt-4">
-              <TrocoBox variant="green" parcela={parcela || 0} prazo={prazo} />
+              <TrocoBox
+                variant="green"
+                parcela={parcela || 0}
+                prazo={prazo}
+                modo={produto === "portabilidade" ? "portabilidade" : "novo"}
+                saldoDevedor={saldoDevedor || 0}
+              />
             </div>
           </section>
 
@@ -610,12 +823,41 @@ export default function DigitacaoAgibank() {
             <Button variant="ghost" onClick={goHome} disabled={submitting}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit} isLoading={submitting} loadingText="Enviando...">
+            <Button onClick={handleClickEnviar} isLoading={submitting} loadingText="Enviando...">
               <Send className="h-4 w-4" /> Enviar proposta
             </Button>
           </div>
         </div>
       )}
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldAlert className="h-5 w-5 text-amber-600" />
+              <AlertDialogTitle>Atenção antes de enviar</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block font-semibold text-foreground">
+                O benefício do cliente precisa estar desbloqueado.
+              </span>
+              <span className="block">
+                Se o benefício estiver bloqueado, a proposta não poderá ser processada pelo banco.
+                Confirme com o cliente antes de prosseguir.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting}>Voltar e revisar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmSubmit}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              Confirmar e enviar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
