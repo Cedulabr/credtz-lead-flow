@@ -4,7 +4,7 @@ import {
   PhoneCall, Kanban, List, RefreshCw, Radar, Bot,
   Coins, Table, Wallet, BarChart3, UsersRound,
   MessageCircle, MessageSquare, Mic, Phone, PhoneOutgoing,
-  File as FileIcon, ClipboardList, Clock, Keyboard, Volume2, GitBranch, NotebookPen,
+  File as FileIcon, ClipboardList, Clock, Keyboard, Volume2, NotebookPen,
   Settings, ChevronDown, Menu, X, LogOut, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -112,7 +112,7 @@ const SECTIONS: Array<
       { id: "time-clock", label: "Controle de Ponto", icon: Clock, permissionKey: "can_access_controle_ponto" },
       { id: "digitacao", label: "Digitação", icon: Keyboard, permissionKey: "can_access_digitacao" },
       { id: "audios", label: "Áudios", icon: Volume2, permissionKey: "can_access_audios" },
-      { id: "portflow", label: "PortFlow", icon: GitBranch, permissionKey: "can_access_portflow" },
+      { id: "digitacao-agibank", label: "Digitação Agibank", icon: Keyboard, permissionKey: "can_access_portflow" },
       { id: "notas", label: "Notas & Workspace", icon: NotebookPen, permissionKey: "can_access_notas" },
     ],
   },

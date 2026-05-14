@@ -64,8 +64,8 @@ export const DigitacaoModule = lazy(() => import('@/modules/digitacao/DigitacaoM
 // Audios
 export const AudiosModule = lazy(() => import('@/modules/audios/AudiosModule').then(m => ({ default: m.AudiosModule })));
 
-// PortFlow
-export const PortFlowModule = lazy(() => import('@/modules/portflow/PortFlowModule').then(m => ({ default: m.PortFlowModule })));
+// Digitação Agibank
+export const DigitacaoAgibankPage = lazy(() => import('@/pages/DigitacaoAgibank'));
 
 // Voicer
 export const VoicerModule = lazy(() => import('@/modules/voicer/VoicerModule').then(m => ({ default: m.VoicerModule })));
@@ -199,7 +199,7 @@ export const LazyRadarModule = withLazyLoading(RadarModule, TableSkeleton);
 export const LazyAutoLeadModule = withLazyLoading(AutoLeadModule, FormSkeleton);
 export const LazyDigitacaoModule = withLazyLoading(DigitacaoModule, FormSkeleton);
 export const LazyAudiosModule = withLazyLoading(AudiosModule, FormSkeleton);
-export const LazyPortFlowModule = withLazyLoading(PortFlowModule, FormSkeleton);
+export const LazyDigitacaoAgibankPage = withLazyLoading(DigitacaoAgibankPage, FormSkeleton);
 export const LazyVoicerModule = withLazyLoading(VoicerModule, FormSkeleton);
 export const LazyNotasModule = withLazyLoading(NotasModule, DashboardSkeleton);
 export const LazyTelefoniaModule = withLazyLoading(TelefoniaModule, FormSkeleton);

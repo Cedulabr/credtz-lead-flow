@@ -4114,6 +4114,66 @@ export type Database = {
           },
         ]
       }
+      digitacao_agibank_propostas: {
+        Row: {
+          banco: string | null
+          cpf: string
+          created_at: string
+          extrato_url: string | null
+          id: string
+          iof_estimado: number
+          nome_cliente: string
+          parcela: number
+          prazo: number
+          produto: string
+          rg_frente_url: string
+          rg_verso_url: string
+          status: string
+          telefone: string
+          troco_calculado: number
+          user_id: string
+          valor_bruto: number
+        }
+        Insert: {
+          banco?: string | null
+          cpf: string
+          created_at?: string
+          extrato_url?: string | null
+          id?: string
+          iof_estimado: number
+          nome_cliente: string
+          parcela: number
+          prazo: number
+          produto: string
+          rg_frente_url: string
+          rg_verso_url: string
+          status?: string
+          telefone: string
+          troco_calculado: number
+          user_id: string
+          valor_bruto: number
+        }
+        Update: {
+          banco?: string | null
+          cpf?: string
+          created_at?: string
+          extrato_url?: string | null
+          id?: string
+          iof_estimado?: number
+          nome_cliente?: string
+          parcela?: number
+          prazo?: number
+          produto?: string
+          rg_frente_url?: string
+          rg_verso_url?: string
+          status?: string
+          telefone?: string
+          troco_calculado?: number
+          user_id?: string
+          valor_bruto?: number
+        }
+        Relationships: []
+      }
       education_content: {
         Row: {
           ativo: boolean | null
