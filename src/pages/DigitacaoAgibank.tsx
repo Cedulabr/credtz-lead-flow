@@ -303,7 +303,7 @@ export default function DigitacaoAgibank() {
 
   // Simular state
   const [simParcela, setSimParcela] = useState<number | undefined>(undefined);
-  const [simPrazo, setSimPrazo] = useState<Prazo>(84);
+  const [simPrazo, setSimPrazo] = useState<Prazo>(108);
 
   // Digitar state
   const [cpf, setCpf] = useState("");
@@ -311,7 +311,7 @@ export default function DigitacaoAgibank() {
   const [telefone, setTelefone] = useState("");
   const [produto, setProduto] = useState<Produto | null>(null);
   const [parcela, setParcela] = useState<number | undefined>(undefined);
-  const [prazo, setPrazo] = useState<Prazo>(84);
+  const [prazo, setPrazo] = useState<Prazo>(108);
   const [rgFrente, setRgFrente] = useState<File | null>(null);
   const [rgVerso, setRgVerso] = useState<File | null>(null);
   const [extrato, setExtrato] = useState<File | null>(null);
@@ -479,7 +479,7 @@ export default function DigitacaoAgibank() {
       setTelefone("");
       setProduto(null);
       setParcela(undefined);
-      setPrazo(84);
+      setPrazo(108);
       setRgFrente(null);
       setRgVerso(null);
       setExtrato(null);
