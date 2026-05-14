@@ -1,78 +1,141 @@
-## Renomear "PortFlow" → "Digitação Agibank" e criar módulo do zero
 
-Substituir o item de menu PortFlow por **Digitação Agibank** (rota `/digitacao-agibank`) com um módulo novo de simulação + cadastro de proposta para o Agibank Easyn.
+# Fase 1 — Fundação SaaS Modular + Piloto SMS
 
-### 1. Sidebar / navegação
-**`src/components/layout/SidebarNav.tsx`**
-- Trocar o item `{ id: "portflow", label: "PortFlow", icon: GitBranch, ... }` por:
-  `{ id: "digitacao-agibank", label: "Digitação Agibank", icon: Keyboard, permissionKey: "can_access_portflow" }` (mantém a chave de permissão existente para não exigir migração de perfis).
+Transformar o Easyn em marketplace modular. Esta fase entrega a **fundação** (catálogo de módulos, assinaturas por empresa, carteiras de crédito, gate de acesso, Marketplace UI, webhook Stripe) e um **piloto ponta-a-ponta**: SMS cobrado por créditos via Stripe.
 
-**`src/pages/Index.tsx` / `src/components/LazyComponents.tsx`**
-- Renomear o caso `portflow` para `digitacao-agibank` e apontar para a nova página `DigitacaoAgibank`.
-- Adicionar rota `/digitacao-agibank` (mantendo `/portflow` como redirect opcional para não quebrar links salvos).
+Mantemos a stack atual: **React + Vite + Supabase + Edge Functions + Stripe BYOK** (evoluindo as 4 functions já criadas).
 
-### 2. Página nova `src/pages/DigitacaoAgibank.tsx`
-Header com ícone `Keyboard` (ti-keyboard), título "Digitação Agibank", subtítulo "Empréstimos Consignado".
+---
 
-Estado interno `view`: `"home" | "simular" | "digitar"`.
+## 1. Modelagem de banco (migration única)
 
-**Home:** dois cards lado a lado.
-- "Simular" (Calculator, accent azul) → `view = "simular"`
-- "Digitar" (Pencil, accent verde) → `view = "digitar"`
+### `modules` — catálogo central
+`id, slug (unique), name, category, description, icon, billing_type` (`subscription` | `credits` | `hybrid`), `monthly_price_cents, credit_price_cents, stripe_price_id, stripe_product_id, trial_days, active, sort_order`.
 
-**Simular (step 1 de 2):** indicador de passos, card "Simular contrato novo":
-- Input parcela (máscara BRL, usa `CurrencyInput` existente)
-- Toggle de prazo (108 / 96 / 84)
-- Box azul com troco calculado em tempo real (label, valor grande, sub-linha bruto/IOF)
-- Botões: "Digitar essa proposta" (verde, leva parcela+prazo para step 2) e "Voltar" (ghost)
+Seed inicial:
+- `leads-premium` — credits — R$ 29,90/crédito
+- `activate-leads` — subscription — R$ 199,90/mês
+- `controle-ponto` — subscription — R$ 149,00/mês (base; per-seat fica para fase 2)
+- `meus-clientes`, `gerador-propostas`, `notas-workspace` — subscription (preços a definir, criados como rascunho `active=false`)
+- `sms` — credits — R$ 0,08/SMS (piloto)
 
-**Digitar (step 2):** indicador de passos com step 1 marcado, banner amarelo de aviso sobre benefício desbloqueado, e três cards:
-1. **Dados do cliente:** CPF (máscara `000.000.000-00`), nome, telefone (máscara `(00) 00000-0000`). Sem nenhum campo de SMS/WhatsApp.
-2. **Qual produto o cliente quer?:** três botões toggle (Novo empréstimo / Refinanciamento / Portabilidade). Quando "Novo empréstimo" estiver selecionado, exibir chip azul "Banco: Agibank Easyn" (Building2 icon). Abaixo, sempre: parcela (BRL) e select de prazo (108/96/84, default 84). Box verde com troco recalculado ao vivo.
-3. **Documentação do cliente:** três zonas drag-and-drop (aceitam imagem e PDF):
-   - "RG — frente" — pill vermelho "Obrigatório"
-   - "RG — verso" — pill vermelho "Obrigatório"
-   - "Extrato bancário" — pill verde "Opcional"
-   Cada zona mostra nome do arquivo e botão X após upload.
+### `company_modules` — ativação por empresa
+`company_id, module_id, status` (`active|trialing|past_due|canceled|inactive`), `stripe_subscription_id, current_period_start, current_period_end, cancel_at_period_end, grace_period_until, activated_at`. Unique `(company_id, module_id)`.
 
-Botões finais: "Enviar proposta" (azul, ícone Send) e "Cancelar" (ghost → home).
+### `wallets` — carteiras de crédito (1 por empresa por módulo)
+`company_id, module_slug, balance, total_purchased, total_consumed, updated_at`. Unique `(company_id, module_slug)`.
 
-Validação inline: bloqueia envio se RG frente/verso ausentes ou campos obrigatórios vazios. Após sucesso → toast `"Proposta enviada com sucesso! Aguarde análise."` e volta para a home do módulo.
+### `wallet_transactions` — extrato
+`wallet_id, type` (`purchase|consume|refund|admin_adjust`), `amount, balance_after, reference_id, metadata, created_at`.
 
-### 3. Lib `src/lib/calcularTroco.ts`
-Função pura `calcularTroco({ parcela, prazo })` retornando `{ valorBruto, iofEstimado, troco }`:
-```
-taxa = 0.0185
-fator = (taxa*(1+taxa)^prazo) / ((1+taxa)^prazo - 1)
-valorBruto = parcela / fator
-dias = prazo * 30
-iof = valorBruto * (min(0.000082*dias, 0.03) + 0.0038)
-troco = valorBruto - iof
-```
-Tratar `parcela <= 0` retornando zeros. Reutilizada por home-Simular e Digitar.
+### `credit_packages` — pacotes pré-definidos
+`module_slug, name, credits, price_cents, stripe_price_id, sort_order, active`.
 
-### 4. Banco de dados (Supabase)
-Migration nova: tabela `public.digitacao_agibank_propostas` com as colunas pedidas (`cpf`, `nome_cliente`, `telefone`, `produto`, `banco`, `parcela`, `prazo` int2, `troco_calculado`, `valor_bruto`, `iof_estimado`, `rg_frente_url`, `rg_verso_url`, `extrato_url` nullable, `status` default `'pendente'`, `user_id`, `created_at`).
+Seed SMS: 100/R$8 · 500/R$40 · 2000/R$160 · 5000/R$400 · custom (calc client-side).
 
-CHECK constraints:
-- `produto IN ('novo_emprestimo','refinanciamento','portabilidade')`
-- `prazo IN (84,96,108)`
+### `billing_events` — log de webhooks Stripe (idempotência)
+`stripe_event_id (unique), type, payload, processed_at, error`.
 
-RLS habilitada com política: `auth.uid() = user_id` para SELECT e INSERT (usuário só vê/insere as próprias propostas).
+### Reaproveitamento
+`subscribers` e `payments` (já existem) ficam para uso geral; `company_modules` e `wallets` passam a ser fonte de verdade do gate.
 
-Bucket de Storage `digitacao-documentos` (privado), com policies de INSERT/SELECT restritas a `(storage.foldername(name))[1] = auth.uid()::text`. Path: `{user_id}/{cpf}/{filename}`.
+### RLS
+- `modules`, `credit_packages`: SELECT público (autenticados).
+- `company_modules`, `wallets`, `wallet_transactions`: SELECT escopado por `company_id` do usuário (via `user_companies`); WRITE só via edge function (service role).
+- `billing_events`: nenhum acesso de cliente.
 
-### 5. Restrições estritas
-- Nenhum campo, toggle ou opção de SMS / WhatsApp / notificação de cliente em qualquer parte do módulo.
-- Todos os textos visíveis em PT-BR; identificadores, arquivos e nomes de função em inglês.
+### RPC `has_module_access(_company_id uuid, _slug text) returns boolean`
+Security definer; retorna true se `company_modules.status in ('active','trialing')` OU dentro de `grace_period_until`.
 
-### Detalhes técnicos
-- Reaproveita `CurrencyInput` de `src/modules/sales-wizard/components/CurrencyInput.tsx` para os inputs de parcela.
-- Usa `supabase.storage.from("digitacao-documentos").upload(...)` + `getPublicUrl` (ou signed URL) e grava o path retornado nas colunas `*_url`.
-- Toda a chamada ao banco passa por `supabase` client com `user_id = auth.user.id` (obtido via `useAuth`).
-- O permissionKey `can_access_portflow` é mantido para não obrigar mudança no schema de profiles. Se quiser renomear depois, fica como follow-up.
+---
 
-### Fora de escopo
-- Remover/renomear a coluna `can_access_portflow` em `profiles`.
-- Aproveitar/migrar dados antigos do PortFlow (módulo será desligado).
-- Integração externa de envio da proposta para o Agibank (apenas grava no Supabase).
+## 2. Edge Functions
+
+Evoluir as 4 existentes + adicionar 3 novas:
+
+| Function | Papel |
+|---|---|
+| `create-subscription` (existente) | Aceita `{ module_slug }`, lê preço de `modules`, cria checkout recorrente, grava `pending` em `company_modules`. |
+| `create-checkout` (existente) | Aceita `{ module_slug, package_id }` ou `{ module_slug, custom_credits }` para compra one-time de créditos. |
+| `check-subscription` (existente) | Reescrita: sincroniza **todas** as assinaturas Stripe do customer com `company_modules`. |
+| `customer-portal` (existente) | Sem mudança. |
+| **`stripe-webhook`** (novo, `verify_jwt=false`) | Recebe eventos, valida assinatura com `STRIPE_WEBHOOK_SECRET`, idempotência via `billing_events`. Trata: `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`. Atualiza `company_modules` e credita `wallets` quando `mode=payment` com metadata de créditos. |
+| **`consume-credits`** (novo) | Server-side: valida saldo, debita atomicamente, registra `wallet_transactions`. Usado pelo `send-sms` no piloto. |
+| **`get-marketplace`** (novo, opcional) | Retorna catálogo + status do módulo para a empresa logada (pode ser query direta no client). |
+
+Secret necessário: **`STRIPE_WEBHOOK_SECRET`** (a adicionar). `STRIPE_SECRET_KEY` já existe.
+
+---
+
+## 3. Frontend — Marketplace + Gate
+
+### Nova rota `/marketplace` (`src/modules/marketplace/`)
+- `MarketplaceModule.tsx` — grid de cards por categoria (Vendas, Gestão, Comunicação).
+- `ModuleCard.tsx` — preço, badge de status (Ativo / Trial / Inadimplente / Não contratado), CTA contextual ("Assinar" / "Comprar créditos" / "Gerenciar").
+- `CreditPackagesDialog.tsx` — pacotes + input custom (calcula `qtd × R$0,08`).
+- `MyModulesView.tsx` — assinaturas ativas, próximo vencimento, botão portal Stripe.
+- `WalletView.tsx` — saldo + extrato (`wallet_transactions`).
+
+### Hook `useModuleAccess(slug)`
+Retorna `{ hasAccess, status, loading }`. Fonte: `company_modules` + RPC `has_module_access`.
+
+### Componente `<ModuleGate slug="..." />`
+Wrapper análogo ao `PermissionGate` existente. Se sem acesso → tela "Contratar módulo" com CTA para `/marketplace`.
+
+### Integração no app
+- Adicionar rota `/marketplace` em `App.tsx`.
+- Adicionar item "Marketplace" na navegação principal do `Index.tsx`.
+- **Não** envolver módulos existentes em `ModuleGate` ainda (evita quebrar usuários atuais). Gate aplicado **apenas no SMS** como piloto.
+
+---
+
+## 4. Piloto SMS ponta-a-ponta
+
+1. Seed do módulo `sms` + 4 pacotes em `credit_packages`.
+2. Card "SMS" no Marketplace → abre `CreditPackagesDialog` → `create-checkout` → Stripe → webhook credita `wallets`.
+3. `WalletView` mostra saldo SMS.
+4. **`send-sms` (function existente)**: antes do envio, chama `consume-credits({ module_slug: 'sms', amount: 1 })`. Se saldo insuficiente, retorna 402 e o front mostra "Comprar créditos".
+5. `SmsModule` exibe banner com saldo no topo + atalho para recarregar.
+
+---
+
+## 5. Painel Admin (mínimo nesta fase)
+
+Em `/admin`, nova aba **"Marketplace"**:
+- Lista de `modules` (toggle `active`, editar preço — sem mexer no Stripe).
+- Tabela de `company_modules` com filtro por status.
+- Visão de MRR aproximado (sum `monthly_price` de `active`).
+
+Métricas avançadas (churn, LTV, ARR, dashboards Grafana) ficam para fase posterior.
+
+---
+
+## 6. Fora desta fase (roadmap)
+
+- Per-seat para Controle de Ponto.
+- Migrar Leads Premium / Voicer / Radar para `wallets` unificadas (hoje usam tabelas próprias).
+- Aplicar `<ModuleGate>` aos módulos pagos existentes (Activate Leads, Meus Clientes etc.) — exige plano de migração de usuários atuais.
+- Trial automático, cobrança proporcional em upgrade/downgrade.
+- Stripe Tax, PIX (precisa habilitar BR + métodos).
+- Painel master com MRR/ARR/churn/LTV completos.
+
+---
+
+## Detalhes técnicos
+
+- **Idempotência webhook**: `INSERT ... ON CONFLICT (stripe_event_id) DO NOTHING`; só processa se inserção criou linha.
+- **Atomicidade do consumo**: function PL/pgSQL `consume_wallet(_wallet_id, _amount)` com `UPDATE ... WHERE balance >= _amount RETURNING` — `consume-credits` chama essa RPC.
+- **Multi-tenant**: toda escrita de `company_modules`/`wallets` resolve `company_id` server-side via `user_companies` (padrão já estabelecido no projeto).
+- **Stripe metadata**: cada checkout grava `{ company_id, module_slug, credits?, package_id? }` em `metadata` para o webhook reconciliar.
+- **URL do webhook**: `https://qwgsplcqyongfsqdjrme.supabase.co/functions/v1/stripe-webhook` — usuário cadastra no dashboard Stripe e cola o secret.
+
+## Entregáveis
+
+1. Migration única (tabelas + RLS + RPCs + seeds).
+2. 3 edge functions novas + 2 reescritas.
+3. Módulo `marketplace` no frontend + rota + nav.
+4. SMS piloto integrado com cobrança real.
+5. Aba Admin → Marketplace básica.
+6. Secret `STRIPE_WEBHOOK_SECRET` solicitado ao usuário.
+
+Após aprovação: solicito o secret e começo pela migration.
