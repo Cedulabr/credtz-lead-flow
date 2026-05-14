@@ -823,7 +823,44 @@ export default function DigitacaoAgibank() {
             <Button variant="ghost" onClick={goHome} disabled={submitting}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit} isLoading={submitting} loadingText="Enviando...">
+            <Button onClick={handleClickEnviar} isLoading={submitting} loadingText="Enviando...">
+              <Send className="h-4 w-4" /> Enviar proposta
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldAlert className="h-5 w-5 text-amber-600" />
+              <AlertDialogTitle>Atenção antes de enviar</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block font-semibold text-foreground">
+                O benefício do cliente precisa estar desbloqueado.
+              </span>
+              <span className="block">
+                Se o benefício estiver bloqueado, a proposta não poderá ser processada pelo banco.
+                Confirme com o cliente antes de prosseguir.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting}>Voltar e revisar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmSubmit}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              Confirmar e enviar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
               <Send className="h-4 w-4" /> Enviar proposta
             </Button>
           </div>
