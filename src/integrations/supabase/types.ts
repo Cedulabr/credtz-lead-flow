@@ -2055,6 +2055,36 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_events: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          payload: Json
+          processed_at: string | null
+          stripe_event_id: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          payload: Json
+          processed_at?: string | null
+          stripe_event_id: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          stripe_event_id?: string
+          type?: string
+        }
+        Relationships: []
+      }
       board_columns: {
         Row: {
           board_id: string
@@ -3732,6 +3762,68 @@ export type Database = {
           },
         ]
       }
+      company_modules: {
+        Row: {
+          activated_at: string | null
+          cancel_at_period_end: boolean
+          canceled_at: string | null
+          company_id: string
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          grace_period_until: string | null
+          id: string
+          module_id: string
+          module_slug: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string | null
+          cancel_at_period_end?: boolean
+          canceled_at?: string | null
+          company_id: string
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          grace_period_until?: string | null
+          id?: string
+          module_id: string
+          module_slug: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string | null
+          cancel_at_period_end?: boolean
+          canceled_at?: string | null
+          company_id?: string
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          grace_period_until?: string | null
+          id?: string
+          module_id?: string
+          module_slug?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_modules_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_plans: {
         Row: {
           activated_at: string
@@ -4047,6 +4139,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      credit_packages: {
+        Row: {
+          active: boolean
+          created_at: string
+          credits: number
+          id: string
+          module_slug: string
+          name: string
+          price_cents: number
+          sort_order: number
+          stripe_price_id: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          credits: number
+          id?: string
+          module_slug: string
+          name: string
+          price_cents: number
+          sort_order?: number
+          stripe_price_id?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          credits?: number
+          id?: string
+          module_slug?: string
+          name?: string
+          price_cents?: number
+          sort_order?: number
+          stripe_price_id?: string | null
+        }
+        Relationships: []
       }
       credit_transactions: {
         Row: {
@@ -6036,6 +6164,63 @@ export type Database = {
           public_url?: string
           size_bytes?: number | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      modules: {
+        Row: {
+          active: boolean
+          billing_type: string
+          category: string
+          created_at: string
+          credit_price_cents: number
+          description: string | null
+          icon: string | null
+          id: string
+          monthly_price_cents: number
+          name: string
+          slug: string
+          sort_order: number
+          stripe_price_id: string | null
+          stripe_product_id: string | null
+          trial_days: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          billing_type: string
+          category?: string
+          created_at?: string
+          credit_price_cents?: number
+          description?: string | null
+          icon?: string | null
+          id?: string
+          monthly_price_cents?: number
+          name: string
+          slug: string
+          sort_order?: number
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          trial_days?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          billing_type?: string
+          category?: string
+          created_at?: string
+          credit_price_cents?: number
+          description?: string | null
+          icon?: string | null
+          id?: string
+          monthly_price_cents?: number
+          name?: string
+          slug?: string
+          sort_order?: number
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          trial_days?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -10445,6 +10630,83 @@ export type Database = {
           },
         ]
       }
+      wallet_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          company_id: string
+          created_at: string
+          id: string
+          metadata: Json
+          reference_id: string | null
+          type: string
+          wallet_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          company_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          reference_id?: string | null
+          type: string
+          wallet_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          company_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          reference_id?: string | null
+          type?: string
+          wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_transactions_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wallets: {
+        Row: {
+          balance: number
+          company_id: string
+          created_at: string
+          id: string
+          module_slug: string
+          total_consumed: number
+          total_purchased: number
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          company_id: string
+          created_at?: string
+          id?: string
+          module_slug: string
+          total_consumed?: number
+          total_purchased?: number
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          company_id?: string
+          created_at?: string
+          id?: string
+          module_slug?: string
+          total_consumed?: number
+          total_purchased?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       whatsapp_conversations: {
         Row: {
           ai_summary: string | null
@@ -10968,6 +11230,15 @@ export type Database = {
           user_name: string
         }[]
       }
+      consume_wallet: {
+        Args: {
+          _amount: number
+          _metadata?: Json
+          _reference_id?: string
+          _wallet_id: string
+        }
+        Returns: Json
+      }
       conversation_has_active_human: {
         Args: { _conversation_id: string }
         Returns: boolean
@@ -10988,6 +11259,17 @@ export type Database = {
       create_admin_profile: {
         Args: { user_email: string; user_name?: string }
         Returns: string
+      }
+      credit_wallet: {
+        Args: {
+          _amount: number
+          _company_id: string
+          _metadata?: Json
+          _module_slug: string
+          _reference_id?: string
+          _type?: string
+        }
+        Returns: Json
       }
       delete_leads_by_date: {
         Args: { p_date: string; p_origem?: string }
@@ -11153,6 +11435,10 @@ export type Database = {
       get_user_tenant_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["tenant_role"]
+      }
+      has_module_access: {
+        Args: { _company_id: string; _slug: string }
+        Returns: boolean
       }
       has_role: {
         Args: {
