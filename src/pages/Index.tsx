@@ -216,7 +216,7 @@ const Index = () => {
     autolead: <LazyAutoLeadModule />,
     digitacao: <LazyDigitacaoModule />,
     audios: <LazyAudiosModule />,
-    portflow: <div className="p-4"><LazyPortFlowModule /></div>,
+    'digitacao-agibank': <LazyDigitacaoAgibankPage />,
     voicer: <LazyVoicerModule />,
     notas: <LazyNotasModule />,
     telefonia: <LazyTelefoniaModule />,
