@@ -4,7 +4,7 @@ import {
   PhoneCall, Kanban, List, RefreshCw, Radar, Bot,
   Coins, Table, Wallet, BarChart3, UsersRound,
   MessageCircle, MessageSquare, Mic, Phone, PhoneOutgoing,
-  File as FileIcon, ClipboardList, Clock, Keyboard, Volume2, GitBranch, NotebookPen,
+  File as FileIcon, ClipboardList, Clock, Keyboard, Volume2, NotebookPen,
   Settings, ChevronDown, Menu, X, LogOut, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
