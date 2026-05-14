@@ -15,6 +15,8 @@ import {
   Check,
   X,
   Upload,
+  Sparkles,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,8 +28,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { CurrencyInput } from "@/modules/sales-wizard/components/CurrencyInput";
-import { calcularTroco, formatBRL } from "@/lib/calcularTroco";
+import {
+  calcularTroco,
+  calcularPortabilidade,
+  FATOR_COEFICIENTE_PORTABILIDADE,
+  formatBRL,
+} from "@/lib/calcularTroco";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
