@@ -626,6 +626,42 @@ export type Database = {
           },
         ]
       }
+      ai_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          company_id: string | null
+          created_at: string
+          id: string
+          message: string
+          metadata: Json | null
+          severity: string
+          type: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          message: string
+          metadata?: Json | null
+          severity?: string
+          type: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          metadata?: Json | null
+          severity?: string
+          type?: string
+        }
+        Relationships: []
+      }
       ai_instance_config: {
         Row: {
           behavior_instructions: string | null
@@ -672,6 +708,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_pricing: {
+        Row: {
+          created_at: string
+          id: string
+          input_per_1k_usd: number
+          is_active: boolean
+          margin_pct: number
+          model: string
+          output_per_1k_usd: number
+          provider: string
+          updated_at: string
+          usd_to_credit_rate: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          input_per_1k_usd?: number
+          is_active?: boolean
+          margin_pct?: number
+          model: string
+          output_per_1k_usd?: number
+          provider: string
+          updated_at?: string
+          usd_to_credit_rate?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          input_per_1k_usd?: number
+          is_active?: boolean
+          margin_pct?: number
+          model?: string
+          output_per_1k_usd?: number
+          provider?: string
+          updated_at?: string
+          usd_to_credit_rate?: number
+        }
+        Relationships: []
       }
       ai_providers: {
         Row: {
@@ -757,35 +832,68 @@ export type Database = {
         Row: {
           company_id: string | null
           conversation_id: string | null
+          cost_credits: number | null
+          cost_usd: number | null
           created_at: string | null
+          error_message: string | null
           id: string
+          latency_ms: number | null
           mode: string
           model: string
           provider: string
+          request_type: string | null
+          session_id: string | null
+          status: string | null
+          tokens_input: number | null
+          tokens_output: number | null
           tokens_used: number | null
-          user_id: string
+          total_tokens: number | null
+          user_id: string | null
+          whatsapp_number: string | null
         }
         Insert: {
           company_id?: string | null
           conversation_id?: string | null
+          cost_credits?: number | null
+          cost_usd?: number | null
           created_at?: string | null
+          error_message?: string | null
           id?: string
+          latency_ms?: number | null
           mode: string
           model: string
           provider: string
+          request_type?: string | null
+          session_id?: string | null
+          status?: string | null
+          tokens_input?: number | null
+          tokens_output?: number | null
           tokens_used?: number | null
-          user_id: string
+          total_tokens?: number | null
+          user_id?: string | null
+          whatsapp_number?: string | null
         }
         Update: {
           company_id?: string | null
           conversation_id?: string | null
+          cost_credits?: number | null
+          cost_usd?: number | null
           created_at?: string | null
+          error_message?: string | null
           id?: string
+          latency_ms?: number | null
           mode?: string
           model?: string
           provider?: string
+          request_type?: string | null
+          session_id?: string | null
+          status?: string | null
+          tokens_input?: number | null
+          tokens_output?: number | null
           tokens_used?: number | null
-          user_id?: string
+          total_tokens?: number | null
+          user_id?: string | null
+          whatsapp_number?: string | null
         }
         Relationships: [
           {
@@ -803,6 +911,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_user_limits: {
+        Row: {
+          allowed_models: string[] | null
+          allowed_providers: string[] | null
+          company_id: string | null
+          created_at: string
+          id: string
+          max_requests_day: number | null
+          max_tokens_day: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          allowed_models?: string[] | null
+          allowed_providers?: string[] | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          max_requests_day?: number | null
+          max_tokens_day?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          allowed_models?: string[] | null
+          allowed_providers?: string[] | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          max_requests_day?: number | null
+          max_tokens_day?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       announcements: {
         Row: {
@@ -6326,6 +6470,7 @@ export type Database = {
         Row: {
           ai_model: string | null
           ai_provider_id: string | null
+          allowed_models: string[] | null
           created_at: string | null
           credits_included: number | null
           description: string | null
@@ -6335,14 +6480,18 @@ export type Database = {
           is_published: boolean
           max_agents: number | null
           max_instances: number | null
+          max_requests_day: number | null
+          max_tokens_month: number | null
           name: string
           price: number | null
           price_per_response: number | null
+          priority: number | null
           type: string
         }
         Insert: {
           ai_model?: string | null
           ai_provider_id?: string | null
+          allowed_models?: string[] | null
           created_at?: string | null
           credits_included?: number | null
           description?: string | null
@@ -6352,14 +6501,18 @@ export type Database = {
           is_published?: boolean
           max_agents?: number | null
           max_instances?: number | null
+          max_requests_day?: number | null
+          max_tokens_month?: number | null
           name: string
           price?: number | null
           price_per_response?: number | null
+          priority?: number | null
           type?: string
         }
         Update: {
           ai_model?: string | null
           ai_provider_id?: string | null
+          allowed_models?: string[] | null
           created_at?: string | null
           credits_included?: number | null
           description?: string | null
@@ -6369,9 +6522,12 @@ export type Database = {
           is_published?: boolean
           max_agents?: number | null
           max_instances?: number | null
+          max_requests_day?: number | null
+          max_tokens_month?: number | null
           name?: string
           price?: number | null
           price_per_response?: number | null
+          priority?: number | null
           type?: string
         }
         Relationships: [
@@ -10655,6 +10811,45 @@ export type Database = {
         }
         Relationships: []
       }
+      vw_ai_usage_by_user: {
+        Row: {
+          company_id: string | null
+          cost_credits: number | null
+          last_request_at: string | null
+          requests: number | null
+          tokens: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vw_ai_usage_daily: {
+        Row: {
+          avg_latency_ms: number | null
+          company_id: string | null
+          cost_credits: number | null
+          cost_usd: number | null
+          day: string | null
+          requests: number | null
+          tokens: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       add_activate_lead_to_blacklist: {
@@ -10804,6 +10999,23 @@ export type Database = {
         Returns: Json
       }
       extract_phone_from_text: { Args: { input_text: string }; Returns: string }
+      fn_consolidate_usage: {
+        Args: {
+          _company_id: string
+          _description: string
+          _real_credits: number
+          _reserved: number
+        }
+        Returns: Json
+      }
+      fn_refund_reserved: {
+        Args: { _company_id: string; _credits: number }
+        Returns: undefined
+      }
+      fn_reserve_credits: {
+        Args: { _company_id: string; _credits: number }
+        Returns: Json
+      }
       get_activate_leads_quality_stats: { Args: never; Returns: Json }
       get_available_bancos: {
         Args: never
