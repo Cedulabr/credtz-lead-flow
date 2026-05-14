@@ -30,3 +30,43 @@ export function calcularTroco({ parcela, prazo }: TrocoInput): TrocoResult {
 
 export const formatBRL = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+// ===== Portabilidade (taxa 1,65% a.m.) =====
+// Fator coeficiente bancário por prazo
+export const FATOR_COEFICIENTE_PORTABILIDADE: Record<number, number> = {
+  108: 0.02095,
+  96: 0.021801,
+  84: 0.023113,
+};
+
+export interface PortabilidadeInput {
+  parcela: number;
+  prazo: number; // 84 | 96 | 108
+  saldoDevedor: number;
+}
+
+export interface PortabilidadeResult {
+  fator: number;
+  novoValorFinanciado: number; // parcela / fator
+  saldoDevedor: number;
+  valorLiberado: number; // troco (novoValorFinanciado - saldoDevedor)
+}
+
+export function calcularPortabilidade({
+  parcela,
+  prazo,
+  saldoDevedor,
+}: PortabilidadeInput): PortabilidadeResult {
+  const fator = FATOR_COEFICIENTE_PORTABILIDADE[prazo] ?? 0;
+  if (!parcela || parcela <= 0 || !fator) {
+    return { fator, novoValorFinanciado: 0, saldoDevedor: saldoDevedor || 0, valorLiberado: 0 };
+  }
+  const novoValorFinanciado = parcela / fator;
+  const valorLiberado = novoValorFinanciado - (saldoDevedor || 0);
+  return {
+    fator,
+    novoValorFinanciado,
+    saldoDevedor: saldoDevedor || 0,
+    valorLiberado,
+  };
+}
