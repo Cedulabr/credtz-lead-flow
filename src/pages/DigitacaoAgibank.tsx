@@ -315,8 +315,14 @@ export default function DigitacaoAgibank() {
   const [rgFrente, setRgFrente] = useState<File | null>(null);
   const [rgVerso, setRgVerso] = useState<File | null>(null);
   const [extrato, setExtrato] = useState<File | null>(null);
+  // Portabilidade extra fields
+  const [bancoOriginador, setBancoOriginador] = useState("");
+  const [prazoTotal, setPrazoTotal] = useState<number | undefined>(undefined);
+  const [parcelasAberto, setParcelasAberto] = useState<number | undefined>(undefined);
+  const [saldoDevedor, setSaldoDevedor] = useState<number | undefined>(undefined);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const goSimular = () => {
     setView("simular");
