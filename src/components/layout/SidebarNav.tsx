@@ -5,7 +5,7 @@ import {
   Coins, Table, Wallet, BarChart3, UsersRound,
   MessageCircle, MessageSquare, Mic, Phone, PhoneOutgoing,
   File as FileIcon, ClipboardList, Clock, Keyboard, Volume2, NotebookPen,
-  Settings, ChevronDown, Menu, X, LogOut, type LucideIcon,
+  Settings, ChevronDown, Menu, X, LogOut, Store, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -52,6 +52,7 @@ const SECTIONS: Array<
     items: [
       { id: "dashboard", label: "Início", icon: Home },
       { id: "my-data", label: "Meus Dados", icon: User },
+      { id: "marketplace", label: "Marketplace", icon: Store },
       { id: "indicate", label: "Indicar", icon: Share2, permissionKey: "can_access_indicar" },
     ],
   },

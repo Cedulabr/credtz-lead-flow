@@ -10,6 +10,7 @@ import { SidebarNav } from "@/components/layout/SidebarNav";
 import LoadingAuth from "@/components/LoadingAuth";
 import { BlockedAccess } from "@/components/BlockedAccess";
 import { LoadingFallback } from "@/components/LoadingFallback";
+import { MarketplaceModule } from "@/modules/marketplace/MarketplaceModule";
 
 // ── All heavy modules via lazy loading ────────────────────────────────
 import {
@@ -220,6 +221,7 @@ const Index = () => {
     voicer: <LazyVoicerModule />,
     notas: <LazyNotasModule />,
     telefonia: <LazyTelefoniaModule />,
+    marketplace: <MarketplaceModule />,
   }), [setActiveTab]);
 
   // ── Render active tab ──────────────────────────────────────────────
