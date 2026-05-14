@@ -678,6 +678,77 @@ export default function DigitacaoAgibank() {
               </div>
             )}
 
+            {produto === "portabilidade" && (
+              <div className="rounded-lg border border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-900 p-4 mb-4 space-y-4">
+                <div className="flex items-center gap-2">
+                  <ArrowRightLeft className="h-4 w-4 text-purple-700 dark:text-purple-300" />
+                  <h4 className="text-sm font-semibold text-purple-900 dark:text-purple-100">
+                    Dados do contrato a portar
+                  </h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Banco originador</Label>
+                    <Input
+                      value={bancoOriginador}
+                      onChange={(e) => setBancoOriginador(e.target.value)}
+                      placeholder="Ex.: Banco do Brasil, Itaú..."
+                    />
+                    {errors.bancoOriginador && (
+                      <p className="text-xs text-red-600">{errors.bancoOriginador}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Prazo total do contrato (meses)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={prazoTotal ?? ""}
+                      onChange={(e) =>
+                        setPrazoTotal(e.target.value ? Number(e.target.value) : undefined)
+                      }
+                      placeholder="Ex.: 96"
+                    />
+                    {errors.prazoTotal && (
+                      <p className="text-xs text-red-600">{errors.prazoTotal}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Parcelas em aberto</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={parcelasAberto ?? ""}
+                      onChange={(e) =>
+                        setParcelasAberto(e.target.value ? Number(e.target.value) : undefined)
+                      }
+                      placeholder="Ex.: 72"
+                    />
+                    {errors.parcelasAberto && (
+                      <p className="text-xs text-red-600">{errors.parcelasAberto}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Saldo devedor (R$)</Label>
+                    <CurrencyInput
+                      value={saldoDevedor}
+                      onChange={setSaldoDevedor}
+                      placeholder="0,00"
+                    />
+                    {errors.saldoDevedor && (
+                      <p className="text-xs text-red-600">{errors.saldoDevedor}</p>
+                    )}
+                  </div>
+                </div>
+                <p className="text-[11px] text-purple-800/80 dark:text-purple-200/80">
+                  Cálculo: parcela ÷ fator coeficiente (taxa 1,65% a.m.) − saldo devedor.
+                  Fatores: 108x = {FATOR_COEFICIENTE_PORTABILIDADE[108]} | 96x ={" "}
+                  {FATOR_COEFICIENTE_PORTABILIDADE[96]} | 84x ={" "}
+                  {FATOR_COEFICIENTE_PORTABILIDADE[84]}.
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
               <div className="space-y-1.5">
                 <Label>Valor da parcela (R$)</Label>
@@ -685,7 +756,7 @@ export default function DigitacaoAgibank() {
                 {errors.parcela && <p className="text-xs text-red-600">{errors.parcela}</p>}
               </div>
               <div className="space-y-1.5">
-                <Label>Prazo</Label>
+                <Label>Prazo (novo contrato)</Label>
                 <Select
                   value={String(prazo)}
                   onValueChange={(v) => setPrazo(Number(v) as Prazo)}
@@ -705,7 +776,13 @@ export default function DigitacaoAgibank() {
             </div>
 
             <div className="mt-4">
-              <TrocoBox variant="green" parcela={parcela || 0} prazo={prazo} />
+              <TrocoBox
+                variant="green"
+                parcela={parcela || 0}
+                prazo={prazo}
+                modo={produto === "portabilidade" ? "portabilidade" : "novo"}
+                saldoDevedor={saldoDevedor || 0}
+              />
             </div>
           </section>
 
