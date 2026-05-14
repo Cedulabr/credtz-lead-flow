@@ -224,12 +224,21 @@ function TrocoBox({
   variant,
   parcela,
   prazo,
+  modo = "novo",
+  saldoDevedor = 0,
 }: {
   variant: "blue" | "green";
   parcela: number;
   prazo: number;
+  modo?: "novo" | "portabilidade";
+  saldoDevedor?: number;
 }) {
-  const result = useMemo(() => calcularTroco({ parcela, prazo }), [parcela, prazo]);
+  const isPort = modo === "portabilidade";
+  const novo = useMemo(() => calcularTroco({ parcela, prazo }), [parcela, prazo]);
+  const port = useMemo(
+    () => calcularPortabilidade({ parcela, prazo, saldoDevedor }),
+    [parcela, prazo, saldoDevedor]
+  );
   const colors =
     variant === "blue"
       ? "bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-950/30 dark:border-blue-900 dark:text-blue-100"
@@ -238,18 +247,51 @@ function TrocoBox({
     variant === "blue"
       ? "text-blue-700/80 dark:text-blue-300/80"
       : "text-emerald-700/80 dark:text-emerald-300/80";
+
+  const titulo = isPort
+    ? "Valor liberado ao cliente (taxa 1,65% a.m.)"
+    : variant === "blue"
+    ? "Troco líquido estimado (taxa 1,85% a.m. — já deduzido IOF)"
+    : "Troco líquido estimado (taxa 1,85% — IOF deduzido)";
+
+  const valor = isPort ? port.valorLiberado : novo.troco;
+  const negativo = isPort && valor < 0;
+
   return (
-    <div className={cn("rounded-xl border p-4", colors)}>
-      <p className="text-xs font-medium mb-1">
-        {variant === "blue"
-          ? "Troco líquido estimado (taxa 1,85% a.m. — já deduzido IOF)"
-          : "Troco líquido (taxa 1,85% — IOF deduzido)"}
+    <div
+      className={cn(
+        "rounded-xl border-2 p-5 shadow-sm ring-1 ring-inset",
+        colors,
+        variant === "blue" ? "ring-blue-300/40" : "ring-emerald-300/40"
+      )}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <Sparkles className="h-3.5 w-3.5" />
+        <p className="text-[11px] uppercase tracking-wider font-semibold">
+          Troco estimado
+        </p>
+      </div>
+      <p className="text-xs font-medium mb-1">{titulo}</p>
+      <p
+        className={cn(
+          "text-3xl md:text-4xl font-extrabold tracking-tight",
+          negativo && "text-red-600 dark:text-red-400"
+        )}
+      >
+        {formatBRL(valor)}
       </p>
-      <p className="text-3xl font-bold tracking-tight">
-        {formatBRL(result.troco)}
-      </p>
-      <p className={cn("text-xs mt-1", sub)}>
-        Crédito bruto: {formatBRL(result.valorBruto)} | IOF estimado: {formatBRL(result.iofEstimado)}
+      {isPort ? (
+        <p className={cn("text-xs mt-1", sub)}>
+          Novo valor financiado: {formatBRL(port.novoValorFinanciado)} | Saldo devedor a quitar:{" "}
+          {formatBRL(port.saldoDevedor)} | Fator {prazo}x: {port.fator.toFixed(6)}
+        </p>
+      ) : (
+        <p className={cn("text-xs mt-1", sub)}>
+          Crédito bruto: {formatBRL(novo.valorBruto)} | IOF estimado: {formatBRL(novo.iofEstimado)}
+        </p>
+      )}
+      <p className="text-[11px] mt-2 italic opacity-80">
+        * Valor estimado com base nas taxas vigentes. Sujeito a confirmação do banco.
       </p>
     </div>
   );
