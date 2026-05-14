@@ -228,18 +228,44 @@ Deno.serve(async (req) => {
 
     // ===== SINGLE SEND MODE =====
     if (body.phone && body.message) {
+      // Try company wallet (new SaaS marketplace) first for non-admins
+      let walletUsed = false;
       if (!isAdmin) {
-        const { data: creditData } = await serviceClient
-          .from("sms_credits")
-          .select("credits_balance")
+        const { data: uc } = await serviceClient
+          .from("user_companies")
+          .select("company_id")
           .eq("user_id", user.id)
-          .single();
-        const balance = creditData?.credits_balance ?? 0;
-        if (balance < 1) {
-          return new Response(
-            JSON.stringify({ error: "Créditos SMS insuficientes. Solicite ao administrador." }),
-            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          .eq("is_active", true)
+          .limit(1)
+          .maybeSingle();
+        if (uc?.company_id) {
+          const { data: wallet } = await serviceClient
+            .from("wallets")
+            .select("id, balance")
+            .eq("company_id", uc.company_id)
+            .eq("module_slug", "sms")
+            .maybeSingle();
+          if (wallet && wallet.balance >= 1) {
+            const { data: rpc } = await serviceClient.rpc("consume_wallet", {
+              _wallet_id: wallet.id, _amount: 1,
+              _reference_id: null, _metadata: { source: "send-sms", phone: body.phone },
+            });
+            if ((rpc as any)?.success) walletUsed = true;
+          }
+        }
+        if (!walletUsed) {
+          const { data: creditData } = await serviceClient
+            .from("sms_credits")
+            .select("credits_balance")
+            .eq("user_id", user.id)
+            .single();
+          const balance = creditData?.credits_balance ?? 0;
+          if (balance < 1) {
+            return new Response(
+              JSON.stringify({ error: "Créditos SMS insuficientes. Compre no Marketplace." }),
+              { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
         }
       }
 
@@ -259,7 +285,7 @@ Deno.serve(async (req) => {
         provider: activeProvider,
       });
 
-      if (result.ok && !isAdmin) {
+      if (result.ok && !isAdmin && !walletUsed) {
         const { data: cur } = await serviceClient
           .from("sms_credits")
           .select("credits_balance")
@@ -278,7 +304,7 @@ Deno.serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ success: result.ok, error: result.error, sid: result.sid, messageId: result.messageId, provider: activeProvider }),
+        JSON.stringify({ success: result.ok, error: result.error, sid: result.sid, messageId: result.messageId, provider: activeProvider, billed_via: walletUsed ? "wallet" : "legacy" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
