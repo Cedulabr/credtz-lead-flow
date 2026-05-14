@@ -41,7 +41,7 @@ import {
   LazyAutoLeadModule,
   LazyDigitacaoModule,
   LazyAudiosModule,
-  LazyPortFlowModule,
+  LazyDigitacaoAgibankPage,
   LazyVoicerModule,
   LazyNotasModule,
   LazyTelefoniaModule,
