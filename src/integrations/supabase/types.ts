@@ -709,6 +709,64 @@ export type Database = {
           },
         ]
       }
+      ai_instance_limits: {
+        Row: {
+          ai_model: string | null
+          ai_provider_id: string | null
+          company_id: string
+          created_at: string
+          id: string
+          instance_id: string
+          max_credits_day: number | null
+          max_credits_month: number | null
+          updated_at: string
+        }
+        Insert: {
+          ai_model?: string | null
+          ai_provider_id?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          instance_id: string
+          max_credits_day?: number | null
+          max_credits_month?: number | null
+          updated_at?: string
+        }
+        Update: {
+          ai_model?: string | null
+          ai_provider_id?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          instance_id?: string
+          max_credits_day?: number | null
+          max_credits_month?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_instance_limits_ai_provider_id_fkey"
+            columns: ["ai_provider_id"]
+            isOneToOne: false
+            referencedRelation: "ai_providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_instance_limits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_instance_limits_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: true
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_pricing: {
         Row: {
           created_at: string
@@ -3685,6 +3743,8 @@ export type Database = {
       companies: {
         Row: {
           ai_follow_up_enabled: boolean
+          ai_model_override: string | null
+          ai_provider_override_id: string | null
           business_days: string[] | null
           business_hours_end: string | null
           business_hours_start: string | null
@@ -3708,6 +3768,8 @@ export type Database = {
         }
         Insert: {
           ai_follow_up_enabled?: boolean
+          ai_model_override?: string | null
+          ai_provider_override_id?: string | null
           business_days?: string[] | null
           business_hours_end?: string | null
           business_hours_start?: string | null
@@ -3731,6 +3793,8 @@ export type Database = {
         }
         Update: {
           ai_follow_up_enabled?: boolean
+          ai_model_override?: string | null
+          ai_provider_override_id?: string | null
           business_days?: string[] | null
           business_hours_end?: string | null
           business_hours_start?: string | null
@@ -3753,6 +3817,13 @@ export type Database = {
           whatsapp_number?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "companies_ai_provider_override_id_fkey"
+            columns: ["ai_provider_override_id"]
+            isOneToOne: false
+            referencedRelation: "ai_providers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "companies_plan_id_fkey"
             columns: ["plan_id"]
@@ -11281,6 +11352,10 @@ export type Database = {
         Returns: Json
       }
       extract_phone_from_text: { Args: { input_text: string }; Returns: string }
+      fn_add_credits: {
+        Args: { _amount: number; _company_id: string; _description?: string }
+        Returns: Json
+      }
       fn_consolidate_usage: {
         Args: {
           _company_id: string
@@ -11296,6 +11371,10 @@ export type Database = {
       }
       fn_reserve_credits: {
         Args: { _company_id: string; _credits: number }
+        Returns: Json
+      }
+      fn_resolve_ai_model: {
+        Args: { _company_id: string; _instance_id: string; _user_id: string }
         Returns: Json
       }
       get_activate_leads_quality_stats: { Args: never; Returns: Json }
