@@ -861,11 +861,3 @@ export default function DigitacaoAgibank() {
     </div>
   );
 }
-              <Send className="h-4 w-4" /> Enviar proposta
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
