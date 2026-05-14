@@ -350,6 +350,12 @@ export default function DigitacaoAgibank() {
     if (!parcela || parcela <= 0) e.parcela = "Informe o valor da parcela";
     if (!rgFrente) e.rgFrente = "Envie o RG (frente)";
     if (!rgVerso) e.rgVerso = "Envie o RG (verso)";
+    if (produto === "portabilidade") {
+      if (!bancoOriginador.trim()) e.bancoOriginador = "Informe o banco originador";
+      if (!prazoTotal || prazoTotal <= 0) e.prazoTotal = "Informe o prazo total";
+      if (!parcelasAberto || parcelasAberto <= 0) e.parcelasAberto = "Informe as parcelas em aberto";
+      if (!saldoDevedor || saldoDevedor <= 0) e.saldoDevedor = "Informe o saldo devedor";
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -365,7 +371,7 @@ export default function DigitacaoAgibank() {
     return path;
   };
 
-  const handleSubmit = async () => {
+  const handleClickEnviar = () => {
     if (!user) {
       toast.error("Faça login para enviar a proposta");
       return;
@@ -374,6 +380,11 @@ export default function DigitacaoAgibank() {
       toast.error("Verifique os campos obrigatórios");
       return;
     }
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    setConfirmOpen(false);
     setSubmitting(true);
     try {
       const [rgFrenteUrl, rgVersoUrl, extratoUrl] = await Promise.all([
@@ -382,30 +393,86 @@ export default function DigitacaoAgibank() {
         extrato ? uploadFile(extrato, "extrato") : Promise.resolve<string | null>(null),
       ]);
 
-      const calc = calcularTroco({ parcela: parcela!, prazo });
+      const isPort = produto === "portabilidade";
+      const calcNovo = calcularTroco({ parcela: parcela!, prazo });
+      const calcPort = isPort
+        ? calcularPortabilidade({ parcela: parcela!, prazo, saldoDevedor: saldoDevedor || 0 })
+        : null;
+      const trocoFinal = isPort ? calcPort!.valorLiberado : calcNovo.troco;
+      const valorBrutoFinal = isPort ? calcPort!.novoValorFinanciado : calcNovo.valorBruto;
 
-      const { error } = await supabase
+      const banco =
+        produto === "novo_emprestimo"
+          ? "Agibank Easyn"
+          : isPort
+          ? bancoOriginador.trim()
+          : "Agibank Easyn";
+
+      const tipoOperacaoMap: Record<string, string> = {
+        novo_emprestimo: "novo",
+        refinanciamento: "refinanciamento",
+        portabilidade: "portabilidade",
+      };
+
+      const observacao = isPort
+        ? `Portabilidade — Banco originador: ${bancoOriginador}; Prazo total: ${prazoTotal}x; Parcelas em aberto: ${parcelasAberto}; Saldo devedor: ${formatBRL(
+            saldoDevedor || 0
+          )}; Fator ${prazo}x: ${calcPort!.fator.toFixed(6)}`
+        : `Origem: Digitação Agibank — ${produto}`;
+
+      // 1) Insert na tabela própria do módulo
+      const { error: errDig } = await supabase
         .from("digitacao_agibank_propostas" as any)
         .insert({
-          user_id: user.id,
+          user_id: user!.id,
           cpf: cpf.replace(/\D/g, ""),
           nome_cliente: nome.trim(),
           telefone: telefone.replace(/\D/g, ""),
           produto,
-          banco: produto === "novo_emprestimo" ? "Agibank Easyn" : null,
+          banco,
           parcela,
           prazo,
-          troco_calculado: calc.troco,
-          valor_bruto: calc.valorBruto,
-          iof_estimado: calc.iofEstimado,
+          troco_calculado: trocoFinal,
+          valor_bruto: valorBrutoFinal,
+          iof_estimado: isPort ? 0 : calcNovo.iofEstimado,
           rg_frente_url: rgFrenteUrl,
           rg_verso_url: rgVersoUrl,
           extrato_url: extratoUrl,
         });
+      if (errDig) throw errDig;
 
-      if (error) throw error;
+      // 2) Buscar company_id do usuário (para isolamento multi-tenant)
+      const { data: uc } = await supabase
+        .from("user_companies")
+        .select("company_id")
+        .eq("user_id", user!.id)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
 
-      toast.success("Proposta enviada com sucesso! Aguarde análise.");
+      // 3) Enviar proposta para Gestão de Televendas
+      const today = new Date().toISOString().slice(0, 10);
+      const { error: errTel } = await supabase.from("televendas").insert({
+        user_id: user!.id,
+        company_id: uc?.company_id ?? null,
+        nome: nome.trim(),
+        cpf: cpf.replace(/\D/g, ""),
+        telefone: telefone.replace(/\D/g, ""),
+        data_venda: today,
+        banco,
+        parcela: parcela!,
+        troco: trocoFinal,
+        saldo_devedor: isPort ? saldoDevedor || 0 : null,
+        tipo_operacao: tipoOperacaoMap[produto!],
+        observacao,
+        modulo_origem: "digitacao_agibank",
+        status: "pendente",
+        status_proposta: "digitada",
+        status_bancario: "aguardando_digitacao",
+      } as any);
+      if (errTel) throw errTel;
+
+      toast.success("Proposta enviada para Gestão de Televendas!");
       // Reset form
       setCpf("");
       setNome("");
@@ -416,6 +483,10 @@ export default function DigitacaoAgibank() {
       setRgFrente(null);
       setRgVerso(null);
       setExtrato(null);
+      setBancoOriginador("");
+      setPrazoTotal(undefined);
+      setParcelasAberto(undefined);
+      setSaldoDevedor(undefined);
       setErrors({});
       goHome();
     } catch (err: any) {
