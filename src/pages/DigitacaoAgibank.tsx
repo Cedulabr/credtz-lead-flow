@@ -479,7 +479,7 @@ export default function DigitacaoAgibank() {
       setTelefone("");
       setProduto(null);
       setParcela(undefined);
-      setPrazo(84);
+      setPrazo(108);
       setRgFrente(null);
       setRgVerso(null);
       setExtrato(null);
