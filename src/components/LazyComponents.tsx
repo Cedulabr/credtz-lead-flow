@@ -64,8 +64,8 @@ export const DigitacaoModule = lazy(() => import('@/modules/digitacao/DigitacaoM
 // Audios
 export const AudiosModule = lazy(() => import('@/modules/audios/AudiosModule').then(m => ({ default: m.AudiosModule })));
 
-// PortFlow
-export const PortFlowModule = lazy(() => import('@/modules/portflow/PortFlowModule').then(m => ({ default: m.PortFlowModule })));
+// Digitação Agibank
+export const DigitacaoAgibankPage = lazy(() => import('@/pages/DigitacaoAgibank'));
 
 // Voicer
 export const VoicerModule = lazy(() => import('@/modules/voicer/VoicerModule').then(m => ({ default: m.VoicerModule })));
