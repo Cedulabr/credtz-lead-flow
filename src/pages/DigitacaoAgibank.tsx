@@ -311,7 +311,7 @@ export default function DigitacaoAgibank() {
   const [telefone, setTelefone] = useState("");
   const [produto, setProduto] = useState<Produto | null>(null);
   const [parcela, setParcela] = useState<number | undefined>(undefined);
-  const [prazo, setPrazo] = useState<Prazo>(84);
+  const [prazo, setPrazo] = useState<Prazo>(108);
   const [rgFrente, setRgFrente] = useState<File | null>(null);
   const [rgVerso, setRgVerso] = useState<File | null>(null);
   const [extrato, setExtrato] = useState<File | null>(null);
