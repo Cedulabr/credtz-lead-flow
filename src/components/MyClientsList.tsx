@@ -1191,7 +1191,7 @@ export function MyClientsList() {
     setExportDialogOpen(false);
   };
 
-
+  return (
     <AnimatedContainer animation="slide-up" className="p-4 md:p-6 space-y-6 pb-20 md:pb-6 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen">
       {/* Pending Deletion Requests Panel - Only for Gestor/Admin */}
       {(isAdmin || isGestor) && deletionRequests.length > 0 && (
