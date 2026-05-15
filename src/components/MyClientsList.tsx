@@ -49,7 +49,8 @@ import {
   Upload,
   X,
   Check,
-  Hourglass
+  Hourglass,
+  Download
 } from "lucide-react";
 import {
   AlertDialog,
@@ -77,6 +78,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 
 interface Client {
@@ -278,7 +281,17 @@ export function MyClientsList() {
   const [filterFutureContact, setFilterFutureContact] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
-  
+
+  // Export state
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportStatuses, setExportStatuses] = useState<string[]>([
+    "cliente_intencionado",
+    "proposta_enviada",
+    "aguardando_retorno",
+    "proposta_digitada",
+  ]);
+  const [exportMode, setExportMode] = useState<"all" | "filter">("all");
+
   // Delete state
   const [deletingClient, setDeletingClient] = useState(false);
   
@@ -1116,6 +1129,68 @@ export function MyClientsList() {
     );
   }
 
+  // CSV export
+  const handleExportClients = () => {
+    const list = exportMode === "all"
+      ? clients
+      : clients.filter(c => exportStatuses.includes(c.client_status || ""));
+
+    if (list.length === 0) {
+      toast({
+        title: "Nenhum cliente para exportar",
+        description: "Ajuste os filtros e tente novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const statusLabel = (id: string | null) =>
+      clientStatuses.find(s => s.id === id)?.label || id || "";
+
+    const headers = [
+      "Nome", "CPF", "Telefone", "WhatsApp", "Convênio",
+      "Valor Proposta", "Status", "Origem", "Criado em",
+      "Último contato", "Próximo contato", "Notas",
+    ];
+
+    const escape = (v: any) => {
+      const s = v == null ? "" : String(v);
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+
+    const rows = list.map(c => [
+      c["Nome do cliente"] || "",
+      c.cpf || "",
+      c.telefone || "",
+      c.whatsapp || "",
+      c.convenio || "",
+      c.valor_proposta ?? c.valor ?? "",
+      statusLabel(c.client_status),
+      c.origem_lead || "",
+      c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy HH:mm") : "",
+      c.last_contact_date ? format(new Date(c.last_contact_date), "dd/MM/yyyy") : "",
+      c.future_contact_date ? format(new Date(c.future_contact_date), "dd/MM/yyyy") : "",
+      (c.notes || "").replace(/\n/g, " "),
+    ].map(escape).join(";"));
+
+    const csv = "\uFEFF" + [headers.map(escape).join(";"), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `meus-clientes-${format(new Date(), "yyyyMMdd-HHmm")}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Exportação concluída",
+      description: `${list.length} cliente(s) exportado(s).`,
+    });
+    setExportDialogOpen(false);
+  };
+
   return (
     <AnimatedContainer animation="slide-up" className="p-4 md:p-6 space-y-6 pb-20 md:pb-6 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen">
       {/* Pending Deletion Requests Panel - Only for Gestor/Admin */}
@@ -1191,7 +1266,17 @@ export function MyClientsList() {
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
-            
+
+            <Button
+              variant="outline"
+              onClick={() => setExportDialogOpen(true)}
+              className="hover:bg-primary/10"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
+
+
             <Button 
               onClick={() => setIsNewClientDialogOpen(true)} 
               className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/25"
@@ -2298,6 +2383,85 @@ export function MyClientsList() {
           });
         }}
       />
+
+      {/* Export Clients Dialog */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Download className="h-5 w-5" />
+              Exportar Clientes
+            </DialogTitle>
+            <DialogDescription>
+              Escolha exportar todos os clientes ou filtrar por status.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <RadioGroup value={exportMode} onValueChange={(v) => setExportMode(v as "all" | "filter")}>
+              <div className="flex items-center space-x-2 rounded-lg border p-3 hover:bg-muted/50 cursor-pointer">
+                <RadioGroupItem value="all" id="export-all" />
+                <Label htmlFor="export-all" className="cursor-pointer flex-1">
+                  Exportar todos os clientes
+                  <span className="block text-xs text-muted-foreground">
+                    Inclui todos os {clients.length} cliente(s) da sua carteira
+                  </span>
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2 rounded-lg border p-3 hover:bg-muted/50 cursor-pointer">
+                <RadioGroupItem value="filter" id="export-filter" />
+                <Label htmlFor="export-filter" className="cursor-pointer flex-1">
+                  Escolher status para exportar
+                </Label>
+              </div>
+            </RadioGroup>
+
+            {exportMode === "filter" && (
+              <div className="space-y-2 pl-2 border-l-2 border-primary/30">
+                {[
+                  { id: "cliente_intencionado", label: "Cliente Intencionado" },
+                  { id: "proposta_enviada", label: "Proposta Enviada" },
+                  { id: "aguardando_retorno", label: "Aguardando Retorno" },
+                  { id: "proposta_digitada", label: "Proposta Digitada" },
+                ].map((s) => (
+                  <div key={s.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`exp-${s.id}`}
+                      checked={exportStatuses.includes(s.id)}
+                      onCheckedChange={(checked) => {
+                        setExportStatuses((prev) =>
+                          checked ? [...prev, s.id] : prev.filter((x) => x !== s.id)
+                        );
+                      }}
+                    />
+                    <Label htmlFor={`exp-${s.id}`} className="cursor-pointer">
+                      {s.label}
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        ({clients.filter(c => c.client_status === s.id).length})
+                      </span>
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleExportClients}
+              disabled={exportMode === "filter" && exportStatuses.length === 0}
+              className="bg-gradient-to-r from-primary to-primary/80"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Exportar CSV
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AnimatedContainer>
+
   );
 }
