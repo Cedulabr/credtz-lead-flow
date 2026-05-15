@@ -278,7 +278,17 @@ export function MyClientsList() {
   const [filterFutureContact, setFilterFutureContact] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
-  
+
+  // Export state
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportStatuses, setExportStatuses] = useState<string[]>([
+    "cliente_intencionado",
+    "proposta_enviada",
+    "aguardando_retorno",
+    "proposta_digitada",
+  ]);
+  const [exportMode, setExportMode] = useState<"all" | "filter">("all");
+
   // Delete state
   const [deletingClient, setDeletingClient] = useState(false);
   
