@@ -1266,7 +1266,17 @@ export function MyClientsList() {
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
-            
+
+            <Button
+              variant="outline"
+              onClick={() => setExportDialogOpen(true)}
+              className="hover:bg-primary/10"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
+
+
             <Button 
               onClick={() => setIsNewClientDialogOpen(true)} 
               className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/25"
