@@ -1129,7 +1129,69 @@ export function MyClientsList() {
     );
   }
 
-  return (
+  // CSV export
+  const handleExportClients = () => {
+    const list = exportMode === "all"
+      ? clients
+      : clients.filter(c => exportStatuses.includes(c.client_status || ""));
+
+    if (list.length === 0) {
+      toast({
+        title: "Nenhum cliente para exportar",
+        description: "Ajuste os filtros e tente novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const statusLabel = (id: string | null) =>
+      clientStatuses.find(s => s.id === id)?.label || id || "";
+
+    const headers = [
+      "Nome", "CPF", "Telefone", "WhatsApp", "Convênio",
+      "Valor Proposta", "Status", "Origem", "Criado em",
+      "Último contato", "Próximo contato", "Notas",
+    ];
+
+    const escape = (v: any) => {
+      const s = v == null ? "" : String(v);
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+
+    const rows = list.map(c => [
+      c["Nome do cliente"] || "",
+      c.cpf || "",
+      c.telefone || "",
+      c.whatsapp || "",
+      c.convenio || "",
+      c.valor_proposta ?? c.valor ?? "",
+      statusLabel(c.client_status),
+      c.origem_lead || "",
+      c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy HH:mm") : "",
+      c.last_contact_date ? format(new Date(c.last_contact_date), "dd/MM/yyyy") : "",
+      c.future_contact_date ? format(new Date(c.future_contact_date), "dd/MM/yyyy") : "",
+      (c.notes || "").replace(/\n/g, " "),
+    ].map(escape).join(";"));
+
+    const csv = "\uFEFF" + [headers.map(escape).join(";"), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `meus-clientes-${format(new Date(), "yyyyMMdd-HHmm")}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Exportação concluída",
+      description: `${list.length} cliente(s) exportado(s).`,
+    });
+    setExportDialogOpen(false);
+  };
+
+
     <AnimatedContainer animation="slide-up" className="p-4 md:p-6 space-y-6 pb-20 md:pb-6 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen">
       {/* Pending Deletion Requests Panel - Only for Gestor/Admin */}
       {(isAdmin || isGestor) && deletionRequests.length > 0 && (
