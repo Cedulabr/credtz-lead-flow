@@ -2383,6 +2383,85 @@ export function MyClientsList() {
           });
         }}
       />
+
+      {/* Export Clients Dialog */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Download className="h-5 w-5" />
+              Exportar Clientes
+            </DialogTitle>
+            <DialogDescription>
+              Escolha exportar todos os clientes ou filtrar por status.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <RadioGroup value={exportMode} onValueChange={(v) => setExportMode(v as "all" | "filter")}>
+              <div className="flex items-center space-x-2 rounded-lg border p-3 hover:bg-muted/50 cursor-pointer">
+                <RadioGroupItem value="all" id="export-all" />
+                <Label htmlFor="export-all" className="cursor-pointer flex-1">
+                  Exportar todos os clientes
+                  <span className="block text-xs text-muted-foreground">
+                    Inclui todos os {clients.length} cliente(s) da sua carteira
+                  </span>
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2 rounded-lg border p-3 hover:bg-muted/50 cursor-pointer">
+                <RadioGroupItem value="filter" id="export-filter" />
+                <Label htmlFor="export-filter" className="cursor-pointer flex-1">
+                  Escolher status para exportar
+                </Label>
+              </div>
+            </RadioGroup>
+
+            {exportMode === "filter" && (
+              <div className="space-y-2 pl-2 border-l-2 border-primary/30">
+                {[
+                  { id: "cliente_intencionado", label: "Cliente Intencionado" },
+                  { id: "proposta_enviada", label: "Proposta Enviada" },
+                  { id: "aguardando_retorno", label: "Aguardando Retorno" },
+                  { id: "proposta_digitada", label: "Proposta Digitada" },
+                ].map((s) => (
+                  <div key={s.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`exp-${s.id}`}
+                      checked={exportStatuses.includes(s.id)}
+                      onCheckedChange={(checked) => {
+                        setExportStatuses((prev) =>
+                          checked ? [...prev, s.id] : prev.filter((x) => x !== s.id)
+                        );
+                      }}
+                    />
+                    <Label htmlFor={`exp-${s.id}`} className="cursor-pointer">
+                      {s.label}
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        ({clients.filter(c => c.client_status === s.id).length})
+                      </span>
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleExportClients}
+              disabled={exportMode === "filter" && exportStatuses.length === 0}
+              className="bg-gradient-to-r from-primary to-primary/80"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Exportar CSV
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AnimatedContainer>
+
   );
 }
