@@ -53,6 +53,7 @@ const SECTIONS: Array<
       { id: "dashboard", label: "Início", icon: Home },
       { id: "my-data", label: "Meus Dados", icon: User },
       { id: "marketplace", label: "Marketplace", icon: Store },
+      { id: "billing", label: "Faturamento", icon: Store },
       { id: "indicate", label: "Indicar", icon: Share2, permissionKey: "can_access_indicar" },
     ],
   },
