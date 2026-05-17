@@ -11,6 +11,10 @@ import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
 import ValidatePoint from "./pages/ValidatePoint";
 import Marketplace from "./pages/Marketplace";
+import Billing from "./pages/Billing";
+import BillingSuccess from "./pages/BillingSuccess";
+import BillingCancel from "./pages/BillingCancel";
+import ModulesAdmin from "./pages/admin/ModulesAdmin";
 import { TestDatabase } from "./components/TestDatabase";
 
 const queryClient = new QueryClient();
@@ -29,6 +33,10 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route path="/validar-ponto/:hash" element={<ValidatePoint />} />
               <Route path="/marketplace" element={<Marketplace />} />
+              <Route path="/billing" element={<Billing />} />
+              <Route path="/billing/success" element={<BillingSuccess />} />
+              <Route path="/billing/cancel" element={<BillingCancel />} />
+              <Route path="/admin/modules" element={<ModulesAdmin />} />
               <Route path="/test-database" element={<TestDatabase />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
