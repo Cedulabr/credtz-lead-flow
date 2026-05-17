@@ -11,6 +11,7 @@ import LoadingAuth from "@/components/LoadingAuth";
 import { BlockedAccess } from "@/components/BlockedAccess";
 import { LoadingFallback } from "@/components/LoadingFallback";
 import { MarketplaceModule } from "@/modules/marketplace/MarketplaceModule";
+import Billing from "@/pages/Billing";
 
 // ── All heavy modules via lazy loading ────────────────────────────────
 import {
@@ -222,6 +223,7 @@ const Index = () => {
     notas: <LazyNotasModule />,
     telefonia: <LazyTelefoniaModule />,
     marketplace: <MarketplaceModule />,
+    billing: <Billing />,
   }), [setActiveTab]);
 
   // ── Render active tab ──────────────────────────────────────────────

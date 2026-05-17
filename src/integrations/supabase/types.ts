@@ -5274,6 +5274,68 @@ export type Database = {
         }
         Relationships: []
       }
+      invoices: {
+        Row: {
+          amount_paid: number
+          company_id: string | null
+          created_at: string
+          currency: string | null
+          hosted_invoice_url: string | null
+          id: string
+          invoice_pdf: string | null
+          module_slug: string | null
+          period_end: string | null
+          period_start: string | null
+          status: string
+          stripe_customer_id: string | null
+          stripe_invoice_id: string | null
+          stripe_subscription_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount_paid?: number
+          company_id?: string | null
+          created_at?: string
+          currency?: string | null
+          hosted_invoice_url?: string | null
+          id?: string
+          invoice_pdf?: string | null
+          module_slug?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          status: string
+          stripe_customer_id?: string | null
+          stripe_invoice_id?: string | null
+          stripe_subscription_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount_paid?: number
+          company_id?: string | null
+          created_at?: string
+          currency?: string | null
+          hosted_invoice_url?: string | null
+          id?: string
+          invoice_pdf?: string | null
+          module_slug?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_invoice_id?: string | null
+          stripe_subscription_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       joinbank_config: {
         Row: {
           company_id: string | null
@@ -6246,6 +6308,7 @@ export type Database = {
           created_at: string
           credit_price_cents: number
           description: string | null
+          features: Json | null
           icon: string | null
           id: string
           monthly_price_cents: number
@@ -6264,6 +6327,7 @@ export type Database = {
           created_at?: string
           credit_price_cents?: number
           description?: string | null
+          features?: Json | null
           icon?: string | null
           id?: string
           monthly_price_cents?: number
@@ -6282,6 +6346,7 @@ export type Database = {
           created_at?: string
           credit_price_cents?: number
           description?: string | null
+          features?: Json | null
           icon?: string | null
           id?: string
           monthly_price_cents?: number

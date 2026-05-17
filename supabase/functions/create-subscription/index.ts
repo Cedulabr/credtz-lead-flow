@@ -69,8 +69,8 @@ Deno.serve(async (req) => {
       customer_email: customerId ? undefined : user.email,
       line_items: [lineItem as any],
       mode: "subscription",
-      success_url: `${origin}/marketplace?status=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/marketplace?status=canceled`,
+      success_url: `${origin}/billing/success?session_id={CHECKOUT_SESSION_ID}&module=${module_slug}`,
+      cancel_url: `${origin}/billing/cancel?module=${module_slug}`,
       subscription_data: {
         trial_period_days: mod.trial_days || undefined,
         metadata: { company_id, module_slug, user_id: user.id },

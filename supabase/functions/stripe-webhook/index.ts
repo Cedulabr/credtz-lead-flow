@@ -172,6 +172,21 @@ Deno.serve(async (req) => {
               stripe_customer_id: sub.customer as string,
               grace_period_until: grace,
             });
+            await supabase.from("invoices").upsert({
+              company_id: md.company_id,
+              user_id: md.user_id ?? null,
+              module_slug: md.module_slug,
+              stripe_invoice_id: inv.id,
+              stripe_subscription_id: sub.id,
+              stripe_customer_id: sub.customer as string,
+              amount_paid: (inv.amount_paid ?? 0) / 100,
+              currency: inv.currency ?? "brl",
+              status: "open",
+              hosted_invoice_url: inv.hosted_invoice_url ?? null,
+              invoice_pdf: inv.invoice_pdf ?? null,
+              period_start: inv.period_start ? new Date(inv.period_start * 1000).toISOString() : null,
+              period_end: inv.period_end ? new Date(inv.period_end * 1000).toISOString() : null,
+            }, { onConflict: "stripe_invoice_id" });
           }
         }
         break;
@@ -192,6 +207,21 @@ Deno.serve(async (req) => {
               current_period_end: new Date(sub.current_period_end * 1000),
               cancel_at_period_end: sub.cancel_at_period_end,
             });
+            await supabase.from("invoices").upsert({
+              company_id: md.company_id,
+              user_id: md.user_id ?? null,
+              module_slug: md.module_slug,
+              stripe_invoice_id: inv.id,
+              stripe_subscription_id: sub.id,
+              stripe_customer_id: sub.customer as string,
+              amount_paid: (inv.amount_paid ?? 0) / 100,
+              currency: inv.currency ?? "brl",
+              status: "paid",
+              hosted_invoice_url: inv.hosted_invoice_url ?? null,
+              invoice_pdf: inv.invoice_pdf ?? null,
+              period_start: inv.period_start ? new Date(inv.period_start * 1000).toISOString() : null,
+              period_end: inv.period_end ? new Date(inv.period_end * 1000).toISOString() : null,
+            }, { onConflict: "stripe_invoice_id" });
           }
         }
         break;
