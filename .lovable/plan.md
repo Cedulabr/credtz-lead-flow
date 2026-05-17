@@ -1,141 +1,61 @@
+## Decisão de arquitetura
 
-# Fase 1 — Fundação SaaS Modular + Piloto SMS
+Mantemos o modelo **modular já existente** (`modules`, `company_modules`, `wallets`, `stripe-webhook`). Cada produto (Easyn Flow, Leads Premium, Activate Leads, Controle de Ponto, SMS) é um **módulo independente** com seu próprio preço/Stripe price. Não criamos tabelas `plans`/`subscriptions`/`invoices` paralelas — usamos o que já está montado e complementamos onde falta.
 
-Transformar o Easyn em marketplace modular. Esta fase entrega a **fundação** (catálogo de módulos, assinaturas por empresa, carteiras de crédito, gate de acesso, Marketplace UI, webhook Stripe) e um **piloto ponta-a-ponta**: SMS cobrado por créditos via Stripe.
+Pontos do documento original que **não vamos** implementar (conflitam com o modelo): tabela `plans` global, `subscriptions` separadas com `max_agents`/`max_instances`, guard de "plano único". O equivalente já existe via `ModuleGate` + `company_modules.status`.
 
-Mantemos a stack atual: **React + Vite + Supabase + Edge Functions + Stripe BYOK** (evoluindo as 4 functions já criadas).
+## O que será feito
 
----
+### 1. Catálogo de módulos
+- Garantir registros em `public.modules` para: `easynflow`, `leads_premium`, `activate_leads`, `time_clock`, `sms` (este já existe).
+- Cada módulo recebe: `name`, `description`, `slug`, `price_monthly`, `stripe_price_id` (preenchido depois), `features` (jsonb), `billing_type` (`subscription` ou `credits`).
+- Migration adiciona colunas que faltarem (`price_monthly`, `features`, `stripe_price_id`) na tabela `modules` se ainda não existirem.
 
-## 1. Modelagem de banco (migration única)
+### 2. Tabela de faturas
+- Nova tabela `public.invoices` (gestor_id, company_id, module_slug, stripe_invoice_id, amount_paid, status, invoice_url, invoice_pdf, period_start, period_end).
+- RLS: gestor vê faturas da sua empresa; admin vê todas.
+- Webhook `stripe-webhook` passa a gravar em `invoices` nos eventos `invoice.paid` e `invoice.payment_failed` (além do que já faz com `company_modules`).
 
-### `modules` — catálogo central
-`id, slug (unique), name, category, description, icon, billing_type` (`subscription` | `credits` | `hybrid`), `monthly_price_cents, credit_price_cents, stripe_price_id, stripe_product_id, trial_days, active, sort_order`.
+### 3. Frontend — páginas de billing
+- `/billing/success` — confirmação + auto-redirect.
+- `/billing/cancel` — mensagem neutra + voltar ao marketplace.
+- Marketplace atual (`/marketplace`) já lista módulos; ajustamos para mostrar **preço mensal** quando `billing_type='subscription'` e botão "Assinar" que chama `create-subscription` (já existe) com `module_slug`.
+- Nova aba **Faturamento** nas configurações do gestor: lista assinaturas ativas (`company_modules`), próximas cobranças, tabela de `invoices`, botão "Gerenciar pagamento" → `customer-portal` (já existe).
 
-Seed inicial:
-- `leads-premium` — credits — R$ 29,90/crédito
-- `activate-leads` — subscription — R$ 199,90/mês
-- `controle-ponto` — subscription — R$ 149,00/mês (base; per-seat fica para fase 2)
-- `meus-clientes`, `gerador-propostas`, `notas-workspace` — subscription (preços a definir, criados como rascunho `active=false`)
-- `sms` — credits — R$ 0,08/SMS (piloto)
+### 4. Admin de módulos (`/admin/modules`)
+- CRUD para super-admin: criar/editar módulo, setar `price_monthly`, `stripe_price_id`, toggles `is_active`, contagem de empresas ativas por módulo.
+- Protegido por role `admin` existente.
 
-### `company_modules` — ativação por empresa
-`company_id, module_id, status` (`active|trialing|past_due|canceled|inactive`), `stripe_subscription_id, current_period_start, current_period_end, cancel_at_period_end, grace_period_until, activated_at`. Unique `(company_id, module_id)`.
+### 5. URLs e ajustes
+- `success_url` / `cancel_url` apontam para `https://credtz-lead-flow.lovable.app/billing/success|cancel` (não `app.easynflow.com`).
+- Role `admin` (não `super_admin`) — já é o padrão do projeto.
 
-### `wallets` — carteiras de crédito (1 por empresa por módulo)
-`company_id, module_slug, balance, total_purchased, total_consumed, updated_at`. Unique `(company_id, module_slug)`.
-
-### `wallet_transactions` — extrato
-`wallet_id, type` (`purchase|consume|refund|admin_adjust`), `amount, balance_after, reference_id, metadata, created_at`.
-
-### `credit_packages` — pacotes pré-definidos
-`module_slug, name, credits, price_cents, stripe_price_id, sort_order, active`.
-
-Seed SMS: 100/R$8 · 500/R$40 · 2000/R$160 · 5000/R$400 · custom (calc client-side).
-
-### `billing_events` — log de webhooks Stripe (idempotência)
-`stripe_event_id (unique), type, payload, processed_at, error`.
-
-### Reaproveitamento
-`subscribers` e `payments` (já existem) ficam para uso geral; `company_modules` e `wallets` passam a ser fonte de verdade do gate.
-
-### RLS
-- `modules`, `credit_packages`: SELECT público (autenticados).
-- `company_modules`, `wallets`, `wallet_transactions`: SELECT escopado por `company_id` do usuário (via `user_companies`); WRITE só via edge function (service role).
-- `billing_events`: nenhum acesso de cliente.
-
-### RPC `has_module_access(_company_id uuid, _slug text) returns boolean`
-Security definer; retorna true se `company_modules.status in ('active','trialing')` OU dentro de `grace_period_until`.
-
----
-
-## 2. Edge Functions
-
-Evoluir as 4 existentes + adicionar 3 novas:
-
-| Function | Papel |
-|---|---|
-| `create-subscription` (existente) | Aceita `{ module_slug }`, lê preço de `modules`, cria checkout recorrente, grava `pending` em `company_modules`. |
-| `create-checkout` (existente) | Aceita `{ module_slug, package_id }` ou `{ module_slug, custom_credits }` para compra one-time de créditos. |
-| `check-subscription` (existente) | Reescrita: sincroniza **todas** as assinaturas Stripe do customer com `company_modules`. |
-| `customer-portal` (existente) | Sem mudança. |
-| **`stripe-webhook`** (novo, `verify_jwt=false`) | Recebe eventos, valida assinatura com `STRIPE_WEBHOOK_SECRET`, idempotência via `billing_events`. Trata: `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`. Atualiza `company_modules` e credita `wallets` quando `mode=payment` com metadata de créditos. |
-| **`consume-credits`** (novo) | Server-side: valida saldo, debita atomicamente, registra `wallet_transactions`. Usado pelo `send-sms` no piloto. |
-| **`get-marketplace`** (novo, opcional) | Retorna catálogo + status do módulo para a empresa logada (pode ser query direta no client). |
-
-Secret necessário: **`STRIPE_WEBHOOK_SECRET`** (a adicionar). `STRIPE_SECRET_KEY` já existe.
-
----
-
-## 3. Frontend — Marketplace + Gate
-
-### Nova rota `/marketplace` (`src/modules/marketplace/`)
-- `MarketplaceModule.tsx` — grid de cards por categoria (Vendas, Gestão, Comunicação).
-- `ModuleCard.tsx` — preço, badge de status (Ativo / Trial / Inadimplente / Não contratado), CTA contextual ("Assinar" / "Comprar créditos" / "Gerenciar").
-- `CreditPackagesDialog.tsx` — pacotes + input custom (calcula `qtd × R$0,08`).
-- `MyModulesView.tsx` — assinaturas ativas, próximo vencimento, botão portal Stripe.
-- `WalletView.tsx` — saldo + extrato (`wallet_transactions`).
-
-### Hook `useModuleAccess(slug)`
-Retorna `{ hasAccess, status, loading }`. Fonte: `company_modules` + RPC `has_module_access`.
-
-### Componente `<ModuleGate slug="..." />`
-Wrapper análogo ao `PermissionGate` existente. Se sem acesso → tela "Contratar módulo" com CTA para `/marketplace`.
-
-### Integração no app
-- Adicionar rota `/marketplace` em `App.tsx`.
-- Adicionar item "Marketplace" na navegação principal do `Index.tsx`.
-- **Não** envolver módulos existentes em `ModuleGate` ainda (evita quebrar usuários atuais). Gate aplicado **apenas no SMS** como piloto.
-
----
-
-## 4. Piloto SMS ponta-a-ponta
-
-1. Seed do módulo `sms` + 4 pacotes em `credit_packages`.
-2. Card "SMS" no Marketplace → abre `CreditPackagesDialog` → `create-checkout` → Stripe → webhook credita `wallets`.
-3. `WalletView` mostra saldo SMS.
-4. **`send-sms` (function existente)**: antes do envio, chama `consume-credits({ module_slug: 'sms', amount: 1 })`. Se saldo insuficiente, retorna 402 e o front mostra "Comprar créditos".
-5. `SmsModule` exibe banner com saldo no topo + atalho para recarregar.
-
----
-
-## 5. Painel Admin (mínimo nesta fase)
-
-Em `/admin`, nova aba **"Marketplace"**:
-- Lista de `modules` (toggle `active`, editar preço — sem mexer no Stripe).
-- Tabela de `company_modules` com filtro por status.
-- Visão de MRR aproximado (sum `monthly_price` de `active`).
-
-Métricas avançadas (churn, LTV, ARR, dashboards Grafana) ficam para fase posterior.
-
----
-
-## 6. Fora desta fase (roadmap)
-
-- Per-seat para Controle de Ponto.
-- Migrar Leads Premium / Voicer / Radar para `wallets` unificadas (hoje usam tabelas próprias).
-- Aplicar `<ModuleGate>` aos módulos pagos existentes (Activate Leads, Meus Clientes etc.) — exige plano de migração de usuários atuais.
-- Trial automático, cobrança proporcional em upgrade/downgrade.
-- Stripe Tax, PIX (precisa habilitar BR + métodos).
-- Painel master com MRR/ARR/churn/LTV completos.
-
----
+### 6. Configuração Stripe (manual pelo usuário)
+Para cada módulo no Stripe Dashboard:
+1. Criar Product + Price recorrente mensal.
+2. Copiar Price ID → colar no admin `/admin/modules` no campo `stripe_price_id`.
+3. Webhook já configurado em `…/functions/v1/stripe-webhook` (feito na fase anterior).
 
 ## Detalhes técnicos
 
-- **Idempotência webhook**: `INSERT ... ON CONFLICT (stripe_event_id) DO NOTHING`; só processa se inserção criou linha.
-- **Atomicidade do consumo**: function PL/pgSQL `consume_wallet(_wallet_id, _amount)` com `UPDATE ... WHERE balance >= _amount RETURNING` — `consume-credits` chama essa RPC.
-- **Multi-tenant**: toda escrita de `company_modules`/`wallets` resolve `company_id` server-side via `user_companies` (padrão já estabelecido no projeto).
-- **Stripe metadata**: cada checkout grava `{ company_id, module_slug, credits?, package_id? }` em `metadata` para o webhook reconciliar.
-- **URL do webhook**: `https://qwgsplcqyongfsqdjrme.supabase.co/functions/v1/stripe-webhook` — usuário cadastra no dashboard Stripe e cola o secret.
+**Migrations:**
+- `ALTER TABLE modules ADD COLUMN IF NOT EXISTS price_monthly numeric(10,2), ADD COLUMN IF NOT EXISTS stripe_price_id text, ADD COLUMN IF NOT EXISTS features jsonb DEFAULT '[]', ADD COLUMN IF NOT EXISTS billing_type text DEFAULT 'subscription' CHECK (billing_type IN ('subscription','credits','hybrid'))`.
+- `INSERT … ON CONFLICT (slug) DO UPDATE` para os 5 módulos com preços: Easyn Flow (a definir), Leads Premium R$29,90, Activate Leads R$199,90, Time Clock R$149,00, SMS (créditos).
+- `CREATE TABLE public.invoices (…)` + RLS via `has_role_safe` + policy por `company_id`.
 
-## Entregáveis
+**Edge functions:**
+- `stripe-webhook/index.ts`: estender `invoice.paid`/`invoice.payment_failed` para inserir em `invoices` (campo `hosted_invoice_url`, `invoice_pdf`).
+- Reusamos `create-subscription`, `customer-portal`, `consume-credits` (já existem).
 
-1. Migration única (tabelas + RLS + RPCs + seeds).
-2. 3 edge functions novas + 2 reescritas.
-3. Módulo `marketplace` no frontend + rota + nav.
-4. SMS piloto integrado com cobrança real.
-5. Aba Admin → Marketplace básica.
-6. Secret `STRIPE_WEBHOOK_SECRET` solicitado ao usuário.
+**Frontend:**
+- `src/pages/BillingSuccess.tsx`, `src/pages/BillingCancel.tsx` + rotas em `App.tsx`.
+- `src/components/billing/InvoicesTable.tsx` + `src/components/billing/BillingSettings.tsx`.
+- `src/pages/admin/ModulesAdmin.tsx` + entrada no menu admin.
+- Marketplace: adicionar preço/CTA "Assinar".
 
-Após aprovação: solicito o secret e começo pela migration.
+## Fora de escopo
+- Não criamos tabela `plans` nem `subscriptions` (usamos `modules` + `company_modules`).
+- Não criamos `cancel-subscription` separada — cancelamento via Stripe Customer Portal.
+- Não mexemos no fluxo de créditos (SMS, Radar, Voicer, Leads) que já funciona.
+
+Pronto para começar?
