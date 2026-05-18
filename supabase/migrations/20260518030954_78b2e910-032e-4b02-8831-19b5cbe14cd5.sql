@@ -1,0 +1,1 @@
+UPDATE public.modules SET monthly_price_cents = 14900 WHERE slug = 'easynflow';
