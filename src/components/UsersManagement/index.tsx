@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { UserData, Company, UserCompany, ViewMode, UserFilters, PERMISSION_MODULES } from "./types";
@@ -6,7 +7,6 @@ import { UserMetricsCards } from "./UserMetricsCards";
 import { UserFiltersBar } from "./UserFiltersBar";
 import { UserTable } from "./UserTable";
 import { UserGridView } from "./UserGridView";
-import { UserPermissionsModal } from "./UserPermissionsModal";
 import { UserEditModal, UserEditForm } from "./UserEditModal";
 import { UserPasswordModal } from "./UserPasswordModal";
 
