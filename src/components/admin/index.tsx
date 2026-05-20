@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminLayout, type AdminModule } from './AdminLayout';
 import { AdminDashboard } from './AdminDashboard';
 import { AdminOperations } from './AdminOperations';
@@ -10,8 +11,17 @@ import { AdminLogs } from './AdminLogs';
 import { supabase } from '@/integrations/supabase/client';
 
 export function AdminPanelNew() {
+  const navigate = useNavigate();
   const [activeModule, setActiveModule] = useState<AdminModule>('dashboard');
   const [pendingAlerts, setPendingAlerts] = useState(0);
+
+  const handleModuleChange = (m: AdminModule) => {
+    if (m === 'permissions') {
+      navigate('/admin/permissions');
+      return;
+    }
+    setActiveModule(m);
+  };
 
   useEffect(() => {
     fetchPendingAlerts();
