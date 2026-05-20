@@ -12,6 +12,7 @@ import { UserPasswordModal } from "./UserPasswordModal";
 
 export function UsersManagement() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [users, setUsers] = useState<UserData[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [userCompanies, setUserCompanies] = useState<Record<string, UserCompany>>({});
@@ -21,7 +22,6 @@ export function UsersManagement() {
 
   // Modal states
   const [editUser, setEditUser] = useState<UserData | null>(null);
-  const [permUser, setPermUser] = useState<UserData | null>(null);
   const [passUser, setPassUser] = useState<UserData | null>(null);
 
   // ── Data loading (preserved from UsersList.tsx) ──
