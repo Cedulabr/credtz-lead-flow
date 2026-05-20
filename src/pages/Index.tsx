@@ -50,6 +50,8 @@ import {
   LazyReaproveitamentoModule,
   LazyEasynFlowModule,
 } from "@/components/LazyComponents";
+import { useActiveModuleMap } from "@/hooks/useUserMenu";
+import { MODULE_BY_KEY } from "@/config/modules";
 
 // ── Types ─────────────────────────────────────────────────────────────
 type TabConfig = {
@@ -181,9 +183,15 @@ const Index = () => {
     }
   }, [user, loading, navigate]);
 
-  // ── Permission helper (deny-by-default) ─────────────────────────────
+  // ── Permission helper ───────────────────────────────────────────────
+  // Prefers new module_permissions table; falls back to legacy profile column.
+  const activeModules = useActiveModuleMap();
   const hasPermission = (permissionKey: string): boolean => {
     if (isAdmin) return true;
+    // If activeTab has a module entry, that wins
+    if (MODULE_BY_KEY[activeTab]) {
+      return activeModules[activeTab] === true;
+    }
     const profileData = profile as any;
     return profileData?.[permissionKey] === true;
   };

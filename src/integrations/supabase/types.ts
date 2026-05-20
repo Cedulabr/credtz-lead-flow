@@ -532,6 +532,36 @@ export type Database = {
           },
         ]
       }
+      admin_audit_log: {
+        Row: {
+          action: string
+          changed_by: string
+          created_at: string
+          id: string
+          module_key: string | null
+          payload: Json | null
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          changed_by: string
+          created_at?: string
+          id?: string
+          module_key?: string | null
+          payload?: Json | null
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          changed_by?: string
+          created_at?: string
+          id?: string
+          module_key?: string | null
+          payload?: Json | null
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
       ai_agents: {
         Row: {
           accepts_payment: boolean | null
@@ -6300,6 +6330,78 @@ export type Database = {
         }
         Relationships: []
       }
+      menu_categories: {
+        Row: {
+          created_at: string
+          icon: string | null
+          id: string
+          is_system: boolean
+          key: string
+          label: string
+          position: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_system?: boolean
+          key: string
+          label: string
+          position?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_system?: boolean
+          key?: string
+          label?: string
+          position?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      module_permissions: {
+        Row: {
+          category_key: string
+          created_at: string
+          display_name: string | null
+          icon: string | null
+          id: string
+          is_active: boolean
+          module_key: string
+          position: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_key: string
+          created_at?: string
+          display_name?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          module_key: string
+          position?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category_key?: string
+          created_at?: string
+          display_name?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          module_key?: string
+          position?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       module_settings: {
         Row: {
           access_url: string | null
@@ -11683,6 +11785,15 @@ export type Database = {
       is_user_gestor_of_any_company: {
         Args: { _user_id: string }
         Returns: boolean
+      }
+      log_admin_action: {
+        Args: {
+          _action: string
+          _module_key: string
+          _payload: Json
+          _target_user_id: string
+        }
+        Returns: string
       }
       merge_activate_leads: {
         Args: {
