@@ -28,7 +28,8 @@ export type AdminModule =
   | 'finance' 
   | 'system'
   | 'database'
-  | 'logs';
+  | 'logs'
+  | 'permissions';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -86,6 +87,13 @@ const modules = [
     icon: ScrollText,
     description: 'Atividades do sistema',
     color: 'from-orange-500 to-orange-600'
+  },
+  { 
+    id: 'permissions' as AdminModule, 
+    label: 'Permissões', 
+    icon: Shield,
+    description: 'Módulos e menu por usuário',
+    color: 'from-pink-500 to-pink-600'
   },
 ];
 
