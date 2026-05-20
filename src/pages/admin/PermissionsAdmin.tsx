@@ -21,11 +21,47 @@ import { UserMenuPreview } from "@/components/admin/UserMenuPreview";
 export default function PermissionsAdmin() {
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const qc = useQueryClient();
-  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [selectedUserId, setSelectedUserId] = useState<string>(searchParams.get("user") || "");
   const [search, setSearch] = useState("");
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [drawerKey, setDrawerKey] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  useEffect(() => {
+    const u = searchParams.get("user");
+    if (u && u !== selectedUserId) setSelectedUserId(u);
+  }, [searchParams]);
+
+  const { data: companies = [] } = useQuery({
+    queryKey: ["permissions_active_companies"],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: userCompanyMap = {} } = useQuery({
+    queryKey: ["permissions_user_companies"],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_companies")
+        .select("user_id, company_id")
+        .eq("is_active", true);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      (data || []).forEach((uc: any) => { map[uc.user_id] = uc.company_id; });
+      return map;
+    },
+  });
 
   const { data: users = [] } = useQuery({
     queryKey: ["admin_users_list"],
@@ -46,11 +82,17 @@ export default function PermissionsAdmin() {
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter((u: any) =>
-      (u.name || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q)
-    );
-  }, [users, search]);
+    return users.filter((u: any) => {
+      if (companyFilter !== "all" && userCompanyMap[u.id] !== companyFilter) return false;
+      if (q && !((u.name || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }, [users, search, companyFilter, userCompanyMap]);
+
+  const handleSelectUser = (id: string) => {
+    setSelectedUserId(id);
+    setSearchParams(id ? { user: id } : {});
+  };
 
   const permsByKey = useMemo(() => {
     const map: Record<string, ModulePermission> = {};
