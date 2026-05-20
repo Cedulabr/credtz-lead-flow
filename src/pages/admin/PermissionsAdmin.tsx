@@ -1,8 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -21,11 +21,47 @@ import { UserMenuPreview } from "@/components/admin/UserMenuPreview";
 export default function PermissionsAdmin() {
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const qc = useQueryClient();
-  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [selectedUserId, setSelectedUserId] = useState<string>(searchParams.get("user") || "");
   const [search, setSearch] = useState("");
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [drawerKey, setDrawerKey] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  useEffect(() => {
+    const u = searchParams.get("user");
+    if (u && u !== selectedUserId) setSelectedUserId(u);
+  }, [searchParams]);
+
+  const { data: companies = [] } = useQuery({
+    queryKey: ["permissions_active_companies"],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: userCompanyMap = {} } = useQuery({
+    queryKey: ["permissions_user_companies"],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_companies")
+        .select("user_id, company_id")
+        .eq("is_active", true);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      (data || []).forEach((uc: any) => { map[uc.user_id] = uc.company_id; });
+      return map;
+    },
+  });
 
   const { data: users = [] } = useQuery({
     queryKey: ["admin_users_list"],
@@ -46,11 +82,17 @@ export default function PermissionsAdmin() {
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter((u: any) =>
-      (u.name || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q)
-    );
-  }, [users, search]);
+    return users.filter((u: any) => {
+      if (companyFilter !== "all" && userCompanyMap[u.id] !== companyFilter) return false;
+      if (q && !((u.name || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }, [users, search, companyFilter, userCompanyMap]);
+
+  const handleSelectUser = (id: string) => {
+    setSelectedUserId(id);
+    setSearchParams(id ? { user: id } : {});
+  };
 
   const permsByKey = useMemo(() => {
     const map: Record<string, ModulePermission> = {};
@@ -123,8 +165,22 @@ export default function PermissionsAdmin() {
           </TabsList>
 
           <TabsContent value="modules" className="space-y-4">
-            <Card className="p-4 flex flex-col md:flex-row gap-3 md:items-end">
-              <div className="flex-1">
+            <Card className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3 md:items-end">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Empresa</label>
+                <Select value={companyFilter} onValueChange={(v) => { setCompanyFilter(v); }}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Todas as empresas" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-80">
+                    <SelectItem value="all">Todas as empresas</SelectItem>
+                    {companies.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <label className="text-xs font-medium text-muted-foreground">Buscar usuário</label>
                 <div className="relative mt-1">
                   <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-muted-foreground" />
@@ -136,13 +192,16 @@ export default function PermissionsAdmin() {
                   />
                 </div>
               </div>
-              <div className="md:w-80">
+              <div>
                 <label className="text-xs font-medium text-muted-foreground">Usuário selecionado</label>
-                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <Select value={selectedUserId} onValueChange={handleSelectUser}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Selecione um usuário" />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
+                    {filteredUsers.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">Nenhum usuário encontrado</div>
+                    )}
                     {filteredUsers.map((u: any) => (
                       <SelectItem key={u.id} value={u.id}>
                         {u.name || u.email}

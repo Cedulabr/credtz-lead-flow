@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { UserData, Company, UserCompany, ViewMode, UserFilters, PERMISSION_MODULES } from "./types";
@@ -6,12 +7,12 @@ import { UserMetricsCards } from "./UserMetricsCards";
 import { UserFiltersBar } from "./UserFiltersBar";
 import { UserTable } from "./UserTable";
 import { UserGridView } from "./UserGridView";
-import { UserPermissionsModal } from "./UserPermissionsModal";
 import { UserEditModal, UserEditForm } from "./UserEditModal";
 import { UserPasswordModal } from "./UserPasswordModal";
 
 export function UsersManagement() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [users, setUsers] = useState<UserData[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [userCompanies, setUserCompanies] = useState<Record<string, UserCompany>>({});
@@ -21,7 +22,6 @@ export function UsersManagement() {
 
   // Modal states
   const [editUser, setEditUser] = useState<UserData | null>(null);
-  const [permUser, setPermUser] = useState<UserData | null>(null);
   const [passUser, setPassUser] = useState<UserData | null>(null);
 
   // ── Data loading (preserved from UsersList.tsx) ──
@@ -220,7 +220,6 @@ export function UsersManagement() {
       const { error } = await supabase.from("profiles").update(newPerms).eq("id", userId);
       if (error) throw error;
       toast({ title: "Permissões atualizadas!", description: "Permissões salvas com sucesso." });
-      setPermUser(null);
       loadUsers();
     } catch (e) {
       toast({ title: "Erro", description: "Erro ao atualizar permissões.", variant: "destructive" });
@@ -230,7 +229,7 @@ export function UsersManagement() {
   // ── Action handlers for components ──
   const actions = {
     onEdit: (u: UserData) => setEditUser(u),
-    onPermissions: (u: UserData) => setPermUser(u),
+    onPermissions: (u: UserData) => navigate(`/admin/permissions?user=${u.id}`),
     onSetPassword: (u: UserData) => setPassUser(u),
     onResetPassword: resetUserPassword,
     onToggleStatus: toggleUserStatus,
@@ -266,12 +265,6 @@ export function UsersManagement() {
       )}
 
       {/* Modals */}
-      <UserPermissionsModal
-        open={!!permUser}
-        onOpenChange={(o) => !o && setPermUser(null)}
-        user={permUser}
-        onSave={updatePermissions}
-      />
 
       <UserEditModal
         open={!!editUser}
