@@ -839,31 +839,37 @@ export type Database = {
       ai_providers: {
         Row: {
           api_key: string | null
+          base_url: string | null
           created_at: string
           default_model: string
           id: string
           is_active: boolean
           name: string
+          priority: number
           provider_key: string
           type: string
         }
         Insert: {
           api_key?: string | null
+          base_url?: string | null
           created_at?: string
           default_model: string
           id?: string
           is_active?: boolean
           name: string
+          priority?: number
           provider_key: string
           type?: string
         }
         Update: {
           api_key?: string | null
+          base_url?: string | null
           created_at?: string
           default_model?: string
           id?: string
           is_active?: boolean
           name?: string
+          priority?: number
           provider_key?: string
           type?: string
         }
