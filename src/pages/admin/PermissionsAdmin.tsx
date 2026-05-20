@@ -165,8 +165,22 @@ export default function PermissionsAdmin() {
           </TabsList>
 
           <TabsContent value="modules" className="space-y-4">
-            <Card className="p-4 flex flex-col md:flex-row gap-3 md:items-end">
-              <div className="flex-1">
+            <Card className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3 md:items-end">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Empresa</label>
+                <Select value={companyFilter} onValueChange={(v) => { setCompanyFilter(v); }}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Todas as empresas" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-80">
+                    <SelectItem value="all">Todas as empresas</SelectItem>
+                    {companies.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <label className="text-xs font-medium text-muted-foreground">Buscar usuário</label>
                 <div className="relative mt-1">
                   <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-muted-foreground" />
@@ -178,13 +192,16 @@ export default function PermissionsAdmin() {
                   />
                 </div>
               </div>
-              <div className="md:w-80">
+              <div>
                 <label className="text-xs font-medium text-muted-foreground">Usuário selecionado</label>
-                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <Select value={selectedUserId} onValueChange={handleSelectUser}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Selecione um usuário" />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
+                    {filteredUsers.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">Nenhum usuário encontrado</div>
+                    )}
                     {filteredUsers.map((u: any) => (
                       <SelectItem key={u.id} value={u.id}>
                         {u.name || u.email}
