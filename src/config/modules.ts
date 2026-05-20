@@ -32,18 +32,31 @@ export interface ModuleDef {
 }
 
 export const MODULE_CATALOG: ModuleDef[] = [
-  // Gestão Whatsapp
+  // Gestão Whatsapp / Comunicação
   { key: "easyn-flow", defaultLabel: "Easyn Flow", defaultIcon: "Zap", defaultCategory: "gestao_whatsapp" },
+  { key: "whatsapp", defaultLabel: "WhatsApp Config", defaultIcon: "MessageCircle", defaultCategory: "gestao_whatsapp" },
+  { key: "autolead", defaultLabel: "AutoLead", defaultIcon: "Bot", defaultCategory: "gestao_whatsapp" },
+  { key: "sms", defaultLabel: "SMS", defaultIcon: "MessageSquare", defaultCategory: "gestao_whatsapp" },
+  { key: "meu-numero", defaultLabel: "Meu Número", defaultIcon: "Phone", defaultCategory: "gestao_whatsapp" },
+  { key: "telefonia", defaultLabel: "Telefonia", defaultIcon: "PhoneOutgoing", defaultCategory: "gestao_whatsapp" },
+  { key: "voicer", defaultLabel: "Easyn Voicer", defaultIcon: "Mic", defaultCategory: "gestao_whatsapp" },
+  { key: "audios", defaultLabel: "Áudios", defaultIcon: "Volume2", defaultCategory: "gestao_whatsapp" },
 
   // Captação
   { key: "proposal-generator", defaultLabel: "Gerador de Proposta", defaultIcon: "FileText", defaultCategory: "captacao" },
   { key: "activate-leads", defaultLabel: "Activate Leads", defaultIcon: "Zap", defaultCategory: "captacao" },
   { key: "leads", defaultLabel: "Leads Premium", defaultIcon: "TrendingUp", defaultCategory: "captacao" },
+  { key: "radar", defaultLabel: "Radar de Oportunidades", defaultIcon: "Radar", defaultCategory: "captacao" },
+  { key: "baseoff-consulta", defaultLabel: "Base OFF", defaultIcon: "Database", defaultCategory: "captacao" },
+  { key: "reaproveitamento", defaultLabel: "Reaproveitamento", defaultIcon: "RefreshCw", defaultCategory: "captacao" },
+  { key: "reuse-alerts", defaultLabel: "Painel de Oportunidades", defaultIcon: "Target", defaultCategory: "captacao" },
 
   // Televendas
   { key: "televendas", defaultLabel: "Televendas", defaultIcon: "PhoneCall", defaultCategory: "televendas" },
+  { key: "digitacao", defaultLabel: "Digitação", defaultIcon: "Keyboard", defaultCategory: "televendas" },
   { key: "digitacao-agibank", defaultLabel: "Digitação Agibank", defaultIcon: "Keyboard", defaultCategory: "televendas" },
   { key: "televendas-manage", defaultLabel: "Gestão de Televendas", defaultIcon: "Kanban", defaultCategory: "televendas" },
+  { key: "my-clients", defaultLabel: "Meus Clientes", defaultIcon: "Users", defaultCategory: "televendas" },
 
   // Financeiro
   { key: "finances", defaultLabel: "Finanças", defaultIcon: "Coins", defaultCategory: "financeiro" },
