@@ -15,6 +15,7 @@ import Billing from "./pages/Billing";
 import BillingSuccess from "./pages/BillingSuccess";
 import BillingCancel from "./pages/BillingCancel";
 import ModulesAdmin from "./pages/admin/ModulesAdmin";
+import EasynFlowAdmin from "./pages/admin/EasynFlowAdmin";
 import { TestDatabase } from "./components/TestDatabase";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => (
               <Route path="/billing/success" element={<BillingSuccess />} />
               <Route path="/billing/cancel" element={<BillingCancel />} />
               <Route path="/admin/modules" element={<ModulesAdmin />} />
+              <Route path="/admin/easyn-flow" element={<EasynFlowAdmin />} />
               <Route path="/test-database" element={<TestDatabase />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

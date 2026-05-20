@@ -6300,6 +6300,51 @@ export type Database = {
         }
         Relationships: []
       }
+      module_settings: {
+        Row: {
+          access_url: string | null
+          banner_image_url: string | null
+          buy_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_enabled: boolean
+          learn_more_url: string | null
+          module_name: string
+          subtitle: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_url?: string | null
+          banner_image_url?: string | null
+          buy_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_enabled?: boolean
+          learn_more_url?: string | null
+          module_name: string
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_url?: string | null
+          banner_image_url?: string | null
+          buy_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_enabled?: boolean
+          learn_more_url?: string | null
+          module_name?: string
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       modules: {
         Row: {
           active: boolean
