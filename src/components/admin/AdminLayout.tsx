@@ -28,7 +28,8 @@ export type AdminModule =
   | 'finance' 
   | 'system'
   | 'database'
-  | 'logs';
+  | 'logs'
+  | 'permissions';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
