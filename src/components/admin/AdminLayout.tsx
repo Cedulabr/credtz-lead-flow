@@ -29,7 +29,8 @@ export type AdminModule =
   | 'system'
   | 'database'
   | 'logs'
-  | 'permissions';
+  | 'permissions'
+  | 'easyn-flow';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
