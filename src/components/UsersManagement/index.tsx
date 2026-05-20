@@ -220,7 +220,6 @@ export function UsersManagement() {
       const { error } = await supabase.from("profiles").update(newPerms).eq("id", userId);
       if (error) throw error;
       toast({ title: "Permissões atualizadas!", description: "Permissões salvas com sucesso." });
-      setPermUser(null);
       loadUsers();
     } catch (e) {
       toast({ title: "Erro", description: "Erro ao atualizar permissões.", variant: "destructive" });
@@ -230,7 +229,7 @@ export function UsersManagement() {
   // ── Action handlers for components ──
   const actions = {
     onEdit: (u: UserData) => setEditUser(u),
-    onPermissions: (u: UserData) => setPermUser(u),
+    onPermissions: (u: UserData) => navigate(`/admin/permissions?user=${u.id}`),
     onSetPassword: (u: UserData) => setPassUser(u),
     onResetPassword: resetUserPassword,
     onToggleStatus: toggleUserStatus,
