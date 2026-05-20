@@ -96,6 +96,13 @@ const modules = [
     description: 'Módulos e menu por usuário',
     color: 'from-pink-500 to-pink-600'
   },
+  { 
+    id: 'easyn-flow' as AdminModule, 
+    label: 'Easyn Flow', 
+    icon: Bell,
+    description: 'Banner, links e imagem',
+    color: 'from-fuchsia-500 to-fuchsia-600'
+  },
 ];
 
 export function AdminLayout({ 
