@@ -265,12 +265,6 @@ export function UsersManagement() {
       )}
 
       {/* Modals */}
-      <UserPermissionsModal
-        open={!!permUser}
-        onOpenChange={(o) => !o && setPermUser(null)}
-        user={permUser}
-        onSave={updatePermissions}
-      />
 
       <UserEditModal
         open={!!editUser}
