@@ -73,7 +73,7 @@ export function AdminPanelNew() {
   return (
     <AdminLayout
       activeModule={activeModule}
-      onModuleChange={setActiveModule}
+      onModuleChange={handleModuleChange}
       pendingAlerts={pendingAlerts}
     >
       {renderModuleContent()}
