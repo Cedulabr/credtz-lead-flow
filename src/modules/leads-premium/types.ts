@@ -211,6 +211,15 @@ export const PIPELINE_STAGES: Record<string, {
     borderColor: "border-stone-300",
     dotColor: "bg-stone-500",
     order: 12
+  },
+  cliente_negativo: {
+    label: "Cliente Negativado",
+    color: "from-red-600 to-rose-700",
+    textColor: "text-red-800",
+    bgColor: "bg-red-50",
+    borderColor: "border-red-300",
+    dotColor: "bg-red-600",
+    order: 13
   }
 };
 
