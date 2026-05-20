@@ -88,6 +88,13 @@ const modules = [
     description: 'Atividades do sistema',
     color: 'from-orange-500 to-orange-600'
   },
+  { 
+    id: 'permissions' as AdminModule, 
+    label: 'Permissões', 
+    icon: Shield,
+    description: 'Módulos e menu por usuário',
+    color: 'from-pink-500 to-pink-600'
+  },
 ];
 
 export function AdminLayout({ 
