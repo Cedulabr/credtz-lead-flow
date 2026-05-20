@@ -48,6 +48,7 @@ import {
   LazyNotasModule,
   LazyTelefoniaModule,
   LazyReaproveitamentoModule,
+  LazyEasynFlowModule,
 } from "@/components/LazyComponents";
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -224,6 +225,7 @@ const Index = () => {
     telefonia: <LazyTelefoniaModule />,
     marketplace: <MarketplaceModule />,
     billing: <Billing />,
+    'easyn-flow': <LazyEasynFlowModule />,
   }), [setActiveTab]);
 
   // ── Render active tab ──────────────────────────────────────────────
