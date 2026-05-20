@@ -20,6 +20,10 @@ export function AdminPanelNew() {
       navigate('/admin/permissions');
       return;
     }
+    if (m === 'easyn-flow') {
+      navigate('/admin/easyn-flow');
+      return;
+    }
     setActiveModule(m);
   };
 
