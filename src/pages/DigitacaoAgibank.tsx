@@ -348,6 +348,7 @@ export default function DigitacaoAgibank() {
     if (!nome.trim()) e.nome = "Informe o nome do cliente";
     if (telefone.replace(/\D/g, "").length < 10) e.telefone = "Telefone inválido";
     if (!produto) e.produto = "Selecione um produto";
+    if (isLoas === null) e.isLoas = "Informe se o cliente é LOAS";
     if (!parcela || parcela <= 0) e.parcela = "Informe o valor da parcela";
     if (!rgFrente) e.rgFrente = "Envie o RG (frente)";
     if (!rgVerso) e.rgVerso = "Envie o RG (verso)";
