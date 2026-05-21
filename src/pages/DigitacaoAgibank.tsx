@@ -490,6 +490,7 @@ export default function DigitacaoAgibank() {
       setPrazoTotal(undefined);
       setParcelasAberto(undefined);
       setSaldoDevedor(undefined);
+      setIsLoas(null);
       setErrors({});
       goHome();
     } catch (err: any) {
