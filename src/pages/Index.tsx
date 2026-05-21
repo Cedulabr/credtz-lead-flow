@@ -235,6 +235,7 @@ const Index = () => {
     marketplace: <MarketplaceModule />,
     billing: <Billing />,
     'easyn-flow': <LazyEasynFlowModule />,
+    'leads-agibank': <LazyAgibankLeadsModule />,
   }), [setActiveTab]);
 
   // ── Render active tab ──────────────────────────────────────────────
