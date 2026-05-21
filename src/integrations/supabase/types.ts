@@ -1511,6 +1511,42 @@ export type Database = {
           },
         ]
       }
+      b2b_digitacoes: {
+        Row: {
+          atua_consignado: boolean
+          cpf_cnpj: string
+          created_at: string
+          email: string
+          id: string
+          ip_origem: string | null
+          nome_razao_social: string
+          rede_social: string | null
+          whatsapp: string
+        }
+        Insert: {
+          atua_consignado: boolean
+          cpf_cnpj: string
+          created_at?: string
+          email: string
+          id?: string
+          ip_origem?: string | null
+          nome_razao_social: string
+          rede_social?: string | null
+          whatsapp: string
+        }
+        Update: {
+          atua_consignado?: boolean
+          cpf_cnpj?: string
+          created_at?: string
+          email?: string
+          id?: string
+          ip_origem?: string | null
+          nome_razao_social?: string
+          rede_social?: string | null
+          whatsapp?: string
+        }
+        Relationships: []
+      }
       bank_reuse_settings: {
         Row: {
           bank_name: string
