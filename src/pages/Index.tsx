@@ -49,6 +49,7 @@ import {
   LazyTelefoniaModule,
   LazyReaproveitamentoModule,
   LazyEasynFlowModule,
+  LazyAgibankLeadsModule,
 } from "@/components/LazyComponents";
 import { useActiveModuleMap } from "@/hooks/useUserMenu";
 import { MODULE_BY_KEY } from "@/config/modules";
