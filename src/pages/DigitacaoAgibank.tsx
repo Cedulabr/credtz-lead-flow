@@ -320,6 +320,7 @@ export default function DigitacaoAgibank() {
   const [prazoTotal, setPrazoTotal] = useState<number | undefined>(undefined);
   const [parcelasAberto, setParcelasAberto] = useState<number | undefined>(undefined);
   const [saldoDevedor, setSaldoDevedor] = useState<number | undefined>(undefined);
+  const [isLoas, setIsLoas] = useState<boolean | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
