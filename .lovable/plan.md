@@ -1,93 +1,136 @@
-## Objetivo
+## Plan: Módulo "Leads Agibank"
 
-Substituir a sidebar atual por uma navegação hierárquica em accordions, alimentada dinamicamente por uma nova fonte de verdade (`module_permissions` + `menu_categories`). Itens permanecem invisíveis quando o usuário não tem permissão. Admin ganha um painel "Gerenciar Permissões" reformulado, com cards de módulos, drawer de configuração, categorias dinâmicas, preview do menu por usuário e log de auditoria.
+Replicar a arquitetura do módulo Leads Premium criando um novo módulo independente para leads do Agibank, com sistema de créditos por abertura, importação em lote, blacklist automática e ações de WhatsApp (API + link).
 
-## Estrutura do menu (final)
+---
 
-Sempre visível (hardcoded, não passa pela tabela):
-- Meus Dados → Perfil, Configurações da conta
-- Marketplace, Faturamento, Indicar
+### 1. Banco de Dados (migração Supabase)
 
-Dinâmico (vem de `module_permissions` + `menu_categories`):
-- Gestão Whatsapp, Captação, Televendas, Financeiro, Gestão, e qualquer categoria criada pelo admin
-- Cada categoria com 0 módulos ativos para o usuário fica oculta
-- Seção da rota atual auto-expande no load
+**Tabelas novas:**
 
-## Banco de dados
+- `agibank_leads`
+  - `id`, `created_at`, `updated_at`
+  - `agent_id` (uuid → auth.users)
+  - `company_id` (uuid → companies) — necessário para escopo do gestor (padrão do projeto)
+  - `name`, `phone` (text, apenas dígitos), `document` (cpf)
+  - `status` (enum): `novo | em_andamento | nao_e_whatsapp | nao_e_cliente | sem_interesse | cliente_fechado | agendado`
+  - `scheduled_at` (timestamptz, null)
+  - `credits_cost` (int, default 1)
+  - `first_opened_at` (timestamptz, null) — controla se já foi cobrado
+  - `notes` (text)
+  - `list_id` (uuid → agibank_lead_lists, null)
 
-### Nova tabela `menu_categories` (categorias dinâmicas)
-Campos de domínio: `key` (slug único), `label`, `icon`, `position`, `is_system` (true = não pode deletar, ex.: Capação/Televendas seed inicial).
-RLS: leitura para qualquer autenticado; insert/update/delete só admin.
+- `agibank_lead_lists`
+  - `id`, `created_at`, `uploaded_by`, `company_id`
+  - `file_name`, `total_rows`, `imported_rows`, `skipped_duplicates`, `skipped_blacklist`
 
-### Nova tabela `module_permissions` (por usuário)
-Campos de domínio: `user_id`, `module_key`, `is_active`, `category_key` (FK lógica para `menu_categories.key`), `display_name`, `icon`, `position`.
-Unique (`user_id`, `module_key`).
-RLS: usuário lê o próprio; admin lê/escreve tudo.
+- `agibank_blacklist`
+  - `id`, `phone` (unique), `reason`, `added_by`, `created_at`
 
-### Nova tabela `admin_audit_log`
-Campos de domínio: `action` (`module_enabled`, `module_disabled`, `module_recategorized`, `category_created`, etc.), `module_key`, `target_user_id`, `changed_by`, `payload` (jsonb), `created_at`.
-RLS: insert via trigger/RPC; select só admin.
+- `agibank_credits`
+  - `id`, `user_id` (unique), `balance` (int, default 0), `updated_at`
 
-### Catálogo de módulos
-Registro estático no frontend (`src/config/modules.ts`) com: `key`, `defaultLabel`, `defaultIcon`, `defaultCategory`, `route`, descrição. Lista canônica dos 19 módulos do prompt. O admin só atribui/sobrescreve esses metadados na tabela.
+**Funções e triggers:**
+- `agibank_consume_credit(_lead_id)` — SECURITY DEFINER, marca `first_opened_at`, debita 1 do `agibank_credits.balance` do agente. Retorna `{ success, balance, error }`.
+- Trigger em `agibank_leads`: ao mudar `status` para `sem_interesse`, insere `phone` em `agibank_blacklist` (ON CONFLICT DO NOTHING).
+- `agibank_add_credits(_user_id, _amount)` — SECURITY DEFINER, gestor/admin.
 
-### Migração das permissões existentes
-Script SQL que lê as colunas `can_access_*` do `profiles` e popula `module_permissions` 1×1 por usuário, mapeando para `module_key` + `category_key` padrão do catálogo. Após validado, as colunas antigas e a RPC `sync_permission_columns` podem ser descontinuadas (passo manual, fora desta entrega).
+**RLS (padrão do projeto via `has_role_safe`):**
+- Agente: SELECT/UPDATE somente onde `agent_id = auth.uid()`
+- Gestor: SELECT/UPDATE no mesmo `company_id`
+- Admin: tudo
+- INSERT em `agibank_leads`: gestor/admin
+- `agibank_blacklist`: SELECT gestor/admin, DELETE admin
+- `agibank_credits`: SELECT próprio, UPDATE somente via RPCs
 
-## Frontend
+---
 
-### Sidebar (`src/components/layout/SidebarNav.tsx` — redesenho in-place)
-- Novo hook `useUserMenu()` que faz: `menu_categories` (todas) + `module_permissions` do `auth.uid()` onde `is_active = true`, agrupa por `category_key`, ordena por `position`.
-- Renderiza accordions colapsáveis (componente `Collapsible` do shadcn) com chevron, ícone, label e contador.
-- Seção contendo a rota atual abre por default.
-- Item ativo destacado com `bg-primary/15 text-primary`.
-- Mobile: rail icon-only com Tooltip; expande em sheet.
-- Sem itens em uma categoria → categoria some.
+### 2. Edge Function
 
-### Admin "Gerenciar Permissões" (`src/pages/admin/PermissionsAdmin.tsx`)
-- Header: seletor de usuário (busca por nome/email) + botão "Pré-visualizar menu deste usuário" (abre dialog com a sidebar renderizada read-only).
-- Grid de cards (um por módulo do catálogo) mostrando: ícone, nome, badge Ativo/Inativo, categoria atual, switch on/off rápido, botão "Configurar".
-- Drawer lateral (shadcn `Sheet` right) com: toggle ativo, select de categoria (inclui "+ Nova categoria…" abrindo mini-form inline), input display name, seletor de ícone (grid de ícones Lucide pré-curados), input numérico de posição, botão Salvar.
-- Aba/seção "Categorias" para CRUD de `menu_categories` (criar, renomear, reordenar, excluir não-system).
-- Toda mutação grava em `admin_audit_log` via RPC `log_admin_action`.
-- Atualização otimista (TanStack Query `setQueryData`) para refletir mudanças instantaneamente.
+`agibank-import-leads` — recebe array de `{name, phone, document}` + `assignment_mode` (`round_robin` | `manual`) + `agent_ids[]`. Cria registro em `agibank_lead_lists`, valida telefones, filtra duplicatas (já existentes em `agibank_leads`) e blacklist, distribui agentes, retorna contagens.
 
-### Substituição do `PermissionGate`
-- Atualizar `PermissionGate` para consultar `module_permissions` (via contexto cacheado) em vez de `profile.can_access_*`. Mantém a mesma API pública para não quebrar callers.
+---
 
-## Arquivos
+### 3. Frontend — Módulo
 
-Criar:
-- `supabase/migrations/<ts>_module_permissions_system.sql`
-- `src/config/modules.ts` (catálogo + ícones default)
-- `src/hooks/useUserMenu.ts`
-- `src/hooks/useModulePermissions.ts` (admin: CRUD)
-- `src/hooks/useMenuCategories.ts`
-- `src/pages/admin/PermissionsAdmin.tsx`
-- `src/components/admin/ModuleCard.tsx`
-- `src/components/admin/ModuleConfigDrawer.tsx`
-- `src/components/admin/CategoriesManager.tsx`
-- `src/components/admin/UserMenuPreview.tsx`
-- `src/components/layout/SidebarSection.tsx` (accordion item)
-- `src/components/layout/IconPicker.tsx`
+Estrutura espelhando `src/modules/leads-premium/`:
 
-Editar:
-- `src/components/layout/SidebarNav.tsx` (redesenho)
-- `src/components/PermissionGate.tsx` (nova fonte)
-- `src/App.tsx` (rota `/admin/permissions` apontando para nova página; remover/redirecionar antiga)
-- `src/components/admin/AdminLayout.tsx` (entrada do módulo de permissões)
-- `src/pages/admin/ModulesAdmin.tsx` (ajustar/integrar se conflitar)
+```
+src/modules/leads-agibank/
+  AgibankLeadsModule.tsx          (entry)
+  index.ts
+  types.ts                         (status enum, labels, cores)
+  hooks/
+    useAgibankLeads.ts            (list + filter + status update + consume credit)
+    useAgibankCredits.ts          (balance do agente logado, top-up para gestor)
+    useAgibankImport.ts           (upload CSV/XLSX via edge function)
+    useAgibankBlacklist.ts        (admin only)
+  components/
+    LeadCard.tsx                  (nome, fone mascarado, badge, 2 botões WA)
+    LeadDrawer.tsx                (detalhes + notes + status dropdown + datepicker)
+    FilterTabs.tsx                (pílulas horizontais)
+    ImportModal.tsx               (upload + preview + assignment)
+    CreditBadge.tsx               (mostra saldo + modal de bloqueio se 0)
+    NoCreditsModal.tsx
+    BlacklistManager.tsx          (admin)
+  views/
+    LeadsListView.tsx             (filtro + grid de cards)
+```
 
-## Detalhes técnicos
+Reaproveita:
+- Botão verde padrão `bg-green-600` + ícone Send para "API WhatsApp" (memória do projeto)
+- `useGestorCompany`, `has_role_safe`, padrões de signed URL N/A aqui
+- Edge function existente `send-whatsapp` (Evolution API) — sem criar nova
 
-- RLS de `module_permissions`: select usa `auth.uid() = user_id OR has_role_safe(auth.uid(),'admin')`. Mutações: `has_role_safe(auth.uid(),'admin')`.
-- RPC `log_admin_action(action text, module_key text, target_user_id uuid, payload jsonb)` SECURITY DEFINER para garantir gravação no audit log mesmo quando RLS está restritivo.
-- Catálogo de módulos no frontend evita "modules table" — admin não cria módulos novos, só ativa/recategoriza/relabela os existentes. Adicionar novo módulo = nova entrada em `src/config/modules.ts`.
-- Categorias seed iniciais (is_system=true): `gestao_whatsapp`, `captacao`, `televendas`, `financeiro`, `gestao`.
-- Realtime opcional (fora do escopo): poderia escutar mudanças em `module_permissions` do próprio usuário para refletir promoções instantaneamente; por ora, refetch após login/refresh.
+---
 
-## Fora do escopo
+### 4. Integração no Sidebar / Permissões
 
-- Roles/empresas (mantém `profiles.role` atual; só admin acessa o painel).
-- Remoção física das colunas `can_access_*` do `profiles` (manter como fallback até validação em produção).
-- Telemetria avançada / Notificações ao usuário quando ganha módulo novo.
+- Adicionar entrada em `src/config/modules.ts`:
+  `{ key: "leads-agibank", defaultLabel: "Leads Agibank", defaultIcon: "TrendingUp", defaultCategory: "captacao" }`
+- Adicionar case no `Index.tsx` para renderizar `<AgibankLeadsModule />`
+- Permissão dinâmica já será gerenciada pelo módulo `/admin/permissions` automaticamente
+
+---
+
+### 5. Permissão de Importação / Blacklist / Créditos
+
+Controle puramente por role no frontend (`has_role_safe` no backend já bloqueia):
+- `ImportModal` visível para `admin | gestor`
+- `BlacklistManager` (sub-aba) visível só para `admin`
+- Botão "Adicionar créditos" no card do agente (dentro de `UsersManagement` existente) — `admin | gestor`
+
+---
+
+### 6. Comportamento detalhado
+
+- Ao abrir o `LeadDrawer` pela primeira vez (agente): chama `agibank_consume_credit`. Se retornar `success: false` → fecha drawer e abre `NoCreditsModal`.
+- Saldo zero: clique em qualquer card abre `NoCreditsModal` (não baixa crédito de novo se já abriu antes — `first_opened_at != null` libera reabertura grátis).
+- Mudança de status no dropdown → auto-save + toast.
+- Status `agendado` mostra `DatePicker` (shadcn) inline; `scheduled_at` obrigatório.
+- Status `sem_interesse` → trigger adiciona à blacklist + toast.
+- Telefone mascarado: `(••) •••••-1234`.
+- Botão "WhatsApp link" → `window.open('https://wa.me/55' + phone)`.
+- Botão "API WhatsApp" → chama edge function `send-whatsapp` com template padrão (mensagem editável em modal rápido).
+
+---
+
+### 7. Validação técnica
+
+- Zod schema para upload (name string, phone 10–11 dígitos, document 11 dígitos)
+- CSV parser: usar `papaparse` (já presente) ou parser inline
+- XLSX: `xlsx` (verificar se já existe no projeto; se não, adicionar)
+
+---
+
+### Ordem de execução
+
+1. Migração Supabase (tabelas + RLS + funções + trigger)
+2. Edge function `agibank-import-leads`
+3. Tipos + hooks
+4. Componentes (LeadCard, FilterTabs, CreditBadge, LeadDrawer, ImportModal, NoCreditsModal, BlacklistManager)
+5. View principal + entry module
+6. Registrar no `config/modules.ts` + `Index.tsx`
+7. Top-up de créditos em `UsersManagement`
+
+Aprovação necessária antes da migração (passo 1).
