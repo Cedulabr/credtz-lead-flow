@@ -211,3 +211,4 @@ export const LazyNotasModule = withLazyLoading(NotasModule, DashboardSkeleton);
 export const LazyTelefoniaModule = withLazyLoading(TelefoniaModule, FormSkeleton);
 export const LazyReaproveitamentoModule = withLazyLoading(ReaproveitamentoModule, TableSkeleton);
 export const LazyEasynFlowModule = withLazyLoading(EasynFlowModule, FormSkeleton);
+export const LazyAgibankLeadsModule = withLazyLoading(AgibankLeadsModule, TableSkeleton);
