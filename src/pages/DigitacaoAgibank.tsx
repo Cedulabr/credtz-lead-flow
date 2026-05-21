@@ -416,11 +416,12 @@ export default function DigitacaoAgibank() {
         portabilidade: "portabilidade",
       };
 
+      const loasTag = `LOAS: ${isLoas ? "Sim" : "Não"}`;
       const observacao = isPort
         ? `Portabilidade — Banco originador: ${bancoOriginador}; Prazo total: ${prazoTotal}x; Parcelas em aberto: ${parcelasAberto}; Saldo devedor: ${formatBRL(
             saldoDevedor || 0
-          )}; Fator ${prazo}x: ${calcPort!.fator.toFixed(6)}`
-        : `Origem: Digitação Agibank — ${produto}`;
+          )}; Fator ${prazo}x: ${calcPort!.fator.toFixed(6)} | ${loasTag}`
+        : `Origem: Digitação Agibank — ${produto} | ${loasTag}`;
 
       // 1) Insert na tabela própria do módulo
       const { error: errDig } = await supabase
