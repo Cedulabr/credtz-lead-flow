@@ -320,6 +320,7 @@ export default function DigitacaoAgibank() {
   const [prazoTotal, setPrazoTotal] = useState<number | undefined>(undefined);
   const [parcelasAberto, setParcelasAberto] = useState<number | undefined>(undefined);
   const [saldoDevedor, setSaldoDevedor] = useState<number | undefined>(undefined);
+  const [isLoas, setIsLoas] = useState<boolean | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -347,6 +348,7 @@ export default function DigitacaoAgibank() {
     if (!nome.trim()) e.nome = "Informe o nome do cliente";
     if (telefone.replace(/\D/g, "").length < 10) e.telefone = "Telefone inválido";
     if (!produto) e.produto = "Selecione um produto";
+    if (isLoas === null) e.isLoas = "Informe se o cliente é LOAS";
     if (!parcela || parcela <= 0) e.parcela = "Informe o valor da parcela";
     if (!rgFrente) e.rgFrente = "Envie o RG (frente)";
     if (!rgVerso) e.rgVerso = "Envie o RG (verso)";
@@ -414,11 +416,12 @@ export default function DigitacaoAgibank() {
         portabilidade: "portabilidade",
       };
 
+      const loasTag = `LOAS: ${isLoas ? "Sim" : "Não"}`;
       const observacao = isPort
         ? `Portabilidade — Banco originador: ${bancoOriginador}; Prazo total: ${prazoTotal}x; Parcelas em aberto: ${parcelasAberto}; Saldo devedor: ${formatBRL(
             saldoDevedor || 0
-          )}; Fator ${prazo}x: ${calcPort!.fator.toFixed(6)}`
-        : `Origem: Digitação Agibank — ${produto}`;
+          )}; Fator ${prazo}x: ${calcPort!.fator.toFixed(6)} | ${loasTag}`
+        : `Origem: Digitação Agibank — ${produto} | ${loasTag}`;
 
       // 1) Insert na tabela própria do módulo
       const { error: errDig } = await supabase
@@ -487,6 +490,7 @@ export default function DigitacaoAgibank() {
       setPrazoTotal(undefined);
       setParcelasAberto(undefined);
       setSaldoDevedor(undefined);
+      setIsLoas(null);
       setErrors({});
       goHome();
     } catch (err: any) {
@@ -636,6 +640,41 @@ export default function DigitacaoAgibank() {
                   inputMode="tel"
                 />
                 {errors.telefone && <p className="text-xs text-red-600">{errors.telefone}</p>}
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <Label>Cliente é LOAS / BPC?</Label>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                    Obrigatório
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsLoas(true)}
+                    className={cn(
+                      "flex-1 h-10 rounded-lg border text-sm font-medium transition-colors",
+                      isLoas === true
+                        ? "bg-amber-500 text-white border-amber-500"
+                        : "bg-background hover:bg-secondary"
+                    )}
+                  >
+                    Sim, é LOAS
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsLoas(false)}
+                    className={cn(
+                      "flex-1 h-10 rounded-lg border text-sm font-medium transition-colors",
+                      isLoas === false
+                        ? "bg-emerald-600 text-white border-emerald-600"
+                        : "bg-background hover:bg-secondary"
+                    )}
+                  >
+                    Não é LOAS
+                  </button>
+                </div>
+                {errors.isLoas && <p className="text-xs text-red-600">{errors.isLoas}</p>}
               </div>
             </div>
           </section>
