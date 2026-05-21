@@ -562,6 +562,146 @@ export type Database = {
         }
         Relationships: []
       }
+      agibank_blacklist: {
+        Row: {
+          added_by: string | null
+          created_at: string
+          id: string
+          phone: string
+          reason: string | null
+        }
+        Insert: {
+          added_by?: string | null
+          created_at?: string
+          id?: string
+          phone: string
+          reason?: string | null
+        }
+        Update: {
+          added_by?: string | null
+          created_at?: string
+          id?: string
+          phone?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
+      agibank_credits: {
+        Row: {
+          balance: number
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      agibank_lead_lists: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          file_name: string
+          id: string
+          imported_rows: number
+          skipped_blacklist: number
+          skipped_duplicates: number
+          total_rows: number
+          uploaded_by: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          file_name: string
+          id?: string
+          imported_rows?: number
+          skipped_blacklist?: number
+          skipped_duplicates?: number
+          total_rows?: number
+          uploaded_by: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          file_name?: string
+          id?: string
+          imported_rows?: number
+          skipped_blacklist?: number
+          skipped_duplicates?: number
+          total_rows?: number
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
+      agibank_leads: {
+        Row: {
+          agent_id: string | null
+          company_id: string | null
+          created_at: string
+          credits_cost: number
+          document: string | null
+          first_opened_at: string | null
+          id: string
+          list_id: string | null
+          name: string
+          notes: string | null
+          phone: string
+          scheduled_at: string | null
+          status: Database["public"]["Enums"]["agibank_lead_status"]
+          updated_at: string
+        }
+        Insert: {
+          agent_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          credits_cost?: number
+          document?: string | null
+          first_opened_at?: string | null
+          id?: string
+          list_id?: string | null
+          name: string
+          notes?: string | null
+          phone: string
+          scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["agibank_lead_status"]
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          credits_cost?: number
+          document?: string | null
+          first_opened_at?: string | null
+          id?: string
+          list_id?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string
+          scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["agibank_lead_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agibank_leads_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "agibank_lead_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agents: {
         Row: {
           accepts_payment: boolean | null
@@ -11471,6 +11611,11 @@ export type Database = {
         }
         Returns: Json
       }
+      agibank_add_credits: {
+        Args: { _amount: number; _user_id: string }
+        Returns: Json
+      }
+      agibank_consume_credit: { Args: { _lead_id: string }; Returns: Json }
       autolead_increment_failed: {
         Args: { p_job_id: string }
         Returns: undefined
@@ -12061,6 +12206,14 @@ export type Database = {
         | "remove_record"
         | "justify_absence"
         | "other"
+      agibank_lead_status:
+        | "novo"
+        | "em_andamento"
+        | "nao_e_whatsapp"
+        | "nao_e_cliente"
+        | "sem_interesse"
+        | "cliente_fechado"
+        | "agendado"
       app_role: "admin" | "partner"
       chatbot_flow_status: "draft" | "active" | "paused"
       chatbot_run_status:
@@ -12242,6 +12395,15 @@ export const Constants = {
         "remove_record",
         "justify_absence",
         "other",
+      ],
+      agibank_lead_status: [
+        "novo",
+        "em_andamento",
+        "nao_e_whatsapp",
+        "nao_e_cliente",
+        "sem_interesse",
+        "cliente_fechado",
+        "agendado",
       ],
       app_role: ["admin", "partner"],
       chatbot_flow_status: ["draft", "active", "paused"],
