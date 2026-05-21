@@ -46,6 +46,7 @@ export const MODULE_CATALOG: ModuleDef[] = [
   { key: "proposal-generator", defaultLabel: "Gerador de Proposta", defaultIcon: "FileText", defaultCategory: "captacao" },
   { key: "activate-leads", defaultLabel: "Activate Leads", defaultIcon: "Zap", defaultCategory: "captacao" },
   { key: "leads", defaultLabel: "Leads Premium", defaultIcon: "TrendingUp", defaultCategory: "captacao" },
+  { key: "leads-agibank", defaultLabel: "Leads Agibank", defaultIcon: "TrendingUp", defaultCategory: "captacao" },
   { key: "radar", defaultLabel: "Radar de Oportunidades", defaultIcon: "Radar", defaultCategory: "captacao" },
   { key: "baseoff-consulta", defaultLabel: "Base OFF", defaultIcon: "Database", defaultCategory: "captacao" },
   { key: "reaproveitamento", defaultLabel: "Reaproveitamento", defaultIcon: "RefreshCw", defaultCategory: "captacao" },
