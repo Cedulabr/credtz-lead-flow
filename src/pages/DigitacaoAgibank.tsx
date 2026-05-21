@@ -641,6 +641,41 @@ export default function DigitacaoAgibank() {
                 />
                 {errors.telefone && <p className="text-xs text-red-600">{errors.telefone}</p>}
               </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <Label>Cliente é LOAS / BPC?</Label>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                    Obrigatório
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsLoas(true)}
+                    className={cn(
+                      "flex-1 h-10 rounded-lg border text-sm font-medium transition-colors",
+                      isLoas === true
+                        ? "bg-amber-500 text-white border-amber-500"
+                        : "bg-background hover:bg-secondary"
+                    )}
+                  >
+                    Sim, é LOAS
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsLoas(false)}
+                    className={cn(
+                      "flex-1 h-10 rounded-lg border text-sm font-medium transition-colors",
+                      isLoas === false
+                        ? "bg-emerald-600 text-white border-emerald-600"
+                        : "bg-background hover:bg-secondary"
+                    )}
+                  >
+                    Não é LOAS
+                  </button>
+                </div>
+                {errors.isLoas && <p className="text-xs text-red-600">{errors.isLoas}</p>}
+              </div>
             </div>
           </section>
 
