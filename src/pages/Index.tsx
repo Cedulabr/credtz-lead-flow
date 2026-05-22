@@ -53,6 +53,7 @@ import {
 } from "@/components/LazyComponents";
 import { useActiveModuleMap } from "@/hooks/useUserMenu";
 import { MODULE_BY_KEY } from "@/config/modules";
+import { MODULE_TO_PROFILE_FLAG } from "@/config/permissionFlags";
 
 // ── Types ─────────────────────────────────────────────────────────────
 type TabConfig = {
