@@ -1,136 +1,67 @@
-## Plan: Módulo "Leads Agibank"
+## Diagnóstico
 
-Replicar a arquitetura do módulo Leads Premium criando um novo módulo independente para leads do Agibank, com sistema de créditos por abertura, importação em lote, blacklist automática e ações de WhatsApp (API + link).
+Conferi os dados e o código. Os usuários afetados (`alessandroalves` gestor, `analuiza` colaborador) **têm linhas `is_active=true` em `module_permissions`** para os dois módulos, **têm `user_companies` ativos** e os módulos estão registrados em `MODULE_CATALOG`, `LazyComponents` e `Index.tsx`. Mesmo assim "não carregam".
 
----
+Identifiquei três causas combinadas:
 
-### 1. Banco de Dados (migração Supabase)
+### 1. `module_permissions` não está em `supabase_realtime`
+A correção anterior (subscription realtime no `useUserMenu`) não tem efeito — a tabela **não está publicada**. Resultado: quando você ativa um módulo no admin, a sessão do usuário só recebe via `refetchOnWindowFocus` (5s + voltar à aba). Em muitos casos o usuário fica olhando o menu antigo achando que "não carregou".
 
-**Tabelas novas:**
-
-- `agibank_leads`
-  - `id`, `created_at`, `updated_at`
-  - `agent_id` (uuid → auth.users)
-  - `company_id` (uuid → companies) — necessário para escopo do gestor (padrão do projeto)
-  - `name`, `phone` (text, apenas dígitos), `document` (cpf)
-  - `status` (enum): `novo | em_andamento | nao_e_whatsapp | nao_e_cliente | sem_interesse | cliente_fechado | agendado`
-  - `scheduled_at` (timestamptz, null)
-  - `credits_cost` (int, default 1)
-  - `first_opened_at` (timestamptz, null) — controla se já foi cobrado
-  - `notes` (text)
-  - `list_id` (uuid → agibank_lead_lists, null)
-
-- `agibank_lead_lists`
-  - `id`, `created_at`, `uploaded_by`, `company_id`
-  - `file_name`, `total_rows`, `imported_rows`, `skipped_duplicates`, `skipped_blacklist`
-
-- `agibank_blacklist`
-  - `id`, `phone` (unique), `reason`, `added_by`, `created_at`
-
-- `agibank_credits`
-  - `id`, `user_id` (unique), `balance` (int, default 0), `updated_at`
-
-**Funções e triggers:**
-- `agibank_consume_credit(_lead_id)` — SECURITY DEFINER, marca `first_opened_at`, debita 1 do `agibank_credits.balance` do agente. Retorna `{ success, balance, error }`.
-- Trigger em `agibank_leads`: ao mudar `status` para `sem_interesse`, insere `phone` em `agibank_blacklist` (ON CONFLICT DO NOTHING).
-- `agibank_add_credits(_user_id, _amount)` — SECURITY DEFINER, gestor/admin.
-
-**RLS (padrão do projeto via `has_role_safe`):**
-- Agente: SELECT/UPDATE somente onde `agent_id = auth.uid()`
-- Gestor: SELECT/UPDATE no mesmo `company_id`
-- Admin: tudo
-- INSERT em `agibank_leads`: gestor/admin
-- `agibank_blacklist`: SELECT gestor/admin, DELETE admin
-- `agibank_credits`: SELECT próprio, UPDATE somente via RPCs
-
----
-
-### 2. Edge Function
-
-`agibank-import-leads` — recebe array de `{name, phone, document}` + `assignment_mode` (`round_robin` | `manual`) + `agent_ids[]`. Cria registro em `agibank_lead_lists`, valida telefones, filtra duplicatas (já existentes em `agibank_leads`) e blacklist, distribui agentes, retorna contagens.
-
----
-
-### 3. Frontend — Módulo
-
-Estrutura espelhando `src/modules/leads-premium/`:
-
+### 2. Gate em `Index.tsx` retorna falso durante o carregamento das permissões
+```ts
+if (MODULE_BY_KEY[activeTab]) {
+  return activeModules[activeTab] === true;   // undefined no 1º render
+}
 ```
-src/modules/leads-agibank/
-  AgibankLeadsModule.tsx          (entry)
-  index.ts
-  types.ts                         (status enum, labels, cores)
-  hooks/
-    useAgibankLeads.ts            (list + filter + status update + consume credit)
-    useAgibankCredits.ts          (balance do agente logado, top-up para gestor)
-    useAgibankImport.ts           (upload CSV/XLSX via edge function)
-    useAgibankBlacklist.ts        (admin only)
-  components/
-    LeadCard.tsx                  (nome, fone mascarado, badge, 2 botões WA)
-    LeadDrawer.tsx                (detalhes + notes + status dropdown + datepicker)
-    FilterTabs.tsx                (pílulas horizontais)
-    ImportModal.tsx               (upload + preview + assignment)
-    CreditBadge.tsx               (mostra saldo + modal de bloqueio se 0)
-    NoCreditsModal.tsx
-    BlacklistManager.tsx          (admin)
-  views/
-    LeadsListView.tsx             (filtro + grid de cards)
+No primeiro render `useUserMenu` ainda está em loading → `activeModules` vazio → `BlockedAccess` aparece. Se o usuário entra direto via deep-link ou refresh, vê a tela bloqueada por uma fração de segundo (e às vezes ela "fica") em vez do conteúdo.
+
+### 3. Falta de feedback / instrumentação
+Não há nenhum `console.log` ou Error Boundary específico nesses módulos, então não dá para diferenciar "bloqueado por permissão" de "componente quebrou ao carregar" de "permissão ainda carregando". Hoje é tudo a mesma tela em branco/bloqueada.
+
+## Plano de correção
+
+### Passo 1 — Habilitar realtime de verdade em `module_permissions`
+Migração:
+```sql
+ALTER TABLE public.module_permissions REPLICA IDENTITY FULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.module_permissions;
 ```
+Com isso, a subscription que já existe em `useUserMenu` passa a invalidar o cache do usuário **imediatamente** quando o admin clica no toggle. Liberação instantânea, sem F5.
 
-Reaproveita:
-- Botão verde padrão `bg-green-600` + ícone Send para "API WhatsApp" (memória do projeto)
-- `useGestorCompany`, `has_role_safe`, padrões de signed URL N/A aqui
-- Edge function existente `send-whatsapp` (Evolution API) — sem criar nova
+### Passo 2 — Corrigir `hasPermission` em `src/pages/Index.tsx`
+Trocar a checagem por uma versão consciente do estado de loading:
+- Enquanto `useUserMenu` está carregando → mostrar `LoadingAuth` (mesmo skeleton do auth), não `BlockedAccess`.
+- Só decidir bloquear depois que `permissions` chegar.
+- Adicionar fallback: se `MODULE_BY_KEY[activeTab]` existe **e** o perfil tem a flag legada `can_access_*` ligada, tratar como liberado (compatibilidade com permissões antigas que ainda não foram migradas para `module_permissions`).
 
----
+### Passo 3 — Sincronizar legado ↔ novo
+Quando o admin ativa um módulo em `PermissionsAdmin`, também gravar a flag `can_access_*` correspondente no `profiles` (apenas para os módulos que ainda têm coluna no `profiles`). Mapa:
+- `time-clock` → `can_access_controle_ponto`
+- `leads-agibank` → (criar) ou apenas confiar em `module_permissions`
+- demais já mapeados em `TAB_PERMISSIONS`.
 
-### 4. Integração no Sidebar / Permissões
+Isso elimina a divergência entre as duas fontes de verdade e dá segurança para componentes que ainda leem `profile.can_access_*` diretamente.
 
-- Adicionar entrada em `src/config/modules.ts`:
-  `{ key: "leads-agibank", defaultLabel: "Leads Agibank", defaultIcon: "TrendingUp", defaultCategory: "captacao" }`
-- Adicionar case no `Index.tsx` para renderizar `<AgibankLeadsModule />`
-- Permissão dinâmica já será gerenciada pelo módulo `/admin/permissions` automaticamente
+### Passo 4 — Instrumentação para acelerar diagnósticos futuros
+- Envolver cada `Lazy*Module` em `Index.tsx` num `<ErrorBoundary>` que loga `console.error` com `moduleKey` e mostra um card "Falha ao carregar módulo X — recarregar".
+- Adicionar `console.debug('[perm]', activeTab, activeModules[activeTab], isLoading)` no `renderActiveComponent` (removível depois).
 
----
+### Passo 5 — Validar
+- Logar com conta `analuiza@credtz.com` (preview), abrir `time-clock` e `leads-agibank`, conferir que carregam.
+- Toggle no admin → confirmar que o menu do outro usuário atualiza em < 1s sem refresh (realtime).
+- Conferir Edge Logs e console limpos.
 
-### 5. Permissão de Importação / Blacklist / Créditos
+## Detalhes técnicos / Arquivos a alterar
 
-Controle puramente por role no frontend (`has_role_safe` no backend já bloqueia):
-- `ImportModal` visível para `admin | gestor`
-- `BlacklistManager` (sub-aba) visível só para `admin`
-- Botão "Adicionar créditos" no card do agente (dentro de `UsersManagement` existente) — `admin | gestor`
+| Arquivo | Mudança |
+|---|---|
+| `supabase/migrations/<novo>.sql` | `REPLICA IDENTITY FULL` + `ADD TABLE` na publicação |
+| `src/pages/Index.tsx` | `hasPermission` ciente do loading + fallback `can_access_*`; envolver módulos em ErrorBoundary |
+| `src/hooks/useUserMenu.ts` | Expor `isLoading` de `permissions` para o gate |
+| `src/pages/admin/PermissionsAdmin.tsx` | Ao togglar, também `update profiles set can_access_*` para módulos com flag legada |
+| `src/components/ModuleErrorBoundary.tsx` (novo) | Boundary leve com botão "Tentar novamente" |
 
----
+## Fora do escopo
+- Não vou alterar a UI do menu, dos módulos, nem regras de negócio internas (RLS de `agibank_leads`, lógica de ponto). Só permissão/visibilidade/carregamento.
 
-### 6. Comportamento detalhado
-
-- Ao abrir o `LeadDrawer` pela primeira vez (agente): chama `agibank_consume_credit`. Se retornar `success: false` → fecha drawer e abre `NoCreditsModal`.
-- Saldo zero: clique em qualquer card abre `NoCreditsModal` (não baixa crédito de novo se já abriu antes — `first_opened_at != null` libera reabertura grátis).
-- Mudança de status no dropdown → auto-save + toast.
-- Status `agendado` mostra `DatePicker` (shadcn) inline; `scheduled_at` obrigatório.
-- Status `sem_interesse` → trigger adiciona à blacklist + toast.
-- Telefone mascarado: `(••) •••••-1234`.
-- Botão "WhatsApp link" → `window.open('https://wa.me/55' + phone)`.
-- Botão "API WhatsApp" → chama edge function `send-whatsapp` com template padrão (mensagem editável em modal rápido).
-
----
-
-### 7. Validação técnica
-
-- Zod schema para upload (name string, phone 10–11 dígitos, document 11 dígitos)
-- CSV parser: usar `papaparse` (já presente) ou parser inline
-- XLSX: `xlsx` (verificar se já existe no projeto; se não, adicionar)
-
----
-
-### Ordem de execução
-
-1. Migração Supabase (tabelas + RLS + funções + trigger)
-2. Edge function `agibank-import-leads`
-3. Tipos + hooks
-4. Componentes (LeadCard, FilterTabs, CreditBadge, LeadDrawer, ImportModal, NoCreditsModal, BlacklistManager)
-5. View principal + entry module
-6. Registrar no `config/modules.ts` + `Index.tsx`
-7. Top-up de créditos em `UsersManagement`
-
-Aprovação necessária antes da migração (passo 1).
+Se concordar, sigo para implementação.
