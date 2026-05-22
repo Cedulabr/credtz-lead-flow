@@ -119,6 +119,16 @@ export default function PermissionsAdmin() {
         .from("module_permissions" as any)
         .upsert(row, { onConflict: "user_id,module_key" });
       if (error) throw error;
+
+      // Sync legacy profile flag so older components (and Index fallback) stay in sync.
+      const legacyFlag = MODULE_TO_PROFILE_FLAG[payload.module_key];
+      if (legacyFlag) {
+        await supabase
+          .from("profiles")
+          .update({ [legacyFlag]: row.is_active } as any)
+          .eq("id", selectedUserId);
+      }
+
       await supabase.rpc("log_admin_action" as any, {
         _action: payload.is_active === false ? "module_disabled" : "module_updated",
         _module_key: payload.module_key,
