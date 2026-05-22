@@ -138,12 +138,12 @@ export function useUserMenu(userId?: string) {
   return { sections, isLoading, categories: cats.data || [], permissions: perms.data || [] };
 }
 
-/** Returns a map of moduleKey -> boolean (active). Used by Index.tsx gating. */
+/** Returns a map of moduleKey -> boolean (active) plus loading state. Used by Index.tsx gating. */
 export function useActiveModuleMap() {
-  const { permissions } = useUserMenu();
+  const { permissions, isLoading } = useUserMenu();
   const map: Record<string, boolean> = {};
   for (const p of permissions) map[p.module_key] = p.is_active;
-  return map;
+  return { map, isLoading };
 }
 
 export { MODULE_CATALOG };

@@ -53,6 +53,7 @@ import {
 } from "@/components/LazyComponents";
 import { useActiveModuleMap } from "@/hooks/useUserMenu";
 import { MODULE_BY_KEY } from "@/config/modules";
+import { MODULE_TO_PROFILE_FLAG } from "@/config/permissionFlags";
 
 // ── Types ─────────────────────────────────────────────────────────────
 type TabConfig = {
@@ -186,14 +187,18 @@ const Index = () => {
 
   // ── Permission helper ───────────────────────────────────────────────
   // Prefers new module_permissions table; falls back to legacy profile column.
-  const activeModules = useActiveModuleMap();
+  const { map: activeModules, isLoading: permsLoading } = useActiveModuleMap();
   const hasPermission = (permissionKey: string): boolean => {
     if (isAdmin) return true;
-    // If activeTab has a module entry, that wins
-    if (MODULE_BY_KEY[activeTab]) {
-      return activeModules[activeTab] === true;
-    }
     const profileData = profile as any;
+    // If activeTab maps to a module in the catalog, prefer module_permissions,
+    // but fall back to legacy profile flag for backward compatibility.
+    if (MODULE_BY_KEY[activeTab]) {
+      if (activeModules[activeTab] === true) return true;
+      const legacyKey = MODULE_TO_PROFILE_FLAG[activeTab];
+      if (legacyKey && profileData?.[legacyKey] === true) return true;
+      return false;
+    }
     return profileData?.[permissionKey] === true;
   };
 
@@ -241,6 +246,12 @@ const Index = () => {
   // ── Render active tab ──────────────────────────────────────────────
   const renderActiveComponent = () => {
     const permConfig = TAB_PERMISSIONS[activeTab];
+    const isModuleTab = !!MODULE_BY_KEY[activeTab];
+
+    // Wait for permissions to load before deciding to block a module-backed tab.
+    if (!isAdmin && isModuleTab && permsLoading) {
+      return <LoadingFallback />;
+    }
 
     if (permConfig?.permission && !hasPermission(permConfig.permission)) {
       return <BlockedAccess message={permConfig.blockedMessage} purchaseMode={permConfig.purchaseMode} />;

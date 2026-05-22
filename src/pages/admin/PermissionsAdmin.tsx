@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Search, Eye, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { MODULE_CATALOG, getIcon } from "@/config/modules";
+import { MODULE_TO_PROFILE_FLAG } from "@/config/permissionFlags";
 import { useMenuCategories, useUserModulePermissions, type ModulePermission } from "@/hooks/useUserMenu";
 import { ModuleConfigDrawer } from "@/components/admin/ModuleConfigDrawer";
 import { CategoriesManager } from "@/components/admin/CategoriesManager";
@@ -118,6 +119,16 @@ export default function PermissionsAdmin() {
         .from("module_permissions" as any)
         .upsert(row, { onConflict: "user_id,module_key" });
       if (error) throw error;
+
+      // Sync legacy profile flag so older components (and Index fallback) stay in sync.
+      const legacyFlag = MODULE_TO_PROFILE_FLAG[payload.module_key];
+      if (legacyFlag) {
+        await supabase
+          .from("profiles")
+          .update({ [legacyFlag]: row.is_active } as any)
+          .eq("id", selectedUserId);
+      }
+
       await supabase.rpc("log_admin_action" as any, {
         _action: payload.is_active === false ? "module_disabled" : "module_updated",
         _module_key: payload.module_key,
