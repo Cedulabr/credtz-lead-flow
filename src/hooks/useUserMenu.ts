@@ -59,6 +59,24 @@ export function useMenuCategories() {
 export function useUserModulePermissions(userId?: string) {
   const { user } = useAuth();
   const targetId = userId ?? user?.id;
+  const qc = useQueryClient();
+
+  // Realtime: invalidate this user's permissions when any row changes.
+  useEffect(() => {
+    if (!targetId) return;
+    const channel = supabase
+      .channel(`module_permissions_${targetId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "module_permissions", filter: `user_id=eq.${targetId}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["module_permissions", targetId] });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [targetId, qc]);
+
   return useQuery({
     queryKey: ["module_permissions", targetId],
     enabled: !!targetId,
@@ -70,7 +88,9 @@ export function useUserModulePermissions(userId?: string) {
       if (error) throw error;
       return (data as any) || [];
     },
-    staleTime: 30_000,
+    staleTime: 5_000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 }
 
