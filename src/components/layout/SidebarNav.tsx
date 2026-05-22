@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Home, User, Share2, Settings, ChevronDown, Menu, X, LogOut,
-  Store, Receipt, type LucideIcon,
+  Store, Receipt, Clock, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,6 +33,7 @@ function loadOpenState(): Record<string, boolean> {
 const TOP_ITEMS: FlatItem[] = [
   { id: "dashboard", label: "Início", icon: Home },
   { id: "my-data", label: "Meus Dados", icon: User },
+  { id: "time-clock", label: "Controle de Ponto", icon: Clock },
 ];
 
 const BOTTOM_ITEMS: FlatItem[] = [
@@ -47,6 +48,15 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(loadOpenState);
   const { sections } = useUserMenu();
+  const visibleSections = useMemo(
+    () => sections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => item.moduleKey !== "time-clock"),
+      }))
+      .filter((section) => section.items.length > 0),
+    [sections]
+  );
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(openGroups)); } catch {}
@@ -57,7 +67,7 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
     setOpenGroups((prev) => {
       const next = { ...prev };
       let changed = false;
-      for (const s of sections) {
+      for (const s of visibleSections) {
         if (s.items.some((it) => it.moduleKey === activeTab) && !prev[s.categoryKey]) {
           next[s.categoryKey] = true;
           changed = true;
@@ -65,7 +75,7 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
       }
       return changed ? next : prev;
     });
-  }, [sections, activeTab]);
+  }, [visibleSections, activeTab]);
 
   useEffect(() => { setMobileOpen(false); }, [activeTab]);
 
@@ -113,7 +123,7 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
     );
   };
 
-  const renderSection = (section: typeof sections[number]) => {
+  const renderSection = (section: typeof visibleSections[number]) => {
     const Icon = getIcon(section.icon);
     const isOpen = !!openGroups[section.categoryKey];
     const hasActive = section.items.some((it) => it.moduleKey === activeTab);
@@ -184,11 +194,11 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
         </div>
 
         {/* Dynamic sections */}
-        {sections.length > 0 && (
+        {visibleSections.length > 0 && (
           <div className="mx-3.5 my-1.5 border-t border-border/60" style={{ borderTopWidth: "0.5px" }} />
         )}
         <div className="space-y-0.5">
-          {sections.map(renderSection)}
+          {visibleSections.map(renderSection)}
         </div>
 
         {/* Always visible bottom utilities */}
