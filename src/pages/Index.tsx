@@ -258,7 +258,7 @@ const Index = () => {
       return <LoadingFallback />;
     }
 
-    if (permConfig?.permission && !hasPermission(permConfig.permission)) {
+    if (activeTab !== 'time-clock' && permConfig?.permission && !hasPermission(permConfig.permission)) {
       return <BlockedAccess message={permConfig.blockedMessage} purchaseMode={permConfig.purchaseMode} />;
     }
 
