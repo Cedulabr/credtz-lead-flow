@@ -54,6 +54,7 @@ import {
 import { useActiveModuleMap } from "@/hooks/useUserMenu";
 import { MODULE_BY_KEY } from "@/config/modules";
 import { MODULE_TO_PROFILE_FLAG } from "@/config/permissionFlags";
+import { ModuleGate } from "@/components/ModuleGate";
 
 // ── Types ─────────────────────────────────────────────────────────────
 type TabConfig = {
@@ -222,7 +223,11 @@ const Index = () => {
     'reuse-alerts': <LazyOpportunitiesModule />,
     'performance-report': <LazyPerformanceReport />,
     collaborative: <LazyCollaborative />,
-    'time-clock': <LazyTimeClock />,
+    'time-clock': (
+      <ModuleGate slug="controle-ponto" moduleName="Controle de Ponto">
+        <LazyTimeClock />
+      </ModuleGate>
+    ),
     sms: <LazySmsModule />,
     whatsapp: <LazyWhatsAppConfig />,
     'meu-numero': <LazyMeuNumeroModule />,
