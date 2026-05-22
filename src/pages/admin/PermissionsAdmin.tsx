@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Search, Eye, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { MODULE_CATALOG, getIcon } from "@/config/modules";
+import { MODULE_TO_PROFILE_FLAG } from "@/config/permissionFlags";
 import { useMenuCategories, useUserModulePermissions, type ModulePermission } from "@/hooks/useUserMenu";
 import { ModuleConfigDrawer } from "@/components/admin/ModuleConfigDrawer";
 import { CategoriesManager } from "@/components/admin/CategoriesManager";
