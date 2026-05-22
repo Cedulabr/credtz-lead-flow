@@ -246,6 +246,12 @@ const Index = () => {
   // ── Render active tab ──────────────────────────────────────────────
   const renderActiveComponent = () => {
     const permConfig = TAB_PERMISSIONS[activeTab];
+    const isModuleTab = !!MODULE_BY_KEY[activeTab];
+
+    // Wait for permissions to load before deciding to block a module-backed tab.
+    if (!isAdmin && isModuleTab && permsLoading) {
+      return <LoadingFallback />;
+    }
 
     if (permConfig?.permission && !hasPermission(permConfig.permission)) {
       return <BlockedAccess message={permConfig.blockedMessage} purchaseMode={permConfig.purchaseMode} />;
