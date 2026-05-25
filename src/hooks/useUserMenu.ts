@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { MODULE_CATALOG, MODULE_BY_KEY } from "@/config/modules";
+import { MODULE_TO_PROFILE_FLAG } from "@/config/permissionFlags";
 
 export interface MenuCategory {
   id: string;
@@ -101,12 +102,32 @@ export function useUserModulePermissions(userId?: string) {
 export function useUserMenu(userId?: string) {
   const cats = useMenuCategories();
   const perms = useUserModulePermissions(userId);
+  const { profile } = useAuth();
 
   const isLoading = cats.isLoading || perms.isLoading;
 
   const sections: MenuSection[] = [];
   if (!isLoading && cats.data && perms.data) {
-    const activePerms = perms.data.filter((p) => p.is_active);
+    const activePerms = [...perms.data.filter((p) => p.is_active)];
+    if (!userId && profile) {
+      const activeKeys = new Set(activePerms.map((p) => p.module_key));
+      for (const def of MODULE_CATALOG) {
+        const legacyFlag = MODULE_TO_PROFILE_FLAG[def.key];
+        if (!legacyFlag || activeKeys.has(def.key)) continue;
+        if ((profile as any)?.[legacyFlag] === true) {
+          activePerms.push({
+            id: `legacy-${def.key}`,
+            user_id: profile.id,
+            module_key: def.key,
+            is_active: true,
+            category_key: def.defaultCategory,
+            display_name: null,
+            icon: null,
+            position: 0,
+          });
+        }
+      }
+    }
     const byCat = new Map<string, MenuItem[]>();
     for (const p of activePerms) {
       const def = MODULE_BY_KEY[p.module_key];
