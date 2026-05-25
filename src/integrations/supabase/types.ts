@@ -11579,6 +11579,8 @@ export type Database = {
       }
     }
     Functions: {
+      _module_default_category: { Args: { _key: string }; Returns: string }
+      _profile_flag_to_module_key: { Args: { _flag: string }; Returns: string }
       add_activate_lead_to_blacklist: {
         Args: {
           p_cpf?: string

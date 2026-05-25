@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { MODULE_BY_KEY, ICON_LIBRARY, getIcon } from "@/config/modules";
+import { MODULE_TO_PROFILE_FLAG } from "@/config/permissionFlags";
 import type { MenuCategory, ModulePermission } from "@/hooks/useUserMenu";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +56,14 @@ export function ModuleConfigDrawer({ moduleKey, userId, current, categories, ope
         .from("module_permissions" as any)
         .upsert(row, { onConflict: "user_id,module_key" });
       if (error) throw error;
+      const legacyFlag = MODULE_TO_PROFILE_FLAG[moduleKey];
+      if (legacyFlag) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({ [legacyFlag]: isActive } as any)
+          .eq("id", userId);
+        if (profileError) throw profileError;
+      }
       await supabase.rpc("log_admin_action" as any, {
         _action: "module_configured",
         _module_key: moduleKey,
