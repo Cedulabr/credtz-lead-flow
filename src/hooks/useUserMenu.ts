@@ -53,6 +53,7 @@ export function useMenuCategories() {
       return (data as any) || [];
     },
     staleTime: 60_000,
+    refetchOnMount: "always",
   });
 }
 
