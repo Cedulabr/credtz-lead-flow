@@ -143,6 +143,62 @@ export default function PermissionsAdmin() {
     onError: (e: any) => toast.error(e.message || "Erro ao salvar"),
   });
 
+  const [bulkCategory, setBulkCategory] = useState<string>("all");
+
+  const bulkMutation = useMutation({
+    mutationFn: async ({ activate }: { activate: boolean }) => {
+      if (!selectedUserId) throw new Error("Selecione um usuário");
+      const targets = MODULE_CATALOG.filter(
+        (m) => bulkCategory === "all" || m.defaultCategory === bulkCategory
+      );
+      const rows = targets.map((def) => {
+        const existing = permsByKey[def.key];
+        return {
+          user_id: selectedUserId,
+          module_key: def.key,
+          is_active: activate,
+          category_key: existing?.category_key ?? def.defaultCategory,
+          display_name: existing?.display_name ?? null,
+          icon: existing?.icon ?? null,
+          position: existing?.position ?? 0,
+        };
+      });
+      if (rows.length === 0) return 0;
+      const { error } = await supabase
+        .from("module_permissions" as any)
+        .upsert(rows, { onConflict: "user_id,module_key" });
+      if (error) throw error;
+
+      // Sync legacy profile flags in a single update.
+      const profileUpdate: Record<string, boolean> = {};
+      for (const def of targets) {
+        const legacyFlag = MODULE_TO_PROFILE_FLAG[def.key];
+        if (legacyFlag) profileUpdate[legacyFlag] = activate;
+      }
+      if (Object.keys(profileUpdate).length > 0) {
+        await supabase.from("profiles").update(profileUpdate as any).eq("id", selectedUserId);
+      }
+
+      await supabase.rpc("log_admin_action" as any, {
+        _action: activate ? "modules_bulk_enabled" : "modules_bulk_disabled",
+        _module_key: bulkCategory,
+        _target_user_id: selectedUserId,
+        _payload: { count: rows.length, category: bulkCategory } as any,
+      });
+
+      return rows.length;
+    },
+    onSuccess: (count, { activate }) => {
+      qc.invalidateQueries({ queryKey: ["module_permissions", selectedUserId] });
+      toast.success(
+        activate
+          ? `${count} permissões ativadas com sucesso`
+          : `${count} permissões desativadas com sucesso`
+      );
+    },
+    onError: (e: any) => toast.error(e.message || "Erro na ação em lote"),
+  });
+
   if (!isAdmin) {
     return <div className="p-6">Acesso restrito.</div>;
   }
