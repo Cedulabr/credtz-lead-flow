@@ -29,3 +29,7 @@ export const MODULE_TO_PROFILE_FLAG: Record<string, string> = {
   televendas: "can_access_televendas",
   "televendas-manage": "can_access_gestao_televendas",
 };
+
+export const PROFILE_FLAG_TO_MODULE = Object.fromEntries(
+  Object.entries(MODULE_TO_PROFILE_FLAG).map(([moduleKey, profileFlag]) => [profileFlag, moduleKey])
+) as Record<string, string>;
