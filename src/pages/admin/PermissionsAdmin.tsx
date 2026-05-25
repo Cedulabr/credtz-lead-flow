@@ -356,6 +356,7 @@ export default function PermissionsAdmin() {
                   );
                 })}
               </div>
+              </>
             ) : (
               <Card className="p-12 text-center text-muted-foreground">
                 Selecione um usuário para configurar suas permissões.
