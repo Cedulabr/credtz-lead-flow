@@ -280,7 +280,44 @@ export default function PermissionsAdmin() {
             </Card>
 
             {selectedUserId ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <>
+                <Card className="p-3 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+                  <div className="text-sm">
+                    <div className="font-medium">Ações em lote</div>
+                    <div className="text-xs text-muted-foreground">
+                      Ativar ou desativar todos os módulos de uma categoria de uma só vez.
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                    <Select value={bulkCategory} onValueChange={setBulkCategory}>
+                      <SelectTrigger className="min-w-[200px]">
+                        <SelectValue placeholder="Categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas as categorias</SelectItem>
+                        {categories.map((c) => (
+                          <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      onClick={() => bulkMutation.mutate({ activate: true })}
+                      disabled={bulkMutation.isPending}
+                    >
+                      Ativar Todos
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => bulkMutation.mutate({ activate: false })}
+                      disabled={bulkMutation.isPending}
+                    >
+                      Desativar Todos
+                    </Button>
+                  </div>
+                </Card>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {MODULE_CATALOG.map((m) => {
                   const p = permsByKey[m.key];
                   const active = p?.is_active ?? false;
