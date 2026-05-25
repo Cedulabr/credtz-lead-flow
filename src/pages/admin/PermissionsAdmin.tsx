@@ -143,6 +143,62 @@ export default function PermissionsAdmin() {
     onError: (e: any) => toast.error(e.message || "Erro ao salvar"),
   });
 
+  const [bulkCategory, setBulkCategory] = useState<string>("all");
+
+  const bulkMutation = useMutation({
+    mutationFn: async ({ activate }: { activate: boolean }) => {
+      if (!selectedUserId) throw new Error("Selecione um usuário");
+      const targets = MODULE_CATALOG.filter(
+        (m) => bulkCategory === "all" || m.defaultCategory === bulkCategory
+      );
+      const rows = targets.map((def) => {
+        const existing = permsByKey[def.key];
+        return {
+          user_id: selectedUserId,
+          module_key: def.key,
+          is_active: activate,
+          category_key: existing?.category_key ?? def.defaultCategory,
+          display_name: existing?.display_name ?? null,
+          icon: existing?.icon ?? null,
+          position: existing?.position ?? 0,
+        };
+      });
+      if (rows.length === 0) return 0;
+      const { error } = await supabase
+        .from("module_permissions" as any)
+        .upsert(rows, { onConflict: "user_id,module_key" });
+      if (error) throw error;
+
+      // Sync legacy profile flags in a single update.
+      const profileUpdate: Record<string, boolean> = {};
+      for (const def of targets) {
+        const legacyFlag = MODULE_TO_PROFILE_FLAG[def.key];
+        if (legacyFlag) profileUpdate[legacyFlag] = activate;
+      }
+      if (Object.keys(profileUpdate).length > 0) {
+        await supabase.from("profiles").update(profileUpdate as any).eq("id", selectedUserId);
+      }
+
+      await supabase.rpc("log_admin_action" as any, {
+        _action: activate ? "modules_bulk_enabled" : "modules_bulk_disabled",
+        _module_key: bulkCategory,
+        _target_user_id: selectedUserId,
+        _payload: { count: rows.length, category: bulkCategory } as any,
+      });
+
+      return rows.length;
+    },
+    onSuccess: (count, { activate }) => {
+      qc.invalidateQueries({ queryKey: ["module_permissions", selectedUserId] });
+      toast.success(
+        activate
+          ? `${count} permissões ativadas com sucesso`
+          : `${count} permissões desativadas com sucesso`
+      );
+    },
+    onError: (e: any) => toast.error(e.message || "Erro na ação em lote"),
+  });
+
   if (!isAdmin) {
     return <div className="p-6">Acesso restrito.</div>;
   }
@@ -224,7 +280,44 @@ export default function PermissionsAdmin() {
             </Card>
 
             {selectedUserId ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <>
+                <Card className="p-3 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+                  <div className="text-sm">
+                    <div className="font-medium">Ações em lote</div>
+                    <div className="text-xs text-muted-foreground">
+                      Ativar ou desativar todos os módulos de uma categoria de uma só vez.
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                    <Select value={bulkCategory} onValueChange={setBulkCategory}>
+                      <SelectTrigger className="min-w-[200px]">
+                        <SelectValue placeholder="Categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas as categorias</SelectItem>
+                        {categories.map((c) => (
+                          <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      onClick={() => bulkMutation.mutate({ activate: true })}
+                      disabled={bulkMutation.isPending}
+                    >
+                      Ativar Todos
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => bulkMutation.mutate({ activate: false })}
+                      disabled={bulkMutation.isPending}
+                    >
+                      Desativar Todos
+                    </Button>
+                  </div>
+                </Card>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {MODULE_CATALOG.map((m) => {
                   const p = permsByKey[m.key];
                   const active = p?.is_active ?? false;
@@ -263,6 +356,7 @@ export default function PermissionsAdmin() {
                   );
                 })}
               </div>
+              </>
             ) : (
               <Card className="p-12 text-center text-muted-foreground">
                 Selecione um usuário para configurar suas permissões.

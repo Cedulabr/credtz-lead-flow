@@ -53,6 +53,7 @@ export function useMenuCategories() {
       return (data as any) || [];
     },
     staleTime: 60_000,
+    refetchOnMount: "always",
   });
 }
 
@@ -102,14 +103,31 @@ export function useUserModulePermissions(userId?: string) {
 export function useUserMenu(userId?: string) {
   const cats = useMenuCategories();
   const perms = useUserModulePermissions(userId);
-  const { profile } = useAuth();
+  const { profile, isAdmin } = useAuth();
 
   const isLoading = cats.isLoading || perms.isLoading;
 
   const sections: MenuSection[] = [];
   if (!isLoading && cats.data && perms.data) {
     const activePerms = [...perms.data.filter((p) => p.is_active)];
-    if (!userId && profile) {
+
+    // Admin viewing own menu → sees every module in the catalog.
+    if (!userId && isAdmin && profile) {
+      const activeKeys = new Set(activePerms.map((p) => p.module_key));
+      for (const def of MODULE_CATALOG) {
+        if (activeKeys.has(def.key)) continue;
+        activePerms.push({
+          id: `admin-${def.key}`,
+          user_id: profile.id,
+          module_key: def.key,
+          is_active: true,
+          category_key: def.defaultCategory,
+          display_name: null,
+          icon: null,
+          position: 0,
+        });
+      }
+    } else if (!userId && profile) {
       const activeKeys = new Set(activePerms.map((p) => p.module_key));
       for (const def of MODULE_CATALOG) {
         const legacyFlag = MODULE_TO_PROFILE_FLAG[def.key];
@@ -128,6 +146,7 @@ export function useUserMenu(userId?: string) {
         }
       }
     }
+
     const byCat = new Map<string, MenuItem[]>();
     for (const p of activePerms) {
       const def = MODULE_BY_KEY[p.module_key];
@@ -142,6 +161,8 @@ export function useUserMenu(userId?: string) {
       arr.push(item);
       byCat.set(p.category_key, arr);
     }
+
+    const knownKeys = new Set(cats.data.map((c) => c.key));
     for (const c of cats.data) {
       const items = (byCat.get(c.key) || []).sort((a, b) => a.position - b.position);
       if (items.length === 0) continue;
@@ -153,6 +174,26 @@ export function useUserMenu(userId?: string) {
         items,
       });
     }
+
+    // Orphan items (category_key not present in menu_categories) → "Outros".
+    const orphanItems: MenuItem[] = [];
+    const orphanCats: string[] = [];
+    for (const [catKey, items] of byCat.entries()) {
+      if (knownKeys.has(catKey)) continue;
+      orphanCats.push(catKey);
+      orphanItems.push(...items);
+    }
+    if (orphanItems.length > 0) {
+      console.warn("[useUserMenu] Módulos ativos com category_key órfãs:", orphanCats);
+      sections.push({
+        categoryKey: "outros",
+        label: "Outros",
+        icon: "Folder",
+        position: 9999,
+        items: orphanItems.sort((a, b) => a.position - b.position),
+      });
+    }
+
     sections.sort((a, b) => a.position - b.position);
   }
 

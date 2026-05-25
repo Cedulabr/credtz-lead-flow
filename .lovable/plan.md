@@ -1,69 +1,54 @@
-## Diagnóstico do problema
+# Permissões — Ativar Todos + Correção de Renderização do Menu
 
-Encontrei a causa principal: hoje existem duas fontes de permissão que ficaram divergentes.
+## 1. Novo controle "Ativar Todos" (com filtro por categoria)
 
-- A tela antiga de usuários grava permissões nas colunas `profiles.can_access_*`.
-- O menu novo lê principalmente a tabela `module_permissions`.
-- Resultado: vários usuários estão com módulo liberado no perfil antigo, mas sem linha ativa em `module_permissions`, então o módulo nunca aparece no menu.
-- A publicação realtime de `module_permissions` já está habilitada e com `REPLICA IDENTITY FULL`, então o problema de “demorar horas/dias” não é mais realtime em si; é falta de sincronização e fallback do menu.
+Local: `src/pages/admin/PermissionsAdmin.tsx`, acima do grid de cards de módulos (aparece apenas quando há um usuário selecionado).
 
-A consulta no banco mostrou muitos casos assim, por exemplo:
+UI:
+- Botão **"Ativar Todos"** + `Select` com as categorias reais já existentes em `menu_categories` (Gestão WhatsApp, Captação, Televendas, Financeiro, Gestão, etc.), além da opção **"Todas as categorias"**.
+- Botão secundário **"Desativar Todos"** (mesmo escopo) para simetria.
+- Toast de sucesso: `"X permissões ativadas com sucesso"` (ou desativadas).
 
-- `notas`: 18 usuários com perfil liberado e menu sem linha
-- `sms`: 18 usuários
-- `digitacao`: 17 usuários
-- `televendas`: 17 usuários
-- `digitacao-agibank`: 16 usuários
-- `time-clock`: 11 usuários
+Lógica:
+- Itera sobre `MODULE_CATALOG` filtrando por `defaultCategory === categoriaSelecionada` (ou todos).
+- Faz um único `upsert` em lote no `module_permissions` (`onConflict: user_id,module_key`) com `is_active=true`, preservando `category_key`, `display_name`, `icon`, `position` quando já existirem.
+- Em paralelo, sincroniza os `profiles.can_access_*` correspondentes via `MODULE_TO_PROFILE_FLAG` (mantém compatibilidade com o sistema legado, igual já é feito no `upsertMutation` atual).
+- Invalida `["module_permissions", selectedUserId]` ao final.
 
-## Plano de correção
+Permissão:
+- Botão visível apenas para `isAdmin` (já é a guard atual da página). A RLS existente em `module_permissions` continua sendo o gate real.
 
-### 1. Fazer o menu reconhecer permissões antigas imediatamente
-Ajustar `useUserMenu` para combinar:
+## 2. Correção da renderização do menu
 
-- permissões ativas da tabela `module_permissions`
-- permissões legadas vindas do `profiles.can_access_*`
+### Diagnóstico
+O menu lateral em `SidebarNav.tsx` usa `useUserMenu()` (sem `userId`), que monta as seções a partir de `menu_categories` + `module_permissions` ativos. Já existe um fallback legacy (lê `profiles.can_access_*`) e realtime na tabela `module_permissions`. Porém:
 
-Assim, se o usuário já tem `can_access_controle_ponto = true`, `can_access_portflow = true`, etc., o módulo aparece no menu mesmo que ainda não exista linha em `module_permissions`.
+1. **`useUserMenu` no Sidebar é chamado sem `userId`**, então o realtime do `useUserModulePermissions` é registrado com `filter: user_id=eq.<currentUserId>` — funciona, mas a invalidação só ocorre se o usuário logado **for o mesmo** que teve a permissão alterada. Quando um admin ativa o módulo para outro usuário, o outro usuário só vê após refresh — isso está correto.
+2. **Itens ativos cuja `category_key` não existe em `menu_categories` são silenciosamente descartados** no loop `for (const c of cats.data)`. Esse é o principal motivo de "ativei mas não aparece": se o admin (ou trigger de backfill) inseriu `category_key = 'gestao'` mas a categoria cadastrada tem outra `key`, o item desaparece. Vamos:
+   - Adicionar uma **seção fallback "Outros"** que recolhe qualquer item ativo cuja `category_key` não bate com nenhuma categoria cadastrada, em vez de descartar.
+   - Logar `console.warn` listando as `category_key` órfãs para facilitar diagnóstico.
+3. **`staleTime` de categorias é 60s** — ok, mas adicionar `refetchOnMount: "always"` para garantir refresh imediato após troca de aba.
+4. **Garantir que admin sempre veja tudo**: no `useUserMenu`, se `isAdmin === true` e `!userId` (menu do próprio admin), montar as seções a partir do `MODULE_CATALOG` completo, ignorando filtros de `is_active`. Isso satisfaz o STEP 4 (super_admin sempre vê todos os módulos ativos — e, no caso do admin, todos os existentes).
 
-### 2. Criar sincronização automática no banco
-Criar uma migração com funções/triggers para manter as duas fontes sincronizadas:
+### Mudanças de código
+- **`src/hooks/useUserMenu.ts`**
+  - Importar `useAuth` → `isAdmin`.
+  - Quando `!userId && isAdmin`: gerar `activePerms` a partir de `MODULE_CATALOG` inteiro (todos ativos).
+  - Quando montar seções: agrupar itens ativos com `category_key` desconhecida na seção sintética `{ categoryKey: "outros", label: "Outros", icon: "Folder", position: 9999 }` em vez de descartá-los; emitir `console.warn` com a lista.
+  - Definir `refetchOnMount: "always"` em `useMenuCategories`.
 
-- quando `profiles.can_access_*` mudar, o banco cria/atualiza a linha correspondente em `module_permissions`
-- quando `module_permissions.is_active` mudar para módulos com flag antiga, o banco atualiza a coluna correspondente em `profiles`
-- incluir trava anti-loop para evitar trigger chamando trigger infinitamente
+- **`src/components/layout/SidebarNav.tsx`**
+  - Sem mudanças funcionais — apenas confirmar que o `time-clock` continua fixo no TOP_ITEMS (regra atual) e que a seção "Outros" renderiza pelo mesmo `renderSection`.
 
-Isso acelera liberações futuras e evita que permissões fiquem “presas” por dias.
+### Verificação manual
+1. Admin ativa um módulo de um usuário → toggle imediato no card; usuário-alvo recarrega e vê item.
+2. Desativar → some do menu após refresh.
+3. Logar como admin → todos os módulos aparecem.
+4. Inserir manualmente um `module_permissions` com `category_key` inexistente → item aparece em "Outros" + warning no console (em vez de sumir).
+5. "Ativar Todos" → categoria escolhida fica 100% verde nos cards; toast com contagem correta.
 
-### 3. Migrar dados já divergentes
-Na mesma migração, preencher `module_permissions` para todos os usuários que hoje já têm `can_access_* = true` no perfil.
+## Resumo dos arquivos editados
+- `src/pages/admin/PermissionsAdmin.tsx` — UI + mutation bulk
+- `src/hooks/useUserMenu.ts` — admin bypass + seção "Outros" + refetch
 
-Isso corrige os usuários afetados agora, sem precisar ativar/desativar módulo manualmente.
-
-### 4. Corrigir o painel admin de configuração avançada
-A tela `ModuleConfigDrawer` atualmente salva direto em `module_permissions`, mas não sincroniza `profiles` como a tela principal já faz.
-
-Vou atualizar esse fluxo para também manter as flags legadas consistentes.
-
-### 5. Melhorar atualização instantânea no frontend
-Ajustar invalidações/cache para:
-
-- `useUserMenu` refazer consulta corretamente após alteração
-- o preview do menu no admin refletir o estado atualizado
-- o usuário receber atualização via realtime ou, no pior caso, por refetch curto sem esperar horas
-
-## Arquivos envolvidos
-
-- `src/hooks/useUserMenu.ts`
-- `src/components/admin/ModuleConfigDrawer.tsx`
-- `src/config/permissionFlags.ts` se precisar expor o mapa reverso
-- nova migração Supabase para triggers e backfill
-
-## Resultado esperado
-
-Depois da correção:
-
-- ativou no Admin, aparece no menu do usuário rapidamente
-- usuários que já estão com permissões antigas ativas passam a ver os módulos
-- módulos como Controle de Ponto, Leads Agibank, Digitação, SMS, Notas etc. não dependem mais de ajuste manual duplicado
-- o sistema fica resiliente mesmo enquanto coexistirem permissões antigas e o novo menu dinâmico
+Nenhuma alteração de RLS, migration ou lógica de permissão existente é necessária.
