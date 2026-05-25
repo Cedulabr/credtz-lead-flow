@@ -1,67 +1,69 @@
-## Diagnóstico
+## Diagnóstico do problema
 
-Conferi os dados e o código. Os usuários afetados (`alessandroalves` gestor, `analuiza` colaborador) **têm linhas `is_active=true` em `module_permissions`** para os dois módulos, **têm `user_companies` ativos** e os módulos estão registrados em `MODULE_CATALOG`, `LazyComponents` e `Index.tsx`. Mesmo assim "não carregam".
+Encontrei a causa principal: hoje existem duas fontes de permissão que ficaram divergentes.
 
-Identifiquei três causas combinadas:
+- A tela antiga de usuários grava permissões nas colunas `profiles.can_access_*`.
+- O menu novo lê principalmente a tabela `module_permissions`.
+- Resultado: vários usuários estão com módulo liberado no perfil antigo, mas sem linha ativa em `module_permissions`, então o módulo nunca aparece no menu.
+- A publicação realtime de `module_permissions` já está habilitada e com `REPLICA IDENTITY FULL`, então o problema de “demorar horas/dias” não é mais realtime em si; é falta de sincronização e fallback do menu.
 
-### 1. `module_permissions` não está em `supabase_realtime`
-A correção anterior (subscription realtime no `useUserMenu`) não tem efeito — a tabela **não está publicada**. Resultado: quando você ativa um módulo no admin, a sessão do usuário só recebe via `refetchOnWindowFocus` (5s + voltar à aba). Em muitos casos o usuário fica olhando o menu antigo achando que "não carregou".
+A consulta no banco mostrou muitos casos assim, por exemplo:
 
-### 2. Gate em `Index.tsx` retorna falso durante o carregamento das permissões
-```ts
-if (MODULE_BY_KEY[activeTab]) {
-  return activeModules[activeTab] === true;   // undefined no 1º render
-}
-```
-No primeiro render `useUserMenu` ainda está em loading → `activeModules` vazio → `BlockedAccess` aparece. Se o usuário entra direto via deep-link ou refresh, vê a tela bloqueada por uma fração de segundo (e às vezes ela "fica") em vez do conteúdo.
-
-### 3. Falta de feedback / instrumentação
-Não há nenhum `console.log` ou Error Boundary específico nesses módulos, então não dá para diferenciar "bloqueado por permissão" de "componente quebrou ao carregar" de "permissão ainda carregando". Hoje é tudo a mesma tela em branco/bloqueada.
+- `notas`: 18 usuários com perfil liberado e menu sem linha
+- `sms`: 18 usuários
+- `digitacao`: 17 usuários
+- `televendas`: 17 usuários
+- `digitacao-agibank`: 16 usuários
+- `time-clock`: 11 usuários
 
 ## Plano de correção
 
-### Passo 1 — Habilitar realtime de verdade em `module_permissions`
-Migração:
-```sql
-ALTER TABLE public.module_permissions REPLICA IDENTITY FULL;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.module_permissions;
-```
-Com isso, a subscription que já existe em `useUserMenu` passa a invalidar o cache do usuário **imediatamente** quando o admin clica no toggle. Liberação instantânea, sem F5.
+### 1. Fazer o menu reconhecer permissões antigas imediatamente
+Ajustar `useUserMenu` para combinar:
 
-### Passo 2 — Corrigir `hasPermission` em `src/pages/Index.tsx`
-Trocar a checagem por uma versão consciente do estado de loading:
-- Enquanto `useUserMenu` está carregando → mostrar `LoadingAuth` (mesmo skeleton do auth), não `BlockedAccess`.
-- Só decidir bloquear depois que `permissions` chegar.
-- Adicionar fallback: se `MODULE_BY_KEY[activeTab]` existe **e** o perfil tem a flag legada `can_access_*` ligada, tratar como liberado (compatibilidade com permissões antigas que ainda não foram migradas para `module_permissions`).
+- permissões ativas da tabela `module_permissions`
+- permissões legadas vindas do `profiles.can_access_*`
 
-### Passo 3 — Sincronizar legado ↔ novo
-Quando o admin ativa um módulo em `PermissionsAdmin`, também gravar a flag `can_access_*` correspondente no `profiles` (apenas para os módulos que ainda têm coluna no `profiles`). Mapa:
-- `time-clock` → `can_access_controle_ponto`
-- `leads-agibank` → (criar) ou apenas confiar em `module_permissions`
-- demais já mapeados em `TAB_PERMISSIONS`.
+Assim, se o usuário já tem `can_access_controle_ponto = true`, `can_access_portflow = true`, etc., o módulo aparece no menu mesmo que ainda não exista linha em `module_permissions`.
 
-Isso elimina a divergência entre as duas fontes de verdade e dá segurança para componentes que ainda leem `profile.can_access_*` diretamente.
+### 2. Criar sincronização automática no banco
+Criar uma migração com funções/triggers para manter as duas fontes sincronizadas:
 
-### Passo 4 — Instrumentação para acelerar diagnósticos futuros
-- Envolver cada `Lazy*Module` em `Index.tsx` num `<ErrorBoundary>` que loga `console.error` com `moduleKey` e mostra um card "Falha ao carregar módulo X — recarregar".
-- Adicionar `console.debug('[perm]', activeTab, activeModules[activeTab], isLoading)` no `renderActiveComponent` (removível depois).
+- quando `profiles.can_access_*` mudar, o banco cria/atualiza a linha correspondente em `module_permissions`
+- quando `module_permissions.is_active` mudar para módulos com flag antiga, o banco atualiza a coluna correspondente em `profiles`
+- incluir trava anti-loop para evitar trigger chamando trigger infinitamente
 
-### Passo 5 — Validar
-- Logar com conta `analuiza@credtz.com` (preview), abrir `time-clock` e `leads-agibank`, conferir que carregam.
-- Toggle no admin → confirmar que o menu do outro usuário atualiza em < 1s sem refresh (realtime).
-- Conferir Edge Logs e console limpos.
+Isso acelera liberações futuras e evita que permissões fiquem “presas” por dias.
 
-## Detalhes técnicos / Arquivos a alterar
+### 3. Migrar dados já divergentes
+Na mesma migração, preencher `module_permissions` para todos os usuários que hoje já têm `can_access_* = true` no perfil.
 
-| Arquivo | Mudança |
-|---|---|
-| `supabase/migrations/<novo>.sql` | `REPLICA IDENTITY FULL` + `ADD TABLE` na publicação |
-| `src/pages/Index.tsx` | `hasPermission` ciente do loading + fallback `can_access_*`; envolver módulos em ErrorBoundary |
-| `src/hooks/useUserMenu.ts` | Expor `isLoading` de `permissions` para o gate |
-| `src/pages/admin/PermissionsAdmin.tsx` | Ao togglar, também `update profiles set can_access_*` para módulos com flag legada |
-| `src/components/ModuleErrorBoundary.tsx` (novo) | Boundary leve com botão "Tentar novamente" |
+Isso corrige os usuários afetados agora, sem precisar ativar/desativar módulo manualmente.
 
-## Fora do escopo
-- Não vou alterar a UI do menu, dos módulos, nem regras de negócio internas (RLS de `agibank_leads`, lógica de ponto). Só permissão/visibilidade/carregamento.
+### 4. Corrigir o painel admin de configuração avançada
+A tela `ModuleConfigDrawer` atualmente salva direto em `module_permissions`, mas não sincroniza `profiles` como a tela principal já faz.
 
-Se concordar, sigo para implementação.
+Vou atualizar esse fluxo para também manter as flags legadas consistentes.
+
+### 5. Melhorar atualização instantânea no frontend
+Ajustar invalidações/cache para:
+
+- `useUserMenu` refazer consulta corretamente após alteração
+- o preview do menu no admin refletir o estado atualizado
+- o usuário receber atualização via realtime ou, no pior caso, por refetch curto sem esperar horas
+
+## Arquivos envolvidos
+
+- `src/hooks/useUserMenu.ts`
+- `src/components/admin/ModuleConfigDrawer.tsx`
+- `src/config/permissionFlags.ts` se precisar expor o mapa reverso
+- nova migração Supabase para triggers e backfill
+
+## Resultado esperado
+
+Depois da correção:
+
+- ativou no Admin, aparece no menu do usuário rapidamente
+- usuários que já estão com permissões antigas ativas passam a ver os módulos
+- módulos como Controle de Ponto, Leads Agibank, Digitação, SMS, Notas etc. não dependem mais de ajuste manual duplicado
+- o sistema fica resiliente mesmo enquanto coexistirem permissões antigas e o novo menu dinâmico
