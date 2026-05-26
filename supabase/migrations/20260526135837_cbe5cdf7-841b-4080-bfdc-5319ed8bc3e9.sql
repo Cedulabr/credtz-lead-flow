@@ -1,0 +1,2 @@
+ALTER TABLE public.propostas DROP CONSTRAINT IF EXISTS propostas_client_status_check;
+ALTER TABLE public.propostas ADD CONSTRAINT propostas_client_status_check CHECK (client_status = ANY (ARRAY['novo'::text, 'contato_iniciado'::text, 'cliente_intencionado'::text, 'contato_futuro'::text, 'cliente_recusado'::text, 'proposta_enviada'::text, 'proposta_digitada'::text, 'proposta_recusada'::text, 'aguardando_retorno'::text, 'cliente_negativo'::text, 'base_positiva'::text]));
