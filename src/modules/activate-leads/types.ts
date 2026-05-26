@@ -177,6 +177,16 @@ export const ACTIVATE_STATUS_CONFIG: Record<string, {
     dotColor: 'bg-red-600',
     order: 12,
   },
+  base_positiva: {
+    label: 'Base Positiva',
+    emoji: '💚',
+    color: 'from-green-500 to-emerald-600',
+    textColor: 'text-green-700',
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-200',
+    dotColor: 'bg-green-500',
+    order: 13,
+  },
 };
 
 export const PIPELINE_STATUSES = ['novo', 'em_andamento', 'fechado', 'sem_possibilidade'];
