@@ -219,6 +219,16 @@ const clientStatuses = [
     borderColor: "border-red-300",
     dotColor: "bg-red-600"
   },
+  {
+    id: "base_positiva",
+    label: "Base Positiva",
+    icon: UserCheck,
+    color: "from-green-500 to-emerald-600",
+    textColor: "text-green-700",
+    bgColor: "bg-gradient-to-r from-green-50 to-emerald-100",
+    borderColor: "border-green-200",
+    dotColor: "bg-green-500"
+  },
 ];
 
 const rejectionReasons = [

@@ -220,12 +220,21 @@ export const PIPELINE_STAGES: Record<string, {
     borderColor: "border-red-300",
     dotColor: "bg-red-600",
     order: 13
+  },
+  base_positiva: {
+    label: "Base Positiva",
+    color: "from-green-500 to-emerald-600",
+    textColor: "text-green-700",
+    bgColor: "bg-green-50",
+    borderColor: "border-green-200",
+    dotColor: "bg-green-500",
+    order: 14
   }
 };
 
 // Status categories for quick filtering
 export const STATUS_CATEGORIES = {
-  active: ['new_lead', 'autolead', 'em_andamento', 'aguardando_retorno', 'agendamento'],
+  active: ['new_lead', 'autolead', 'em_andamento', 'aguardando_retorno', 'agendamento', 'base_positiva'],
   converted: ['cliente_fechado'],
   lost: ['recusou_oferta', 'sem_interesse', 'nao_e_cliente', 'sem_retorno', 'nao_e_whatsapp', 'sem_possibilidade', 'cliente_negativo'],
   scheduled: ['contato_futuro', 'agendamento']
