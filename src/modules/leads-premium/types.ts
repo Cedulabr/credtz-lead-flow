@@ -220,6 +220,15 @@ export const PIPELINE_STAGES: Record<string, {
     borderColor: "border-red-300",
     dotColor: "bg-red-600",
     order: 13
+  },
+  base_positiva: {
+    label: "Base Positiva",
+    color: "from-green-500 to-emerald-600",
+    textColor: "text-green-700",
+    bgColor: "bg-green-50",
+    borderColor: "border-green-200",
+    dotColor: "bg-green-500",
+    order: 14
   }
 };
 
