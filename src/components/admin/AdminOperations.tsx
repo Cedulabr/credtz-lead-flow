@@ -40,7 +40,8 @@ type OperationSection =
   | 'duplicates'
   | 'inactivity'
   | 'banking-api'
-  | 'leads-import-fields';
+  | 'leads-import-fields'
+  | 'agibank-credits';
 
 interface SectionItem {
   id: OperationSection;
