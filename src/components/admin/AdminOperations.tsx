@@ -28,6 +28,7 @@ import { AdminInactivitySettings } from '@/components/AdminInactivitySettings';
 import { AdminSmsCreditsManagement } from '@/components/AdminSmsCreditsManagement';
 import { AdminBankingAPI } from '@/components/admin/AdminBankingAPI';
 import { LeadsImportFieldsConfig } from '@/components/admin/LeadsImportFieldsConfig';
+import { AdminAgibankCredits } from '@/components/admin/AdminAgibankCredits';
 
 type OperationSection = 
   | 'menu' 
@@ -39,7 +40,8 @@ type OperationSection =
   | 'duplicates'
   | 'inactivity'
   | 'banking-api'
-  | 'leads-import-fields';
+  | 'leads-import-fields'
+  | 'agibank-credits';
 
 interface SectionItem {
   id: OperationSection;
@@ -64,6 +66,16 @@ export function AdminOperations() {
       icon: Coins,
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
+    },
+    {
+      id: 'agibank-credits' as OperationSection,
+      label: 'Créditos Leads Agibank',
+      description: 'Adicionar ou remover créditos do módulo Leads Agibank',
+      icon: Coins,
+      color: 'text-teal-600',
+      bgColor: 'bg-teal-100 dark:bg-teal-900/30',
+      badge: 'Novo',
+      badgeVariant: 'default' as const,
     },
     {
       id: 'sms-credits' as OperationSection,
@@ -157,6 +169,8 @@ export function AdminOperations() {
         return <AdminBankingAPI />;
       case 'leads-import-fields':
         return <LeadsImportFieldsConfig />;
+      case 'agibank-credits':
+        return <AdminAgibankCredits />;
       default:
         return null;
     }
