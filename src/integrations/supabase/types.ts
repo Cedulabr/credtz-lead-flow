@@ -7823,6 +7823,154 @@ export type Database = {
           },
         ]
       }
+      sdr_audit_log: {
+        Row: {
+          action_taken: string | null
+          company_id: string
+          conversation_id: string
+          created_at: string
+          id: string
+          intent_detected: string | null
+          message_id: string | null
+          reasoning: string | null
+          score_after: number | null
+          score_before: number | null
+          stage_at_time: string | null
+        }
+        Insert: {
+          action_taken?: string | null
+          company_id: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          intent_detected?: string | null
+          message_id?: string | null
+          reasoning?: string | null
+          score_after?: number | null
+          score_before?: number | null
+          stage_at_time?: string | null
+        }
+        Update: {
+          action_taken?: string | null
+          company_id?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          intent_detected?: string | null
+          message_id?: string | null
+          reasoning?: string | null
+          score_after?: number | null
+          score_before?: number | null
+          stage_at_time?: string | null
+        }
+        Relationships: []
+      }
+      sdr_config: {
+        Row: {
+          active: boolean
+          behavior: Json
+          company_id: string
+          created_at: string
+          funnel_stages: Json
+          id: string
+          instance_id: string
+          safety_limits: Json
+          scoring_rules: Json
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          behavior?: Json
+          company_id: string
+          created_at?: string
+          funnel_stages?: Json
+          id?: string
+          instance_id: string
+          safety_limits?: Json
+          scoring_rules?: Json
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          behavior?: Json
+          company_id?: string
+          created_at?: string
+          funnel_stages?: Json
+          id?: string
+          instance_id?: string
+          safety_limits?: Json
+          scoring_rules?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_config_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: true
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_conversation_state: {
+        Row: {
+          company_id: string
+          conversation_id: string
+          created_at: string
+          current_stage: string
+          id: string
+          instance_id: string
+          last_ai_message_at: string | null
+          last_stage_change_at: string
+          lead_score: number
+          messages_sent_by_ai: number
+          objections_detected: Json
+          outcome: string
+          qualification_answers: Json
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          conversation_id: string
+          created_at?: string
+          current_stage?: string
+          id?: string
+          instance_id: string
+          last_ai_message_at?: string | null
+          last_stage_change_at?: string
+          lead_score?: number
+          messages_sent_by_ai?: number
+          objections_detected?: Json
+          outcome?: string
+          qualification_answers?: Json
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          conversation_id?: string
+          created_at?: string
+          current_stage?: string
+          id?: string
+          instance_id?: string
+          last_ai_message_at?: string | null
+          last_stage_change_at?: string
+          lead_score?: number
+          messages_sent_by_ai?: number
+          objections_detected?: Json
+          outcome?: string
+          qualification_answers?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_conversation_state_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       simulation_notifications: {
         Row: {
           created_at: string
@@ -11241,6 +11389,7 @@ export type Database = {
           last_message_at: string | null
           last_message_type: string | null
           lead_score: string | null
+          sdr_score: number | null
           status: string
           unread_count: number
           updated_at: string
@@ -11274,6 +11423,7 @@ export type Database = {
           last_message_at?: string | null
           last_message_type?: string | null
           lead_score?: string | null
+          sdr_score?: number | null
           status?: string
           unread_count?: number
           updated_at?: string
@@ -11307,6 +11457,7 @@ export type Database = {
           last_message_at?: string | null
           last_message_type?: string | null
           lead_score?: string | null
+          sdr_score?: number | null
           status?: string
           unread_count?: number
           updated_at?: string
