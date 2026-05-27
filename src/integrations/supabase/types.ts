@@ -647,6 +647,7 @@ export type Database = {
         Row: {
           admin_note: string | null
           created_at: string
+          ddds: string[] | null
           id: string
           income_range: string | null
           notes: string | null
@@ -655,12 +656,14 @@ export type Database = {
           reviewed_at: string | null
           reviewed_by: string | null
           status: string
+          tags: string[] | null
           updated_at: string
           user_id: string
         }
         Insert: {
           admin_note?: string | null
           created_at?: string
+          ddds?: string[] | null
           id?: string
           income_range?: string | null
           notes?: string | null
@@ -669,12 +672,14 @@ export type Database = {
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
+          tags?: string[] | null
           updated_at?: string
           user_id: string
         }
         Update: {
           admin_note?: string | null
           created_at?: string
+          ddds?: string[] | null
           id?: string
           income_range?: string | null
           notes?: string | null
@@ -683,6 +688,7 @@ export type Database = {
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
+          tags?: string[] | null
           updated_at?: string
           user_id?: string
         }
@@ -4286,6 +4292,7 @@ export type Database = {
         Row: {
           company_id: string
           created_at: string | null
+          created_by: string | null
           email: string | null
           id: string
           name: string | null
@@ -4299,6 +4306,7 @@ export type Database = {
         Insert: {
           company_id: string
           created_at?: string | null
+          created_by?: string | null
           email?: string | null
           id?: string
           name?: string | null
@@ -4312,6 +4320,7 @@ export type Database = {
         Update: {
           company_id?: string
           created_at?: string | null
+          created_by?: string | null
           email?: string | null
           id?: string
           name?: string | null
@@ -12016,6 +12025,20 @@ export type Database = {
         Returns: Json
       }
       get_activate_leads_quality_stats: { Args: never; Returns: Json }
+      get_agibank_available_ddds: {
+        Args: never
+        Returns: {
+          available_count: number
+          ddd: string
+        }[]
+      }
+      get_agibank_available_tags: {
+        Args: never
+        Returns: {
+          available_count: number
+          tag: string
+        }[]
+      }
       get_available_bancos: {
         Args: never
         Returns: {
