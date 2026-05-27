@@ -104,6 +104,23 @@ Deno.serve(async (req) => {
     const phones = Array.from(new Set(valid.map(r => r.phone)));
 
     // Existing leads with these phones
+    const valid = rows
+      .map((r, i) => ({
+        ...r,
+        phone: norm(r.phone),
+        phone2: r.phone2 ? norm(r.phone2) : null,
+        phone3: r.phone3 ? norm(r.phone3) : null,
+        phone4: r.phone4 ? norm(r.phone4) : null,
+        phone5: r.phone5 ? norm(r.phone5) : null,
+        tag: r.tag ? String(r.tag).trim() : null,
+        document: r.document ? norm(r.document) : null,
+        _idx: i,
+      }))
+      .filter(r => r.phone.length >= 10 && r.phone.length <= 13 && r.name);
+
+    const phones = Array.from(new Set(valid.map(r => r.phone)));
+
+    // Existing leads with these phones
     const { data: existingLeads } = await service
       .from("agibank_leads")
       .select("phone")
@@ -161,6 +178,11 @@ Deno.serve(async (req) => {
         list_id: listId,
         name: r.name,
         phone: r.phone,
+        phone2: r.phone2,
+        phone3: r.phone3,
+        phone4: r.phone4,
+        phone5: r.phone5,
+        tag: r.tag,
         document: r.document,
         status: "novo",
       });
