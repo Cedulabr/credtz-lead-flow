@@ -151,6 +151,7 @@ export function AgibankLeadsModule() {
         onStatusChange={updateLeadStatus}
         onSaveNotes={updateNotes}
         onApiWhatsApp={handleApiWhatsApp}
+        onUpdateLead={updateLead}
         canReassign={canManage}
         onReassign={reassignAgent}
         agents={Object.entries(agentsById).map(([id, v]) => ({ id, ...v }))}
