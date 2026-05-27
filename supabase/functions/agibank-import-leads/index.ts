@@ -6,7 +6,16 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-interface InRow { name: string; phone: string; document?: string | null; }
+interface InRow {
+  name: string;
+  phone: string;
+  phone2?: string | null;
+  phone3?: string | null;
+  phone4?: string | null;
+  phone5?: string | null;
+  tag?: string | null;
+  document?: string | null;
+}
 interface Body {
   rows: InRow[];
   file_name: string;
