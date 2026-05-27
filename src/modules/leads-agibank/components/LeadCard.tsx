@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Send, MessageCircle, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AgibankLead, STATUS_COLORS, STATUS_LABELS, maskPhone, normalizePhone } from "../types";
+import { AgibankLead, STATUS_COLORS, STATUS_LABELS, maskPhone, normalizePhone, getLeadTemperature, TEMPERATURE_META } from "../types";
 
 interface Props {
   lead: AgibankLead;
@@ -17,6 +17,8 @@ interface Props {
 export function LeadCard({ lead, agentName, onOpen, onApiWhatsApp }: Props) {
   const phone = normalizePhone(lead.phone);
   const waLink = `https://wa.me/55${phone}`;
+  const temp = getLeadTemperature(lead);
+  const tempMeta = TEMPERATURE_META[temp];
 
   return (
     <Card
@@ -31,7 +33,12 @@ export function LeadCard({ lead, agentName, onOpen, onApiWhatsApp }: Props) {
             <p className="text-xs text-muted-foreground mt-0.5">Agente: {agentName}</p>
           )}
         </div>
-        <Badge className={STATUS_COLORS[lead.status]}>{STATUS_LABELS[lead.status]}</Badge>
+        <div className="flex flex-col items-end gap-1">
+          <Badge className={STATUS_COLORS[lead.status]}>{STATUS_LABELS[lead.status]}</Badge>
+          <span className={`text-xs font-medium ${tempMeta.color}`} title={`Temperatura: ${tempMeta.label}`}>
+            {tempMeta.emoji} {tempMeta.label}
+          </span>
+        </div>
       </div>
 
       {lead.status === "agendado" && lead.scheduled_at && (

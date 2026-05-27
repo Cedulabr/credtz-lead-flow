@@ -16,6 +16,7 @@ import { ImportModal } from "./components/ImportModal";
 import { CreditBadge } from "./components/CreditBadge";
 import { NoCreditsModal } from "./components/NoCreditsModal";
 import { BlacklistManager } from "./components/BlacklistManager";
+import { MetricsCards } from "./components/MetricsCards";
 import { AgibankLead, AgibankLeadStatus, STATUS_ORDER, normalizePhone } from "./types";
 
 export function AgibankLeadsModule() {
@@ -116,6 +117,8 @@ export function AgibankLeadsModule() {
           )}
         </div>
       </div>
+
+      <MetricsCards leads={leads} creditsBalance={balance} />
 
       <FilterTabs active={activeFilter} onChange={setActiveFilter} counts={counts} />
 
