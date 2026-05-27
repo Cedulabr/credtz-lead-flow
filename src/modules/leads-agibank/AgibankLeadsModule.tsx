@@ -105,8 +105,11 @@ export function AgibankLeadsModule() {
           <h1 className="text-2xl md:text-3xl font-bold">Leads Agibank</h1>
           <p className="text-sm text-muted-foreground">{leads.length} leads no total</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <CreditBadge balance={balance} />
+          <Button size="sm" onClick={() => setShowRequest(true)} className="gap-1">
+            <Send className="h-4 w-4" /> Pedir Leads
+          </Button>
           {canManage && (
             <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
               <Upload className="h-4 w-4 mr-1" /> Importar
