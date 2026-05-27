@@ -68,6 +68,16 @@ export function AdminOperations() {
       bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
     },
     {
+      id: 'agibank-credits' as OperationSection,
+      label: 'Créditos Leads Agibank',
+      description: 'Adicionar ou remover créditos do módulo Leads Agibank',
+      icon: Coins,
+      color: 'text-teal-600',
+      bgColor: 'bg-teal-100 dark:bg-teal-900/30',
+      badge: 'Novo',
+      badgeVariant: 'default' as const,
+    },
+    {
       id: 'sms-credits' as OperationSection,
       label: 'Créditos SMS',
       description: 'Gerenciar créditos SMS dos colaboradores',
