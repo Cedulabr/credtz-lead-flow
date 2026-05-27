@@ -137,5 +137,5 @@ export function useAgibankLeads() {
     return result;
   }, []);
 
-  return { leads, isLoading, agentsById, fetchLeads, updateLeadStatus, updateNotes, reassignAgent, consumeCredit };
+  return { leads, isLoading, agentsById, fetchLeads, updateLeadStatus, updateNotes, reassignAgent, updateLead, consumeCredit };
 }
