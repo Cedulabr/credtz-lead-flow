@@ -6,7 +6,16 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-interface InRow { name: string; phone: string; document?: string | null; }
+interface InRow {
+  name: string;
+  phone: string;
+  phone2?: string | null;
+  phone3?: string | null;
+  phone4?: string | null;
+  phone5?: string | null;
+  tag?: string | null;
+  document?: string | null;
+}
 interface Body {
   rows: InRow[];
   file_name: string;
@@ -89,7 +98,17 @@ Deno.serve(async (req) => {
     // Normalize + validate phones
     const norm = (p: string) => (p || "").replace(/\D/g, "");
     const valid = rows
-      .map((r, i) => ({ ...r, phone: norm(r.phone), document: r.document ? norm(r.document) : null, _idx: i }))
+      .map((r, i) => ({
+        ...r,
+        phone: norm(r.phone),
+        phone2: r.phone2 ? norm(r.phone2) : null,
+        phone3: r.phone3 ? norm(r.phone3) : null,
+        phone4: r.phone4 ? norm(r.phone4) : null,
+        phone5: r.phone5 ? norm(r.phone5) : null,
+        tag: r.tag ? String(r.tag).trim() : null,
+        document: r.document ? norm(r.document) : null,
+        _idx: i,
+      }))
       .filter(r => r.phone.length >= 10 && r.phone.length <= 13 && r.name);
 
     const phones = Array.from(new Set(valid.map(r => r.phone)));
@@ -152,6 +171,11 @@ Deno.serve(async (req) => {
         list_id: listId,
         name: r.name,
         phone: r.phone,
+        phone2: r.phone2,
+        phone3: r.phone3,
+        phone4: r.phone4,
+        phone5: r.phone5,
+        tag: r.tag,
         document: r.document,
         status: "novo",
       });

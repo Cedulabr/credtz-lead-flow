@@ -23,7 +23,7 @@ import { AgibankLead, AgibankLeadStatus, STATUS_ORDER, normalizePhone } from "./
 export function AgibankLeadsModule() {
   const { user, profile } = useAuth();
   const isAdmin = (profile as any)?.role === "admin";
-  const { leads, isLoading, agentsById, fetchLeads, updateLeadStatus, updateNotes, reassignAgent, consumeCredit } = useAgibankLeads();
+  const { leads, isLoading, agentsById, fetchLeads, updateLeadStatus, updateNotes, reassignAgent, updateLead, consumeCredit } = useAgibankLeads();
   const { balance } = useAgibankCredits();
 
   const [activeFilter, setActiveFilter] = useState<AgibankLeadStatus | "todos">("todos");
@@ -151,6 +151,7 @@ export function AgibankLeadsModule() {
         onStatusChange={updateLeadStatus}
         onSaveNotes={updateNotes}
         onApiWhatsApp={handleApiWhatsApp}
+        onUpdateLead={updateLead}
         canReassign={canManage}
         onReassign={reassignAgent}
         agents={Object.entries(agentsById).map(([id, v]) => ({ id, ...v }))}

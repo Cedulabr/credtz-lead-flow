@@ -94,7 +94,7 @@ export function ImportModal({ open, onClose, onImported }: Props) {
                 <FileText className="h-3 w-3" /> {file.name} — {parsed.length} linhas válidas
               </p>
             )}
-            <p className="text-xs text-muted-foreground mt-1">Colunas esperadas: name, phone, document (CPF)</p>
+            <p className="text-xs text-muted-foreground mt-1">Colunas aceitas: NOME, TELEFONE1, TELEFONE2-5 (opcionais), TAG (opcional), CPF (opcional)</p>
           </div>
 
           <div>

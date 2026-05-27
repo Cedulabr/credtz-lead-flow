@@ -100,6 +100,22 @@ export function useAgibankLeads() {
     }
   }, []);
 
+  const updateLead = useCallback(async (leadId: string, patch: Partial<AgibankLead>) => {
+    try {
+      const { error } = await supabase
+        .from("agibank_leads")
+        .update(patch as any)
+        .eq("id", leadId);
+      if (error) throw error;
+      setLeads(prev => prev.map(l => (l.id === leadId ? { ...l, ...patch } : l)));
+      toast.success("Lead atualizado");
+      return true;
+    } catch (e: any) {
+      toast.error("Erro ao atualizar lead", { description: e.message });
+      return false;
+    }
+  }, []);
+
   const consumeCredit = useCallback(async (leadId: string) => {
     const { data, error } = await supabase.rpc("agibank_consume_credit", { _lead_id: leadId });
     if (error) {
@@ -121,5 +137,5 @@ export function useAgibankLeads() {
     return result;
   }, []);
 
-  return { leads, isLoading, agentsById, fetchLeads, updateLeadStatus, updateNotes, reassignAgent, consumeCredit };
+  return { leads, isLoading, agentsById, fetchLeads, updateLeadStatus, updateNotes, reassignAgent, updateLead, consumeCredit };
 }

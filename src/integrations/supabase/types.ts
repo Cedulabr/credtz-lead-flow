@@ -707,8 +707,13 @@ export type Database = {
           name: string
           notes: string | null
           phone: string
+          phone2: string | null
+          phone3: string | null
+          phone4: string | null
+          phone5: string | null
           scheduled_at: string | null
           status: Database["public"]["Enums"]["agibank_lead_status"]
+          tag: string | null
           updated_at: string
         }
         Insert: {
@@ -723,8 +728,13 @@ export type Database = {
           name: string
           notes?: string | null
           phone: string
+          phone2?: string | null
+          phone3?: string | null
+          phone4?: string | null
+          phone5?: string | null
           scheduled_at?: string | null
           status?: Database["public"]["Enums"]["agibank_lead_status"]
+          tag?: string | null
           updated_at?: string
         }
         Update: {
@@ -739,8 +749,13 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string
+          phone2?: string | null
+          phone3?: string | null
+          phone4?: string | null
+          phone5?: string | null
           scheduled_at?: string | null
           status?: Database["public"]["Enums"]["agibank_lead_status"]
+          tag?: string | null
           updated_at?: string
         }
         Relationships: [

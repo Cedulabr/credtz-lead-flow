@@ -3,14 +3,23 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
-export interface ParsedRow { name: string; phone: string; document?: string | null; }
-
 export interface ImportSummary {
   total: number;
   imported: number;
   skipped_duplicates: number;
   skipped_blacklist: number;
   skipped_invalid: number;
+}
+
+export interface ParsedRow {
+  name: string;
+  phone: string;
+  phone2?: string | null;
+  phone3?: string | null;
+  phone4?: string | null;
+  phone5?: string | null;
+  tag?: string | null;
+  document?: string | null;
 }
 
 function pick(row: any, ...keys: string[]): string {
@@ -31,11 +40,19 @@ export function parseFile(file: File): Promise<ParsedRow[]> {
         const wb = XLSX.read(data, { type: "array" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json<any>(sheet, { defval: "" });
-        const parsed: ParsedRow[] = rows.map(r => ({
-          name: pick(r, "name", "nome", "Nome", "NOME"),
-          phone: pick(r, "phone", "telefone", "Telefone", "TELEFONE", "celular"),
-          document: pick(r, "document", "cpf", "CPF", "documento") || null,
-        })).filter(r => r.name && r.phone);
+        const parsed: ParsedRow[] = rows.map(r => {
+          const phone1 = pick(r, "phone", "telefone", "Telefone", "TELEFONE", "TELEFONE1", "Telefone1", "telefone1", "celular");
+          return {
+            name: pick(r, "name", "nome", "Nome", "NOME"),
+            phone: phone1,
+            phone2: pick(r, "TELEFONE2", "Telefone2", "telefone2", "phone2") || null,
+            phone3: pick(r, "TELEFONE3", "Telefone3", "telefone3", "phone3") || null,
+            phone4: pick(r, "TELEFONE4", "Telefone4", "telefone4", "phone4") || null,
+            phone5: pick(r, "TELEFONE5", "Telefone5", "telefone5", "phone5") || null,
+            tag: pick(r, "TAG", "tag", "Tag") || null,
+            document: pick(r, "document", "cpf", "CPF", "documento") || null,
+          };
+        }).filter(r => r.name && r.phone);
         resolve(parsed);
       } catch (e) { reject(e); }
     };
