@@ -17,6 +17,11 @@ export interface AgibankLead {
   list_id: string | null;
   name: string;
   phone: string;
+  phone2: string | null;
+  phone3: string | null;
+  phone4: string | null;
+  phone5: string | null;
+  tag: string | null;
   document: string | null;
   status: AgibankLeadStatus;
   scheduled_at: string | null;
