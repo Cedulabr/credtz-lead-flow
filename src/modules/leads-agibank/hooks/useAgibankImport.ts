@@ -3,7 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
-export interface ParsedRow {
+export interface ImportSummary {
+  total: number;
+  imported: number;
+  skipped_duplicates: number;
+  skipped_blacklist: number;
+  skipped_invalid: number;
+}
+
+
   name: string;
   phone: string;
   phone2?: string | null;
