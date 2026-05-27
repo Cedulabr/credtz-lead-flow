@@ -98,13 +98,6 @@ Deno.serve(async (req) => {
     // Normalize + validate phones
     const norm = (p: string) => (p || "").replace(/\D/g, "");
     const valid = rows
-      .map((r, i) => ({ ...r, phone: norm(r.phone), document: r.document ? norm(r.document) : null, _idx: i }))
-      .filter(r => r.phone.length >= 10 && r.phone.length <= 13 && r.name);
-
-    const phones = Array.from(new Set(valid.map(r => r.phone)));
-
-    // Existing leads with these phones
-    const valid = rows
       .map((r, i) => ({
         ...r,
         phone: norm(r.phone),
