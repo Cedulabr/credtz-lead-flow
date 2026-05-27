@@ -169,6 +169,8 @@ export function AdminOperations() {
         return <AdminBankingAPI />;
       case 'leads-import-fields':
         return <LeadsImportFieldsConfig />;
+      case 'agibank-credits':
+        return <AdminAgibankCredits />;
       default:
         return null;
     }
