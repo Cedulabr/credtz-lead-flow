@@ -32,6 +32,7 @@ export function AgibankLeadsModule() {
   const [showImport, setShowImport] = useState(false);
   const [showBlacklist, setShowBlacklist] = useState(false);
   const [showNoCredits, setShowNoCredits] = useState(false);
+  const [showRequest, setShowRequest] = useState(false);
 
   const [waLead, setWaLead] = useState<AgibankLead | null>(null);
   const [waMessage, setWaMessage] = useState("");
