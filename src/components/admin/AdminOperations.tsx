@@ -28,6 +28,7 @@ import { AdminInactivitySettings } from '@/components/AdminInactivitySettings';
 import { AdminSmsCreditsManagement } from '@/components/AdminSmsCreditsManagement';
 import { AdminBankingAPI } from '@/components/admin/AdminBankingAPI';
 import { LeadsImportFieldsConfig } from '@/components/admin/LeadsImportFieldsConfig';
+import { AdminAgibankCredits } from '@/components/admin/AdminAgibankCredits';
 
 type OperationSection = 
   | 'menu' 
