@@ -158,6 +158,7 @@ export function AgibankLeadsModule() {
       />
 
       <ImportModal open={showImport} onClose={() => setShowImport(false)} onImported={fetchLeads} />
+      <RequestLeadsModal open={showRequest} onClose={() => setShowRequest(false)} currentBalance={balance} />
       <BlacklistManager open={showBlacklist} onClose={() => setShowBlacklist(false)} canDelete={isAdmin} />
       <NoCreditsModal open={showNoCredits} onClose={() => setShowNoCredits(false)} />
 
