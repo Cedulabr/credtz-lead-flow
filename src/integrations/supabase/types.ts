@@ -643,6 +643,51 @@ export type Database = {
         }
         Relationships: []
       }
+      agibank_lead_requests: {
+        Row: {
+          admin_note: string | null
+          created_at: string
+          id: string
+          income_range: string | null
+          notes: string | null
+          quantity: number
+          region: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          created_at?: string
+          id?: string
+          income_range?: string | null
+          notes?: string | null
+          quantity: number
+          region?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          created_at?: string
+          id?: string
+          income_range?: string | null
+          notes?: string | null
+          quantity?: number
+          region?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       agibank_leads: {
         Row: {
           agent_id: string | null

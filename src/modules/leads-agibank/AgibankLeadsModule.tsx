@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Upload, Shield } from "lucide-react";
+import { Upload, Shield, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAgibankLeads } from "./hooks/useAgibankLeads";
@@ -17,6 +17,7 @@ import { CreditBadge } from "./components/CreditBadge";
 import { NoCreditsModal } from "./components/NoCreditsModal";
 import { BlacklistManager } from "./components/BlacklistManager";
 import { MetricsCards } from "./components/MetricsCards";
+import { RequestLeadsModal } from "./components/RequestLeadsModal";
 import { AgibankLead, AgibankLeadStatus, STATUS_ORDER, normalizePhone } from "./types";
 
 export function AgibankLeadsModule() {
@@ -31,6 +32,7 @@ export function AgibankLeadsModule() {
   const [showImport, setShowImport] = useState(false);
   const [showBlacklist, setShowBlacklist] = useState(false);
   const [showNoCredits, setShowNoCredits] = useState(false);
+  const [showRequest, setShowRequest] = useState(false);
 
   const [waLead, setWaLead] = useState<AgibankLead | null>(null);
   const [waMessage, setWaMessage] = useState("");
@@ -103,8 +105,11 @@ export function AgibankLeadsModule() {
           <h1 className="text-2xl md:text-3xl font-bold">Leads Agibank</h1>
           <p className="text-sm text-muted-foreground">{leads.length} leads no total</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <CreditBadge balance={balance} />
+          <Button size="sm" onClick={() => setShowRequest(true)} className="gap-1">
+            <Send className="h-4 w-4" /> Pedir Leads
+          </Button>
           {canManage && (
             <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
               <Upload className="h-4 w-4 mr-1" /> Importar
@@ -153,6 +158,7 @@ export function AgibankLeadsModule() {
       />
 
       <ImportModal open={showImport} onClose={() => setShowImport(false)} onImported={fetchLeads} />
+      <RequestLeadsModal open={showRequest} onClose={() => setShowRequest(false)} currentBalance={balance} />
       <BlacklistManager open={showBlacklist} onClose={() => setShowBlacklist(false)} canDelete={isAdmin} />
       <NoCreditsModal open={showNoCredits} onClose={() => setShowNoCredits(false)} />
 
