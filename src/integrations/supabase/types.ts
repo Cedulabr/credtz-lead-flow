@@ -12408,6 +12408,7 @@ export type Database = {
         | "sem_interesse"
         | "cliente_fechado"
         | "agendado"
+        | "negativado"
       app_role: "admin" | "partner"
       chatbot_flow_status: "draft" | "active" | "paused"
       chatbot_run_status:
@@ -12598,6 +12599,7 @@ export const Constants = {
         "sem_interesse",
         "cliente_fechado",
         "agendado",
+        "negativado",
       ],
       app_role: ["admin", "partner"],
       chatbot_flow_status: ["draft", "active", "paused"],
