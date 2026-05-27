@@ -17,6 +17,7 @@ import { CreditBadge } from "./components/CreditBadge";
 import { NoCreditsModal } from "./components/NoCreditsModal";
 import { BlacklistManager } from "./components/BlacklistManager";
 import { MetricsCards } from "./components/MetricsCards";
+import { RequestLeadsModal } from "./components/RequestLeadsModal";
 import { AgibankLead, AgibankLeadStatus, STATUS_ORDER, normalizePhone } from "./types";
 
 export function AgibankLeadsModule() {
