@@ -11,7 +11,7 @@ export interface ImportSummary {
   skipped_invalid: number;
 }
 
-
+export interface ParsedRow {
   name: string;
   phone: string;
   phone2?: string | null;
