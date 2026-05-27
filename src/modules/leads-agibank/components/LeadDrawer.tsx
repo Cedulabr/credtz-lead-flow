@@ -16,6 +16,7 @@ interface Props {
   onStatusChange: (leadId: string, status: AgibankLeadStatus, extra?: Partial<AgibankLead>) => Promise<boolean>;
   onSaveNotes: (leadId: string, notes: string) => Promise<boolean>;
   onApiWhatsApp: (lead: AgibankLead) => void;
+  onUpdateLead?: (leadId: string, patch: Partial<AgibankLead>) => Promise<boolean>;
   canReassign?: boolean;
   onReassign?: (leadId: string, agentId: string | null) => Promise<boolean>;
   agents?: Array<{ id: string; name: string | null; email: string | null }>;
@@ -23,19 +24,20 @@ interface Props {
 }
 
 export function LeadDrawer({
-  lead, open, onClose, onStatusChange, onSaveNotes, onApiWhatsApp,
+  lead, open, onClose, onStatusChange, onSaveNotes, onApiWhatsApp, onUpdateLead,
   canReassign, onReassign, agents, agentName,
 }: Props) {
   const [notes, setNotes] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
+  const [cpf, setCpf] = useState("");
 
   useEffect(() => {
     setNotes(lead?.notes || "");
     setScheduledAt(lead?.scheduled_at ? lead.scheduled_at.slice(0, 16) : "");
+    setCpf(lead?.document || "");
   }, [lead]);
 
   if (!lead) return null;
-  const phone = normalizePhone(lead.phone);
 
   const handleStatusSelect = async (v: string) => {
     const status = v as AgibankLeadStatus;
@@ -59,44 +61,78 @@ export function LeadDrawer({
     }
   };
 
+  const handleSaveCpf = async () => {
+    const cleaned = cpf.replace(/\D/g, "");
+    if (cleaned === (lead.document || "")) return;
+    if (cleaned && (cleaned.length < 11 || cleaned.length > 11)) {
+      return;
+    }
+    await onUpdateLead?.(lead.id, { document: cleaned || null });
+  };
+
+  const phones: Array<{ label: string; value: string }> = [
+    { label: "Telefone 1", value: lead.phone },
+    ...(lead.phone2 ? [{ label: "Telefone 2", value: lead.phone2 }] : []),
+    ...(lead.phone3 ? [{ label: "Telefone 3", value: lead.phone3 }] : []),
+    ...(lead.phone4 ? [{ label: "Telefone 4", value: lead.phone4 }] : []),
+    ...(lead.phone5 ? [{ label: "Telefone 5", value: lead.phone5 }] : []),
+  ];
+
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
+          <SheetTitle className="flex items-center gap-2 flex-wrap">
             {lead.name}
             <Badge className={STATUS_COLORS[lead.status]}>{STATUS_LABELS[lead.status]}</Badge>
+            {lead.tag && <Badge variant="outline">{lead.tag}</Badge>}
           </SheetTitle>
         </SheetHeader>
 
         <div className="space-y-4 mt-4">
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <Label className="text-xs text-muted-foreground">Telefone</Label>
-              <p className="font-mono">{phone}</p>
-            </div>
-            {lead.document && (
-              <div>
-                <Label className="text-xs text-muted-foreground">CPF</Label>
-                <p className="font-mono">{lead.document}</p>
-              </div>
-            )}
-            {agentName && (
-              <div className="col-span-2">
-                <Label className="text-xs text-muted-foreground">Agente</Label>
-                <p>{agentName}</p>
-              </div>
-            )}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Telefones</Label>
+            {phones.map((p) => {
+              const n = normalizePhone(p.value);
+              return (
+                <div key={p.label} className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-muted-foreground">{p.label}</p>
+                    <p className="font-mono text-sm truncate">{p.value}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => onApiWhatsApp({ ...lead, phone: p.value })}
+                  >
+                    <Send className="h-4 w-4 mr-1" /> API
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => window.open(`https://wa.me/55${n}`, "_blank")}>
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })}
           </div>
 
-          <div className="flex gap-2">
-            <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={() => onApiWhatsApp(lead)}>
-              <Send className="h-4 w-4 mr-2" /> API WhatsApp
-            </Button>
-            <Button variant="outline" onClick={() => window.open(`https://wa.me/55${phone}`, "_blank")}>
-              <MessageCircle className="h-4 w-4" />
-            </Button>
+          <div>
+            <Label className="text-xs text-muted-foreground">CPF (opcional)</Label>
+            <Input
+              value={cpf}
+              onChange={(e) => setCpf(e.target.value)}
+              onBlur={handleSaveCpf}
+              placeholder="Apenas números"
+              inputMode="numeric"
+              maxLength={14}
+            />
           </div>
+
+          {agentName && (
+            <div>
+              <Label className="text-xs text-muted-foreground">Agente</Label>
+              <p className="text-sm">{agentName}</p>
+            </div>
+          )}
 
           <div>
             <Label>Status</Label>
