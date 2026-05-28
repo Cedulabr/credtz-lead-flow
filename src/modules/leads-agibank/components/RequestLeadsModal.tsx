@@ -22,7 +22,7 @@ interface Props {
 
 const FEATURED_DDDS = ["11", "21", "31", "71", "41", "51", "61", "81", "85", "27"];
 
-export function RequestLeadsModal({ open, onClose, currentBalance }: Props) {
+export function RequestLeadsModal({ open, onClose, currentBalance, onClaimed }: Props) {
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const [sending, setSending] = useState(false);
