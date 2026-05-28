@@ -17,6 +17,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   currentBalance: number;
+  onClaimed?: () => void;
 }
 
 const FEATURED_DDDS = ["11", "21", "31", "71", "41", "51", "61", "81", "85", "27"];
