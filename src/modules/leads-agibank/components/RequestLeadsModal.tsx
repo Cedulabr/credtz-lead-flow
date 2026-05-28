@@ -63,17 +63,29 @@ export function RequestLeadsModal({ open, onClose, currentBalance, onClaimed }: 
   const submit = async () => {
     if (!user) return;
     if (!quantity || quantity <= 0) return toast.error("Informe uma quantidade válida");
+    if (quantity > currentBalance) return toast.error("Créditos insuficientes", { description: `Você tem ${currentBalance} crédito(s).` });
     setSending(true);
-    const { error } = await supabase.from("agibank_lead_requests" as any).insert({
-      user_id: user.id,
-      quantity,
-      ddds: selectedDDDs.length ? selectedDDDs : null,
-      tags: selectedTags.length ? selectedTags : null,
+    const { data, error } = await supabase.rpc("agibank_claim_leads" as any, {
+      _quantity: quantity,
+      _ddds: selectedDDDs.length ? selectedDDDs : null,
+      _tags: selectedTags.length ? selectedTags : null,
     });
     setSending(false);
-    if (error) return toast.error("Erro ao enviar solicitação", { description: error.message });
-    toast.success("Solicitação enviada ao administrador");
+    if (error) return toast.error("Erro ao reservar leads", { description: error.message });
+    const result = data as any;
+    if (!result?.success) {
+      return toast.error("Não foi possível reservar leads", { description: result?.error || "Tente novamente" });
+    }
+    const claimed = Number(result.claimed || 0);
+    if (claimed === 0) {
+      toast.warning("Nenhum lead disponível com esses filtros");
+    } else if (claimed < quantity) {
+      toast.success(`${claimed} leads reservados (havia menos disponíveis no pool)`);
+    } else {
+      toast.success(`${claimed} leads reservados com sucesso`);
+    }
     setQuantity(10); setSelectedDDDs([]); setSelectedTags([]);
+    onClaimed?.();
     onClose();
   };
 
