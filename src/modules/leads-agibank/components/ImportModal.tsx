@@ -101,17 +101,23 @@ export function ImportModal({ open, onClose, onImported }: Props) {
           </div>
 
           <div>
-            <Label>Modo de atribuição</Label>
+            <Label>Modo de importação</Label>
             <Select value={mode} onValueChange={(v) => setMode(v as any)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="round_robin">Round-robin (distribuir entre vários agentes)</SelectItem>
-                <SelectItem value="manual">Manual (todos para um agente)</SelectItem>
+                <SelectItem value="pool">Pool — usuários com crédito solicitam</SelectItem>
+                <SelectItem value="round_robin">Direto: round-robin entre agentes</SelectItem>
+                <SelectItem value="manual">Direto: todos para um agente</SelectItem>
               </SelectContent>
             </Select>
+            {mode === "pool" && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Leads ficam no banco compartilhado (sem dono) e são reservados ao usuário que solicitar — outros usuários não veem.
+              </p>
+            )}
           </div>
 
-          {mode === "manual" ? (
+          {mode === "manual" && (
             <div>
               <Label>Agente</Label>
               <Select value={manualAgent} onValueChange={setManualAgent}>
@@ -121,7 +127,8 @@ export function ImportModal({ open, onClose, onImported }: Props) {
                 </SelectContent>
               </Select>
             </div>
-          ) : (
+          )}
+          {mode === "round_robin" && (
             <div>
               <Label>Agentes (round-robin entre selecionados)</Label>
               <div className="max-h-48 overflow-y-auto border rounded p-2 space-y-1">
