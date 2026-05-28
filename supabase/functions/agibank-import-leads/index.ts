@@ -162,8 +162,9 @@ Deno.serve(async (req) => {
       if (blackSet.has(r.phone)) { blackCount++; continue; }
       if (existingSet.has(r.phone) || seenInBatch.has(r.phone)) { dupCount++; continue; }
       seenInBatch.add(r.phone);
-      const agentId =
-        body.assignment_mode === "manual"
+      const agentId = isPool
+        ? null
+        : body.assignment_mode === "manual"
           ? manualMap.get(r._idx) || agentIds[rrIdx % agentIds.length]
           : agentIds[rrIdx % agentIds.length];
       rrIdx++;
