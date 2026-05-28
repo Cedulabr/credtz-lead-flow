@@ -79,16 +79,18 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "no_rows" }), { status: 400, headers: corsHeaders });
     }
     const agentIds = body.agent_ids || [];
-    if (agentIds.length === 0) {
+    const isPool = body.assignment_mode === "pool";
+    if (!isPool && agentIds.length === 0) {
       return new Response(JSON.stringify({ error: "no_agents" }), { status: 400, headers: corsHeaders });
     }
 
-    // Resolve company_id for admin if not set (use first agent's company)
+    // Resolve company_id for admin if not set
     if (!companyId) {
+      const sourceUser = !isPool && agentIds[0] ? agentIds[0] : uid;
       const { data: uc } = await service
         .from("user_companies")
         .select("company_id")
-        .eq("user_id", agentIds[0])
+        .eq("user_id", sourceUser)
         .eq("is_active", true)
         .limit(1)
         .maybeSingle();
