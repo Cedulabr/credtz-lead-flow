@@ -68,7 +68,7 @@ export function useAgibankImport() {
       rows: ParsedRow[];
       file_name: string;
       agent_ids: string[];
-      assignment_mode: "round_robin" | "manual";
+      assignment_mode: "round_robin" | "manual" | "pool";
       manual_assignments?: Array<{ index: number; agent_id: string }>;
     }): Promise<ImportSummary | null> => {
       setIsImporting(true);
