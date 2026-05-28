@@ -20,7 +20,7 @@ export function ImportModal({ open, onClose, onImported }: Props) {
   const [parsed, setParsed] = useState<ParsedRow[]>([]);
   const [agents, setAgents] = useState<Array<{ id: string; name: string | null; email: string | null }>>([]);
   const [selected, setSelected] = useState<string[]>([]);
-  const [mode, setMode] = useState<"round_robin" | "manual">("round_robin");
+  const [mode, setMode] = useState<"pool" | "round_robin" | "manual">("pool");
   const [manualAgent, setManualAgent] = useState<string>("");
 
   useEffect(() => {
@@ -62,8 +62,11 @@ export function ImportModal({ open, onClose, onImported }: Props) {
 
   const handleSubmit = async () => {
     if (parsed.length === 0) { toast.error("Selecione um arquivo"); return; }
-    const agent_ids = mode === "manual" ? (manualAgent ? [manualAgent] : []) : selected;
-    if (agent_ids.length === 0) { toast.error("Selecione ao menos um agente"); return; }
+    let agent_ids: string[] = [];
+    if (mode !== "pool") {
+      agent_ids = mode === "manual" ? (manualAgent ? [manualAgent] : []) : selected;
+      if (agent_ids.length === 0) { toast.error("Selecione ao menos um agente"); return; }
+    }
 
     const res = await importLeads({
       rows: parsed,
@@ -98,17 +101,23 @@ export function ImportModal({ open, onClose, onImported }: Props) {
           </div>
 
           <div>
-            <Label>Modo de atribuição</Label>
+            <Label>Modo de importação</Label>
             <Select value={mode} onValueChange={(v) => setMode(v as any)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="round_robin">Round-robin (distribuir entre vários agentes)</SelectItem>
-                <SelectItem value="manual">Manual (todos para um agente)</SelectItem>
+                <SelectItem value="pool">Pool — usuários com crédito solicitam</SelectItem>
+                <SelectItem value="round_robin">Direto: round-robin entre agentes</SelectItem>
+                <SelectItem value="manual">Direto: todos para um agente</SelectItem>
               </SelectContent>
             </Select>
+            {mode === "pool" && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Leads ficam no banco compartilhado (sem dono) e são reservados ao usuário que solicitar — outros usuários não veem.
+              </p>
+            )}
           </div>
 
-          {mode === "manual" ? (
+          {mode === "manual" && (
             <div>
               <Label>Agente</Label>
               <Select value={manualAgent} onValueChange={setManualAgent}>
@@ -118,7 +127,8 @@ export function ImportModal({ open, onClose, onImported }: Props) {
                 </SelectContent>
               </Select>
             </div>
-          ) : (
+          )}
+          {mode === "round_robin" && (
             <div>
               <Label>Agentes (round-robin entre selecionados)</Label>
               <div className="max-h-48 overflow-y-auto border rounded p-2 space-y-1">

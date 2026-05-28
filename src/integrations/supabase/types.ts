@@ -11878,6 +11878,10 @@ export type Database = {
         Args: { _amount: number; _user_id: string }
         Returns: Json
       }
+      agibank_claim_leads: {
+        Args: { _ddds?: string[]; _quantity: number; _tags?: string[] }
+        Returns: Json
+      }
       agibank_consume_credit: { Args: { _lead_id: string }; Returns: Json }
       autolead_increment_failed: {
         Args: { p_job_id: string }

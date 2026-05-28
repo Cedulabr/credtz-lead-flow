@@ -20,7 +20,7 @@ interface Body {
   rows: InRow[];
   file_name: string;
   agent_ids: string[];
-  assignment_mode: "round_robin" | "manual";
+  assignment_mode: "round_robin" | "manual" | "pool";
   manual_assignments?: Array<{ index: number; agent_id: string }>;
 }
 
@@ -79,16 +79,18 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "no_rows" }), { status: 400, headers: corsHeaders });
     }
     const agentIds = body.agent_ids || [];
-    if (agentIds.length === 0) {
+    const isPool = body.assignment_mode === "pool";
+    if (!isPool && agentIds.length === 0) {
       return new Response(JSON.stringify({ error: "no_agents" }), { status: 400, headers: corsHeaders });
     }
 
-    // Resolve company_id for admin if not set (use first agent's company)
+    // Resolve company_id for admin if not set
     if (!companyId) {
+      const sourceUser = !isPool && agentIds[0] ? agentIds[0] : uid;
       const { data: uc } = await service
         .from("user_companies")
         .select("company_id")
-        .eq("user_id", agentIds[0])
+        .eq("user_id", sourceUser)
         .eq("is_active", true)
         .limit(1)
         .maybeSingle();
@@ -160,8 +162,9 @@ Deno.serve(async (req) => {
       if (blackSet.has(r.phone)) { blackCount++; continue; }
       if (existingSet.has(r.phone) || seenInBatch.has(r.phone)) { dupCount++; continue; }
       seenInBatch.add(r.phone);
-      const agentId =
-        body.assignment_mode === "manual"
+      const agentId = isPool
+        ? null
+        : body.assignment_mode === "manual"
           ? manualMap.get(r._idx) || agentIds[rrIdx % agentIds.length]
           : agentIds[rrIdx % agentIds.length];
       rrIdx++;
