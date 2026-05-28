@@ -20,7 +20,7 @@ export function ImportModal({ open, onClose, onImported }: Props) {
   const [parsed, setParsed] = useState<ParsedRow[]>([]);
   const [agents, setAgents] = useState<Array<{ id: string; name: string | null; email: string | null }>>([]);
   const [selected, setSelected] = useState<string[]>([]);
-  const [mode, setMode] = useState<"round_robin" | "manual">("round_robin");
+  const [mode, setMode] = useState<"pool" | "round_robin" | "manual">("pool");
   const [manualAgent, setManualAgent] = useState<string>("");
 
   useEffect(() => {
