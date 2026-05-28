@@ -62,8 +62,11 @@ export function ImportModal({ open, onClose, onImported }: Props) {
 
   const handleSubmit = async () => {
     if (parsed.length === 0) { toast.error("Selecione um arquivo"); return; }
-    const agent_ids = mode === "manual" ? (manualAgent ? [manualAgent] : []) : selected;
-    if (agent_ids.length === 0) { toast.error("Selecione ao menos um agente"); return; }
+    let agent_ids: string[] = [];
+    if (mode !== "pool") {
+      agent_ids = mode === "manual" ? (manualAgent ? [manualAgent] : []) : selected;
+      if (agent_ids.length === 0) { toast.error("Selecione ao menos um agente"); return; }
+    }
 
     const res = await importLeads({
       rows: parsed,
