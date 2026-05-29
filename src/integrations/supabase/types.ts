@@ -6542,6 +6542,39 @@ export type Database = {
           },
         ]
       }
+      leads_inss_site: {
+        Row: {
+          cpf: string | null
+          created_at: string | null
+          id: number
+          nome: string | null
+          origem: string | null
+          produto: string | null
+          status: string | null
+          telefone: string | null
+        }
+        Insert: {
+          cpf?: string | null
+          created_at?: string | null
+          id?: never
+          nome?: string | null
+          origem?: string | null
+          produto?: string | null
+          status?: string | null
+          telefone?: string | null
+        }
+        Update: {
+          cpf?: string | null
+          created_at?: string | null
+          id?: never
+          nome?: string | null
+          origem?: string | null
+          produto?: string | null
+          status?: string | null
+          telefone?: string | null
+        }
+        Relationships: []
+      }
       leads_margem_history: {
         Row: {
           created_at: string
