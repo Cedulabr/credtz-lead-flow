@@ -63,15 +63,37 @@ serve(async (req: Request) => {
     // Use service role to create auth user and profile
     const adminClient = createClient(supabaseUrl, serviceKey);
 
-    const { data: created, error: createErr } = await adminClient.auth.admin.createUser({
+    let { data: created, error: createErr } = await adminClient.auth.admin.createUser({
       email: payload.email,
       password: payload.password,
       email_confirm: true,
       user_metadata: { name: payload.name },
     });
 
-    if (createErr || !created.user) {
-      throw new Error(createErr?.message || "Failed to create user");
+    let existingUserReused = false;
+    if (createErr || !created?.user) {
+      const msg = (createErr?.message || "").toLowerCase();
+      const alreadyExists = msg.includes("already") && msg.includes("registered");
+      if (!alreadyExists) {
+        throw new Error(createErr?.message || "Failed to create user");
+      }
+      // Find existing user by email and reuse it (idempotent re-link)
+      let foundUser: any = null;
+      for (let page = 1; page <= 20 && !foundUser; page++) {
+        const { data: list, error: listErr } = await adminClient.auth.admin.listUsers({ page, perPage: 200 });
+        if (listErr) throw new Error(listErr.message);
+        foundUser = list.users.find((u: any) => (u.email || "").toLowerCase() === payload.email.toLowerCase());
+        if (!list.users.length || list.users.length < 200) break;
+      }
+      if (!foundUser) throw new Error("Usuário com este email já existe, mas não foi possível localizá-lo.");
+      // Reset password to the one provided
+      await adminClient.auth.admin.updateUserById(foundUser.id, {
+        password: payload.password,
+        email_confirm: true,
+        user_metadata: { name: payload.name },
+      });
+      created = { user: foundUser } as any;
+      existingUserReused = true;
     }
 
     // Default restrictive permissions: only Televendas, Gestão Televendas, Digitação and PortFlow enabled
@@ -115,8 +137,14 @@ serve(async (req: Request) => {
 
     if (profileErr) throw new Error(profileErr.message);
 
-    // If company_id is provided and valid, link user to company
+    // If company_id is provided and valid, link user to company (upsert to be idempotent)
     if (payload.company_id && payload.company_id !== "none") {
+      // Remove any previous links to avoid duplicates, then insert the requested one
+      await adminClient
+        .from("user_companies")
+        .delete()
+        .eq("user_id", created.user.id);
+
       const { error: companyErr } = await adminClient
         .from("user_companies")
         .insert({
@@ -127,12 +155,11 @@ serve(async (req: Request) => {
 
       if (companyErr) {
         console.error("Error linking user to company:", companyErr);
-        // Don't throw - user was created, just log the error
       }
     }
 
     return new Response(
-      JSON.stringify({ success: true, user_id: created.user.id }),
+      JSON.stringify({ success: true, user_id: created.user.id, reused: existingUserReused }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (err: any) {
