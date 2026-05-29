@@ -137,8 +137,14 @@ serve(async (req: Request) => {
 
     if (profileErr) throw new Error(profileErr.message);
 
-    // If company_id is provided and valid, link user to company
+    // If company_id is provided and valid, link user to company (upsert to be idempotent)
     if (payload.company_id && payload.company_id !== "none") {
+      // Remove any previous links to avoid duplicates, then insert the requested one
+      await adminClient
+        .from("user_companies")
+        .delete()
+        .eq("user_id", created.user.id);
+
       const { error: companyErr } = await adminClient
         .from("user_companies")
         .insert({
@@ -149,12 +155,11 @@ serve(async (req: Request) => {
 
       if (companyErr) {
         console.error("Error linking user to company:", companyErr);
-        // Don't throw - user was created, just log the error
       }
     }
 
     return new Response(
-      JSON.stringify({ success: true, user_id: created.user.id }),
+      JSON.stringify({ success: true, user_id: created.user.id, reused: existingUserReused }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (err: any) {
