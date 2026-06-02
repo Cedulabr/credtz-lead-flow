@@ -136,7 +136,7 @@ export function MyData() {
         .update(dataToSave)
         .eq('id', userData.id);
 
-      if (error) throw error;
+      if (error) { console.error('Update user_data error:', error); throw error; }
 
       // Log history
       await supabase.from('user_data_history').insert({
