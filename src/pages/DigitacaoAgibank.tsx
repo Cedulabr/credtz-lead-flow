@@ -469,11 +469,14 @@ export default function DigitacaoAgibank() {
         tipo_operacao: tipoOperacaoMap[produto!],
         observacao,
         modulo_origem: "digitacao_agibank",
-        status: "pendente",
+        status: "proposta_pendente",
         status_proposta: "digitada",
         status_bancario: "aguardando_digitacao",
       } as any);
-      if (errTel) throw errTel;
+      if (errTel) {
+        console.error("Erro ao inserir em televendas:", errTel);
+        throw new Error(errTel.message || "Erro ao enviar proposta");
+      }
 
       toast.success("Proposta enviada para Gestão de Televendas!");
       // Reset form
