@@ -153,7 +153,7 @@ export function MyData() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) { console.error('Insert user_data error:', error); throw error; }
 
       // Log history
       if (newData) {
