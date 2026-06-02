@@ -4312,6 +4312,8 @@ export type Database = {
           id: string
           name: string | null
           notes: string | null
+          opted_out_sdr: boolean
+          opted_out_sdr_at: string | null
           phone: string | null
           profile_pic_updated_at: string | null
           profile_pic_url: string | null
@@ -4326,6 +4328,8 @@ export type Database = {
           id?: string
           name?: string | null
           notes?: string | null
+          opted_out_sdr?: boolean
+          opted_out_sdr_at?: string | null
           phone?: string | null
           profile_pic_updated_at?: string | null
           profile_pic_url?: string | null
@@ -4340,6 +4344,8 @@ export type Database = {
           id?: string
           name?: string | null
           notes?: string | null
+          opted_out_sdr?: boolean
+          opted_out_sdr_at?: string | null
           phone?: string | null
           profile_pic_updated_at?: string | null
           profile_pic_url?: string | null
@@ -7077,6 +7083,48 @@ export type Database = {
           },
         ]
       }
+      parceiro_credtz: {
+        Row: {
+          atua_com_consignado: boolean | null
+          cpf_cnpj: string
+          created_at: string | null
+          id: number
+          nome_razao_social: string
+          observacoes: string | null
+          origem: string | null
+          receber_leads: boolean | null
+          rede_social: string | null
+          status: string | null
+          whatsapp: string
+        }
+        Insert: {
+          atua_com_consignado?: boolean | null
+          cpf_cnpj: string
+          created_at?: string | null
+          id?: never
+          nome_razao_social: string
+          observacoes?: string | null
+          origem?: string | null
+          receber_leads?: boolean | null
+          rede_social?: string | null
+          status?: string | null
+          whatsapp: string
+        }
+        Update: {
+          atua_com_consignado?: boolean | null
+          cpf_cnpj?: string
+          created_at?: string | null
+          id?: never
+          nome_razao_social?: string
+          observacoes?: string | null
+          origem?: string | null
+          receber_leads?: boolean | null
+          rede_social?: string | null
+          status?: string | null
+          whatsapp?: string
+        }
+        Relationships: []
+      }
       payment_receipts: {
         Row: {
           company_id: string
@@ -7967,6 +8015,82 @@ export type Database = {
         }
         Relationships: []
       }
+      sdr_campaigns: {
+        Row: {
+          ai_template_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          delay_minutes: number
+          escalation_trigger: string | null
+          id: string
+          instance_id: string
+          interval_between_attempts_hours: number
+          is_active: boolean
+          max_attempts: number
+          name: string
+          opening_message: string
+          target_type: string
+          updated_at: string
+        }
+        Insert: {
+          ai_template_id?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          delay_minutes?: number
+          escalation_trigger?: string | null
+          id?: string
+          instance_id: string
+          interval_between_attempts_hours?: number
+          is_active?: boolean
+          max_attempts?: number
+          name: string
+          opening_message: string
+          target_type: string
+          updated_at?: string
+        }
+        Update: {
+          ai_template_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          delay_minutes?: number
+          escalation_trigger?: string | null
+          id?: string
+          instance_id?: string
+          interval_between_attempts_hours?: number
+          is_active?: boolean
+          max_attempts?: number
+          name?: string
+          opening_message?: string
+          target_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_campaigns_ai_template_id_fkey"
+            columns: ["ai_template_id"]
+            isOneToOne: false
+            referencedRelation: "ai_config_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_campaigns_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_campaigns_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sdr_config: {
         Row: {
           active: boolean
@@ -8068,6 +8192,86 @@ export type Database = {
             foreignKeyName: "sdr_conversation_state_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: true
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_executions: {
+        Row: {
+          attempt_number: number
+          campaign_id: string
+          company_id: string
+          contact_id: string | null
+          conversation_id: string | null
+          converted_at: string | null
+          created_at: string
+          error: string | null
+          id: string
+          message_sent: string | null
+          phone: string
+          replied_at: string | null
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          attempt_number?: number
+          campaign_id: string
+          company_id: string
+          contact_id?: string | null
+          conversation_id?: string | null
+          converted_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          message_sent?: string | null
+          phone: string
+          replied_at?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          attempt_number?: number
+          campaign_id?: string
+          company_id?: string
+          contact_id?: string | null
+          conversation_id?: string | null
+          converted_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          message_sent?: string | null
+          phone?: string
+          replied_at?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_executions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_executions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_executions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_executions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "whatsapp_conversations"
             referencedColumns: ["id"]
           },
@@ -11598,6 +11802,7 @@ export type Database = {
           id: string
           instance_name: string
           instance_status: string | null
+          is_primary: boolean
           phone_number: string | null
           qr_code: string | null
           updated_at: string
@@ -11611,6 +11816,7 @@ export type Database = {
           id?: string
           instance_name: string
           instance_status?: string | null
+          is_primary?: boolean
           phone_number?: string | null
           qr_code?: string | null
           updated_at?: string
@@ -11624,6 +11830,7 @@ export type Database = {
           id?: string
           instance_name?: string
           instance_status?: string | null
+          is_primary?: boolean
           phone_number?: string | null
           qr_code?: string | null
           updated_at?: string
