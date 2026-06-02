@@ -411,9 +411,9 @@ export default function DigitacaoAgibank() {
           : "Agibank Easyn";
 
       const tipoOperacaoMap: Record<string, string> = {
-        novo_emprestimo: "novo",
-        refinanciamento: "refinanciamento",
-        portabilidade: "portabilidade",
+        novo_emprestimo: "Novo empréstimo",
+        refinanciamento: "Refinanciamento",
+        portabilidade: "Portabilidade",
       };
 
       const loasTag = `LOAS: ${isLoas ? "Sim" : "Não"}`;
