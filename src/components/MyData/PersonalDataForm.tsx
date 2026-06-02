@@ -113,8 +113,9 @@ export function PersonalDataForm({ data, onSave, isAdmin, readOnly }: PersonalDa
     try {
       await onSave(formData);
       toast.success('Dados salvos com sucesso');
-    } catch (error) {
-      toast.error('Erro ao salvar dados');
+    } catch (error: any) {
+      console.error('Erro ao salvar dados pessoais:', error);
+      toast.error(error?.message || error?.error_description || 'Erro ao salvar dados');
     } finally {
       setLoading(false);
     }
