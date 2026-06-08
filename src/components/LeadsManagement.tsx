@@ -1940,13 +1940,6 @@ export function LeadsManagement() {
                           <span className="hidden md:inline">Histórico</span>
                         </Button>
 
-                        {/* Botão Solicitar Simulação */}
-                        <SimulationRequestButton
-                          leadId={lead.id}
-                          leadName={lead.name}
-                          currentSimulationStatus={lead.simulation_status}
-                          onSuccess={fetchLeads}
-                        />
 
                         {/* Botão Solicitar Digitação - Destaque para mobile */}
                         <Button
