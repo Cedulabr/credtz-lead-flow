@@ -9,7 +9,7 @@ export { LeadDetailDrawer } from "./components/LeadDetailDrawer";
 export { MobileNavBar } from "./components/MobileNavBar";
 export { MobileActionBar } from "./components/MobileActionBar";
 export { RequestLeadsModal } from "./components/RequestLeadsModal";
-export { SimulationsDashboard } from "./views/SimulationsDashboard";
+
 export { useLeadsPremium } from "./hooks/useLeadsPremium";
 export { useLeads } from "./hooks/useLeads";
 export * from "./types";
