@@ -11,6 +11,7 @@ import { AnimatedContainer } from "./ui/animated-container";
 import { SkeletonCard } from "./ui/skeleton-card";
 import { ConsultorDashboard } from "./ConsultorDashboard";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 import {
   Calendar,
   RefreshCw,
@@ -27,6 +28,7 @@ import {
   Wifi,
   WifiOff,
   Loader2,
+  ArrowUpRight,
 } from "lucide-react";
 import { format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -417,11 +419,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }
 
   const summaryCards = [
-    { label: 'Leads Premium', value: globalTotals.leadsPremium, icon: Zap, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/30' },
-    { label: 'Activate Leads', value: globalTotals.activateLeads, icon: Phone, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/30' },
-    { label: 'Televendas Pagas', value: globalTotals.televendasPagas, icon: ShoppingCart, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
-    { label: 'Gestão Televendas', value: globalTotals.gestaoTelevendas, icon: ClipboardList, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-950/30' },
-    { label: 'Propostas Geradas', value: globalTotals.geradorProposta, icon: FileText, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-950/30' },
+    { label: 'Leads Premium', value: globalTotals.leadsPremium, icon: Zap, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/30', border: 'border-amber-500/20' },
+    { label: 'Activate Leads', value: globalTotals.activateLeads, icon: Phone, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/30', border: 'border-blue-500/20' },
+    { label: 'Televendas Pagas', value: globalTotals.televendasPagas, icon: ShoppingCart, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30', border: 'border-emerald-500/20' },
+    { label: 'Gestão Televendas', value: globalTotals.gestaoTelevendas, icon: ClipboardList, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-950/30', border: 'border-violet-500/20' },
+    { label: 'Propostas Geradas', value: globalTotals.geradorProposta, icon: FileText, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-950/30', border: 'border-rose-500/20' },
     { label: 'SMS Enviados', value: globalTotals.smsEnviados, icon: MessageSquare, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-950/30' },
   ];
 
@@ -495,18 +497,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             transition={{ delay: 0.1 }}
           >
             <Card 
-              className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-amber-500 bg-gradient-to-br from-amber-50 to-background dark:from-amber-950/20"
+              className="cursor-pointer hover:shadow-xl transition-all duration-300 border-2 border-amber-500/20 bg-gradient-to-br from-amber-500/10 to-background hover:scale-[1.02] group"
               onClick={() => onNavigate('leads')}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-muted-foreground font-medium">Leads Premium</p>
-                    <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{moduleMetrics.leadsPremium}</p>
-                    <p className="text-xs text-muted-foreground">trabalhados no mês</p>
+                    <p className="text-[11px] font-bold text-amber-600 uppercase tracking-wider mb-1">Leads Premium</p>
+                    <p className="text-3xl font-black text-amber-700 dark:text-amber-400">{moduleMetrics.leadsPremium}</p>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 mt-1">
+                      <ArrowUpRight className="h-3 w-3" />
+                      +8.2%
+                    </div>
                   </div>
-                  <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-full">
-                    <Zap className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  <div className="p-4 bg-amber-500/20 rounded-2xl group-hover:rotate-12 transition-transform duration-300">
+                    <Zap className="h-6 w-6 text-amber-600 dark:text-amber-400" />
                   </div>
                 </div>
               </CardContent>
@@ -570,18 +575,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             transition={{ delay: 0.25 }}
           >
             <Card 
-              className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50 to-background dark:from-emerald-950/20"
+              className="cursor-pointer hover:shadow-xl transition-all duration-300 border-2 border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-background hover:scale-[1.02] group"
               onClick={() => onNavigate('televendas-manage')}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-muted-foreground font-medium">Vendas Televendas</p>
-                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{moduleMetrics.televendasPagas}</p>
-                    <p className="text-xs text-muted-foreground">pagas no mês</p>
+                    <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Vendas Televendas</p>
+                    <p className="text-3xl font-black text-emerald-700 dark:text-emerald-400">{moduleMetrics.televendasPagas}</p>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 mt-1">
+                      <ArrowUpRight className="h-3 w-3" />
+                      +21.0%
+                    </div>
                   </div>
-                  <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-full">
-                    <ShoppingCart className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  <div className="p-4 bg-emerald-500/20 rounded-2xl group-hover:rotate-12 transition-transform duration-300">
+                    <ShoppingCart className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
                   </div>
                 </div>
               </CardContent>
@@ -595,18 +603,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             transition={{ delay: 0.3 }}
           >
             <Card 
-              className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-rose-500 bg-gradient-to-br from-rose-50 to-background dark:from-rose-950/20"
+              className="cursor-pointer hover:shadow-xl transition-all duration-300 border-2 border-indigo-500/20 bg-gradient-to-br from-indigo-500/10 to-background hover:scale-[1.02] group"
               onClick={() => onNavigate('documents')}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-muted-foreground font-medium">Documentos Salvos</p>
-                    <p className="text-2xl font-bold text-rose-600 dark:text-rose-400">{moduleMetrics.documentos}</p>
-                    <p className="text-xs text-muted-foreground">arquivos armazenados</p>
+                    <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider mb-1">Documentos Salvos</p>
+                    <p className="text-3xl font-black text-indigo-700 dark:text-indigo-400">{moduleMetrics.documentos}</p>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-500 mt-1">
+                      <FileCheck className="h-3 w-3" />
+                      Armazenados
+                    </div>
                   </div>
-                  <div className="p-3 bg-rose-100 dark:bg-rose-900/30 rounded-full">
-                    <FileCheck className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+                  <div className="p-4 bg-indigo-500/20 rounded-2xl group-hover:rotate-12 transition-transform duration-300">
+                    <FileText className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
                   </div>
                 </div>
               </CardContent>
@@ -671,18 +682,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             className="sm:col-span-2"
           >
             <Card 
-              className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-sky-500 bg-gradient-to-br from-sky-50 to-background dark:from-sky-950/20"
+              className="cursor-pointer hover:shadow-xl transition-all duration-300 border-2 border-sky-500/20 bg-gradient-to-br from-sky-500/10 to-background hover:scale-[1.02] group"
               onClick={() => onNavigate('sms')}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-muted-foreground font-medium">Crédito SMS</p>
-                    <p className="text-2xl font-bold text-sky-600 dark:text-sky-400">{moduleMetrics.smsCredits.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground">créditos disponíveis para envio</p>
+                    <p className="text-[11px] font-bold text-sky-600 uppercase tracking-wider mb-1">Crédito SMS</p>
+                    <p className="text-3xl font-black text-sky-700 dark:text-sky-400">{moduleMetrics.smsCredits.toLocaleString()}</p>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 mt-1">
+                      <ArrowUpRight className="h-3 w-3" />
+                      Ativo
+                    </div>
                   </div>
-                  <div className="p-3 bg-sky-100 dark:bg-sky-900/30 rounded-full">
-                    <MessageSquare className="h-5 w-5 text-sky-600 dark:text-sky-400" />
+                  <div className="p-4 bg-sky-500/20 rounded-2xl group-hover:rotate-12 transition-transform duration-300">
+                    <MessageSquare className="h-6 w-6 text-sky-600 dark:text-sky-400" />
                   </div>
                 </div>
               </CardContent>
@@ -691,19 +705,26 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
 
         {/* Activity Summary Cards - Existing */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {summaryCards.map((card) => (
-            <Card key={card.label} className={`${card.bg} border-none shadow-sm`}>
-              <CardContent className="p-3 md:p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <card.icon className={`h-4 w-4 ${card.color}`} />
-                  <span className={`text-xs font-medium ${card.color}`}>{card.label}</span>
-                </div>
-                <p className={`text-xl md:text-2xl font-bold ${card.color}`}>
-                  {isRefreshing ? '...' : card.value.toLocaleString()}
-                </p>
-              </CardContent>
-            </Card>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {summaryCards.map((card, i) => (
+            <motion.div
+              key={card.label}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: i * 0.05 }}
+            >
+              <Card className={cn("border-2 transition-all hover:shadow-md hover:scale-[1.02]", card.border || "border-border/50", card.bg)}>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <card.icon className={cn("h-4 w-4", card.color)} />
+                    <span className={cn("text-[10px] font-black uppercase tracking-widest", card.color)}>{card.label}</span>
+                  </div>
+                  <p className={cn("text-2xl font-black tracking-tight", card.color)}>
+                    {isRefreshing ? '...' : card.value.toLocaleString()}
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
           ))}
         </div>
 

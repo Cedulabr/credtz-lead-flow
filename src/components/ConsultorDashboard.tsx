@@ -19,7 +19,9 @@ import {
   WifiOff,
   Loader2,
   Send,
+  TrendingUp,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion } from "framer-motion";
@@ -245,7 +247,7 @@ export function ConsultorDashboard({ onNavigate }: ConsultorDashboardProps) {
       </AnimatedContainer>
 
       {/* Module Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {cards.map((card, i) => (
           <motion.div
             key={card.title}
@@ -255,23 +257,34 @@ export function ConsultorDashboard({ onNavigate }: ConsultorDashboardProps) {
             variants={cardVariants}
           >
             <Card
-              className={`border ${card.borderColor} cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] h-full`}
+              className={cn(
+                "border-2 cursor-pointer transition-all duration-300 hover:shadow-xl hover:scale-[1.03] h-full group",
+                card.borderColor
+              )}
               onClick={() => onNavigate(card.tab)}
             >
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${card.iconBg}`}>
-                    <card.icon className={`h-5 w-5 ${card.iconColor}`} />
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className={cn(
+                    "h-12 w-12 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:rotate-12",
+                    card.iconBg
+                  )}>
+                    <card.icon className={cn("h-6 w-6", card.iconColor)} />
                   </div>
-                  {isLoading && (
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  {isLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  ) : (
+                    <div className="flex items-center gap-1 text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-full">
+                      <TrendingUp className="h-3 w-3" />
+                      +12%
+                    </div>
                   )}
                 </div>
-                <p className="text-2xl md:text-3xl font-bold tabular-nums">
+                <p className="text-3xl font-extrabold tabular-nums tracking-tight">
                   {isLoading ? "—" : card.value.toLocaleString("pt-BR")}
                 </p>
-                <p className="text-sm font-medium mt-0.5">{card.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{card.description}</p>
+                <h3 className="text-base font-bold mt-1 tracking-tight">{card.title}</h3>
+                <p className="text-xs text-muted-foreground font-medium mt-1 leading-relaxed">{card.description}</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -368,20 +381,22 @@ export function ConsultorDashboard({ onNavigate }: ConsultorDashboardProps) {
       <SalesRanking selectedMonth={selectedMonth} />
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Nova Venda", icon: ShoppingCart, tab: "televendas", color: "text-primary" },
-          { label: "Meus Leads", icon: Star, tab: "leads", color: "text-amber-500" },
-          { label: "Indicar", icon: UserPlus, tab: "indicate", color: "text-emerald-500" },
+          { label: "Nova Venda", icon: ShoppingCart, tab: "televendas", color: "text-primary", bg: "bg-primary/10" },
+          { label: "Meus Leads", icon: Star, tab: "leads", color: "text-amber-500", bg: "bg-amber-500/10" },
+          { label: "Indicar", icon: UserPlus, tab: "indicate", color: "text-emerald-500", bg: "bg-emerald-500/10" },
         ].map((action) => (
           <Button
             key={action.label}
             variant="outline"
-            className="h-auto py-3 flex-col gap-1.5 rounded-xl"
+            className="h-auto py-4 flex-col gap-2 rounded-2xl border-2 transition-all hover:border-primary/50 hover:bg-muted/50"
             onClick={() => onNavigate(action.tab)}
           >
-            <action.icon className={`h-5 w-5 ${action.color}`} />
-            <span className="text-xs">{action.label}</span>
+            <div className={cn("p-2 rounded-xl mb-1", action.bg)}>
+              <action.icon className={cn("h-6 w-6", action.color)} />
+            </div>
+            <span className="text-[13px] font-bold tracking-tight">{action.label}</span>
           </Button>
         ))}
       </div>

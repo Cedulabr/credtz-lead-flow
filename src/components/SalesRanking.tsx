@@ -234,31 +234,33 @@ export function SalesRanking({ companyFilter, selectedMonth }: SalesRankingProps
         {topUser ? (
           <div className="space-y-4">
             {/* Destaque do primeiro lugar */}
-            <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-4 border-2 border-primary/20">
-              <div className="absolute top-2 right-2">
-                <Crown className="h-8 w-8 text-yellow-500 opacity-50" />
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-primary/5 to-transparent p-6 border-2 border-primary/20 shadow-inner">
+              <div className="absolute -top-2 -right-2 rotate-12">
+                <Crown className="h-16 w-16 text-yellow-500/10" />
               </div>
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <Avatar className="h-14 w-14 border-2 border-yellow-500 shadow-lg">
-                    <AvatarFallback className="bg-gradient-to-br from-yellow-400 to-yellow-600 text-white font-bold text-lg">
+              <div className="flex items-center gap-6">
+                <div className="relative group/avatar">
+                  <Avatar className="h-20 w-20 border-4 border-yellow-500 shadow-2xl transition-transform duration-500 group-hover/avatar:scale-110">
+                    <AvatarFallback className="bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600 text-white font-black text-2xl shadow-inner">
                       {getInitials(topUser.name)}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="absolute -bottom-1 -right-1 bg-yellow-500 rounded-full p-1">
-                    <Crown className="h-3 w-3 text-white" />
+                  <div className="absolute -bottom-2 -right-2 bg-yellow-500 rounded-full p-2 shadow-lg border-2 border-background">
+                    <Crown className="h-4 w-4 text-white" />
                   </div>
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-bold text-foreground truncate">{topUser.name}</p>
-                    <Badge className="bg-yellow-500/20 text-yellow-700 border-yellow-500/30">
-                      🥇 1º Lugar
+                  <div className="flex flex-col gap-1">
+                    <Badge className="w-fit bg-yellow-500/20 text-yellow-700 border-yellow-500/30 font-bold uppercase tracking-wider text-[10px] px-2 py-0.5">
+                      🥇 Vendedor Platinum
                     </Badge>
+                    <p className="font-black text-2xl text-foreground tracking-tight">{topUser.name}</p>
                   </div>
-                  <div className="flex items-center gap-1 mt-1">
-                    <TrendingUp className="h-4 w-4 text-success" />
-                    <span className="text-sm font-medium">{topUser.salesCount} {topUser.salesCount === 1 ? 'venda' : 'vendas'}</span>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="bg-emerald-500/10 text-emerald-600 px-3 py-1 rounded-full flex items-center gap-1.5 border border-emerald-500/20">
+                      <TrendingUp className="h-4 w-4" />
+                      <span className="text-sm font-bold">{topUser.salesCount} {topUser.salesCount === 1 ? 'venda' : 'vendas'}</span>
+                    </div>
                   </div>
                 </div>
               </div>

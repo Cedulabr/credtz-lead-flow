@@ -109,15 +109,15 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
         type="button"
         onClick={() => onTabChange(it.id)}
         className={cn(
-          "group w-full flex items-center gap-2.5 mx-1.5 rounded-lg transition-colors",
-          isSub ? "h-8 pl-[42px] pr-3 text-[12.5px]" : "h-[34px] px-3.5 text-[13px]",
+          "group w-full flex items-center gap-3 mx-1.5 rounded-lg transition-all duration-200 border border-transparent",
+          isSub ? "h-9 pl-[46px] pr-3 text-[13px]" : "h-[40px] px-4 text-[13.5px]",
           active
-            ? "bg-primary/15 text-primary font-medium"
-            : "text-foreground/80 hover:bg-secondary"
+            ? "bg-primary/10 border-primary/20 text-primary font-semibold shadow-sm"
+            : "text-foreground/70 hover:bg-muted/60 hover:text-foreground"
         )}
         style={{ width: "calc(100% - 12px)" }}
       >
-        {!isSub && <Icon className="shrink-0" size={16} style={{ width: 18 }} strokeWidth={active ? 2.25 : 1.75} />}
+        {!isSub && <Icon className="shrink-0" size={18} strokeWidth={active ? 2.5 : 2} />}
         <span className="flex-1 text-left truncate">{it.label}</span>
       </button>
     );
@@ -133,15 +133,15 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
           type="button"
           onClick={() => toggleGroup(section.categoryKey)}
           className={cn(
-            "group w-full flex items-center gap-2.5 mx-1.5 rounded-lg transition-colors h-[34px] px-3.5 text-[13px]",
-            hasActive ? "text-foreground font-medium" : "text-foreground/80 hover:bg-secondary"
+            "group w-full flex items-center gap-3 mx-1.5 rounded-lg transition-all duration-200 h-[40px] px-4 text-[13.5px]",
+            hasActive ? "text-foreground font-semibold bg-muted/40" : "text-foreground/70 hover:bg-muted/60"
           )}
           style={{ width: "calc(100% - 12px)" }}
           aria-expanded={isOpen}
         >
-          <Icon className="shrink-0" size={16} style={{ width: 18 }} strokeWidth={1.75} />
+          <Icon className="shrink-0 text-primary/80" size={18} strokeWidth={2} />
           <span className="flex-1 text-left truncate">{section.label}</span>
-          <ChevronDown size={14} className={cn("transition-transform duration-200", isOpen ? "rotate-0" : "-rotate-90")} />
+          <ChevronDown size={16} className={cn("transition-transform duration-300 opacity-60", isOpen ? "rotate-0" : "-rotate-90")} />
         </button>
         <div
           className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
@@ -171,16 +171,16 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
       </div>
 
       {user && (
-        <div className="mx-3 mb-2 px-2.5 py-2 rounded-lg bg-secondary/50 flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-[11px] font-semibold shrink-0">
+        <div className="mx-3 mb-4 px-3 py-3 rounded-2xl bg-gradient-to-br from-primary/10 via-muted/50 to-muted/30 border border-primary/10 flex items-center gap-3 shadow-sm">
+          <div className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[12px] font-bold shrink-0 border-2 border-primary/20 shadow-inner">
             {userInitials}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[12px] font-medium truncate">{profile?.name || user.email}</div>
-            <div className="text-[10.5px] text-muted-foreground truncate">{companyName}</div>
+            <div className="text-[13px] font-bold text-foreground truncate">{profile?.name || user.email}</div>
+            <div className="text-[11px] font-medium text-muted-foreground truncate opacity-80">{companyName}</div>
           </div>
           {roleBadge && (
-            <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", roleBadge.className)}>
+            <span className={cn("text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter shadow-sm", roleBadge.className)}>
               {roleBadge.label}
             </span>
           )}
@@ -213,21 +213,21 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
           <button
             type="button"
             onClick={() => (window.location.href = "/admin")}
-            className="w-full flex items-center gap-2.5 mx-1.5 rounded-lg h-[34px] px-3.5 text-[13px] text-foreground/80 hover:bg-secondary transition-colors"
+            className="w-full flex items-center gap-3 mx-1.5 rounded-lg h-[40px] px-4 text-[13.5px] text-foreground/70 hover:bg-muted/60 transition-all duration-200"
             style={{ width: "calc(100% - 12px)" }}
           >
-            <Settings className="shrink-0" size={16} style={{ width: 18 }} strokeWidth={1.75} />
+            <Settings className="shrink-0 text-primary/60" size={18} strokeWidth={2} />
             <span className="flex-1 text-left">Admin</span>
           </button>
         )}
         <button
           type="button"
           onClick={handleSignOut}
-          className="w-full flex items-center gap-2.5 mx-1.5 rounded-lg h-[34px] px-3.5 text-[13px] text-foreground/70 hover:bg-secondary transition-colors"
+          className="w-full flex items-center gap-3 mx-1.5 rounded-lg h-[40px] px-4 text-[13.5px] text-destructive/80 hover:bg-destructive/10 transition-all duration-200"
           style={{ width: "calc(100% - 12px)" }}
         >
-          <LogOut className="shrink-0" size={16} style={{ width: 18 }} strokeWidth={1.75} />
-          <span className="flex-1 text-left">Sair</span>
+          <LogOut className="shrink-0" size={18} strokeWidth={2} />
+          <span className="flex-1 text-left font-medium">Sair</span>
         </button>
       </div>
     </>
