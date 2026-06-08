@@ -144,35 +144,7 @@ export function LeadsListView({
   };
 
   const handleExportLeads = () => {
-    if (filteredLeads.length === 0) {
-      return;
-    }
-
-    // Prepare data for CSV
-    const headers = ["Nome", "CPF", "Telefone", "Telefone 2", "Convênio", "Tag", "Status", "Data de Criação"];
-    const csvContent = [
-      headers.join(","),
-      ...filteredLeads.map(lead => [
-        `"${lead.name || ''}"`,
-        `"${lead.cpf || ''}"`,
-        `"${lead.phone || ''}"`,
-        `"${lead.phone2 || ''}"`,
-        `"${lead.convenio || ''}"`,
-        `"${lead.tag || ''}"`,
-        `"${PIPELINE_STAGES[lead.status]?.label || lead.status}"`,
-        `"${format(new Date(lead.created_at), 'dd/MM/yyyy HH:mm')}"`
-      ].join(","))
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `leads_premium_export_${format(new Date(), 'yyyy-MM-dd_HHmm')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    setIsExportDialogOpen(true);
   };
 
   if (isLoading) {
