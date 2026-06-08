@@ -69,7 +69,6 @@ import {
   DownloadCloud
 } from 'lucide-react';
 import { ExportLeadsModal } from '@/modules/activate-leads/components/ExportLeadsModal';
-} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
