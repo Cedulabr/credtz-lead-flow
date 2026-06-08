@@ -109,11 +109,11 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
         type="button"
         onClick={() => onTabChange(it.id)}
         className={cn(
-          "group w-full flex items-center gap-2.5 mx-1.5 rounded-lg transition-colors",
-          isSub ? "h-8 pl-[42px] pr-3 text-[12.5px]" : "h-[34px] px-3.5 text-[13px]",
+          "group w-full flex items-center gap-3 mx-1.5 rounded-lg transition-all duration-200 border border-transparent",
+          isSub ? "h-9 pl-[46px] pr-3 text-[13px]" : "h-[40px] px-4 text-[13.5px]",
           active
-            ? "bg-primary/15 text-primary font-medium"
-            : "text-foreground/80 hover:bg-secondary"
+            ? "bg-primary/10 border-primary/20 text-primary font-semibold shadow-sm"
+            : "text-foreground/70 hover:bg-muted/60 hover:text-foreground"
         )}
         style={{ width: "calc(100% - 12px)" }}
       >
