@@ -15,8 +15,7 @@ import { DistributedLeadsManager } from "./DistributedLeadsManager";
 import { LeadHistoryModal } from "./LeadHistoryModal";
 import { DailyLeadsTracking } from "./DailyLeadsTracking";
 import { AnimatedContainer, StaggerContainer, StaggerItem } from "./ui/animated-container";
-import { SimulationSummaryCards, SimulationRequestButton, SimulationManager } from "./leads";
-import { useSimulationNotifications } from "@/hooks/useSimulationNotifications";
+import { UpdateDataWizard } from "./leads";
 import { SkeletonCard } from "./ui/skeleton-card";
 import { 
   Search, 
