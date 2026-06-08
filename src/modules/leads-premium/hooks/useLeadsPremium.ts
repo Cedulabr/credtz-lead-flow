@@ -141,6 +141,10 @@ export function useLeadsPremium() {
       if (!isAdmin && isGestor && companyUserIds.length > 0) {
         query = query.in('id', companyUserIds);
       }
+      
+      if (!isAdmin && !isGestor && user) {
+        query = query.eq('id', user.id);
+      }
 
       const { data, error } = await query;
       if (error) throw error;
