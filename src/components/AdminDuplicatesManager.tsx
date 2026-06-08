@@ -42,13 +42,8 @@ export function AdminDuplicatesManager() {
   const fetchStats = async () => {
     setIsLoading(true);
     try {
-      // Fetch stats for each table separately since the RPC might be slow
-      const [leadsResult, baseoffResult] = await Promise.all([
-        fetchLeadsStats(),
-        fetchBaseoffStats()
-      ]);
-      
-      setStats([leadsResult, baseoffResult].filter(Boolean) as TableStats[]);
+      const leadsResult = await fetchLeadsStats();
+      setStats([leadsResult].filter(Boolean) as TableStats[]);
     } catch (error: any) {
       console.error('Error fetching stats:', error);
       toast({
@@ -63,19 +58,17 @@ export function AdminDuplicatesManager() {
 
   const fetchLeadsStats = async (): Promise<TableStats | null> => {
     try {
-      // Get total count
       const { count: totalCount } = await supabase
         .from('leads_database')
         .select('*', { count: 'exact', head: true });
-      
-      // Get duplicate count using RPC
+
       const { data: duplicateCount, error: dupError } = await supabase
         .rpc('count_leads_database_duplicates');
-      
+
       if (dupError) {
         console.error('Error counting leads duplicates:', dupError);
       }
-      
+
       return {
         table_name: 'leads_database',
         total_records: totalCount || 0,
@@ -88,32 +81,6 @@ export function AdminDuplicatesManager() {
     }
   };
 
-  const fetchBaseoffStats = async (): Promise<TableStats | null> => {
-    try {
-      // Get total count
-      const { count: totalCount } = await supabase
-        .from('baseoff_clients')
-        .select('*', { count: 'exact', head: true });
-      
-      // Get duplicate count using RPC
-      const { data: duplicateCount, error: dupError } = await supabase
-        .rpc('count_baseoff_duplicates');
-      
-      if (dupError) {
-        console.error('Error counting baseoff duplicates:', dupError);
-      }
-      
-      return {
-        table_name: 'baseoff_clients',
-        total_records: totalCount || 0,
-        duplicate_count: duplicateCount || 0,
-        estimated_size: 'N/A'
-      };
-    } catch (error) {
-      console.error('Error fetching baseoff stats:', error);
-      return null;
-    }
-  };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -139,10 +106,6 @@ export function AdminDuplicatesManager() {
       
       if (selectedTable === 'leads_database') {
         const { data, error } = await supabase.rpc('remove_leads_database_duplicates');
-        if (error) throw error;
-        deletedCount = data || 0;
-      } else if (selectedTable === 'baseoff_clients') {
-        const { data, error } = await supabase.rpc('remove_baseoff_duplicates');
         if (error) throw error;
         deletedCount = data || 0;
       }

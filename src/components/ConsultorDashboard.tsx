@@ -107,11 +107,7 @@ export function ConsultorDashboard({ onNavigate }: ConsultorDashboardProps) {
           .from("client_documents")
           .select("id", { count: "exact", head: true })
           .eq("uploaded_by", user.id),
-        supabase
-          .from("radar_credits")
-          .select("credits_balance")
-          .eq("user_id", user.id)
-          .maybeSingle(),
+        Promise.resolve({ data: { credits_balance: 0 } as any }),
         supabase
           .from("sms_credits")
           .select("credits_balance")

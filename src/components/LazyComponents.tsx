@@ -23,8 +23,8 @@ export const ClientDocuments = lazy(() => import('./ClientDocuments').then(m => 
 // Televendas
 export const TelevendasModule = lazy(() => import('@/modules/televendas/TelevendasModule').then(m => ({ default: m.TelevendasModule })));
 
-// Base OFF
-export const BaseOffModule = lazy(() => import('@/modules/baseoff/BaseOffModule').then(m => ({ default: m.BaseOffModule })));
+// Base OFF — módulo removido
+
 
 // Opportunities
 export const OpportunitiesModule = lazy(() => import('@/modules/opportunities/OpportunitiesModule').then(m => ({ default: m.OpportunitiesModule })));
@@ -47,22 +47,23 @@ export const TimeClock = lazy(() => import('./TimeClock').then(m => ({ default: 
 // Communication
 export const SmsModule = lazy(() => import('@/modules/sms/SmsModule').then(m => ({ default: m.SmsModule || m.default })));
 export const WhatsAppConfig = lazy(() => import('./WhatsAppConfig').then(m => ({ default: m.WhatsAppConfig })));
-export const MeuNumeroModule = lazy(() => import('@/modules/meu-numero/MeuNumeroModule').then(m => ({ default: m.MeuNumeroModule })));
+// Meu Número — módulo removido
+
 
 // Client Reuse
 export const ClientReuseAlerts = lazy(() => import('./ClientReuseAlerts').then(m => ({ default: m.ClientReuseAlerts })));
 
-// Radar
-export const RadarModule = lazy(() => import('@/modules/radar/RadarModule').then(m => ({ default: m.RadarModule })));
+// Radar — módulo removido
 
-// AutoLead
-export const AutoLeadModule = lazy(() => import('@/modules/autolead/AutoLeadModule').then(m => ({ default: m.AutoLeadModule })));
+
+// AutoLead — módulo removido
+
 
 // Digitação
 export const DigitacaoModule = lazy(() => import('@/modules/digitacao/DigitacaoModule').then(m => ({ default: m.DigitacaoModule })));
 
-// Audios
-export const AudiosModule = lazy(() => import('@/modules/audios/AudiosModule').then(m => ({ default: m.AudiosModule })));
+// Audios — módulo removido
+
 
 // Digitação Agibank
 export const DigitacaoAgibankPage = lazy(() => import('@/pages/DigitacaoAgibank'));
@@ -85,9 +86,8 @@ export const EasynFlowModule = lazy(() => import('@/modules/easyn-flow/EasynFlow
 // Leads Agibank
 export const AgibankLeadsModule = lazy(() => import('@/modules/leads-agibank/AgibankLeadsModule').then(m => ({ default: m.AgibankLeadsModule })));
 
-// Base OFF legacy
-export const BaseOff = lazy(() => import('./BaseOff').then(m => ({ default: m.BaseOff })));
-export const BaseOffModern = lazy(() => import('./BaseOffModern').then(m => ({ default: m.BaseOffModern })));
+// Base OFF legacy — removido
+
 export const MyClientsKanban = lazy(() => import('./MyClientsKanban').then(m => ({ default: m.MyClientsKanban })));
 
 // ── Loading Skeletons ─────────────────────────────────────────────────
@@ -173,8 +173,6 @@ export const withLazyLoading = <P extends Record<string, any>>(
 // ── Pre-configured lazy components with loading states ────────────────
 export const LazyDashboard = withLazyLoading(Dashboard, DashboardSkeleton);
 export const LazyAdminPanel = withLazyLoading(AdminPanel, FormSkeleton);
-export const LazyBaseOff = withLazyLoading(BaseOff, TableSkeleton);
-export const LazyBaseOffModern = withLazyLoading(BaseOffModern, TableSkeleton);
 export const LazyCommissions = withLazyLoading(Commissions, TableSkeleton);
 export const LazyLeadsManagement = withLazyLoading(LeadsManagement, TableSkeleton);
 export const LazyLeadsIndicados = withLazyLoading(LeadsIndicados, FormSkeleton);
@@ -190,7 +188,7 @@ export const LazyProposalGenerator = withLazyLoading(ProposalGenerator, FormSkel
 export const LazyMyClientsList = withLazyLoading(MyClientsList, TableSkeleton);
 export const LazyClientDocuments = withLazyLoading(ClientDocuments, TableSkeleton);
 export const LazySalesWizard = withLazyLoading(SalesWizard, FormSkeleton);
-export const LazyBaseOffModule = withLazyLoading(BaseOffModule, TableSkeleton);
+
 export const LazyOpportunitiesModule = withLazyLoading(OpportunitiesModule, TableSkeleton);
 export const LazyCommissionTable = withLazyLoading(CommissionTable, TableSkeleton);
 export const LazyPerformanceReport = withLazyLoading(PerformanceReport, TableSkeleton);
@@ -199,12 +197,9 @@ export const LazyMyData = withLazyLoading(MyData, FormSkeleton);
 export const LazyTimeClock = withLazyLoading(TimeClock, TableSkeleton);
 export const LazySmsModule = withLazyLoading(SmsModule, TableSkeleton);
 export const LazyWhatsAppConfig = withLazyLoading(WhatsAppConfig, FormSkeleton);
-export const LazyMeuNumeroModule = withLazyLoading(MeuNumeroModule, FormSkeleton);
+
 export const LazySystemStatus = withLazyLoading(SystemStatus, FormSkeleton);
-export const LazyRadarModule = withLazyLoading(RadarModule, TableSkeleton);
-export const LazyAutoLeadModule = withLazyLoading(AutoLeadModule, FormSkeleton);
 export const LazyDigitacaoModule = withLazyLoading(DigitacaoModule, FormSkeleton);
-export const LazyAudiosModule = withLazyLoading(AudiosModule, FormSkeleton);
 export const LazyDigitacaoAgibankPage = withLazyLoading(DigitacaoAgibankPage, FormSkeleton);
 export const LazyVoicerModule = withLazyLoading(VoicerModule, FormSkeleton);
 export const LazyNotasModule = withLazyLoading(NotasModule, DashboardSkeleton);
