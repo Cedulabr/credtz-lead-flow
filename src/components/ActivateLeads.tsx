@@ -1870,7 +1870,7 @@ export const ActivateLeads = () => {
       </motion.div>
 
       {/* Simulation Manager */}
-      <ActivateSimulationManager onUpdate={fetchLeads} />
+      
 
       {/* Bulk Actions */}
       <AnimatePresence>
