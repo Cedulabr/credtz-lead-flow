@@ -1644,7 +1644,7 @@ export function LeadsManagement() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:flex gap-2 md:gap-3">
+              <div className="flex flex-col md:flex-row gap-4 w-full">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-full md:w-44 border-2 focus:border-primary h-11 md:h-14 text-sm md:text-base font-semibold">
                     <Filter className="h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2 flex-shrink-0" />
