@@ -4677,6 +4677,7 @@ export type Database = {
           best_counter_arguments: Json | null
           best_scripts: Json | null
           better_offer_opportunities: Json | null
+          closed_leads: Json | null
           company_id: string | null
           conversations_closed: number | null
           created_at: string | null
@@ -4702,6 +4703,7 @@ export type Database = {
           best_counter_arguments?: Json | null
           best_scripts?: Json | null
           better_offer_opportunities?: Json | null
+          closed_leads?: Json | null
           company_id?: string | null
           conversations_closed?: number | null
           created_at?: string | null
@@ -4727,6 +4729,7 @@ export type Database = {
           best_counter_arguments?: Json | null
           best_scripts?: Json | null
           better_offer_opportunities?: Json | null
+          closed_leads?: Json | null
           company_id?: string | null
           conversations_closed?: number | null
           created_at?: string | null
@@ -5076,6 +5079,8 @@ export type Database = {
       follow_up_queue: {
         Row: {
           action_taken: string | null
+          ai_analysis: string | null
+          ai_score: number | null
           bucket: string | null
           company_id: string | null
           contact_name: string | null
@@ -5084,6 +5089,7 @@ export type Database = {
           hours_waiting: number | null
           id: string
           instance_id: string | null
+          intent_category: string | null
           last_message_direction: string | null
           last_message_preview: string | null
           note: string | null
@@ -5095,6 +5101,8 @@ export type Database = {
         }
         Insert: {
           action_taken?: string | null
+          ai_analysis?: string | null
+          ai_score?: number | null
           bucket?: string | null
           company_id?: string | null
           contact_name?: string | null
@@ -5103,6 +5111,7 @@ export type Database = {
           hours_waiting?: number | null
           id?: string
           instance_id?: string | null
+          intent_category?: string | null
           last_message_direction?: string | null
           last_message_preview?: string | null
           note?: string | null
@@ -5114,6 +5123,8 @@ export type Database = {
         }
         Update: {
           action_taken?: string | null
+          ai_analysis?: string | null
+          ai_score?: number | null
           bucket?: string | null
           company_id?: string | null
           contact_name?: string | null
@@ -5122,6 +5133,7 @@ export type Database = {
           hours_waiting?: number | null
           id?: string
           instance_id?: string | null
+          intent_category?: string | null
           last_message_direction?: string | null
           last_message_preview?: string | null
           note?: string | null
@@ -7973,6 +7985,140 @@ export type Database = {
           },
         ]
       }
+      sdr_agent_config: {
+        Row: {
+          agent_name: string
+          allowed_actions_text: string | null
+          can_ask_location: boolean
+          can_ask_name: boolean
+          can_offer_discount: boolean
+          can_request_documents: boolean
+          can_schedule: boolean
+          can_send_catalog: boolean
+          can_send_payment_link: boolean
+          company_id: string
+          company_presentation: string | null
+          created_at: string
+          followup_interval_hours: number
+          forbidden_actions_text: string | null
+          forbidden_phrases: string[]
+          human_escalation_message: string | null
+          id: string
+          max_discount_percent: number | null
+          max_followups: number
+          pricing_info: string | null
+          product_description: string | null
+          product_id: number | null
+          schedule_days: string[]
+          schedule_end_time: string | null
+          schedule_start_time: string | null
+          tone: string
+          updated_at: string
+        }
+        Insert: {
+          agent_name?: string
+          allowed_actions_text?: string | null
+          can_ask_location?: boolean
+          can_ask_name?: boolean
+          can_offer_discount?: boolean
+          can_request_documents?: boolean
+          can_schedule?: boolean
+          can_send_catalog?: boolean
+          can_send_payment_link?: boolean
+          company_id: string
+          company_presentation?: string | null
+          created_at?: string
+          followup_interval_hours?: number
+          forbidden_actions_text?: string | null
+          forbidden_phrases?: string[]
+          human_escalation_message?: string | null
+          id?: string
+          max_discount_percent?: number | null
+          max_followups?: number
+          pricing_info?: string | null
+          product_description?: string | null
+          product_id?: number | null
+          schedule_days?: string[]
+          schedule_end_time?: string | null
+          schedule_start_time?: string | null
+          tone?: string
+          updated_at?: string
+        }
+        Update: {
+          agent_name?: string
+          allowed_actions_text?: string | null
+          can_ask_location?: boolean
+          can_ask_name?: boolean
+          can_offer_discount?: boolean
+          can_request_documents?: boolean
+          can_schedule?: boolean
+          can_send_catalog?: boolean
+          can_send_payment_link?: boolean
+          company_id?: string
+          company_presentation?: string | null
+          created_at?: string
+          followup_interval_hours?: number
+          forbidden_actions_text?: string | null
+          forbidden_phrases?: string[]
+          human_escalation_message?: string | null
+          id?: string
+          max_discount_percent?: number | null
+          max_followups?: number
+          pricing_info?: string | null
+          product_description?: string | null
+          product_id?: number | null
+          schedule_days?: string[]
+          schedule_end_time?: string | null
+          schedule_start_time?: string | null
+          tone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_agent_config_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_agent_templates: {
+        Row: {
+          company_id: string
+          config_snapshot: Json
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          scope: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          config_snapshot?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          scope?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          config_snapshot?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          scope?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sdr_audit_log: {
         Row: {
           action_taken: string | null
@@ -8015,57 +8161,319 @@ export type Database = {
         }
         Relationships: []
       }
+      sdr_campaign_contacts: {
+        Row: {
+          campaign_id: string
+          company_id: string
+          contact_id: string | null
+          conversation_id: string | null
+          converted_at: string | null
+          created_at: string
+          error: string | null
+          extra_data: Json
+          follow_up_count: number
+          id: string
+          last_contacted_at: string | null
+          last_inbound_at: string | null
+          name: string | null
+          next_attempt_at: string | null
+          phone: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          campaign_id: string
+          company_id: string
+          contact_id?: string | null
+          conversation_id?: string | null
+          converted_at?: string | null
+          created_at?: string
+          error?: string | null
+          extra_data?: Json
+          follow_up_count?: number
+          id?: string
+          last_contacted_at?: string | null
+          last_inbound_at?: string | null
+          name?: string | null
+          next_attempt_at?: string | null
+          phone: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          company_id?: string
+          contact_id?: string | null
+          conversation_id?: string | null
+          converted_at?: string | null
+          created_at?: string
+          error?: string | null
+          extra_data?: Json
+          follow_up_count?: number
+          id?: string
+          last_contacted_at?: string | null
+          last_inbound_at?: string | null
+          name?: string | null
+          next_attempt_at?: string | null
+          phone?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_campaign_contacts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_campaign_interactions: {
+        Row: {
+          ai_action_taken: string | null
+          ai_intent_detected: string | null
+          campaign_contact_id: string
+          campaign_id: string
+          company_id: string
+          direction: string
+          id: string
+          message: string
+          sent_at: string
+        }
+        Insert: {
+          ai_action_taken?: string | null
+          ai_intent_detected?: string | null
+          campaign_contact_id: string
+          campaign_id: string
+          company_id: string
+          direction: string
+          id?: string
+          message: string
+          sent_at?: string
+        }
+        Update: {
+          ai_action_taken?: string | null
+          ai_intent_detected?: string | null
+          campaign_contact_id?: string
+          campaign_id?: string
+          company_id?: string
+          direction?: string
+          id?: string
+          message?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_campaign_interactions_campaign_contact_id_fkey"
+            columns: ["campaign_contact_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_campaign_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_campaign_interactions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_campaign_runs: {
+        Row: {
+          campaign_id: string
+          company_id: string
+          failed_count: number
+          finished_at: string | null
+          followup_count: number
+          id: string
+          message: string | null
+          next_window_at: string | null
+          sent_count: number
+          skipped_reason: string | null
+          started_at: string
+          status: string
+          trigger: string
+        }
+        Insert: {
+          campaign_id: string
+          company_id: string
+          failed_count?: number
+          finished_at?: string | null
+          followup_count?: number
+          id?: string
+          message?: string | null
+          next_window_at?: string | null
+          sent_count?: number
+          skipped_reason?: string | null
+          started_at?: string
+          status?: string
+          trigger?: string
+        }
+        Update: {
+          campaign_id?: string
+          company_id?: string
+          failed_count?: number
+          finished_at?: string | null
+          followup_count?: number
+          id?: string
+          message?: string | null
+          next_window_at?: string | null
+          sent_count?: number
+          skipped_reason?: string | null
+          started_at?: string
+          status?: string
+          trigger?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_campaign_runs_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sdr_campaigns: {
         Row: {
+          ai_persona: string | null
           ai_template_id: string | null
+          allowed_to_ask: Json | null
+          auto_reply_enabled: boolean
+          closing_goal: string | null
           company_id: string
+          company_info: Json | null
+          confirmation_message: string | null
+          conversion_goal: string
+          conversion_keywords: string[]
           created_at: string
           created_by: string | null
+          daily_send_limit: number | null
           delay_minutes: number
           escalation_trigger: string | null
+          follow_up_sequence: Json
+          forbidden_to_ask: Json | null
           id: string
           instance_id: string
           interval_between_attempts_hours: number
           is_active: boolean
+          last_sync_at: string | null
           max_attempts: number
+          mode: string
           name: string
+          notification_on_conversion: boolean
+          notification_on_reply: boolean
+          offer_message: string | null
+          offer_pitch: string | null
           opening_message: string
+          product_description: string | null
+          product_id: number | null
+          product_name: string | null
+          schedule_days: string[] | null
+          schedule_end_time: string | null
+          schedule_start_time: string | null
+          send_delay_seconds: number
+          status: string
           target_type: string
+          timezone: string
           updated_at: string
+          working_days: number[]
+          working_hours_end: string
+          working_hours_start: string
         }
         Insert: {
+          ai_persona?: string | null
           ai_template_id?: string | null
+          allowed_to_ask?: Json | null
+          auto_reply_enabled?: boolean
+          closing_goal?: string | null
           company_id: string
+          company_info?: Json | null
+          confirmation_message?: string | null
+          conversion_goal?: string
+          conversion_keywords?: string[]
           created_at?: string
           created_by?: string | null
+          daily_send_limit?: number | null
           delay_minutes?: number
           escalation_trigger?: string | null
+          follow_up_sequence?: Json
+          forbidden_to_ask?: Json | null
           id?: string
           instance_id: string
           interval_between_attempts_hours?: number
           is_active?: boolean
+          last_sync_at?: string | null
           max_attempts?: number
+          mode?: string
           name: string
+          notification_on_conversion?: boolean
+          notification_on_reply?: boolean
+          offer_message?: string | null
+          offer_pitch?: string | null
           opening_message: string
+          product_description?: string | null
+          product_id?: number | null
+          product_name?: string | null
+          schedule_days?: string[] | null
+          schedule_end_time?: string | null
+          schedule_start_time?: string | null
+          send_delay_seconds?: number
+          status?: string
           target_type: string
+          timezone?: string
           updated_at?: string
+          working_days?: number[]
+          working_hours_end?: string
+          working_hours_start?: string
         }
         Update: {
+          ai_persona?: string | null
           ai_template_id?: string | null
+          allowed_to_ask?: Json | null
+          auto_reply_enabled?: boolean
+          closing_goal?: string | null
           company_id?: string
+          company_info?: Json | null
+          confirmation_message?: string | null
+          conversion_goal?: string
+          conversion_keywords?: string[]
           created_at?: string
           created_by?: string | null
+          daily_send_limit?: number | null
           delay_minutes?: number
           escalation_trigger?: string | null
+          follow_up_sequence?: Json
+          forbidden_to_ask?: Json | null
           id?: string
           instance_id?: string
           interval_between_attempts_hours?: number
           is_active?: boolean
+          last_sync_at?: string | null
           max_attempts?: number
+          mode?: string
           name?: string
+          notification_on_conversion?: boolean
+          notification_on_reply?: boolean
+          offer_message?: string | null
+          offer_pitch?: string | null
           opening_message?: string
+          product_description?: string | null
+          product_id?: number | null
+          product_name?: string | null
+          schedule_days?: string[] | null
+          schedule_end_time?: string | null
+          schedule_start_time?: string | null
+          send_delay_seconds?: number
+          status?: string
           target_type?: string
+          timezone?: string
           updated_at?: string
+          working_days?: number[]
+          working_hours_end?: string
+          working_hours_start?: string
         }
         Relationships: [
           {
@@ -8087,6 +8495,13 @@ export type Database = {
             columns: ["instance_id"]
             isOneToOne: false
             referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_campaigns_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -8199,52 +8614,79 @@ export type Database = {
       }
       sdr_executions: {
         Row: {
+          ai_conversation_history: Json
           attempt_number: number
           campaign_id: string
           company_id: string
           contact_id: string | null
           conversation_id: string | null
+          conversion_detected_at: string | null
           converted_at: string | null
           created_at: string
           error: string | null
+          failure_reason: string | null
           id: string
+          last_message_at: string | null
+          lead_data_snapshot: Json
           message_sent: string | null
+          next_attempt_at: string | null
+          opted_out: boolean
           phone: string
           replied_at: string | null
+          response_count: number
           sent_at: string | null
           status: string
+          updated_at: string
         }
         Insert: {
+          ai_conversation_history?: Json
           attempt_number?: number
           campaign_id: string
           company_id: string
           contact_id?: string | null
           conversation_id?: string | null
+          conversion_detected_at?: string | null
           converted_at?: string | null
           created_at?: string
           error?: string | null
+          failure_reason?: string | null
           id?: string
+          last_message_at?: string | null
+          lead_data_snapshot?: Json
           message_sent?: string | null
+          next_attempt_at?: string | null
+          opted_out?: boolean
           phone: string
           replied_at?: string | null
+          response_count?: number
           sent_at?: string | null
           status?: string
+          updated_at?: string
         }
         Update: {
+          ai_conversation_history?: Json
           attempt_number?: number
           campaign_id?: string
           company_id?: string
           contact_id?: string | null
           conversation_id?: string | null
+          conversion_detected_at?: string | null
           converted_at?: string | null
           created_at?: string
           error?: string | null
+          failure_reason?: string | null
           id?: string
+          last_message_at?: string | null
+          lead_data_snapshot?: Json
           message_sent?: string | null
+          next_attempt_at?: string | null
+          opted_out?: boolean
           phone?: string
           replied_at?: string | null
+          response_count?: number
           sent_at?: string | null
           status?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -8273,6 +8715,142 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_knowledge_files: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          extracted_text: string | null
+          extraction_error: string | null
+          extraction_status: string
+          file_type: string
+          filename: string
+          id: string
+          size_bytes: number | null
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          extracted_text?: string | null
+          extraction_error?: string | null
+          extraction_status?: string
+          file_type: string
+          filename: string
+          id?: string
+          size_bytes?: number | null
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          extracted_text?: string | null
+          extraction_error?: string | null
+          extraction_status?: string
+          file_type?: string
+          filename?: string
+          id?: string
+          size_bytes?: number | null
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sdr_knowledge_items: {
+        Row: {
+          campaign_id: string
+          category: string
+          company_id: string
+          content: string
+          created_at: string
+          id: string
+          is_active: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          campaign_id: string
+          category?: string
+          company_id: string
+          content: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          category?: string
+          company_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_knowledge_items_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_sync_log: {
+        Row: {
+          campaign_id: string | null
+          company_id: string
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          new_conversions: number
+          new_replies: number
+          started_at: string
+          synced_executions: number
+        }
+        Insert: {
+          campaign_id?: string | null
+          company_id: string
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          new_conversions?: number
+          new_replies?: number
+          started_at?: string
+          synced_executions?: number
+        }
+        Update: {
+          campaign_id?: string | null
+          company_id?: string
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          new_conversions?: number
+          new_replies?: number
+          started_at?: string
+          synced_executions?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_sync_log_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_campaigns"
             referencedColumns: ["id"]
           },
         ]
@@ -11101,6 +11679,7 @@ export type Database = {
           company_id: string
           created_at: string | null
           id: string
+          is_active: boolean
           role: Database["public"]["Enums"]["tenant_role"]
           user_id: string
         }
@@ -11108,6 +11687,7 @@ export type Database = {
           company_id: string
           created_at?: string | null
           id?: string
+          is_active?: boolean
           role?: Database["public"]["Enums"]["tenant_role"]
           user_id: string
         }
@@ -11115,6 +11695,7 @@ export type Database = {
           company_id?: string
           created_at?: string | null
           id?: string
+          is_active?: boolean
           role?: Database["public"]["Enums"]["tenant_role"]
           user_id?: string
         }
@@ -11669,8 +12250,11 @@ export type Database = {
       }
       whatsapp_conversations: {
         Row: {
+          ai_active: boolean
           ai_summary: string | null
           assigned_to: string | null
+          automation_ref_id: string | null
+          automation_source: string | null
           avatar_url: string | null
           closed_at: string | null
           closed_by: string | null
@@ -11703,8 +12287,11 @@ export type Database = {
           waiting_since: string | null
         }
         Insert: {
+          ai_active?: boolean
           ai_summary?: string | null
           assigned_to?: string | null
+          automation_ref_id?: string | null
+          automation_source?: string | null
           avatar_url?: string | null
           closed_at?: string | null
           closed_by?: string | null
@@ -11737,8 +12324,11 @@ export type Database = {
           waiting_since?: string | null
         }
         Update: {
+          ai_active?: boolean
           ai_summary?: string | null
           assigned_to?: string | null
+          automation_ref_id?: string | null
+          automation_source?: string | null
           avatar_url?: string | null
           closed_at?: string | null
           closed_by?: string | null
@@ -11790,6 +12380,262 @@ export type Database = {
             columns: ["kanban_column_id"]
             isOneToOne: false
             referencedRelation: "kanban_columns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_group_messages: {
+        Row: {
+          company_id: string
+          content: string | null
+          created_at: string
+          group_id: string
+          id: string
+          media_type: string | null
+          media_url: string | null
+          message_id: string | null
+          message_type: string
+          quoted_message_id: string | null
+          sender_is_me: boolean | null
+          sender_name: string | null
+          sender_phone: string
+          timestamp: string
+        }
+        Insert: {
+          company_id: string
+          content?: string | null
+          created_at?: string
+          group_id: string
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+          message_id?: string | null
+          message_type?: string
+          quoted_message_id?: string | null
+          sender_is_me?: boolean | null
+          sender_name?: string | null
+          sender_phone: string
+          timestamp?: string
+        }
+        Update: {
+          company_id?: string
+          content?: string | null
+          created_at?: string
+          group_id?: string
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+          message_id?: string | null
+          message_type?: string
+          quoted_message_id?: string | null
+          sender_is_me?: boolean | null
+          sender_name?: string | null
+          sender_phone?: string
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_group_messages_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_group_messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_group_participants: {
+        Row: {
+          company_id: string
+          group_id: string
+          id: string
+          is_admin: boolean | null
+          joined_at: string
+          name: string | null
+          phone: string
+        }
+        Insert: {
+          company_id: string
+          group_id: string
+          id?: string
+          is_admin?: boolean | null
+          joined_at?: string
+          name?: string | null
+          phone: string
+        }
+        Update: {
+          company_id?: string
+          group_id?: string
+          id?: string
+          is_admin?: boolean | null
+          joined_at?: string
+          name?: string | null
+          phone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_group_participants_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_group_participants_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_group_schedules: {
+        Row: {
+          company_id: string
+          content: string | null
+          created_at: string
+          created_by: string | null
+          error_message: string | null
+          group_id: string
+          id: string
+          media_type: string | null
+          media_url: string | null
+          message_type: string
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          whatsapp_instance_id: string
+        }
+        Insert: {
+          company_id: string
+          content?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          group_id: string
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+          message_type?: string
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string
+          whatsapp_instance_id: string
+        }
+        Update: {
+          company_id?: string
+          content?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          group_id?: string
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+          message_type?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          whatsapp_instance_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_group_schedules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_group_schedules_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_group_schedules_whatsapp_instance_id_fkey"
+            columns: ["whatsapp_instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_groups: {
+        Row: {
+          avatar_url: string | null
+          company_id: string
+          created_at: string
+          description: string | null
+          group_jid: string
+          id: string
+          is_archived: boolean
+          is_pinned: boolean
+          last_message_at: string | null
+          last_message_preview: string | null
+          name: string
+          participant_count: number | null
+          pinned_at: string | null
+          unread_count: number | null
+          updated_at: string
+          whatsapp_instance_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          company_id: string
+          created_at?: string
+          description?: string | null
+          group_jid: string
+          id?: string
+          is_archived?: boolean
+          is_pinned?: boolean
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          name: string
+          participant_count?: number | null
+          pinned_at?: string | null
+          unread_count?: number | null
+          updated_at?: string
+          whatsapp_instance_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          group_jid?: string
+          id?: string
+          is_archived?: boolean
+          is_pinned?: boolean
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          name?: string
+          participant_count?: number | null
+          pinned_at?: string | null
+          unread_count?: number | null
+          updated_at?: string
+          whatsapp_instance_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_groups_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_groups_whatsapp_instance_id_fkey"
+            columns: ["whatsapp_instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
             referencedColumns: ["id"]
           },
         ]
