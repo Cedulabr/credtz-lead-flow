@@ -1621,15 +1621,6 @@ export const ActivateLeads = () => {
     }
   };
 
-  const handleRequestSimulation = async (lead: ActivateLead) => {
-    try {
-      await requestSimulation(lead.id, lead.nome);
-      toast({ title: '📊 Simulação solicitada!', description: 'O gestor será notificado.' });
-      fetchLeads();
-    } catch (error: any) {
-      toast({ title: '❌ Erro', description: error.message, variant: 'destructive' });
-    }
-  };
 
   const totalPages = Math.ceil(filteredLeads.length / ITEMS_PER_PAGE);
   const paginatedLeads = filteredLeads.slice(
