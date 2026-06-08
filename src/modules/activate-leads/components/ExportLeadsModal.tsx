@@ -71,28 +71,36 @@ export const ExportLeadsModal = ({ isOpen, onOpenChange, leads }: ExportLeadsMod
         linkElement.setAttribute('href', dataUri);
         linkElement.setAttribute('download', `leads_export_${format(new Date(), 'yyyy-MM-dd')}.json`);
         linkElement.click();
+      } else if (formatType === 'xlsx') {
+        const worksheet = XLSX.utils.json_to_sheet(filteredLeads.map(l => ({
+          ID: l.id,
+          Nome: l.nome,
+          Telefone: l.telefone,
+          Origem: l.origem,
+          Status: l.status,
+          'Data Criação': format(new Date(l.created_at), 'dd/MM/yyyy HH:mm'),
+          CPF: l.cpf || '',
+          Produto: l.produto || ''
+        })));
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Leads");
+        XLSX.writeFile(workbook, `leads_export_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
       } else {
-        // Simple CSV generation
-        const headers = ['ID', 'Nome', 'Telefone', 'Origem', 'Status', 'Data de Criação'];
-        const rows = filteredLeads.map(l => [
-          l.id,
-          l.nome,
-          l.telefone,
-          l.origem,
-          l.status,
-          format(new Date(l.created_at), 'dd/MM/yyyy HH:mm')
-        ]);
-        
-        const csvContent = [
-          headers.join(','),
-          ...rows.map(r => r.map(c => `"${c}"`).join(','))
-        ].join('\n');
-        
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        // CSV format
+        const worksheet = XLSX.utils.json_to_sheet(filteredLeads.map(l => ({
+          ID: l.id,
+          Nome: l.nome,
+          Telefone: l.telefone,
+          Origem: l.origem,
+          Status: l.status,
+          'Data Criação': format(new Date(l.created_at), 'dd/MM/yyyy HH:mm')
+        })));
+        const csv = XLSX.utils.sheet_to_csv(worksheet);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.setAttribute('href', url);
-        link.setAttribute('download', `leads_export_${format(new Date(), 'yyyy-MM-dd')}.${formatType}`);
+        link.setAttribute('download', `leads_export_${format(new Date(), 'yyyy-MM-dd')}.csv`);
         link.click();
       }
 
