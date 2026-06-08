@@ -117,7 +117,7 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
         )}
         style={{ width: "calc(100% - 12px)" }}
       >
-        {!isSub && <Icon className="shrink-0" size={16} style={{ width: 18 }} strokeWidth={active ? 2.25 : 1.75} />}
+        {!isSub && <Icon className="shrink-0" size={18} strokeWidth={active ? 2.5 : 2} />}
         <span className="flex-1 text-left truncate">{it.label}</span>
       </button>
     );
@@ -171,16 +171,16 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
       </div>
 
       {user && (
-        <div className="mx-3 mb-2 px-2.5 py-2 rounded-lg bg-secondary/50 flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-[11px] font-semibold shrink-0">
+        <div className="mx-3 mb-4 px-3 py-3 rounded-2xl bg-gradient-to-br from-primary/10 via-muted/50 to-muted/30 border border-primary/10 flex items-center gap-3 shadow-sm">
+          <div className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[12px] font-bold shrink-0 border-2 border-primary/20 shadow-inner">
             {userInitials}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[12px] font-medium truncate">{profile?.name || user.email}</div>
-            <div className="text-[10.5px] text-muted-foreground truncate">{companyName}</div>
+            <div className="text-[13px] font-bold text-foreground truncate">{profile?.name || user.email}</div>
+            <div className="text-[11px] font-medium text-muted-foreground truncate opacity-80">{companyName}</div>
           </div>
           {roleBadge && (
-            <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", roleBadge.className)}>
+            <span className={cn("text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter shadow-sm", roleBadge.className)}>
               {roleBadge.label}
             </span>
           )}
