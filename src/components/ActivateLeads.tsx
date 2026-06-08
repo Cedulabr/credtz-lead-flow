@@ -2120,12 +2120,6 @@ export const ActivateLeads = () => {
                         </TableCell>
                         {/* Simulação */}
                         <TableCell>
-                          <ActivateSimulationRequestButton
-                            leadId={lead.id}
-                            leadName={lead.nome}
-                            currentSimulationStatus={lead.simulation_status}
-                            onSuccess={fetchLeads}
-                          />
                         </TableCell>
                         {/* API WhatsApp */}
                         <TableCell>
