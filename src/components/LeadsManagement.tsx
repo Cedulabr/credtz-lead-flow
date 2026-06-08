@@ -1904,10 +1904,10 @@ export function LeadsManagement() {
                             window.open(`https://wa.me/55${lead.phone.replace(/\D/g, '')}?text=${message}`, '_blank');
                           }}
                           className="h-10 md:h-12 px-3 md:px-4 bg-green-50 hover:bg-green-100 text-green-700 hover:text-green-800 border-green-300 hover:border-green-400 font-bold text-sm md:text-base"
-                          title="WhatsApp (Direto) Telefone 1"
+                          title="Botão WhatsApp"
                         >
                           <MessageCircle className="h-4 w-4 md:h-5 md:w-5 md:mr-1" />
-                          <span className="hidden md:inline">WhatsApp 1</span>
+                          <span className="hidden md:inline">Botão WhatsApp 1</span>
                         </Button>
 
                         {/* Botão WhatsApp Tel 2 - apenas se tiver telefone 2 */}
