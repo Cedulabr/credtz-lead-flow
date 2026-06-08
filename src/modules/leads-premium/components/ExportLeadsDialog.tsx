@@ -136,7 +136,7 @@ export function ExportLeadsDialog({
         <div className="grid gap-4 py-4">
           <div className="space-y-4">
             {/* User Filter */}
-            {(isAdmin || filters.user !== "all") && (
+            {(isAdmin || users.length > 1) && (
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <User className="h-4 w-4" />
