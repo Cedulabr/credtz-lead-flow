@@ -87,7 +87,7 @@ export function LeadDetailDrawer({
   // Modal states
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [showSimulationModal, setShowSimulationModal] = useState(false);
+  
   const [showTypingModal, setShowTypingModal] = useState(false);
   const [showTreatmentDialog, setShowTreatmentDialog] = useState(false);
   const [pendingNewStatus, setPendingNewStatus] = useState("");
@@ -99,11 +99,6 @@ export function LeadDetailDrawer({
   });
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
-  const [simulationForm, setSimulationForm] = useState({
-    banco: "",
-    produto: "",
-    notes: ""
-  });
   const [typingForm, setTypingForm] = useState({
     banco: "",
     valor: "",
@@ -258,49 +253,6 @@ export function LeadDetailDrawer({
     }
   };
 
-  const handleSimulationRequest = async () => {
-    if (!simulationForm.banco) {
-      toast({
-        title: "Erro",
-        description: "Selecione o banco para simulação",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const { error } = await supabase
-        .from('activate_leads_simulations')
-        .insert({
-          lead_id: lead.id,
-          requested_by: user?.id,
-          banco: simulationForm.banco,
-          produto: simulationForm.produto,
-          notes: simulationForm.notes,
-          status: 'pending'
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Simulação solicitada!",
-        description: "O operador será notificado para processar a simulação."
-      });
-
-      setShowSimulationModal(false);
-      setSimulationForm({ banco: "", produto: "", notes: "" });
-    } catch (error: any) {
-      console.error('Error requesting simulation:', error);
-      toast({
-        title: "Erro",
-        description: error.message || "Erro ao solicitar simulação",
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
 
   const handleTypingRequest = async () => {
@@ -923,7 +875,7 @@ export function LeadDetailDrawer({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Solicitar Digitação
+              Digitar ao Cliente
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -968,7 +920,7 @@ export function LeadDetailDrawer({
             <div>
               <Label>Observações</Label>
               <Textarea
-                placeholder="Informações para digitação..."
+                placeholder="Informações adicionais para a venda..."
                 value={typingForm.notes}
                 onChange={(e) => setTypingForm(prev => ({ ...prev, notes: e.target.value }))}
                 rows={2}
@@ -984,7 +936,7 @@ export function LeadDetailDrawer({
               disabled={isProcessing || !typingForm.banco}
             >
               {isProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Solicitar Digitação
+              Digitar ao Cliente
             </Button>
           </DialogFooter>
         </DialogContent>
