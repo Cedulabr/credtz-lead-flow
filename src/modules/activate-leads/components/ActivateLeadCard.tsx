@@ -1,6 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Phone, Package, Clock } from "lucide-react";
+import { Phone, Package, Clock, Zap, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ActivateLead, ACTIVATE_STATUS_CONFIG, ActivateUser } from "../types";
