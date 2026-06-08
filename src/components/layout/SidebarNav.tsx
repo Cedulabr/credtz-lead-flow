@@ -213,21 +213,21 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
           <button
             type="button"
             onClick={() => (window.location.href = "/admin")}
-            className="w-full flex items-center gap-2.5 mx-1.5 rounded-lg h-[34px] px-3.5 text-[13px] text-foreground/80 hover:bg-secondary transition-colors"
+            className="w-full flex items-center gap-3 mx-1.5 rounded-lg h-[40px] px-4 text-[13.5px] text-foreground/70 hover:bg-muted/60 transition-all duration-200"
             style={{ width: "calc(100% - 12px)" }}
           >
-            <Settings className="shrink-0" size={16} style={{ width: 18 }} strokeWidth={1.75} />
+            <Settings className="shrink-0 text-primary/60" size={18} strokeWidth={2} />
             <span className="flex-1 text-left">Admin</span>
           </button>
         )}
         <button
           type="button"
           onClick={handleSignOut}
-          className="w-full flex items-center gap-2.5 mx-1.5 rounded-lg h-[34px] px-3.5 text-[13px] text-foreground/70 hover:bg-secondary transition-colors"
+          className="w-full flex items-center gap-3 mx-1.5 rounded-lg h-[40px] px-4 text-[13.5px] text-destructive/80 hover:bg-destructive/10 transition-all duration-200"
           style={{ width: "calc(100% - 12px)" }}
         >
-          <LogOut className="shrink-0" size={16} style={{ width: 18 }} strokeWidth={1.75} />
-          <span className="flex-1 text-left">Sair</span>
+          <LogOut className="shrink-0" size={18} strokeWidth={2} />
+          <span className="flex-1 text-left font-medium">Sair</span>
         </button>
       </div>
     </>
