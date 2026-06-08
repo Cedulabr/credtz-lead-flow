@@ -233,7 +233,7 @@ export function WhatsAppSendDialog({
                   </Select>
                   {selectedAudio && (
                     <audio controls className="w-full" preload="none">
-                      <source src={getPublicUrl(selectedAudio.file_path)} type={selectedAudio.mime_type || 'audio/mpeg'} />
+                      <source src={getPublicUrl(selectedAudio.file_path) || ''} type={'audio/mpeg'} />
                     </audio>
                   )}
                 </div>
