@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
-import { RefreshCcw, Inbox, ChevronLeft, ChevronRight } from "lucide-react";
+import { RefreshCcw, Inbox, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { startOfDay, startOfWeek, startOfMonth, subDays, isAfter } from "date-fns";
 
 interface LeadsListViewProps {
@@ -141,6 +141,38 @@ export function LeadsListView({
     setCurrentPage(1);
   };
 
+  const handleExportLeads = () => {
+    if (filteredLeads.length === 0) {
+      return;
+    }
+
+    // Prepare data for CSV
+    const headers = ["Nome", "CPF", "Telefone", "Telefone 2", "Convênio", "Tag", "Status", "Data de Criação"];
+    const csvContent = [
+      headers.join(","),
+      ...filteredLeads.map(lead => [
+        `"${lead.name || ''}"`,
+        `"${lead.cpf || ''}"`,
+        `"${lead.phone || ''}"`,
+        `"${lead.phone2 || ''}"`,
+        `"${lead.convenio || ''}"`,
+        `"${lead.tag || ''}"`,
+        `"${PIPELINE_STAGES[lead.status]?.label || lead.status}"`,
+        `"${format(new Date(lead.created_at), 'dd/MM/yyyy HH:mm')}"`
+      ].join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `leads_premium_export_${format(new Date(), 'yyyy-MM-dd_HHmm')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (isLoading) {
     return (
       <div className="p-4 space-y-3">
@@ -167,14 +199,26 @@ export function LeadsListView({
               showUserFilter={isAdmin}
             />
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onRefresh}
-            className="shrink-0"
-          >
-            <RefreshCcw className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleExportLeads}
+              className="shrink-0"
+              title="Exportar Leads"
+              disabled={filteredLeads.length === 0}
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onRefresh}
+              className="shrink-0"
+            >
+              <RefreshCcw className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <p className="text-xs text-muted-foreground mt-2">
           Mostrando {((safeCurrentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(safeCurrentPage * ITEMS_PER_PAGE, filteredLeads.length)} de {filteredLeads.length} leads

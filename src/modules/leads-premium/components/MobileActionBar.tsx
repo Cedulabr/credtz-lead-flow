@@ -51,23 +51,6 @@ export function MobileActionBar({
             )}
           </Button>
 
-          {/* Simulations Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onOpenSimulations}
-            className="relative h-10 px-3"
-          >
-            <Calculator className="h-4 w-4" />
-            {pendingSimulations > 0 && (
-              <Badge 
-                variant="destructive"
-                className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px]"
-              >
-                {pendingSimulations}
-              </Badge>
-            )}
-          </Button>
 
           {/* Import (admin only) */}
           {isAdmin && onOpenImport && (
