@@ -1921,10 +1921,10 @@ export function LeadsManagement() {
                               window.open(`https://wa.me/55${lead.phone2!.replace(/\D/g, '')}?text=${message}`, '_blank');
                             }}
                             className="h-10 md:h-12 px-3 md:px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 border-emerald-300 hover:border-emerald-400 font-bold text-sm md:text-base"
-                            title="WhatsApp Telefone 2"
+                            title="WhatsApp (Direto) Telefone 2"
                           >
                             <MessageCircle className="h-4 w-4 md:h-5 md:w-5 md:mr-1" />
-                            <span className="hidden md:inline">Zap 2</span>
+                            <span className="hidden md:inline">WhatsApp 2</span>
                           </Button>
                         )}
 
