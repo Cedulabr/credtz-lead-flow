@@ -10,6 +10,7 @@ import { LayoutGrid, List, BarChart3, Calculator, Zap, HelpCircle } from "lucide
 import { ActivateGuidedFlow } from "./components/ActivateGuidedFlow";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 import { ActivateLeads as OriginalActivateLeads } from "@/components/ActivateLeads";
 
