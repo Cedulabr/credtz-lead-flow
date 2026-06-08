@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
 import { RefreshCcw, Inbox, ChevronLeft, ChevronRight, Download } from "lucide-react";
-import { startOfDay, startOfWeek, startOfMonth, subDays, isAfter } from "date-fns";
+import { startOfDay, startOfWeek, startOfMonth, subDays, isAfter, format } from "date-fns";
 
 interface LeadsListViewProps {
   leads: Lead[];
