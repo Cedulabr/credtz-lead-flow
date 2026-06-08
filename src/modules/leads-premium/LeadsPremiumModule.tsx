@@ -504,16 +504,6 @@ export function LeadsPremiumModule() {
         onRequestLeads={handleRequestLeads}
       />
 
-      {/* Inline Simulation Modal */}
-      <SimulationModal
-        open={showSimulationModal}
-        onOpenChange={setShowSimulationModal}
-        lead={simulationLead}
-        form={simulationForm}
-        onFormChange={setSimulationForm}
-        onSubmit={handleSimulationSubmit}
-        isProcessing={isSimProcessing}
-      />
 
       {/* Inline Typing Modal */}
       <TypingModal
