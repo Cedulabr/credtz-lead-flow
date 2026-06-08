@@ -575,18 +575,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             transition={{ delay: 0.25 }}
           >
             <Card 
-              className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50 to-background dark:from-emerald-950/20"
+              className="cursor-pointer hover:shadow-xl transition-all duration-300 border-2 border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-background hover:scale-[1.02] group"
               onClick={() => onNavigate('televendas-manage')}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-muted-foreground font-medium">Vendas Televendas</p>
-                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{moduleMetrics.televendasPagas}</p>
-                    <p className="text-xs text-muted-foreground">pagas no mês</p>
+                    <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Vendas Televendas</p>
+                    <p className="text-3xl font-black text-emerald-700 dark:text-emerald-400">{moduleMetrics.televendasPagas}</p>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 mt-1">
+                      <ArrowUpRight className="h-3 w-3" />
+                      +21.0%
+                    </div>
                   </div>
-                  <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-full">
-                    <ShoppingCart className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  <div className="p-4 bg-emerald-500/20 rounded-2xl group-hover:rotate-12 transition-transform duration-300">
+                    <ShoppingCart className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
                   </div>
                 </div>
               </CardContent>
