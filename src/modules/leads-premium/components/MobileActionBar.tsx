@@ -6,9 +6,7 @@ interface MobileActionBarProps {
   userCredits: number;
   onRequestLeads: () => void;
   onOpenFilters: () => void;
-  onOpenSimulations: () => void;
   activeFiltersCount: number;
-  pendingSimulations: number;
   isAdmin?: boolean;
   onOpenImport?: () => void;
 }
