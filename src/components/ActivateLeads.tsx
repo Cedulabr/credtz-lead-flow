@@ -1732,9 +1732,9 @@ export const ActivateLeads = () => {
                   <Upload className="h-4 w-4 mr-2" />
                   <span className="hidden sm:inline">📤 Importar</span>
                 </Button>
-                <Button variant="outline" onClick={() => setIsPullLeadsModalOpen(true)} className="hover:bg-primary/10 transition-all duration-300">
-                  <Download className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">📥 Puxar</span>
+                <Button variant="outline" onClick={() => setIsExportLeadsModalOpen(true)} className="hover:bg-primary/10 transition-all duration-300">
+                  <DownloadCloud className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">📥 Exportar</span>
                 </Button>
                 <ImportHistory module="activate_leads" title="Activate Leads" />
               </>
