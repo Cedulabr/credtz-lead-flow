@@ -309,9 +309,7 @@ export function LeadsPremiumModule() {
           userCredits={userCredits}
           onRequestLeads={() => setIsRequestModalOpen(true)}
           onOpenFilters={() => setIsFiltersOpen(true)}
-          onOpenSimulations={() => {}}
           activeFiltersCount={activeFiltersCount}
-          pendingSimulations={0}
           isAdmin={isAdmin}
           onOpenImport={() => setShowImportBase(true)}
         />
