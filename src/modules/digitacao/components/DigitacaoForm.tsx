@@ -19,8 +19,6 @@ import {
   INITIAL_CLIENT_DATA, INITIAL_BANK_DATA,
   OPERATION_TYPES, UF_OPTIONS, BENEFIT_TYPES
 } from '../types';
-import { SimulationModal } from './SimulationModal';
-import { SimulationCard } from './SimulationCard';
 
 interface DigitacaoFormProps {
   onClose: () => void;
