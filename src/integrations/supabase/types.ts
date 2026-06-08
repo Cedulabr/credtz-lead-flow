@@ -4232,6 +4232,39 @@ export type Database = {
           },
         ]
       }
+      follow_up_intents: {
+        Row: {
+          ai_analysis: string | null
+          ai_score: number | null
+          conversation_id: string | null
+          created_at: string | null
+          id: string
+          intent_category: string
+          lead_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          ai_analysis?: string | null
+          ai_score?: number | null
+          conversation_id?: string | null
+          created_at?: string | null
+          id?: string
+          intent_category: string
+          lead_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          ai_analysis?: string | null
+          ai_score?: number | null
+          conversation_id?: string | null
+          created_at?: string | null
+          id?: string
+          intent_category?: string
+          lead_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       follow_up_queue: {
         Row: {
           action_taken: string | null
