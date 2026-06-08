@@ -15,9 +15,7 @@ export function MobileActionBar({
   userCredits,
   onRequestLeads,
   onOpenFilters,
-  onOpenSimulations,
   activeFiltersCount,
-  pendingSimulations,
   isAdmin = false,
   onOpenImport
 }: MobileActionBarProps) {
