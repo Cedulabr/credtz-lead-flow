@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Phone, MessageCircle, Clock, Calculator, FileText, ChevronRight, Send } from "lucide-react";
+import { Phone, MessageCircle, Clock, FileText, ChevronRight, Send, LayoutPanelLeft } from "lucide-react";
 import { WhatsAppSendDialog, type WhatsAppSentInfo } from "@/components/WhatsAppSendDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,13 +16,13 @@ import { useIsMobile } from "@/hooks/use-mobile";
 interface LeadListItemProps {
   lead: Lead;
   onClick: () => void;
-  onSimulation?: (lead: Lead) => void;
+  onSalesPanel?: (lead: Lead) => void;
   onTyping?: (lead: Lead) => void;
   onStatusChange?: (lead: Lead, status: string) => void;
   canEdit?: boolean;
 }
 
-export function LeadListItem({ lead, onClick, onSimulation, onTyping, onStatusChange, canEdit = true }: LeadListItemProps) {
+export function LeadListItem({ lead, onClick, onSalesPanel, onTyping, onStatusChange, canEdit = true }: LeadListItemProps) {
   const isMobile = useIsMobile();
   const { user, profile } = useAuth();
   const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
@@ -45,14 +45,14 @@ export function LeadListItem({ lead, onClick, onSimulation, onTyping, onStatusCh
     window.open(`https://wa.me/55${phone}?text=${message}`, "_blank");
   };
 
-  const handleCall = (e: React.MouseEvent) => {
+  const handleCall = (e: React.MouseEvent, phoneToCall: string) => {
     e.stopPropagation();
-    window.open(`tel:+55${lead.phone.replace(/\D/g, "")}`, "_blank");
+    window.open(`tel:+55${phoneToCall.replace(/\D/g, "")}`, "_blank");
   };
 
-  const handleSimulation = (e: React.MouseEvent) => {
+  const handleSalesPanel = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onSimulation?.(lead);
+    onSalesPanel?.(lead);
   };
 
   const handleTyping = (e: React.MouseEvent) => {
@@ -75,123 +75,118 @@ export function LeadListItem({ lead, onClick, onSimulation, onTyping, onStatusCh
     <>
     <Card 
       className={cn(
-        "cursor-pointer transition-all hover:shadow-md border-l-4 active:scale-[0.99]",
-        config.borderColor
+        "group cursor-pointer transition-all hover:shadow-lg border-l-4 active:scale-[0.99] bg-card",
+        config.borderColor,
+        "hover:bg-accent/5"
       )}
       onClick={onClick}
     >
-      <CardContent className="p-3 sm:p-4">
-        {/* Row 1: Name + Status + Chevron */}
-        <div className="flex items-center gap-2 mb-2">
-          <div className={cn("w-2.5 h-2.5 rounded-full shrink-0", config.dotColor)} />
+      <CardContent className="p-3 sm:p-5">
+        {/* Row 1: Name + Status + Date */}
+        <div className="flex items-center gap-3 mb-3">
+          <div className={cn("w-3 h-3 rounded-full shrink-0 shadow-sm", config.dotColor)} />
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm sm:text-base truncate">
+            <h3 className="font-bold text-base sm:text-lg tracking-tight truncate group-hover:text-primary transition-colors">
               {lead.name}
-            </p>
+            </h3>
           </div>
           <Badge 
             variant="outline" 
-            className={cn("shrink-0 text-[10px] sm:text-xs", config.bgColor, config.textColor, "border-0")}
+            className={cn("shrink-0 font-medium px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs shadow-sm border-0", config.bgColor, config.textColor)}
           >
             {config.label}
           </Badge>
-          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-        </div>
-
-        {/* Row 2: Phone + Convenio + Tag + Time */}
-        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 ml-5 mb-2">
-          <span className="text-xs sm:text-sm text-muted-foreground font-mono">
-            {formatPhone(lead.phone)}
-          </span>
-          {lead.convenio && (
-            <Badge variant="secondary" className="text-[10px] sm:text-xs h-5">
-              {lead.convenio}
-            </Badge>
-          )}
-          {lead.tag && (
-            <Badge variant="outline" className="text-[10px] sm:text-xs h-5">
-              {lead.tag}
-            </Badge>
-          )}
-          <span className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1 ml-auto">
+          <span className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1.5 shrink-0 bg-muted/50 px-2 py-1 rounded-md">
             <Clock className="h-3 w-3" />
             {timeAgo}
           </span>
         </div>
 
-        {/* Row 3: Action Buttons */}
-        <div className="flex items-center gap-1.5 ml-5 flex-wrap">
-          {/* WhatsApp wa.me */}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 px-2 text-green-600 hover:text-green-700 hover:bg-green-50 gap-1"
-            onClick={handleWhatsApp}
-          >
-            <MessageCircle className="h-3.5 w-3.5" />
-            <span className="text-xs hidden sm:inline">WhatsApp</span>
-          </Button>
+        {/* Row 2: Info Badges & Phones */}
+        <div className="flex items-center flex-wrap gap-2 mb-4">
+          <div className="flex items-center gap-2 bg-muted/30 px-2.5 py-1 rounded-lg border">
+            <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs sm:text-sm font-semibold font-mono text-foreground">
+              {formatPhone(lead.phone)}
+            </span>
+            {lead.phone2 && (
+              <>
+                <div className="w-px h-3 bg-muted-foreground/30 mx-1" />
+                <span className="text-xs sm:text-sm font-semibold font-mono text-muted-foreground">
+                  {formatPhone(lead.phone2)}
+                </span>
+              </>
+            )}
+          </div>
+          
+          {lead.convenio && (
+            <Badge variant="secondary" className="px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/15 border-0">
+              {lead.convenio}
+            </Badge>
+          )}
+          
+          {lead.tag && (
+            <Badge variant="outline" className="px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-md border-primary/20 text-muted-foreground">
+              {lead.tag}
+            </Badge>
+          )}
+        </div>
 
-          {/* API WhatsApp */}
-          <Button
-            size="sm"
-            className="h-8 px-2.5 bg-green-600 hover:bg-green-700 text-white gap-1"
-            onClick={(e) => { e.stopPropagation(); setShowWhatsAppDialog(true); }}
-          >
-            <Send className="h-3.5 w-3.5" />
-            <span className="text-xs">API WhatsApp</span>
-          </Button>
+        {/* Row 3: Action Buttons & Status Selector */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-1">
+            {/* Sales Panel Button (Painel Televendas) */}
+            <Button
+              size="sm"
+              variant="default"
+              className="h-9 px-4 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm rounded-lg transition-all"
+              onClick={handleSalesPanel}
+            >
+              <LayoutPanelLeft className="h-4 w-4" />
+              <span className="text-xs font-bold uppercase tracking-wider">Painel</span>
+            </Button>
 
-          {/* Ligar */}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 px-2 gap-1"
-            onClick={handleCall}
-          >
-            <Phone className="h-3.5 w-3.5" />
-            <span className="text-xs hidden sm:inline">Ligar</span>
-          </Button>
-
-          {/* Simular */}
-          {showActionButtons && onSimulation && (
+            {/* API WhatsApp */}
             <Button
               size="sm"
               variant="outline"
-              className="h-8 px-2.5 gap-1 border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
-              onClick={handleSimulation}
+              className="h-9 px-3 gap-2 border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300 rounded-lg"
+              onClick={(e) => { e.stopPropagation(); setShowWhatsAppDialog(true); }}
             >
-              <Calculator className="h-3.5 w-3.5" />
-              <span className="text-xs">Simular</span>
+              <Send className="h-3.5 w-3.5" />
+              <span className="text-xs font-medium">WhatsApp</span>
             </Button>
-          )}
 
-          {/* Digitar */}
-          {showActionButtons && onTyping && (
-            <Button
-              size="sm"
-              className="h-8 px-2.5 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-              onClick={handleTyping}
-            >
-              <FileText className="h-3.5 w-3.5" />
-              <span className="text-xs">Digitar</span>
-            </Button>
-          )}
+            {/* Digitar ao Cliente */}
+            {showActionButtons && onTyping && (
+              <Button
+                size="sm"
+                className="h-9 px-4 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm rounded-lg"
+                onClick={handleTyping}
+              >
+                <FileText className="h-4 w-4" />
+                <span className="text-xs font-bold uppercase tracking-wider">Digitar</span>
+              </Button>
+            )}
+          </div>
 
-          {/* Status Change Dropdown (desktop) */}
-          {canEdit && onStatusChange && !isMobile && (
-            <div className="ml-auto" onClick={(e) => e.stopPropagation()}>
+          {/* Status Change Dropdown */}
+          {canEdit && onStatusChange && (
+            <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
               <Select 
                 value={lead.status}
                 onValueChange={handleStatusSelect}
               >
-                <SelectTrigger className="h-8 w-[140px] text-xs">
+                <SelectTrigger className="h-9 w-[140px] sm:w-[180px] text-xs font-medium bg-muted/50 border-muted rounded-lg hover:bg-muted transition-colors">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent align="end">
                   {Object.entries(PIPELINE_STAGES).map(([key, stageConfig]) => (
-                    <SelectItem key={key} value={key}>
-                      <span className="text-xs">{stageConfig.label}</span>
+                    <SelectItem key={key} value={key} className="text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className={cn("w-2 h-2 rounded-full", stageConfig.dotColor)} />
+                        {stageConfig.label}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
