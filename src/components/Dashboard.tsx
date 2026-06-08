@@ -679,18 +679,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             className="sm:col-span-2"
           >
             <Card 
-              className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-sky-500 bg-gradient-to-br from-sky-50 to-background dark:from-sky-950/20"
+              className="cursor-pointer hover:shadow-xl transition-all duration-300 border-2 border-sky-500/20 bg-gradient-to-br from-sky-500/10 to-background hover:scale-[1.02] group"
               onClick={() => onNavigate('sms')}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-muted-foreground font-medium">Crédito SMS</p>
-                    <p className="text-2xl font-bold text-sky-600 dark:text-sky-400">{moduleMetrics.smsCredits.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground">créditos disponíveis para envio</p>
+                    <p className="text-[11px] font-bold text-sky-600 uppercase tracking-wider mb-1">Crédito SMS</p>
+                    <p className="text-3xl font-black text-sky-700 dark:text-sky-400">{moduleMetrics.smsCredits.toLocaleString()}</p>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 mt-1">
+                      <ArrowUpRight className="h-3 w-3" />
+                      Ativo
+                    </div>
                   </div>
-                  <div className="p-3 bg-sky-100 dark:bg-sky-900/30 rounded-full">
-                    <MessageSquare className="h-5 w-5 text-sky-600 dark:text-sky-400" />
+                  <div className="p-4 bg-sky-500/20 rounded-2xl group-hover:rotate-12 transition-transform duration-300">
+                    <MessageSquare className="h-6 w-6 text-sky-600 dark:text-sky-400" />
                   </div>
                 </div>
               </CardContent>
@@ -699,19 +702,26 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
 
         {/* Activity Summary Cards - Existing */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {summaryCards.map((card) => (
-            <Card key={card.label} className={`${card.bg} border-none shadow-sm`}>
-              <CardContent className="p-3 md:p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <card.icon className={`h-4 w-4 ${card.color}`} />
-                  <span className={`text-xs font-medium ${card.color}`}>{card.label}</span>
-                </div>
-                <p className={`text-xl md:text-2xl font-bold ${card.color}`}>
-                  {isRefreshing ? '...' : card.value.toLocaleString()}
-                </p>
-              </CardContent>
-            </Card>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {summaryCards.map((card, i) => (
+            <motion.div
+              key={card.label}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: i * 0.05 }}
+            >
+              <Card className={cn("border-2 transition-all hover:shadow-md hover:scale-[1.02]", card.border || "border-border/50", card.bg)}>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <card.icon className={cn("h-4 w-4", card.color)} />
+                    <span className={cn("text-[10px] font-black uppercase tracking-widest", card.color)}>{card.label}</span>
+                  </div>
+                  <p className={cn("text-2xl font-black tracking-tight", card.color)}>
+                    {isRefreshing ? '...' : card.value.toLocaleString()}
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
           ))}
         </div>
 
