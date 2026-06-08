@@ -18,7 +18,7 @@ interface LeadsListViewProps {
   isLoading: boolean;
   onLeadSelect: (lead: Lead) => void;
   onRefresh: () => void;
-  onSimulation?: (lead: Lead) => void;
+  onSalesPanel?: (lead: Lead) => void;
   onTyping?: (lead: Lead) => void;
   onStatusChange?: (lead: Lead, status: string) => void;
   canEditLead?: (lead: Lead) => boolean;
@@ -30,7 +30,7 @@ export function LeadsListView({
   isLoading, 
   onLeadSelect,
   onRefresh,
-  onSimulation,
+  onSalesPanel,
   onTyping,
   onStatusChange,
   canEditLead
@@ -210,7 +210,7 @@ export function LeadsListView({
                 <LeadListItem
                   lead={lead}
                   onClick={() => onLeadSelect(lead)}
-                  onSimulation={onSimulation}
+                  onSalesPanel={onSalesPanel}
                   onTyping={onTyping}
                   onStatusChange={onStatusChange}
                   canEdit={canEditLead ? canEditLead(lead) : true}
