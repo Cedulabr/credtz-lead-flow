@@ -1645,11 +1645,13 @@ export function LeadsManagement() {
               </div>
               
               <div className="flex flex-col md:flex-row gap-4 w-full">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full md:w-44 border-2 focus:border-primary h-11 md:h-14 text-sm md:text-base font-semibold">
-                    <Filter className="h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2 flex-shrink-0" />
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
+                <div className="flex-1">
+                  <Label className="text-xs font-bold uppercase text-muted-foreground mb-1.5 block">Status do Lead</Label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full border-2 focus:border-primary h-12 md:h-14 text-sm md:text-base font-bold bg-white dark:bg-slate-900 shadow-sm">
+                      <Filter className="h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2 flex-shrink-0 text-muted-foreground" />
+                      <SelectValue placeholder="Filtrar por Status" />
+                    </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all" className="text-sm md:text-base py-2 md:py-3">
                       <span className="flex items-center gap-2 font-semibold">
