@@ -43,11 +43,6 @@ export function LeadsPremiumModule() {
 
   const isAdmin = profile?.role === 'admin';
 
-  // Inline Simulation Modal
-  const [showSimulationModal, setShowSimulationModal] = useState(false);
-  const [simulationLead, setSimulationLead] = useState<Lead | null>(null);
-  const [simulationForm, setSimulationForm] = useState({ banco: "", produto: "", notes: "" });
-  const [isSimProcessing, setIsSimProcessing] = useState(false);
 
   // Inline Typing Modal
   const [showTypingModal, setShowTypingModal] = useState(false);
@@ -126,42 +121,6 @@ export function LeadsPremiumModule() {
     return success;
   };
 
-  // Inline handlers for list-level simulation
-  const handleListSimulation = (lead: Lead) => {
-    setSimulationLead(lead);
-    setSimulationForm({ banco: "", produto: "", notes: "" });
-    setShowSimulationModal(true);
-  };
-
-  const handleSimulationSubmit = async () => {
-    if (!simulationLead || !simulationForm.banco) {
-      toast({ title: "Selecione o banco", variant: "destructive" });
-      return;
-    }
-
-    setIsSimProcessing(true);
-    try {
-      const { error } = await supabase
-        .from('activate_leads_simulations')
-        .insert({
-          lead_id: simulationLead.id,
-          requested_by: user?.id,
-          banco: simulationForm.banco,
-          produto: simulationForm.produto,
-          notes: simulationForm.notes,
-          status: 'pending'
-        });
-
-      if (error) throw error;
-      toast({ title: "Simulação solicitada!", description: "O operador será notificado." });
-      setShowSimulationModal(false);
-      fetchLeads();
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    } finally {
-      setIsSimProcessing(false);
-    }
-  };
 
   // Inline handlers for sales panel
   const handleOpenSalesPanel = (lead: Lead) => {
