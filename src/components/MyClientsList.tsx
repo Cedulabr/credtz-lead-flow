@@ -1600,6 +1600,7 @@ export function MyClientsList() {
                                   variant="ghost"
                                   className="h-7 w-7 p-0 hover:bg-green-100 hover:text-green-700"
                                   onClick={() => openWhatsApp(client.telefone!)}
+                                  title="Botão WhatsApp"
                                 >
                                   <MessageCircle className="h-3.5 w-3.5" />
                                 </Button>

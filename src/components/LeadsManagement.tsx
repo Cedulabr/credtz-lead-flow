@@ -15,8 +15,7 @@ import { DistributedLeadsManager } from "./DistributedLeadsManager";
 import { LeadHistoryModal } from "./LeadHistoryModal";
 import { DailyLeadsTracking } from "./DailyLeadsTracking";
 import { AnimatedContainer, StaggerContainer, StaggerItem } from "./ui/animated-container";
-import { SimulationSummaryCards, SimulationRequestButton, SimulationManager } from "./leads";
-import { useSimulationNotifications } from "@/hooks/useSimulationNotifications";
+import { UpdateDataWizard } from "./leads";
 import { SkeletonCard } from "./ui/skeleton-card";
 import { 
   Search, 
@@ -1213,8 +1212,6 @@ export function LeadsManagement() {
 
   return (
     <AnimatedContainer animation="slide-up" className="p-3 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen">
-      {/* Simulation Manager Cards - Mostra simulações pendentes e prontas */}
-      <SimulationManager onUpdate={fetchLeads} />
 
       {/* Header Simplificado */}
       <div className="flex flex-col space-y-4 md:space-y-8">
@@ -1647,100 +1644,98 @@ export function LeadsManagement() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:flex gap-2 md:gap-3">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full md:w-44 border-2 focus:border-primary h-11 md:h-14 text-sm md:text-base font-semibold">
-                    <Filter className="h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2 flex-shrink-0" />
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-sm md:text-base py-2 md:py-3">
-                      <span className="flex items-center gap-2 font-semibold">
-                        <span className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-slate-400"></span>
-                        Todos
-                      </span>
-                    </SelectItem>
-                    {Object.entries(STATUS_CONFIG).map(([key, config]) => (
-                      <SelectItem key={key} value={key} className="text-sm md:text-base py-2 md:py-3">
-                        <span className="flex items-center gap-2 font-semibold">
-                          <span className={`w-2.5 h-2.5 md:w-3 md:h-3 rounded-full ${config.dotColor}`}></span>
-                          <span className="truncate">{config.label}</span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Filtro por Convênio - Disponível para todos */}
-                <Select value={convenioFilter} onValueChange={setConvenioFilter}>
-                  <SelectTrigger className="w-full md:w-44 border-2 focus:border-primary h-11 md:h-14 text-sm md:text-base font-semibold">
-                    <Building2 className="h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2 flex-shrink-0" />
-                    <SelectValue placeholder="Convênio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-sm md:text-base py-2 md:py-3">
-                      <span className="flex items-center gap-2 font-semibold">
-                        <Building2 className="h-4 w-4" />
-                        Todos Convênios
-                      </span>
-                    </SelectItem>
-                    {[...new Set(leads.map(l => l.convenio).filter(Boolean))].sort().map(convenio => (
-                      <SelectItem key={convenio} value={convenio} className="text-sm md:text-base py-2 md:py-3">
-                        <span className="flex items-center gap-2 font-semibold">
-                          {convenio}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Filtro por Tag - Disponível para todos */}
-                <Select value={tagFilter} onValueChange={setTagFilter}>
-                  <SelectTrigger className="w-full md:w-44 border-2 focus:border-primary h-11 md:h-14 text-sm md:text-base font-semibold">
-                    <Tag className="h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2 flex-shrink-0" />
-                    <SelectValue placeholder="Tag/Perfil" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-sm md:text-base py-2 md:py-3">
-                      <span className="flex items-center gap-2 font-semibold">
-                        <Tag className="h-4 w-4" />
-                        Todas Tags
-                      </span>
-                    </SelectItem>
-                    {[...new Set(leads.map(l => l.tag).filter(Boolean))].sort().map(tag => (
-                      <SelectItem key={tag} value={tag!} className="text-sm md:text-base py-2 md:py-3">
-                        <span className="flex items-center gap-2 font-semibold">
-                          <Tag className="h-4 w-4" />
-                          {tag}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {isAdmin && (
-                  <Select value={userFilter} onValueChange={setUserFilter}>
-                    <SelectTrigger className="w-full md:w-44 border-2 focus:border-primary h-11 md:h-14 text-sm md:text-base font-semibold">
-                      <User className="h-4 w-4 md:h-5 md:w-5 mr-1.5 md:mr-2 flex-shrink-0" />
-                      <SelectValue placeholder="Usuário" />
+              <div className="flex flex-col lg:flex-row gap-4 w-full">
+                {/* Filtro por Status */}
+                <div className="flex-1 min-w-[200px]">
+                  <Label className="text-xs font-black uppercase text-muted-foreground mb-1.5 ml-1 block">Status do Lead</Label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full border-2 focus:border-primary h-12 md:h-14 text-sm md:text-lg font-bold bg-white dark:bg-slate-900 shadow-sm transition-all hover:border-primary/50">
+                      <div className="flex items-center gap-2">
+                        <Filter className="h-4 w-4 md:h-5 md:w-5 text-primary shrink-0" />
+                        <SelectValue placeholder="Status" />
+                      </div>
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all" className="text-sm md:text-base py-2 md:py-3">
-                        <span className="flex items-center gap-2 font-semibold">
-                          <Users className="h-4 w-4" />
-                          Todos
+                      <SelectItem value="all" className="py-3 font-bold">
+                        <span className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded-full bg-slate-400"></span>
+                          Todos os Leads
                         </span>
                       </SelectItem>
-                      {users.map(u => (
-                        <SelectItem key={u.id} value={u.id} className="text-sm md:text-base py-2 md:py-3">
-                          <span className="flex items-center gap-2 font-semibold truncate">
-                            <User className="h-4 w-4 flex-shrink-0" />
-                            <span className="truncate">{u.name || u.email || 'Usuário'}</span>
+                      {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                        <SelectItem key={key} value={key} className="py-3 font-bold text-base">
+                          <span className="flex items-center gap-2">
+                            <span className={`w-3 h-3 rounded-full ${config.dotColor}`}></span>
+                            {config.label}
                           </span>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                {/* Filtro por Convênio */}
+                <div className="flex-1 min-w-[200px]">
+                  <Label className="text-xs font-black uppercase text-muted-foreground mb-1.5 ml-1 block">Convênio</Label>
+                  <Select value={convenioFilter} onValueChange={setConvenioFilter}>
+                    <SelectTrigger className="w-full border-2 focus:border-primary h-12 md:h-14 text-sm md:text-lg font-bold bg-white dark:bg-slate-900 shadow-sm transition-all hover:border-primary/50">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 md:h-5 md:w-5 text-primary shrink-0" />
+                        <SelectValue placeholder="Convênio" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" className="py-3 font-bold">Todos Convênios</SelectItem>
+                      {[...new Set(leads.map(l => l.convenio).filter(Boolean))].sort().map(convenio => (
+                        <SelectItem key={convenio} value={convenio} className="py-3 font-bold text-base">
+                          {convenio}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Filtro por Tag */}
+                <div className="flex-1 min-w-[200px]">
+                  <Label className="text-xs font-black uppercase text-muted-foreground mb-1.5 ml-1 block">Perfil / Tag</Label>
+                  <Select value={tagFilter} onValueChange={setTagFilter}>
+                    <SelectTrigger className="w-full border-2 focus:border-primary h-12 md:h-14 text-sm md:text-lg font-bold bg-white dark:bg-slate-900 shadow-sm transition-all hover:border-primary/50">
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-4 w-4 md:h-5 md:w-5 text-primary shrink-0" />
+                        <SelectValue placeholder="Tag/Perfil" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" className="py-3 font-bold">Todos os Perfis</SelectItem>
+                      {[...new Set(leads.map(l => l.tag).filter(Boolean))].sort().map(tag => (
+                        <SelectItem key={tag} value={tag!} className="py-3 font-bold text-base">
+                          {tag}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {isAdmin && (
+                  <div className="flex-1 min-w-[200px]">
+                    <Label className="text-xs font-black uppercase text-muted-foreground mb-1.5 ml-1 block">Consultor</Label>
+                    <Select value={userFilter} onValueChange={setUserFilter}>
+                      <SelectTrigger className="w-full border-2 focus:border-primary h-12 md:h-14 text-sm md:text-lg font-bold bg-white dark:bg-slate-900 shadow-sm transition-all hover:border-primary/50">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 md:h-5 md:w-5 text-primary shrink-0" />
+                          <SelectValue placeholder="Consultor" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all" className="py-3 font-bold">Todos os Consultores</SelectItem>
+                        {users.map(u => (
+                          <SelectItem key={u.id} value={u.id} className="py-3 font-bold text-base">
+                            {u.name || u.email || 'Usuário'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
               </div>
             </div>
@@ -1907,10 +1902,10 @@ export function LeadsManagement() {
                             window.open(`https://wa.me/55${lead.phone.replace(/\D/g, '')}?text=${message}`, '_blank');
                           }}
                           className="h-10 md:h-12 px-3 md:px-4 bg-green-50 hover:bg-green-100 text-green-700 hover:text-green-800 border-green-300 hover:border-green-400 font-bold text-sm md:text-base"
-                          title="WhatsApp Telefone 1"
+                          title="Botão WhatsApp"
                         >
                           <MessageCircle className="h-4 w-4 md:h-5 md:w-5 md:mr-1" />
-                          <span className="hidden md:inline">Zap 1</span>
+                          <span className="hidden md:inline">Botão WhatsApp 1</span>
                         </Button>
 
                         {/* Botão WhatsApp Tel 2 - apenas se tiver telefone 2 */}
@@ -1924,10 +1919,10 @@ export function LeadsManagement() {
                               window.open(`https://wa.me/55${lead.phone2!.replace(/\D/g, '')}?text=${message}`, '_blank');
                             }}
                             className="h-10 md:h-12 px-3 md:px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 border-emerald-300 hover:border-emerald-400 font-bold text-sm md:text-base"
-                            title="WhatsApp Telefone 2"
+                            title="Botão WhatsApp"
                           >
                             <MessageCircle className="h-4 w-4 md:h-5 md:w-5 md:mr-1" />
-                            <span className="hidden md:inline">Zap 2</span>
+                            <span className="hidden md:inline">Botão WhatsApp 2</span>
                           </Button>
                         )}
 
@@ -1943,13 +1938,6 @@ export function LeadsManagement() {
                           <span className="hidden md:inline">Histórico</span>
                         </Button>
 
-                        {/* Botão Solicitar Simulação */}
-                        <SimulationRequestButton
-                          leadId={lead.id}
-                          leadName={lead.name}
-                          currentSimulationStatus={lead.simulation_status}
-                          onSuccess={fetchLeads}
-                        />
 
                         {/* Botão Solicitar Digitação - Destaque para mobile */}
                         <Button

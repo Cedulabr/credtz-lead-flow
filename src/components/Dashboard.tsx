@@ -419,12 +419,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }
 
   const summaryCards = [
-    { label: 'Leads Premium', value: globalTotals.leadsPremium, icon: Zap, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/30', border: 'border-amber-500/20' },
-    { label: 'Activate Leads', value: globalTotals.activateLeads, icon: Phone, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/30', border: 'border-blue-500/20' },
-    { label: 'Televendas Pagas', value: globalTotals.televendasPagas, icon: ShoppingCart, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/30', border: 'border-emerald-500/20' },
-    { label: 'Gestão Televendas', value: globalTotals.gestaoTelevendas, icon: ClipboardList, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-950/30', border: 'border-violet-500/20' },
-    { label: 'Propostas Geradas', value: globalTotals.geradorProposta, icon: FileText, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-950/30', border: 'border-rose-500/20' },
-    { label: 'SMS Enviados', value: globalTotals.smsEnviados, icon: MessageSquare, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-950/30' },
+    { label: 'Leads Premium', value: globalTotals.leadsPremium, icon: Zap, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30', border: 'border-amber-500 shadow-amber-500/10' },
+    { label: 'Activate Leads', value: globalTotals.activateLeads, icon: Phone, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-500 shadow-blue-500/10' },
+    { label: 'Televendas Pagas', value: globalTotals.televendasPagas, icon: ShoppingCart, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30', border: 'border-emerald-500 shadow-emerald-500/10' },
+    { label: 'Gestão Televendas', value: globalTotals.gestaoTelevendas, icon: ClipboardList, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-100 dark:bg-violet-900/30', border: 'border-violet-500 shadow-violet-500/10' },
+    { label: 'Propostas Geradas', value: globalTotals.geradorProposta, icon: FileText, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-100 dark:bg-rose-900/30', border: 'border-rose-500 shadow-rose-500/10' },
+    { label: 'SMS Enviados', value: globalTotals.smsEnviados, icon: MessageSquare, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-100 dark:bg-sky-900/30', border: 'border-sky-500 shadow-sky-500/10' },
   ];
 
   return (

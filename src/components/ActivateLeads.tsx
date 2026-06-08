@@ -18,9 +18,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ImportHistory } from '@/components/ImportHistory';
 import { ActivateLeadHistoryModal } from '@/components/ActivateLeadHistoryModal';
 import { DuplicateManager } from '@/components/ActivateLeads/DuplicateManager';
-import { ActivateSimulationManager } from '@/components/ActivateLeads/SimulationManager';
-import { ActivateSimulationRequestButton } from '@/components/ActivateLeads/SimulationRequestButton';
-import { useActivateLeadSimulations } from '@/hooks/useActivateLeadSimulations';
 import { PasteImageUpload } from '@/components/ui/paste-image-upload';
 import { DuplicateFileAlert } from '@/components/ui/duplicate-file-alert';
 import { calculateFileHash, checkDuplicateImport, type DuplicateImportInfo } from '@/lib/fileHash';
@@ -294,7 +291,7 @@ export const ActivateLeads = () => {
   const [savingCpf, setSavingCpf] = useState(false);
   
   // Simulation hook
-  const { requestSimulation, isGestorOrAdmin: canManageSimulations } = useActivateLeadSimulations();
+  
 
   // Modal states
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -1624,15 +1621,6 @@ export const ActivateLeads = () => {
     }
   };
 
-  const handleRequestSimulation = async (lead: ActivateLead) => {
-    try {
-      await requestSimulation(lead.id, lead.nome);
-      toast({ title: '📊 Simulação solicitada!', description: 'O gestor será notificado.' });
-      fetchLeads();
-    } catch (error: any) {
-      toast({ title: '❌ Erro', description: error.message, variant: 'destructive' });
-    }
-  };
 
   const totalPages = Math.ceil(filteredLeads.length / ITEMS_PER_PAGE);
   const paginatedLeads = filteredLeads.slice(
@@ -1882,7 +1870,7 @@ export const ActivateLeads = () => {
       </motion.div>
 
       {/* Simulation Manager */}
-      <ActivateSimulationManager onUpdate={fetchLeads} />
+      
 
       {/* Bulk Actions */}
       <AnimatePresence>
@@ -2132,12 +2120,6 @@ export const ActivateLeads = () => {
                         </TableCell>
                         {/* Simulação */}
                         <TableCell>
-                          <ActivateSimulationRequestButton
-                            leadId={lead.id}
-                            leadName={lead.nome}
-                            currentSimulationStatus={lead.simulation_status}
-                            onSuccess={fetchLeads}
-                          />
                         </TableCell>
                         {/* API WhatsApp */}
                         <TableCell>
