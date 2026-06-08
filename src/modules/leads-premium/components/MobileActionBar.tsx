@@ -6,9 +6,7 @@ interface MobileActionBarProps {
   userCredits: number;
   onRequestLeads: () => void;
   onOpenFilters: () => void;
-  onOpenSimulations: () => void;
   activeFiltersCount: number;
-  pendingSimulations: number;
   isAdmin?: boolean;
   onOpenImport?: () => void;
 }
@@ -17,9 +15,7 @@ export function MobileActionBar({
   userCredits,
   onRequestLeads,
   onOpenFilters,
-  onOpenSimulations,
   activeFiltersCount,
-  pendingSimulations,
   isAdmin = false,
   onOpenImport
 }: MobileActionBarProps) {

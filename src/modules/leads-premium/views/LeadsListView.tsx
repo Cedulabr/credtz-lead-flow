@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Lead, UserProfile, PIPELINE_STAGES, LeadFilters } from "../types";
 import { LeadListItem } from "../components/LeadListItem";
 import { LeadsFiltersBar } from "../components/LeadsFiltersBar";
+import { ExportLeadsDialog } from "../components/ExportLeadsDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -41,6 +42,7 @@ export function LeadsListView({
   
   const ITEMS_PER_PAGE = 15;
   const [currentPage, setCurrentPage] = useState(1);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   
   const [filters, setFilters] = useState<LeadFilters & { dateFilter?: string }>({
     search: "",
@@ -142,35 +144,7 @@ export function LeadsListView({
   };
 
   const handleExportLeads = () => {
-    if (filteredLeads.length === 0) {
-      return;
-    }
-
-    // Prepare data for CSV
-    const headers = ["Nome", "CPF", "Telefone", "Telefone 2", "Convênio", "Tag", "Status", "Data de Criação"];
-    const csvContent = [
-      headers.join(","),
-      ...filteredLeads.map(lead => [
-        `"${lead.name || ''}"`,
-        `"${lead.cpf || ''}"`,
-        `"${lead.phone || ''}"`,
-        `"${lead.phone2 || ''}"`,
-        `"${lead.convenio || ''}"`,
-        `"${lead.tag || ''}"`,
-        `"${PIPELINE_STAGES[lead.status]?.label || lead.status}"`,
-        `"${format(new Date(lead.created_at), 'dd/MM/yyyy HH:mm')}"`
-      ].join(","))
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `leads_premium_export_${format(new Date(), 'yyyy-MM-dd_HHmm')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    setIsExportDialogOpen(true);
   };
 
   if (isLoading) {
@@ -196,7 +170,7 @@ export function LeadsListView({
               availableConvenios={availableConvenios}
               availableTags={availableTags}
               users={users}
-              showUserFilter={isAdmin}
+              showUserFilter={isAdmin || users.length > 1}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -313,6 +287,17 @@ export function LeadsListView({
           )}
         </div>
       </ScrollArea>
+
+      <ExportLeadsDialog
+        isOpen={isExportDialogOpen}
+        onClose={() => setIsExportDialogOpen(false)}
+        leads={leads}
+        users={users}
+        currentFilters={filters}
+        availableConvenios={availableConvenios}
+        availableTags={availableTags}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 }
