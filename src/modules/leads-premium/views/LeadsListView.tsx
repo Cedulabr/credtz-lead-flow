@@ -42,6 +42,7 @@ export function LeadsListView({
   
   const ITEMS_PER_PAGE = 15;
   const [currentPage, setCurrentPage] = useState(1);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   
   const [filters, setFilters] = useState<LeadFilters & { dateFilter?: string }>({
     search: "",
