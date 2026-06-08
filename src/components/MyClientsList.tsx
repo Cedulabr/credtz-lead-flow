@@ -1600,17 +1600,18 @@ export function MyClientsList() {
                                   variant="ghost"
                                   className="h-7 w-7 p-0 hover:bg-green-100 hover:text-green-700"
                                   onClick={() => openWhatsApp(client.telefone!)}
+                                  title="WhatsApp (Direto)"
                                 >
                                   <MessageCircle className="h-3.5 w-3.5" />
                                 </Button>
                                 <Button
                                   size="sm"
                                   className="h-7 px-2 bg-green-600 hover:bg-green-700 text-white gap-1"
-                                  title="API WhatsApp"
+                                  title="API WhatsApp (Easyn Flow)"
                                   onClick={() => openWhatsAppApi(client["Nome do cliente"] || "", client.telefone!)}
                                 >
                                   <Send className="h-3.5 w-3.5" />
-                                  <span className="text-[10px]">API WhatsApp</span>
+                                  <span className="text-[10px]">EasyFlow API</span>
                                 </Button>
                               </>
                             )}
