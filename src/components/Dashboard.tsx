@@ -497,18 +497,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             transition={{ delay: 0.1 }}
           >
             <Card 
-              className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-amber-500 bg-gradient-to-br from-amber-50 to-background dark:from-amber-950/20"
+              className="cursor-pointer hover:shadow-xl transition-all duration-300 border-2 border-amber-500/20 bg-gradient-to-br from-amber-500/10 to-background hover:scale-[1.02] group"
               onClick={() => onNavigate('leads')}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-muted-foreground font-medium">Leads Premium</p>
-                    <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{moduleMetrics.leadsPremium}</p>
-                    <p className="text-xs text-muted-foreground">trabalhados no mês</p>
+                    <p className="text-[11px] font-bold text-amber-600 uppercase tracking-wider mb-1">Leads Premium</p>
+                    <p className="text-3xl font-black text-amber-700 dark:text-amber-400">{moduleMetrics.leadsPremium}</p>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 mt-1">
+                      <ArrowUpRight className="h-3 w-3" />
+                      +8.2%
+                    </div>
                   </div>
-                  <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-full">
-                    <Zap className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  <div className="p-4 bg-amber-500/20 rounded-2xl group-hover:rotate-12 transition-transform duration-300">
+                    <Zap className="h-6 w-6 text-amber-600 dark:text-amber-400" />
                   </div>
                 </div>
               </CardContent>
