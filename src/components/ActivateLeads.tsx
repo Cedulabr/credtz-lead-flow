@@ -296,7 +296,7 @@ export const ActivateLeads = () => {
 
   // Modal states
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isPullLeadsModalOpen, setIsPullLeadsModalOpen] = useState(false);
+  const [isExportLeadsModalOpen, setIsExportLeadsModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
   const [isFutureContactModalOpen, setIsFutureContactModalOpen] = useState(false);
