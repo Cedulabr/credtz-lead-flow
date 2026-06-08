@@ -1611,7 +1611,7 @@ export function MyClientsList() {
                                   onClick={() => openWhatsAppApi(client["Nome do cliente"] || "", client.telefone!)}
                                 >
                                   <Send className="h-3.5 w-3.5" />
-                                  <span className="text-[10px]">EasyFlow API</span>
+                                  <span className="text-[10px]">API EasyFlow</span>
                                 </Button>
                               </>
                             )}
