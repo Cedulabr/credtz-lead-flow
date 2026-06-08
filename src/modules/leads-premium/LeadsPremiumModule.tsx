@@ -533,21 +533,10 @@ export function LeadsPremiumModule() {
             isLoading={isLoading}
             onLeadSelect={handleLeadSelect}
             onRefresh={fetchLeads}
-            onSimulation={handleListSimulation}
+            onSalesPanel={handleOpenSalesPanel}
             onTyping={handleListTyping}
             onStatusChange={handleListStatusChange}
             canEditLead={canEditLead}
-          />
-        </TabsContent>
-
-        <TabsContent value="pipeline" className="mt-6">
-          <PipelineView 
-            leads={leads}
-            users={users}
-            isLoading={isLoading}
-            onLeadSelect={handleLeadSelect}
-            onStatusChange={(leadId, newStatus) => handleStatusChange(leadId, newStatus)}
-            stats={stats}
           />
         </TabsContent>
 
