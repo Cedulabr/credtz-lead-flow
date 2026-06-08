@@ -6,7 +6,10 @@ import { useActivateLeads } from "./hooks/useActivateLeads";
 import { ActivatePipelineView } from "./views/ActivatePipelineView";
 import { ActivateMetricsView } from "./views/ActivateMetricsView";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, List, BarChart3, Calculator, Zap } from "lucide-react";
+import { LayoutGrid, List, BarChart3, Calculator, Zap, HelpCircle } from "lucide-react";
+import { ActivateGuidedFlow } from "./components/ActivateGuidedFlow";
+import { motion, AnimatePresence } from "framer-motion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { ActivateLeads as OriginalActivateLeads } from "@/components/ActivateLeads";
 
