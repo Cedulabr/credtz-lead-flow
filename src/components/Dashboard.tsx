@@ -11,6 +11,7 @@ import { AnimatedContainer } from "./ui/animated-container";
 import { SkeletonCard } from "./ui/skeleton-card";
 import { ConsultorDashboard } from "./ConsultorDashboard";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 import {
   Calendar,
   RefreshCw,
@@ -27,6 +28,7 @@ import {
   Wifi,
   WifiOff,
   Loader2,
+  ArrowUpRight,
 } from "lucide-react";
 import { format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";

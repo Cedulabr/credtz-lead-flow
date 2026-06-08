@@ -133,15 +133,15 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
           type="button"
           onClick={() => toggleGroup(section.categoryKey)}
           className={cn(
-            "group w-full flex items-center gap-2.5 mx-1.5 rounded-lg transition-colors h-[34px] px-3.5 text-[13px]",
-            hasActive ? "text-foreground font-medium" : "text-foreground/80 hover:bg-secondary"
+            "group w-full flex items-center gap-3 mx-1.5 rounded-lg transition-all duration-200 h-[40px] px-4 text-[13.5px]",
+            hasActive ? "text-foreground font-semibold bg-muted/40" : "text-foreground/70 hover:bg-muted/60"
           )}
           style={{ width: "calc(100% - 12px)" }}
           aria-expanded={isOpen}
         >
-          <Icon className="shrink-0" size={16} style={{ width: 18 }} strokeWidth={1.75} />
+          <Icon className="shrink-0 text-primary/80" size={18} strokeWidth={2} />
           <span className="flex-1 text-left truncate">{section.label}</span>
-          <ChevronDown size={14} className={cn("transition-transform duration-200", isOpen ? "rotate-0" : "-rotate-90")} />
+          <ChevronDown size={16} className={cn("transition-transform duration-300 opacity-60", isOpen ? "rotate-0" : "-rotate-90")} />
         </button>
         <div
           className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
