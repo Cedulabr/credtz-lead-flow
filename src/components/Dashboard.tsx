@@ -603,18 +603,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             transition={{ delay: 0.3 }}
           >
             <Card 
-              className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-rose-500 bg-gradient-to-br from-rose-50 to-background dark:from-rose-950/20"
+              className="cursor-pointer hover:shadow-xl transition-all duration-300 border-2 border-indigo-500/20 bg-gradient-to-br from-indigo-500/10 to-background hover:scale-[1.02] group"
               onClick={() => onNavigate('documents')}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-muted-foreground font-medium">Documentos Salvos</p>
-                    <p className="text-2xl font-bold text-rose-600 dark:text-rose-400">{moduleMetrics.documentos}</p>
-                    <p className="text-xs text-muted-foreground">arquivos armazenados</p>
+                    <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider mb-1">Documentos Salvos</p>
+                    <p className="text-3xl font-black text-indigo-700 dark:text-indigo-400">{moduleMetrics.documentos}</p>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-500 mt-1">
+                      <FileCheck className="h-3 w-3" />
+                      Armazenados
+                    </div>
                   </div>
-                  <div className="p-3 bg-rose-100 dark:bg-rose-900/30 rounded-full">
-                    <FileCheck className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+                  <div className="p-4 bg-indigo-500/20 rounded-2xl group-hover:rotate-12 transition-transform duration-300">
+                    <FileText className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
                   </div>
                 </div>
               </CardContent>
