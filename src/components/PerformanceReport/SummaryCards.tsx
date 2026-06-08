@@ -51,68 +51,65 @@ export function SummaryCards({ summary, isLoading, teamStats }: SummaryCardsProp
       {/* Resumo Principal - Cards Grandes */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Colaboradores Ativos */}
-        <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+        <Card className="relative overflow-hidden border-2 border-blue-200 bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-100 text-sm font-medium">Colaboradores</p>
-                <p className="text-3xl font-bold mt-1">{summary.totalActiveUsers}</p>
-                <p className="text-blue-100 text-xs mt-1">ativos no período</p>
+                <p className="text-blue-100 text-sm font-bold uppercase tracking-wider">Colaboradores</p>
+                <p className="text-4xl font-black mt-1">{summary.totalActiveUsers}</p>
+                <p className="text-blue-100/80 text-xs mt-1 font-medium">ativos no período</p>
               </div>
-              <div className="p-3 bg-white/20 rounded-xl">
-                <Users className="h-6 w-6" />
+              <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm">
+                <Users className="h-8 w-8" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Total Vendido */}
-        <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
+        <Card className="relative overflow-hidden border-2 border-emerald-200 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-emerald-100 text-sm font-medium">Total Vendido</p>
-                <p className="text-2xl font-bold mt-1">{formatCurrency(summary.totalSoldValue)}</p>
-                <p className="text-emerald-100 text-xs mt-1">em operações</p>
+                <p className="text-emerald-100 text-sm font-bold uppercase tracking-wider">Total Vendido</p>
+                <p className="text-3xl font-black mt-1">{formatCurrency(summary.totalSoldValue)}</p>
+                <p className="text-emerald-100/80 text-xs mt-1 font-medium">em operações</p>
               </div>
-              <div className="p-3 bg-white/20 rounded-xl">
-                <DollarSign className="h-6 w-6" />
+              <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm">
+                <DollarSign className="h-8 w-8" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Comissões */}
-        <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-violet-500 to-violet-600 text-white">
+        <Card className="relative overflow-hidden border-2 border-violet-200 bg-gradient-to-br from-violet-600 to-violet-700 text-white shadow-lg shadow-violet-500/20 transition-all hover:scale-[1.02]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-violet-100 text-sm font-medium">Comissões</p>
-                <p className="text-2xl font-bold mt-1">{formatCurrency(summary.totalCommissions)}</p>
-                <p className="text-violet-100 text-xs mt-1">geradas</p>
+                <p className="text-violet-100 text-sm font-bold uppercase tracking-wider">Comissões</p>
+                <p className="text-3xl font-black mt-1">{formatCurrency(summary.totalCommissions)}</p>
+                <p className="text-violet-100/80 text-xs mt-1 font-medium">geradas</p>
               </div>
-              <div className="p-3 bg-white/20 rounded-xl">
-                <TrendingUp className="h-6 w-6" />
+              <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm">
+                <TrendingUp className="h-8 w-8" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Taxa de Conversão */}
-        <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-amber-500 to-amber-600 text-white">
+        <Card className="relative overflow-hidden border-2 border-amber-200 bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.02]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-amber-100 text-sm font-medium">Conversão</p>
-                <p className="text-3xl font-bold mt-1">
+                <p className="text-amber-100 text-sm font-bold uppercase tracking-wider">Conversão</p>
+                <p className="text-4xl font-black mt-1">
                   {summary.totalProposalsCreated > 0 
                     ? ((summary.proposalsPaid / summary.totalProposalsCreated) * 100).toFixed(1)
                     : 0}%
                 </p>
-                <p className="text-amber-100 text-xs mt-1">propostas pagas</p>
+                <p className="text-amber-100/80 text-xs mt-1 font-medium">propostas pagas</p>
               </div>
-              <div className="p-3 bg-white/20 rounded-xl">
-                <Target className="h-6 w-6" />
+              <div className="p-4 bg-white/20 rounded-2xl backdrop-blur-sm">
+                <Target className="h-8 w-8" />
               </div>
             </div>
           </CardContent>
