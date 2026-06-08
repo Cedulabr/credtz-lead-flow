@@ -301,16 +301,7 @@ export function SimulationActionsBar({ lead, onSuccess }: SimulationActionsBarPr
 
   return (
     <>
-      {/* Action Buttons */}
-      <div className={`grid grid-cols-2 gap-2 ${isMobile ? 'mt-3' : ''}`}>
-        <Button 
-          variant="outline"
-          className="h-11"
-          onClick={() => setShowSimulationModal(true)}
-        >
-          <Calculator className="h-4 w-4 mr-2" />
-          Simulação
-        </Button>
+      <div className={`grid grid-cols-1 gap-2 ${isMobile ? 'mt-3' : ''}`}>
         <Button 
           className="h-11 bg-emerald-600 hover:bg-emerald-700"
           onClick={() => setShowTypingModal(true)}

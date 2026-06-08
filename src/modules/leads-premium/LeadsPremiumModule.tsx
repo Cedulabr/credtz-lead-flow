@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { PipelineView } from "./views/PipelineView";
 import { LeadsListView } from "./views/LeadsListView";
 import { MetricsDashboard } from "./views/MetricsDashboard";
-import { SimulationsDashboard } from "./views/SimulationsDashboard";
+
 import { LeadDetailDrawer } from "./components/LeadDetailDrawer";
 import { MobileActionBar } from "./components/MobileActionBar";
 import { RequestLeadsWizard } from "./components/RequestLeadsWizard";
@@ -32,13 +32,13 @@ export function LeadsPremiumModule() {
   const isMobile = useIsMobile();
   const { user, profile } = useAuth();
   const { toast } = useToast();
-  const [activeView, setActiveView] = useState<"list" | "metrics" | "simulations">("list");
+  const [activeView, setActiveView] = useState<"list" | "metrics">("list");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isSalesPanelOpen, setIsSalesPanelOpen] = useState(false);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-  const [pendingSimulationsCount, setPendingSimulationsCount] = useState(0);
+  
   const [showImportBase, setShowImportBase] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
@@ -71,20 +71,6 @@ export function LeadsPremiumModule() {
   const { overdueLeads, isBlocked: isOverdueBlocked } = useOverdueLeads();
 
   // Fetch pending simulations count
-  useEffect(() => {
-    const fetchPendingSimulations = async () => {
-      const { count } = await supabase
-        .from('activate_leads_simulations')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-      
-      setPendingSimulationsCount(count || 0);
-    };
-
-    fetchPendingSimulations();
-    const interval = setInterval(fetchPendingSimulations, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleLeadSelect = (lead: Lead) => {
     setSelectedLead(lead);
@@ -236,11 +222,6 @@ export function LeadsPremiumModule() {
                   Importar
                 </Button>
               )}
-              {pendingSimulationsCount > 0 && (
-                <Badge variant="destructive" className="animate-pulse">
-                  {pendingSimulationsCount} simulações
-                </Badge>
-              )}
             </div>
           </div>
         </div>
@@ -320,17 +301,6 @@ export function LeadsPremiumModule() {
                 />
               </motion.div>
             )}
-            {activeView === "simulations" && (
-              <motion.div
-                key="simulations"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="h-full"
-              >
-                <SimulationsDashboard />
-              </motion.div>
-            )}
           </AnimatePresence>
         </div>
 
@@ -339,9 +309,9 @@ export function LeadsPremiumModule() {
           userCredits={userCredits}
           onRequestLeads={() => setIsRequestModalOpen(true)}
           onOpenFilters={() => setIsFiltersOpen(true)}
-          onOpenSimulations={() => setActiveView("simulations")}
+          onOpenSimulations={() => {}}
           activeFiltersCount={activeFiltersCount}
-          pendingSimulations={pendingSimulationsCount}
+          pendingSimulations={0}
           isAdmin={isAdmin}
           onOpenImport={() => setShowImportBase(true)}
         />
@@ -443,18 +413,6 @@ export function LeadsPremiumModule() {
               <BarChart3 className="h-4 w-4" />
               Métricas
             </TabsTrigger>
-            <TabsTrigger value="simulations" className="gap-2 relative">
-              <Calculator className="h-4 w-4" />
-              Simulações
-              {pendingSimulationsCount > 0 && (
-                <Badge 
-                  variant="destructive" 
-                  className="ml-1 h-5 px-1.5 text-xs"
-                >
-                  {pendingSimulationsCount}
-                </Badge>
-              )}
-            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -481,9 +439,6 @@ export function LeadsPremiumModule() {
           />
         </TabsContent>
 
-        <TabsContent value="simulations" className="mt-6">
-          <SimulationsDashboard />
-        </TabsContent>
       </Tabs>
 
       {/* Lead Detail Drawer */}
