@@ -287,6 +287,17 @@ export function LeadsListView({
           )}
         </div>
       </ScrollArea>
+
+      <ExportLeadsDialog
+        isOpen={isExportDialogOpen}
+        onClose={() => setIsExportDialogOpen(false)}
+        leads={leads}
+        users={users}
+        currentFilters={filters}
+        availableConvenios={availableConvenios}
+        availableTags={availableTags}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 }
