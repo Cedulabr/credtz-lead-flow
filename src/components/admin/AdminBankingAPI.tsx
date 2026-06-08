@@ -14,7 +14,7 @@ import {
   Wifi,
   WifiOff
 } from 'lucide-react';
-import { useJoinBankAPI } from '@/modules/baseoff/hooks/useJoinBankAPI';
+import { useJoinBankAPI } from '@/hooks/useJoinBankAPI';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 

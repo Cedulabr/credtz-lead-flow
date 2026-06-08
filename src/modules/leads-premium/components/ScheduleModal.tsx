@@ -73,22 +73,8 @@ export function ScheduleModal({ open, onOpenChange, lead, onConfirm }: ScheduleM
         });
       }
 
-      // Schedule WhatsApp if enabled
-      if (whatsappEnabled && whatsappMessage.trim()) {
-        const personalizedWa = whatsappMessage
-          .replace(/\{\{nome\}\}/g, lead.name || "");
+      // Agendamento de WhatsApp via AutoLead removido (módulo descontinuado).
 
-        await (supabase as any).from('autolead_messages').insert({
-          lead_id: lead.id,
-          lead_name: lead.name,
-          phone: lead.phone,
-          message: personalizedWa,
-          scheduled_at: `${date}T${time}:00`,
-          status: 'scheduled',
-          whatsapp_instance_id: 'manual_schedule',
-          job_id: null,
-        });
-      }
 
       toast.success("Agendamento salvo com sucesso!");
       onConfirm();

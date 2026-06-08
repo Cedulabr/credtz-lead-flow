@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { MessageCircle, Send, Loader2, Paperclip, User, CalendarIcon, Clock, Mic } from "lucide-react";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
-import { useAudioFiles } from "@/modules/audios/hooks/useAudioFiles";
+import { useAudioFiles } from "@/hooks/useAudioFiles";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";

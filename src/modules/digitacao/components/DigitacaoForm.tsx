@@ -11,7 +11,7 @@ import {
   Loader2, Send, CheckCircle2, Copy, FileUp, Search, ArrowLeft, ChevronRight, ChevronLeft,
   Plus, Image as ImageIcon, ExternalLink
 } from 'lucide-react';
-import { useJoinBankAPI } from '@/modules/baseoff/hooks/useJoinBankAPI';
+import { useJoinBankAPI } from '@/hooks/useJoinBankAPI';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
