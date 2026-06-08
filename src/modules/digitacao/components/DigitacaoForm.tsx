@@ -334,46 +334,158 @@ export function DigitacaoForm({ onClose, onSuccess, searchClientByCPF }: Digitac
           </div>
         )}
 
-        {/* ===== STEP 1: Simulações ===== */}
+        {/* ===== STEP 1: Valores da Operação ===== */}
         {currentStep === 1 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold">Simulações</h2>
-              <Button onClick={() => setShowSimModal(true)} className="gap-1.5 h-10">
-                <Plus className="w-4 h-4" /> Adicionar Simulação
-              </Button>
+              <h2 className="text-base font-bold">Valores da Operação</h2>
             </div>
 
-            {/* Info banner */}
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
-              <p className="text-xs text-muted-foreground">
-                ⓘ Já incluiu sua proposta de aumento salarial? Saiba que é possível incluir este produto nesta mesma digitação! Basta adicionar uma nova simulação!
-              </p>
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <Label className="text-xs text-muted-foreground">Tipo de Operação</Label>
+                <Select 
+                  value={simulations[0]?.operationType?.toString() || "1"} 
+                  onValueChange={(v) => {
+                    const opType = parseInt(v);
+                    const newSim: SimulationItem = {
+                      id: 'manual',
+                      product: 'inss',
+                      ruleId: 'manual',
+                      ruleName: 'Manual',
+                      operationType: opType,
+                      originLenderCode: '',
+                      originLenderName: '',
+                      originContractNumber: '',
+                      originRate: 1.8,
+                      originTerm: 84,
+                      originInstallmentsRemaining: 0,
+                      originInstallmentValue: 0,
+                      originDueBalance: 0,
+                      refinRate: 1.8,
+                      refinTerm: 84,
+                      refinInstallmentValue: 0,
+                      refinContractValue: 0,
+                      changeValue: 0,
+                      iofValue: 0,
+                      firstDueDate: '',
+                      lastDueDate: '',
+                      calcResult: {},
+                      hasInsurance: false
+                    };
+                    setSimulations([newSim]);
+                  }}
+                >
+                  <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {OPERATION_TYPES.map(op => (
+                      <SelectItem key={op.code} value={op.code.toString()}>{op.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {simulations[0] && (
+                <div className="space-y-4 border p-4 rounded-lg bg-muted/20">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Valor da Parcela</Label>
+                      <Input 
+                        className={inputCls} 
+                        type="number"
+                        value={simulations[0].refinInstallmentValue || simulations[0].originInstallmentValue} 
+                        onChange={e => {
+                          const val = parseFloat(e.target.value);
+                          setSimulations(prev => [{
+                            ...prev[0],
+                            refinInstallmentValue: val,
+                            originInstallmentValue: val
+                          }]);
+                        }} 
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Prazo (Meses)</Label>
+                      <Input 
+                        className={inputCls} 
+                        type="number"
+                        value={simulations[0].refinTerm || simulations[0].originTerm} 
+                        onChange={e => {
+                          const val = parseInt(e.target.value);
+                          setSimulations(prev => [{
+                            ...prev[0],
+                            refinTerm: val,
+                            originTerm: val
+                          }]);
+                        }} 
+                      />
+                    </div>
+                  </div>
+                  
+                  {simulations[0].operationType >= 3 && (
+                    <div className="space-y-4 pt-2 border-t">
+                      <p className="text-xs font-bold uppercase text-primary">Dados do Banco Origem</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Número do Contrato</Label>
+                          <Input 
+                            className={inputCls} 
+                            value={simulations[0].originContractNumber} 
+                            onChange={e => setSimulations(prev => [{...prev[0], originContractNumber: e.target.value}])} 
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Saldo Devedor</Label>
+                          <Input 
+                            className={inputCls} 
+                            type="number"
+                            value={simulations[0].originDueBalance} 
+                            onChange={e => setSimulations(prev => [{...prev[0], originDueBalance: parseFloat(e.target.value)}])} 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {simulations.length === 0 && (
+                <Button 
+                  variant="outline" 
+                  className="w-full h-11 border-dashed"
+                  onClick={() => {
+                    const newSim: SimulationItem = {
+                      id: 'manual',
+                      product: 'inss',
+                      ruleId: 'manual',
+                      ruleName: 'Manual',
+                      operationType: 1,
+                      originLenderCode: '',
+                      originLenderName: '',
+                      originContractNumber: '',
+                      originRate: 1.8,
+                      originTerm: 84,
+                      originInstallmentsRemaining: 0,
+                      originInstallmentValue: 0,
+                      originDueBalance: 0,
+                      refinRate: 1.8,
+                      refinTerm: 84,
+                      refinInstallmentValue: 0,
+                      refinContractValue: 0,
+                      changeValue: 0,
+                      iofValue: 0,
+                      firstDueDate: '',
+                      lastDueDate: '',
+                      calcResult: {},
+                      hasInsurance: false
+                    };
+                    setSimulations([newSim]);
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" /> Definir Valores da Operação
+                </Button>
+              )}
             </div>
-
-            {/* Simulation list */}
-            {simulations.length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground">
-                <p className="text-sm">Nenhuma simulação adicionada</p>
-                <p className="text-xs mt-1">Toque em "Adicionar Simulação" para começar</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {simulations.map(sim => (
-                  <SimulationCard
-                    key={sim.id}
-                    simulation={sim}
-                    onRemove={() => removeSimulation(sim.id)}
-                  />
-                ))}
-              </div>
-            )}
-
-            <SimulationModal
-              open={showSimModal}
-              onClose={() => setShowSimModal(false)}
-              onAdd={addSimulation}
-            />
           </div>
         )}
 
