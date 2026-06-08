@@ -291,7 +291,7 @@ export const ActivateLeads = () => {
   const [savingCpf, setSavingCpf] = useState(false);
   
   // Simulation hook
-  const { requestSimulation, isGestorOrAdmin: canManageSimulations } = useActivateLeadSimulations();
+  
 
   // Modal states
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
