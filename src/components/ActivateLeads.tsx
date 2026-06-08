@@ -2769,68 +2769,12 @@ export const ActivateLeads = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Pull Leads Modal */}
-      <Dialog open={isPullLeadsModalOpen} onOpenChange={setIsPullLeadsModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-primary/20 to-primary/10 flex items-center justify-center">
-                <Download className="h-6 w-6 text-primary" />
-              </div>
-              📥 Puxar Leads
-            </DialogTitle>
-          </DialogHeader>
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-4 py-4"
-          >
-            <div className="space-y-3">
-              <Label className="text-base font-semibold">📍 Origem</Label>
-              <Select value={pullSource} onValueChange={setPullSource}>
-                <SelectTrigger className="border-2 focus:border-primary h-12 text-base">
-                  <SelectValue placeholder="Selecione a origem" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="base_off">📊 Base OFF</SelectItem>
-                  <SelectItem value="leads_database">🗄️ Leads Database</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-3">
-              <Label className="text-base font-semibold">🔢 Quantidade</Label>
-              <Input
-                type="number"
-                value={pullCount}
-                onChange={(e) => setPullCount(Number(e.target.value))}
-                min={1}
-                max={100}
-                className="border-2 focus:border-primary h-12 text-base"
-              />
-            </div>
-          </motion.div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPullLeadsModalOpen(false)} className="transition-all duration-300">
-              ❌ Cancelar
-            </Button>
-            <Button 
-              onClick={() => {
-                toast({
-                  title: '🚧 Em desenvolvimento',
-                  description: 'Funcionalidade em implementação.',
-                });
-                setIsPullLeadsModalOpen(false);
-              }}
-              disabled={!pullSource || pulling}
-              className="bg-gradient-to-r from-primary to-primary/80 transition-all duration-300"
-            >
-              {pulling && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              📥 Puxar Leads
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Export Leads Modal */}
+      <ExportLeadsModal 
+        isOpen={isExportLeadsModalOpen} 
+        onOpenChange={setIsExportLeadsModalOpen} 
+        leads={leads}
+      />
 
       {/* Assign Lead Modal */}
       <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
