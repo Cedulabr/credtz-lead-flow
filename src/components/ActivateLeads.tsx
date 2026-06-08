@@ -65,7 +65,10 @@ import {
   Save,
   Send,
   MoreVertical,
-  CalendarCheck
+  CalendarCheck,
+  DownloadCloud
+} from 'lucide-react';
+import { ExportLeadsModal } from '@/modules/activate-leads/components/ExportLeadsModal';
 } from 'lucide-react';
 import {
   DropdownMenu,
