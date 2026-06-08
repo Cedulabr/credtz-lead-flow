@@ -170,7 +170,7 @@ export function LeadsListView({
               availableConvenios={availableConvenios}
               availableTags={availableTags}
               users={users}
-              showUserFilter={isAdmin}
+              showUserFilter={isAdmin || users.length > 1}
             />
           </div>
           <div className="flex items-center gap-2">
