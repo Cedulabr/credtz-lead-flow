@@ -12,6 +12,7 @@ import { RequestLeadsWizard } from "./components/RequestLeadsWizard";
 import { OverdueBlockBanner } from "./components/OverdueBlockBanner";
 import { useLeadsPremium } from "./hooks/useLeadsPremium";
 import { useOverdueLeads } from "./hooks/useOverdueLeads";
+import { LeadSalesPanel } from "./components/LeadSalesPanel";
 import { Lead, LeadFilters, BANKS_LIST } from "./types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -31,9 +32,10 @@ export function LeadsPremiumModule() {
   const isMobile = useIsMobile();
   const { user, profile } = useAuth();
   const { toast } = useToast();
-  const [activeView, setActiveView] = useState<"pipeline" | "list" | "metrics" | "simulations">("list");
+  const [activeView, setActiveView] = useState<"list" | "metrics" | "simulations">("list");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isSalesPanelOpen, setIsSalesPanelOpen] = useState(false);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [pendingSimulationsCount, setPendingSimulationsCount] = useState(0);
@@ -159,6 +161,12 @@ export function LeadsPremiumModule() {
     } finally {
       setIsSimProcessing(false);
     }
+  };
+
+  // Inline handlers for sales panel
+  const handleOpenSalesPanel = (lead: Lead) => {
+    setTypingLead(lead);
+    setIsSalesPanelOpen(true);
   };
 
   // Inline handlers for list-level typing
@@ -344,10 +352,10 @@ export function LeadsPremiumModule() {
                 <LeadsListView
                   leads={leads}
                   users={users}
-                  isLoading={isLoading}
+                   isLoading={isLoading}
                   onLeadSelect={handleLeadSelect}
                   onRefresh={fetchLeads}
-                  onSimulation={handleListSimulation}
+                  onSalesPanel={handleOpenSalesPanel}
                   onTyping={handleListTyping}
                   onStatusChange={handleListStatusChange}
                   canEditLead={canEditLead}
@@ -433,7 +441,16 @@ export function LeadsPremiumModule() {
           form={typingForm}
           onFormChange={setTypingForm}
           onSubmit={handleTypingSubmit}
-          isProcessing={isTypProcessing}
+           isProcessing={isTypProcessing}
+        />
+
+        {/* Lead Sales Panel */}
+        <LeadSalesPanel
+          lead={typingLead}
+          isOpen={isSalesPanelOpen}
+          onClose={() => setIsSalesPanelOpen(false)}
+          onStatusChange={handleStatusChange}
+          onTyping={handleListTyping}
         />
       </div>
     );
@@ -489,10 +506,6 @@ export function LeadsPremiumModule() {
             <TabsTrigger value="list" className="gap-2">
               <List className="h-4 w-4" />
               Lista
-            </TabsTrigger>
-            <TabsTrigger value="pipeline" className="gap-2">
-              <LayoutGrid className="h-4 w-4" />
-              Pipeline
             </TabsTrigger>
             <TabsTrigger value="metrics" className="gap-2">
               <BarChart3 className="h-4 w-4" />
