@@ -38,18 +38,9 @@ export function useDigitacao() {
     fetchProposals();
   }, [fetchProposals]);
 
-  const searchClientByCPF = useCallback(async (cpf: string) => {
-    const cleanCpf = cpf.replace(/\D/g, '');
-    if (cleanCpf.length < 11) return null;
-
-    const { data } = await supabase
-      .from('baseoff_clients')
-      .select('*')
-      .eq('cpf', cleanCpf)
-      .limit(1)
-      .single();
-
-    return data;
+  // Módulo Base OFF removido — busca por CPF desativada.
+  const searchClientByCPF = useCallback(async (_cpf: string) => {
+    return null as any;
   }, []);
 
   return {

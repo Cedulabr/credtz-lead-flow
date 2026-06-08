@@ -43,23 +43,8 @@ export function TestFunctionalities() {
     }
   };
 
-  const testBaseOffData = async () => {
-    updateTest('Dados BaseOff', 'loading');
-    try {
-      const { data, error } = await supabase
-        .from('baseoff')
-        .select('*')
-        .not('Banco', 'is', null)
-        .not('Nome', 'is', null)
-        .not('CPF', 'is', null)
-        .limit(5);
-      
-      if (error) throw error;
-      updateTest('Dados BaseOff', 'success', `${data?.length || 0} registros encontrados`, data);
-    } catch (error: any) {
-      updateTest('Dados BaseOff', 'error', error.message);
-    }
-  };
+  // Teste de BaseOff removido (módulo descontinuado)
+
 
   const testLeadsCreation = async () => {
     updateTest('Criação de Leads', 'loading');
@@ -153,18 +138,8 @@ export function TestFunctionalities() {
     }
   };
 
-  const testDailyLimit = async () => {
-    updateTest('Limite Diário', 'loading');
-    try {
-      const { data, error } = await supabase
-        .rpc('check_baseoff_daily_limit', { user_id_param: user?.id });
-      
-      if (error) throw error;
-      updateTest('Limite Diário', 'success', `Limite restante: ${data} leads`);
-    } catch (error: any) {
-      updateTest('Limite Diário', 'error', error.message);
-    }
-  };
+  // Teste de limite diário (BaseOff) removido
+
 
   const runAllTests = async () => {
     if (!user) {
@@ -177,12 +152,10 @@ export function TestFunctionalities() {
 
     try {
       await testSupabaseConnection();
-      await testBaseOffData();
       await testLeadsCreation();
       await testIndicateClient();
       await testCommissionData();
       await testNotifications();
-      await testDailyLimit();
       
       toast.success('Todos os testes concluídos!');
     } catch (error) {

@@ -37,11 +37,9 @@ export function SystemStatus() {
     const names: Record<string, string> = {
       'auth': 'Autenticação',
       'database': 'Conexão Database',
-      'baseoff': 'BaseOFF',
       'leads': 'Sistema de Leads',
       'commissions': 'Comissões',
       'notifications': 'Avisos',
-      'daily-limit': 'Limite Diário',
       'user-creation': 'Criação de Usuário',
       'filters': 'Filtros',
       'github-sync': 'Sincronização GitHub'
@@ -80,48 +78,6 @@ export function SystemStatus() {
       updateCheck('database', 'success', 'Conexão com Supabase ativa');
     } catch (error: any) {
       updateCheck('database', 'error', `Erro de conexão: ${error.message}`);
-    }
-  };
-
-  const checkBaseOff = async () => {
-    updateCheck('baseoff', 'checking', 'Verificando dados BaseOFF...');
-    try {
-      // Verificar tabela baseoff
-      const { data: baseoffData, error: baseoffError } = await supabase
-        .from('baseoff')
-        .select('*')
-        .not('Banco', 'is', null)
-        .not('Nome', 'is', null)
-        .not('CPF', 'is', null)
-        .limit(10);
-
-      if (baseoffError) throw new Error(`BaseOFF: ${baseoffError.message}`);
-
-      // Verificar bancos permitidos
-      const { data: allowedBanks, error: banksError } = await supabase
-        .from('baseoff_allowed_banks')
-        .select('*')
-        .eq('is_active', true);
-
-      if (banksError) throw new Error(`Bancos permitidos: ${banksError.message}`);
-
-      if (!baseoffData || baseoffData.length === 0) {
-        updateCheck('baseoff', 'warning', 'Nenhum lead encontrado na BaseOFF');
-        return;
-      }
-
-      if (!allowedBanks || allowedBanks.length === 0) {
-        updateCheck('baseoff', 'error', 'Nenhum banco ativo configurado');
-        return;
-      }
-
-      updateCheck('baseoff', 'success', `${baseoffData.length} leads encontrados, ${allowedBanks.length} bancos ativos`, {
-        leads: baseoffData.length,
-        banks: allowedBanks.length,
-        bankCodes: allowedBanks.map(b => b.codigo_banco)
-      });
-    } catch (error: any) {
-      updateCheck('baseoff', 'error', error.message);
     }
   };
 
@@ -179,21 +135,6 @@ export function SystemStatus() {
     }
   };
 
-  const checkDailyLimit = async () => {
-    updateCheck('daily-limit', 'checking', 'Verificando limite diário...');
-    try {
-      const { data, error } = await supabase
-        .rpc('check_baseoff_daily_limit', { user_id_param: user?.id });
-
-      if (error) throw error;
-
-      updateCheck('daily-limit', 'success', `Limite restante: ${data} leads`, {
-        remainingLimit: data
-      });
-    } catch (error: any) {
-      updateCheck('daily-limit', 'error', `Erro ao verificar limite: ${error.message}`);
-    }
-  };
 
   const runAllChecks = async () => {
     if (!user) {
@@ -207,11 +148,9 @@ export function SystemStatus() {
     try {
       await checkAuthentication();
       await checkDatabaseConnection();
-      await checkBaseOff();
       await checkLeadsSystem();
       await checkCommissions();
       await checkNotifications();
-      await checkDailyLimit();
 
       const errorCount = checks.filter(c => c.status === 'error').length;
       const warningCount = checks.filter(c => c.status === 'warning').length;

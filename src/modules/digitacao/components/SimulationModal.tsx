@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Loader2 } from 'lucide-react';
-import { useJoinBankAPI } from '@/modules/baseoff/hooks/useJoinBankAPI';
+import { useJoinBankAPI } from '@/hooks/useJoinBankAPI';
 import { toast } from 'sonner';
 import { SimulationItem, PRODUCT_OPTIONS } from '../types';
 
