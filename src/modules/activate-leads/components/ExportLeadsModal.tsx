@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format, subDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Download, CalendarIcon, FileSpreadsheet, FileJson, FileText, Loader2, Filter, CheckCircle2 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
