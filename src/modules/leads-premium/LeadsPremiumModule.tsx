@@ -12,6 +12,7 @@ import { RequestLeadsWizard } from "./components/RequestLeadsWizard";
 import { OverdueBlockBanner } from "./components/OverdueBlockBanner";
 import { useLeadsPremium } from "./hooks/useLeadsPremium";
 import { useOverdueLeads } from "./hooks/useOverdueLeads";
+import { LeadSalesPanel } from "./components/LeadSalesPanel";
 import { Lead, LeadFilters, BANKS_LIST } from "./types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -31,9 +32,10 @@ export function LeadsPremiumModule() {
   const isMobile = useIsMobile();
   const { user, profile } = useAuth();
   const { toast } = useToast();
-  const [activeView, setActiveView] = useState<"pipeline" | "list" | "metrics" | "simulations">("list");
+  const [activeView, setActiveView] = useState<"list" | "metrics" | "simulations">("list");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isSalesPanelOpen, setIsSalesPanelOpen] = useState(false);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [pendingSimulationsCount, setPendingSimulationsCount] = useState(0);
@@ -41,11 +43,6 @@ export function LeadsPremiumModule() {
 
   const isAdmin = profile?.role === 'admin';
 
-  // Inline Simulation Modal
-  const [showSimulationModal, setShowSimulationModal] = useState(false);
-  const [simulationLead, setSimulationLead] = useState<Lead | null>(null);
-  const [simulationForm, setSimulationForm] = useState({ banco: "", produto: "", notes: "" });
-  const [isSimProcessing, setIsSimProcessing] = useState(false);
 
   // Inline Typing Modal
   const [showTypingModal, setShowTypingModal] = useState(false);
@@ -124,41 +121,11 @@ export function LeadsPremiumModule() {
     return success;
   };
 
-  // Inline handlers for list-level simulation
-  const handleListSimulation = (lead: Lead) => {
-    setSimulationLead(lead);
-    setSimulationForm({ banco: "", produto: "", notes: "" });
-    setShowSimulationModal(true);
-  };
 
-  const handleSimulationSubmit = async () => {
-    if (!simulationLead || !simulationForm.banco) {
-      toast({ title: "Selecione o banco", variant: "destructive" });
-      return;
-    }
-
-    setIsSimProcessing(true);
-    try {
-      const { error } = await supabase
-        .from('activate_leads_simulations')
-        .insert({
-          lead_id: simulationLead.id,
-          requested_by: user?.id,
-          banco: simulationForm.banco,
-          produto: simulationForm.produto,
-          notes: simulationForm.notes,
-          status: 'pending'
-        });
-
-      if (error) throw error;
-      toast({ title: "Simulação solicitada!", description: "O operador será notificado." });
-      setShowSimulationModal(false);
-      fetchLeads();
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    } finally {
-      setIsSimProcessing(false);
-    }
+  // Inline handlers for sales panel
+  const handleOpenSalesPanel = (lead: Lead) => {
+    setTypingLead(lead);
+    setIsSalesPanelOpen(true);
   };
 
   // Inline handlers for list-level typing
@@ -311,23 +278,6 @@ export function LeadsPremiumModule() {
             <BarChart3 className="h-4 w-4 mr-1" />
             Métricas
           </Button>
-          <Button
-            variant={activeView === "simulations" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setActiveView("simulations")}
-            className="shrink-0 relative"
-          >
-            <Calculator className="h-4 w-4 mr-1" />
-            Simulações
-            {pendingSimulationsCount > 0 && (
-              <Badge 
-                variant="destructive" 
-                className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px]"
-              >
-                {pendingSimulationsCount}
-              </Badge>
-            )}
-          </Button>
         </div>
 
         {/* Content Area */}
@@ -344,10 +294,10 @@ export function LeadsPremiumModule() {
                 <LeadsListView
                   leads={leads}
                   users={users}
-                  isLoading={isLoading}
+                   isLoading={isLoading}
                   onLeadSelect={handleLeadSelect}
                   onRefresh={fetchLeads}
-                  onSimulation={handleListSimulation}
+                  onSalesPanel={handleOpenSalesPanel}
                   onTyping={handleListTyping}
                   onStatusChange={handleListStatusChange}
                   canEditLead={canEditLead}
@@ -414,16 +364,6 @@ export function LeadsPremiumModule() {
           onRequestLeads={handleRequestLeads}
         />
 
-        {/* Inline Simulation Modal */}
-        <SimulationModal
-          open={showSimulationModal}
-          onOpenChange={setShowSimulationModal}
-          lead={simulationLead}
-          form={simulationForm}
-          onFormChange={setSimulationForm}
-          onSubmit={handleSimulationSubmit}
-          isProcessing={isSimProcessing}
-        />
 
         {/* Inline Typing Modal */}
         <TypingModal
@@ -433,7 +373,16 @@ export function LeadsPremiumModule() {
           form={typingForm}
           onFormChange={setTypingForm}
           onSubmit={handleTypingSubmit}
-          isProcessing={isTypProcessing}
+           isProcessing={isTypProcessing}
+        />
+
+        {/* Lead Sales Panel */}
+        <LeadSalesPanel
+          lead={typingLead}
+          isOpen={isSalesPanelOpen}
+          onClose={() => setIsSalesPanelOpen(false)}
+          onStatusChange={handleStatusChange}
+          onTyping={handleListTyping}
         />
       </div>
     );
@@ -490,10 +439,6 @@ export function LeadsPremiumModule() {
               <List className="h-4 w-4" />
               Lista
             </TabsTrigger>
-            <TabsTrigger value="pipeline" className="gap-2">
-              <LayoutGrid className="h-4 w-4" />
-              Pipeline
-            </TabsTrigger>
             <TabsTrigger value="metrics" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               Métricas
@@ -520,21 +465,10 @@ export function LeadsPremiumModule() {
             isLoading={isLoading}
             onLeadSelect={handleLeadSelect}
             onRefresh={fetchLeads}
-            onSimulation={handleListSimulation}
+            onSalesPanel={handleOpenSalesPanel}
             onTyping={handleListTyping}
             onStatusChange={handleListStatusChange}
             canEditLead={canEditLead}
-          />
-        </TabsContent>
-
-        <TabsContent value="pipeline" className="mt-6">
-          <PipelineView 
-            leads={leads}
-            users={users}
-            isLoading={isLoading}
-            onLeadSelect={handleLeadSelect}
-            onStatusChange={(leadId, newStatus) => handleStatusChange(leadId, newStatus)}
-            stats={stats}
           />
         </TabsContent>
 
@@ -570,16 +504,6 @@ export function LeadsPremiumModule() {
         onRequestLeads={handleRequestLeads}
       />
 
-      {/* Inline Simulation Modal */}
-      <SimulationModal
-        open={showSimulationModal}
-        onOpenChange={setShowSimulationModal}
-        lead={simulationLead}
-        form={simulationForm}
-        onFormChange={setSimulationForm}
-        onSubmit={handleSimulationSubmit}
-        isProcessing={isSimProcessing}
-      />
 
       {/* Inline Typing Modal */}
       <TypingModal
@@ -636,76 +560,6 @@ export function LeadsPremiumModule() {
 
 // ----- Extracted Modal Components -----
 
-function SimulationModal({ 
-  open, onOpenChange, lead, form, onFormChange, onSubmit, isProcessing 
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  lead: Lead | null;
-  form: { banco: string; produto: string; notes: string };
-  onFormChange: (form: { banco: string; produto: string; notes: string }) => void;
-  onSubmit: () => void;
-  isProcessing: boolean;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5 text-blue-600" />
-            Solicitar Simulação
-          </DialogTitle>
-        </DialogHeader>
-        {lead && (
-          <div className="p-3 rounded-lg bg-muted/50 border mb-2">
-            <p className="font-semibold">{lead.name}</p>
-            <p className="text-sm text-muted-foreground">{lead.phone}</p>
-          </div>
-        )}
-        <div className="space-y-4">
-          <div>
-            <Label>Banco *</Label>
-            <Select value={form.banco} onValueChange={(v) => onFormChange({ ...form, banco: v })}>
-              <SelectTrigger><SelectValue placeholder="Selecione o banco" /></SelectTrigger>
-              <SelectContent>
-                {BANKS_LIST.map(bank => (
-                  <SelectItem key={bank} value={bank}>{bank}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Produto</Label>
-            <Select value={form.produto} onValueChange={(v) => onFormChange({ ...form, produto: v })}>
-              <SelectTrigger><SelectValue placeholder="Selecione (opcional)" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="novo">Novo Empréstimo</SelectItem>
-                <SelectItem value="portabilidade">Portabilidade</SelectItem>
-                <SelectItem value="refinanciamento">Refinanciamento</SelectItem>
-                <SelectItem value="cartao">Cartão Consignado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Observações</Label>
-            <Textarea 
-              value={form.notes} 
-              onChange={(e) => onFormChange({ ...form, notes: e.target.value })}
-              placeholder="Informações adicionais..."
-              rows={3}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={onSubmit} disabled={isProcessing || !form.banco}>
-            {isProcessing ? "Enviando..." : "Solicitar Simulação"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function TypingModal({ 
   open, onOpenChange, lead, form, onFormChange, onSubmit, isProcessing 
@@ -726,7 +580,7 @@ function TypingModal({
             <span className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
               <span className="text-emerald-700 text-lg">📝</span>
             </span>
-            Solicitar Digitação
+            Digitar ao Cliente
           </DialogTitle>
         </DialogHeader>
         {lead && (
@@ -771,7 +625,7 @@ function TypingModal({
             <Textarea 
               value={form.notes} 
               onChange={(e) => onFormChange({ ...form, notes: e.target.value })}
-              placeholder="Informações adicionais..."
+              placeholder="Informações detalhadas para o Televendas..."
               rows={3}
             />
           </div>
@@ -783,7 +637,7 @@ function TypingModal({
             disabled={isProcessing || !form.banco}
             className="bg-emerald-600 hover:bg-emerald-700"
           >
-            {isProcessing ? "Enviando..." : "Enviar Digitação"}
+            {isProcessing ? "Enviando..." : "Digitar ao Cliente"}
           </Button>
         </DialogFooter>
       </DialogContent>

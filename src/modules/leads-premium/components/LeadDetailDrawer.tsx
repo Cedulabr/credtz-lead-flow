@@ -87,7 +87,7 @@ export function LeadDetailDrawer({
   // Modal states
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [showSimulationModal, setShowSimulationModal] = useState(false);
+  
   const [showTypingModal, setShowTypingModal] = useState(false);
   const [showTreatmentDialog, setShowTreatmentDialog] = useState(false);
   const [pendingNewStatus, setPendingNewStatus] = useState("");
@@ -99,11 +99,6 @@ export function LeadDetailDrawer({
   });
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
-  const [simulationForm, setSimulationForm] = useState({
-    banco: "",
-    produto: "",
-    notes: ""
-  });
   const [typingForm, setTypingForm] = useState({
     banco: "",
     valor: "",
@@ -258,49 +253,6 @@ export function LeadDetailDrawer({
     }
   };
 
-  const handleSimulationRequest = async () => {
-    if (!simulationForm.banco) {
-      toast({
-        title: "Erro",
-        description: "Selecione o banco para simulação",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const { error } = await supabase
-        .from('activate_leads_simulations')
-        .insert({
-          lead_id: lead.id,
-          requested_by: user?.id,
-          banco: simulationForm.banco,
-          produto: simulationForm.produto,
-          notes: simulationForm.notes,
-          status: 'pending'
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Simulação solicitada!",
-        description: "O operador será notificado para processar a simulação."
-      });
-
-      setShowSimulationModal(false);
-      setSimulationForm({ banco: "", produto: "", notes: "" });
-    } catch (error: any) {
-      console.error('Error requesting simulation:', error);
-      toast({
-        title: "Erro",
-        description: error.message || "Erro ao solicitar simulação",
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
 
   const handleTypingRequest = async () => {
@@ -555,26 +507,6 @@ export function LeadDetailDrawer({
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-3 px-3 pb-3">
-                {/* Primary Actions - Simulação e Digitação */}
-                {["new_lead", "em_andamento", "aguardando_retorno"].includes(lead.status) && (
-                  <div className="grid grid-cols-2 gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
-                    <Button 
-                      variant="outline"
-                      className="h-12 flex-col gap-1"
-                      onClick={() => setShowSimulationModal(true)}
-                    >
-                      <Calculator className="h-4 w-4" />
-                      <span className="text-xs">Simulação</span>
-                    </Button>
-                    <Button 
-                      className="h-12 flex-col gap-1 bg-emerald-600 hover:bg-emerald-700"
-                      onClick={() => setShowTypingModal(true)}
-                    >
-                      <FileText className="h-4 w-4" />
-                      <span className="text-xs">Digitação</span>
-                    </Button>
-                  </div>
-                )}
 
                 {lead.status === "new_lead" && (
                   <Button 
@@ -832,90 +764,6 @@ export function LeadDetailDrawer({
         </DialogContent>
       </Dialog>
 
-      {/* Simulation Modal with Product Education */}
-      <Dialog open={showSimulationModal} onOpenChange={setShowSimulationModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Calculator className="h-5 w-5" />
-              Solicitar Simulação
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="p-3 rounded-lg bg-muted/50">
-              <p className="text-sm font-medium">{lead?.name}</p>
-              <p className="text-xs text-muted-foreground">CPF: {lead?.cpf || "Não informado"}</p>
-              <p className="text-xs text-muted-foreground">Convênio: {lead?.convenio || "Não informado"}</p>
-            </div>
-            
-            {/* Product Selection with Education */}
-            <div>
-              <Label className="mb-3 block">Tipo de Produto *</Label>
-              <div className="space-y-2">
-                <ProductSelectCard 
-                  productId="portabilidade" 
-                  isSelected={simulationForm.produto === "portabilidade"}
-                  onSelect={(id) => setSimulationForm(prev => ({ ...prev, produto: id }))}
-                />
-                <ProductSelectCard 
-                  productId="refinanciamento" 
-                  isSelected={simulationForm.produto === "refinanciamento"}
-                  onSelect={(id) => setSimulationForm(prev => ({ ...prev, produto: id }))}
-                />
-                <ProductSelectCard 
-                  productId="novo" 
-                  isSelected={simulationForm.produto === "novo"}
-                  onSelect={(id) => setSimulationForm(prev => ({ ...prev, produto: id }))}
-                />
-                <ProductSelectCard 
-                  productId="cartao" 
-                  isSelected={simulationForm.produto === "cartao"}
-                  onSelect={(id) => setSimulationForm(prev => ({ ...prev, produto: id }))}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label>Banco *</Label>
-              <Select 
-                value={simulationForm.banco} 
-                onValueChange={(v) => setSimulationForm(prev => ({ ...prev, banco: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o banco" />
-                </SelectTrigger>
-                <SelectContent>
-                  {BANKS_LIST.map(bank => (
-                    <SelectItem key={bank} value={bank}>{bank}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label>Observações</Label>
-              <Textarea
-                placeholder="Informações adicionais..."
-                value={simulationForm.notes}
-                onChange={(e) => setSimulationForm(prev => ({ ...prev, notes: e.target.value }))}
-                rows={2}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSimulationModal(false)}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleSimulationRequest} 
-              disabled={isProcessing || !simulationForm.banco || !simulationForm.produto}
-            >
-              {isProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Solicitar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Typing Modal */}
       <Dialog open={showTypingModal} onOpenChange={setShowTypingModal}>
@@ -923,7 +771,7 @@ export function LeadDetailDrawer({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Solicitar Digitação
+              Digitar ao Cliente
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -968,7 +816,7 @@ export function LeadDetailDrawer({
             <div>
               <Label>Observações</Label>
               <Textarea
-                placeholder="Informações para digitação..."
+                placeholder="Informações adicionais para a venda..."
                 value={typingForm.notes}
                 onChange={(e) => setTypingForm(prev => ({ ...prev, notes: e.target.value }))}
                 rows={2}
@@ -984,7 +832,7 @@ export function LeadDetailDrawer({
               disabled={isProcessing || !typingForm.banco}
             >
               {isProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Solicitar Digitação
+              Digitar ao Cliente
             </Button>
           </DialogFooter>
         </DialogContent>
