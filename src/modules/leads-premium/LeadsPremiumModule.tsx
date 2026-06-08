@@ -319,23 +319,6 @@ export function LeadsPremiumModule() {
             <BarChart3 className="h-4 w-4 mr-1" />
             Métricas
           </Button>
-          <Button
-            variant={activeView === "simulations" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setActiveView("simulations")}
-            className="shrink-0 relative"
-          >
-            <Calculator className="h-4 w-4 mr-1" />
-            Simulações
-            {pendingSimulationsCount > 0 && (
-              <Badge 
-                variant="destructive" 
-                className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px]"
-              >
-                {pendingSimulationsCount}
-              </Badge>
-            )}
-          </Button>
         </div>
 
         {/* Content Area */}
@@ -422,16 +405,6 @@ export function LeadsPremiumModule() {
           onRequestLeads={handleRequestLeads}
         />
 
-        {/* Inline Simulation Modal */}
-        <SimulationModal
-          open={showSimulationModal}
-          onOpenChange={setShowSimulationModal}
-          lead={simulationLead}
-          form={simulationForm}
-          onFormChange={setSimulationForm}
-          onSubmit={handleSimulationSubmit}
-          isProcessing={isSimProcessing}
-        />
 
         {/* Inline Typing Modal */}
         <TypingModal
@@ -638,76 +611,6 @@ export function LeadsPremiumModule() {
 
 // ----- Extracted Modal Components -----
 
-function SimulationModal({ 
-  open, onOpenChange, lead, form, onFormChange, onSubmit, isProcessing 
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  lead: Lead | null;
-  form: { banco: string; produto: string; notes: string };
-  onFormChange: (form: { banco: string; produto: string; notes: string }) => void;
-  onSubmit: () => void;
-  isProcessing: boolean;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5 text-blue-600" />
-            Solicitar Simulação
-          </DialogTitle>
-        </DialogHeader>
-        {lead && (
-          <div className="p-3 rounded-lg bg-muted/50 border mb-2">
-            <p className="font-semibold">{lead.name}</p>
-            <p className="text-sm text-muted-foreground">{lead.phone}</p>
-          </div>
-        )}
-        <div className="space-y-4">
-          <div>
-            <Label>Banco *</Label>
-            <Select value={form.banco} onValueChange={(v) => onFormChange({ ...form, banco: v })}>
-              <SelectTrigger><SelectValue placeholder="Selecione o banco" /></SelectTrigger>
-              <SelectContent>
-                {BANKS_LIST.map(bank => (
-                  <SelectItem key={bank} value={bank}>{bank}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Produto</Label>
-            <Select value={form.produto} onValueChange={(v) => onFormChange({ ...form, produto: v })}>
-              <SelectTrigger><SelectValue placeholder="Selecione (opcional)" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="novo">Novo Empréstimo</SelectItem>
-                <SelectItem value="portabilidade">Portabilidade</SelectItem>
-                <SelectItem value="refinanciamento">Refinanciamento</SelectItem>
-                <SelectItem value="cartao">Cartão Consignado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Observações</Label>
-            <Textarea 
-              value={form.notes} 
-              onChange={(e) => onFormChange({ ...form, notes: e.target.value })}
-              placeholder="Informações adicionais..."
-              rows={3}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={onSubmit} disabled={isProcessing || !form.banco}>
-            {isProcessing ? "Enviando..." : "Solicitar Simulação"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function TypingModal({ 
   open, onOpenChange, lead, form, onFormChange, onSubmit, isProcessing 
@@ -728,7 +631,7 @@ function TypingModal({
             <span className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
               <span className="text-emerald-700 text-lg">📝</span>
             </span>
-            Solicitar Digitação
+            Digitar ao Cliente
           </DialogTitle>
         </DialogHeader>
         {lead && (
@@ -773,7 +676,7 @@ function TypingModal({
             <Textarea 
               value={form.notes} 
               onChange={(e) => onFormChange({ ...form, notes: e.target.value })}
-              placeholder="Informações adicionais..."
+              placeholder="Informações detalhadas para o Televendas..."
               rows={3}
             />
           </div>
@@ -785,7 +688,7 @@ function TypingModal({
             disabled={isProcessing || !form.banco}
             className="bg-emerald-600 hover:bg-emerald-700"
           >
-            {isProcessing ? "Enviando..." : "Enviar Digitação"}
+            {isProcessing ? "Enviando..." : "Digitar ao Cliente"}
           </Button>
         </DialogFooter>
       </DialogContent>
