@@ -65,8 +65,10 @@ import {
   Save,
   Send,
   MoreVertical,
-  CalendarCheck
+  CalendarCheck,
+  DownloadCloud
 } from 'lucide-react';
+import { ExportLeadsModal } from '@/modules/activate-leads/components/ExportLeadsModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -296,7 +298,7 @@ export const ActivateLeads = () => {
 
   // Modal states
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isPullLeadsModalOpen, setIsPullLeadsModalOpen] = useState(false);
+  const [isExportLeadsModalOpen, setIsExportLeadsModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
   const [isFutureContactModalOpen, setIsFutureContactModalOpen] = useState(false);
@@ -1730,9 +1732,9 @@ export const ActivateLeads = () => {
                   <Upload className="h-4 w-4 mr-2" />
                   <span className="hidden sm:inline">📤 Importar</span>
                 </Button>
-                <Button variant="outline" onClick={() => setIsPullLeadsModalOpen(true)} className="hover:bg-primary/10 transition-all duration-300">
-                  <Download className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">📥 Puxar</span>
+                <Button variant="outline" onClick={() => setIsExportLeadsModalOpen(true)} className="hover:bg-primary/10 transition-all duration-300">
+                  <DownloadCloud className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">📥 Exportar</span>
                 </Button>
                 <ImportHistory module="activate_leads" title="Activate Leads" />
               </>
@@ -2767,68 +2769,12 @@ export const ActivateLeads = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Pull Leads Modal */}
-      <Dialog open={isPullLeadsModalOpen} onOpenChange={setIsPullLeadsModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-primary/20 to-primary/10 flex items-center justify-center">
-                <Download className="h-6 w-6 text-primary" />
-              </div>
-              📥 Puxar Leads
-            </DialogTitle>
-          </DialogHeader>
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-4 py-4"
-          >
-            <div className="space-y-3">
-              <Label className="text-base font-semibold">📍 Origem</Label>
-              <Select value={pullSource} onValueChange={setPullSource}>
-                <SelectTrigger className="border-2 focus:border-primary h-12 text-base">
-                  <SelectValue placeholder="Selecione a origem" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="base_off">📊 Base OFF</SelectItem>
-                  <SelectItem value="leads_database">🗄️ Leads Database</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-3">
-              <Label className="text-base font-semibold">🔢 Quantidade</Label>
-              <Input
-                type="number"
-                value={pullCount}
-                onChange={(e) => setPullCount(Number(e.target.value))}
-                min={1}
-                max={100}
-                className="border-2 focus:border-primary h-12 text-base"
-              />
-            </div>
-          </motion.div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPullLeadsModalOpen(false)} className="transition-all duration-300">
-              ❌ Cancelar
-            </Button>
-            <Button 
-              onClick={() => {
-                toast({
-                  title: '🚧 Em desenvolvimento',
-                  description: 'Funcionalidade em implementação.',
-                });
-                setIsPullLeadsModalOpen(false);
-              }}
-              disabled={!pullSource || pulling}
-              className="bg-gradient-to-r from-primary to-primary/80 transition-all duration-300"
-            >
-              {pulling && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              📥 Puxar Leads
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Export Leads Modal */}
+      <ExportLeadsModal 
+        isOpen={isExportLeadsModalOpen} 
+        onOpenChange={setIsExportLeadsModalOpen} 
+        leads={leads}
+      />
 
       {/* Assign Lead Modal */}
       <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>

@@ -1,6 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Phone, Package, Clock } from "lucide-react";
+import { Phone, Package, Clock, Zap, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ActivateLead, ACTIVATE_STATUS_CONFIG, ActivateUser } from "../types";
@@ -88,8 +88,18 @@ export function ActivateLeadCard({ lead, assignedUser, onClick, onDragStart, isD
 
         <div className="flex items-center gap-1.5 flex-wrap">
           {lead.origem && (
-            <Badge variant="outline" className="text-[10px] h-5">
+            <Badge variant="outline" className="text-[10px] h-5 bg-background">
               {lead.origem}
+            </Badge>
+          )}
+          {lead.status === 'novo' && !lead.has_quality_issues && (
+            <Badge className="text-[10px] h-5 bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200 gap-1">
+              <Zap className="h-2.5 w-2.5 fill-emerald-500" /> Alta Prioridade
+            </Badge>
+          )}
+          {lead.has_quality_issues && (
+            <Badge variant="destructive" className="text-[10px] h-5 gap-1">
+              <AlertTriangle className="h-2.5 w-2.5" /> Revisar
             </Badge>
           )}
         </div>
