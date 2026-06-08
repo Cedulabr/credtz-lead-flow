@@ -507,26 +507,6 @@ export function LeadDetailDrawer({
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-3 px-3 pb-3">
-                {/* Primary Actions - Simulação e Digitação */}
-                {["new_lead", "em_andamento", "aguardando_retorno"].includes(lead.status) && (
-                  <div className="grid grid-cols-2 gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
-                    <Button 
-                      variant="outline"
-                      className="h-12 flex-col gap-1"
-                      onClick={() => setShowSimulationModal(true)}
-                    >
-                      <Calculator className="h-4 w-4" />
-                      <span className="text-xs">Simulação</span>
-                    </Button>
-                    <Button 
-                      className="h-12 flex-col gap-1 bg-emerald-600 hover:bg-emerald-700"
-                      onClick={() => setShowTypingModal(true)}
-                    >
-                      <FileText className="h-4 w-4" />
-                      <span className="text-xs">Digitação</span>
-                    </Button>
-                  </div>
-                )}
 
                 {lead.status === "new_lead" && (
                   <Button 
