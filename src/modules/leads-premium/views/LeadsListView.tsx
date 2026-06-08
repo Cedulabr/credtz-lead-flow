@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Lead, UserProfile, PIPELINE_STAGES, LeadFilters } from "../types";
 import { LeadListItem } from "../components/LeadListItem";
 import { LeadsFiltersBar } from "../components/LeadsFiltersBar";
+import { ExportLeadsDialog } from "../components/ExportLeadsDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
