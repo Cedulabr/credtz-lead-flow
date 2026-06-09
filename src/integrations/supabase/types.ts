@@ -5860,6 +5860,7 @@ export type Database = {
           agibank_link_date: string | null
           agibank_products: string | null
           banco: string | null
+          batch_id: string | null
           convenio: string
           cpf: string | null
           cpf_added_at: string | null
@@ -5902,6 +5903,7 @@ export type Database = {
           agibank_link_date?: string | null
           agibank_products?: string | null
           banco?: string | null
+          batch_id?: string | null
           convenio: string
           cpf?: string | null
           cpf_added_at?: string | null
@@ -5944,6 +5946,7 @@ export type Database = {
           agibank_link_date?: string | null
           agibank_products?: string | null
           banco?: string | null
+          batch_id?: string | null
           convenio?: string
           cpf?: string | null
           cpf_added_at?: string | null
@@ -5980,7 +5983,15 @@ export type Database = {
           ultimo_desconto?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "leads_database_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_logs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       leads_distribution: {
         Row: {
@@ -13037,6 +13048,7 @@ export type Database = {
           agibank_link_date: string | null
           agibank_products: string | null
           banco: string | null
+          batch_id: string | null
           convenio: string
           cpf: string | null
           cpf_added_at: string | null
