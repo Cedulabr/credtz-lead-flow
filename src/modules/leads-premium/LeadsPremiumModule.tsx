@@ -46,9 +46,6 @@ export function LeadsPremiumModule() {
   const isAdmin = profile?.role === 'admin';
 
 
-  // Inline Typing Modal
-  const [showTypingModal, setShowTypingModal] = useState(false);
-  const [typingLead, setTypingLead] = useState<Lead | null>(null);
 
 
   // Future Contact Modal
@@ -110,54 +107,9 @@ export function LeadsPremiumModule() {
 
   // Inline handlers for sales panel
   const handleOpenSalesPanel = (lead: Lead) => {
-    setTypingLead(lead);
     setIsSalesPanelOpen(true);
   };
 
-  // Inline handlers for list-level typing
-  const handleListTyping = (lead: Lead) => {
-    setTypingLead(lead);
-    setTypingForm({ banco: "", valor: "", parcela: "", notes: "" });
-    setShowTypingModal(true);
-  };
-
-  const handleTypingSubmit = async () => {
-    if (!typingLead || !typingForm.banco) {
-      toast({ title: "Selecione o banco", variant: "destructive" });
-      return;
-    }
-
-    setIsTypProcessing(true);
-    try {
-      const { error } = await supabase
-        .from('propostas')
-        .insert({
-          "Nome do cliente": typingLead.name,
-          cpf: typingLead.cpf,
-          telefone: typingLead.phone,
-          convenio: typingLead.convenio,
-          banco: typingForm.banco,
-          valor_proposta: typingForm.valor ? parseFloat(typingForm.valor) : null,
-          installments: typingForm.parcela ? parseInt(typingForm.parcela.replace(/\D/g, '')) : null,
-          pipeline_stage: "digitacao",
-          client_status: "aguardando_digitacao",
-          origem_lead: "leads_premium",
-          created_by_id: user?.id,
-          assigned_to: user?.id,
-          notes: typingForm.notes || 'Digitação solicitada de Leads Premium'
-        });
-
-      if (error) throw error;
-      await updateLeadStatus(typingLead.id, 'cliente_fechado');
-      toast({ title: "Digitação solicitada!", description: "Lead convertido para proposta." });
-      setShowTypingModal(false);
-      fetchLeads();
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    } finally {
-      setIsTypProcessing(false);
-    }
-  };
 
   // Future contact submit
   const handleFutureContactSubmit = async () => {

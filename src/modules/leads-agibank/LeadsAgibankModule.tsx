@@ -110,9 +110,9 @@ export function AgibankLeadsModule() {
 
   // Inline handlers for sales panel
   const handleOpenSalesPanel = (lead: Lead) => {
-    setTypingLead(lead);
     setIsSalesPanelOpen(true);
   };
+
 
 
   // Future contact submit
