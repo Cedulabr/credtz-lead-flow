@@ -2,18 +2,18 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
-import { PipelineView } from "./views/PipelineView";
-import { LeadsListView } from "./views/LeadsListView";
-import { MetricsDashboard } from "./views/MetricsDashboard";
+import { PipelineView } from "../leads-premium/views/PipelineView";
+import { LeadsListView } from "../leads-premium/views/LeadsListView";
+import { MetricsDashboard } from "../leads-premium/views/MetricsDashboard";
 
-import { LeadDetailDrawer } from "./components/LeadDetailDrawer";
-import { MobileActionBar } from "./components/MobileActionBar";
-import { RequestLeadsWizard } from "./components/RequestLeadsWizard";
-import { OverdueBlockBanner } from "./components/OverdueBlockBanner";
-import { useLeadsPremium } from "./hooks/useLeadsPremium";
-import { useOverdueLeads } from "./hooks/useOverdueLeads";
-import { LeadSalesPanel } from "./components/LeadSalesPanel";
-import { Lead, LeadFilters, BANKS_LIST } from "./types";
+import { LeadDetailDrawer } from "../leads-premium/components/LeadDetailDrawer";
+import { MobileActionBar } from "../leads-premium/components/MobileActionBar";
+import { RequestLeadsWizard } from "../leads-premium/components/RequestLeadsWizard";
+import { OverdueBlockBanner } from "../leads-premium/components/OverdueBlockBanner";
+import { useLeadsAgibank } from "./hooks/useLeadsAgibank";
+import { useOverdueLeads } from "../leads-premium/hooks/useOverdueLeads";
+import { LeadSalesPanel } from "../leads-premium/components/LeadSalesPanel";
+import { Lead, LeadFilters, BANKS_LIST } from "../leads-premium/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,8 +27,9 @@ import { useToast } from "@/hooks/use-toast";
 import { LayoutGrid, List, BarChart3, Calculator, Plus, CreditCard, Filter, CalendarDays, Upload } from "lucide-react";
 import { ImportBase } from "@/components/ImportBase";
 import { addDays, format } from "date-fns";
+import { CreditRequestModal } from "./components/CreditRequestModal";
 
-export function LeadsPremiumModule() {
+export function AgibankLeadsModule() {
   const isMobile = useIsMobile();
   const { user, profile } = useAuth();
   const { toast } = useToast();
@@ -37,6 +38,7 @@ export function LeadsPremiumModule() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isSalesPanelOpen, setIsSalesPanelOpen] = useState(false);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [isCreditRequestModalOpen, setIsCreditRequestModalOpen] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   
   const [showImportBase, setShowImportBase] = useState(false);
@@ -66,7 +68,7 @@ export function LeadsPremiumModule() {
     updateLeadStatus,
     requestLeads,
     canEditLead
-  } = useLeadsPremium();
+  } = useLeadsAgibank();
 
   const { overdueLeads, isBlocked: isOverdueBlocked } = useOverdueLeads();
 
@@ -141,10 +143,10 @@ export function LeadsPremiumModule() {
           installments: typingForm.parcela ? parseInt(typingForm.parcela.replace(/\D/g, '')) : null,
           pipeline_stage: "digitacao",
           client_status: "aguardando_digitacao",
-          origem_lead: "leads_premium",
+          origem_lead: "leads_agibank",
           created_by_id: user?.id,
           assigned_to: user?.id,
-          notes: typingForm.notes || 'Digitação solicitada de Leads Premium'
+          notes: typingForm.notes || 'Digitação solicitada de Leads AGibank'
         });
 
       if (error) throw error;
@@ -205,7 +207,7 @@ export function LeadsPremiumModule() {
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold">Leads Premium</h1>
+              <h1 className="text-xl font-bold">Leads AGibank</h1>
               <p className="text-sm text-muted-foreground">
                 {stats.total} leads · {stats.novos} novos
               </p>
@@ -362,7 +364,7 @@ export function LeadsPremiumModule() {
       {/* Desktop Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Leads Premium</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Leads AGibank</h1>
           <p className="text-muted-foreground">
             Gerencie seus leads e acompanhe o funil de conversão
           </p>
@@ -378,6 +380,10 @@ export function LeadsPremiumModule() {
           <Button onClick={() => setIsRequestModalOpen(true)} disabled={userCredits <= 0 || isOverdueBlocked}>
             <Plus className="h-4 w-4 mr-2" />
             {isOverdueBlocked ? 'Bloqueado' : 'Pedir Leads'}
+          </Button>
+          <Button variant="outline" onClick={() => setIsCreditRequestModalOpen(true)}>
+            <CreditCard className="h-4 w-4 mr-2" />
+            Solicitar Crédito
           </Button>
           {isAdmin && (
             <Button variant="outline" onClick={() => setShowImportBase(true)}>
@@ -455,6 +461,13 @@ export function LeadsPremiumModule() {
         onClose={() => setIsRequestModalOpen(false)}
         userCredits={userCredits}
         onRequestLeads={handleRequestLeads}
+      />
+
+      <CreditRequestModal
+        isOpen={isCreditRequestModalOpen}
+        onClose={() => setIsCreditRequestModalOpen(false)}
+        onSuccess={() => {}}
+        performanceStats={stats}
       />
 
 

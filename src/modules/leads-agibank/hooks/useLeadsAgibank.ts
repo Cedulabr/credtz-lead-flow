@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Lead, UserProfile, LeadStats, PIPELINE_STAGES } from "../types";
+import { Lead, UserProfile, LeadStats, PIPELINE_STAGES } from "../../leads-premium/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-export function useLeadsPremium() {
+export function useLeadsAgibank() {
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -279,11 +279,11 @@ export function useLeadsPremium() {
           convenio: lead.convenio,
           pipeline_stage: "contato_iniciado",
           client_status: "cliente_intencionado",
-          origem_lead: "leads_premium",
+          origem_lead: "leads_agibank",
           created_by_id: user?.id,
           assigned_to: user?.id,
           company_id: companyId,
-          notes: `Convertido de Leads Premium em ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`
+          notes: `Convertido de Leads AGibank em ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`
         });
     } catch (error) {
       console.error('Error creating proposta:', error);
