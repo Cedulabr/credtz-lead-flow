@@ -5566,6 +5566,7 @@ export type Database = {
           history: Json | null
           id: string
           is_rework: boolean | null
+          margem_disponivel: number | null
           margem_total: number | null
           matricula: string | null
           name: string
@@ -5615,6 +5616,7 @@ export type Database = {
           history?: Json | null
           id?: string
           is_rework?: boolean | null
+          margem_disponivel?: number | null
           margem_total?: number | null
           matricula?: string | null
           name: string
@@ -5664,6 +5666,7 @@ export type Database = {
           history?: Json | null
           id?: string
           is_rework?: boolean | null
+          margem_disponivel?: number | null
           margem_total?: number | null
           matricula?: string | null
           name?: string
