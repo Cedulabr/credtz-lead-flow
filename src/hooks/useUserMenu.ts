@@ -109,6 +109,16 @@ export function useUserMenu(userId?: string) {
   const isLoading = cats.isLoading || perms.isLoading;
 
   const sections: MenuSection[] = [];
+  
+  // Define ALWAYS_VISIBLE_TABS metadata
+  const CORE_ITEMS: MenuItem[] = [
+    { moduleKey: "dashboard", label: "Dashboard", icon: "Home", position: -10 },
+    { moduleKey: "my-data", label: "Meus Dados", icon: "User", position: -9 },
+    { moduleKey: "indicate", label: "Indicar", icon: "Share2", position: -8 },
+    { moduleKey: "marketplace", label: "Marketplace", icon: "Store", position: -7 },
+    { moduleKey: "billing", label: "Faturamento", icon: "Receipt", position: -6 },
+  ].sort((a, b) => a.label.localeCompare(b.label));
+
   if (!isLoading && cats.data && perms.data) {
     const now = new Date();
     const activePerms = [...perms.data.filter((p) => {
