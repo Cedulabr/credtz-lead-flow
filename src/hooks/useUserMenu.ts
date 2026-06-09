@@ -170,7 +170,7 @@ export function useUserMenu(userId?: string) {
 
     const knownKeys = new Set(cats.data.map((c) => c.key));
     for (const c of cats.data) {
-      const items = (byCat.get(c.key) || []).sort((a, b) => a.position - b.position);
+      const items = (byCat.get(c.key) || []).sort((a, b) => a.label.localeCompare(b.label));
       if (items.length === 0) continue;
       sections.push({
         categoryKey: c.key,
