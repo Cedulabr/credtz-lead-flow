@@ -36,7 +36,7 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCan
     setPhoneLoading(true);
     try {
       const { data: res, error } = await supabase.rpc('count_leads_with_phone', {
-        convenio_filter: tipoLeadToConvenio(d.tipoLead),
+        convenio_filter: d.tipoLead === 'servidor' ? 'GOVERNO BA' : tipoLeadToConvenio(d.tipoLead),
         ddd_filter: d.ddds.length ? d.ddds : null,
         tag_filter: d.tags.length ? d.tags : null,
       });
