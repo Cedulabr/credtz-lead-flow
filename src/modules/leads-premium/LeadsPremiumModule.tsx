@@ -70,7 +70,6 @@ export function LeadsPremiumModule() {
 
   const { overdueLeads, isBlocked: isOverdueBlocked } = useOverdueLeads();
 
-  // Fetch pending simulations count
 
   const handleLeadSelect = (lead: Lead) => {
     setSelectedLead(lead);
@@ -333,17 +332,6 @@ export function LeadsPremiumModule() {
         />
 
 
-        {/* Inline Typing Modal */}
-        <TypingModal
-          open={showTypingModal}
-          onOpenChange={setShowTypingModal}
-          lead={typingLead}
-          form={typingForm}
-          onFormChange={setTypingForm}
-          onSubmit={handleTypingSubmit}
-           isProcessing={isTypProcessing}
-        />
-
         {/* Lead Sales Panel */}
         <LeadSalesPanel
           lead={typingLead}
@@ -457,17 +445,6 @@ export function LeadsPremiumModule() {
         onRequestLeads={handleRequestLeads}
       />
 
-
-      {/* Inline Typing Modal */}
-      <TypingModal
-        open={showTypingModal}
-        onOpenChange={setShowTypingModal}
-        lead={typingLead}
-        form={typingForm}
-        onFormChange={setTypingForm}
-        onSubmit={handleTypingSubmit}
-        isProcessing={isTypProcessing}
-      />
 
       {/* Future Contact Modal */}
       <Dialog open={showFutureContactModal} onOpenChange={setShowFutureContactModal}>

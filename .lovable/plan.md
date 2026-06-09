@@ -1,30 +1,46 @@
-Tracei um plano para realizar a limpeza solicitada, removendo módulos e tabelas que não são mais utilizados.
+Transform the existing application into a high-end solution (comparable to Monday.com, HubSpot) by implementing advanced customization, automation, and enhanced UI/UX.
 
-### 1. Limpeza do Frontend
-Removerei as referências, componentes e arquivos dos seguintes módulos:
-- **Base OFF**: Remover `src/modules/baseoff`, referências em `Index.tsx`, `LazyComponents.tsx` e `SidebarNav.tsx`.
-- **Auto Lead**: Remover `src/modules/autolead`, referências em `Index.tsx`, `LazyComponents.tsx` e `SidebarNav.tsx`.
-- **Meu Número**: Remover `src/modules/meu-numero`, referências em `Index.tsx`, `LazyComponents.tsx` e `SidebarNav.tsx`.
-- **Radar de Oportunidade**: Remover `src/modules/radar`, referências em `Index.tsx`, `LazyComponents.tsx` e `SidebarNav.tsx`.
-- **Módulo Áudios**: Remover `src/modules/audios`, referências em `Index.tsx`, `LazyComponents.tsx` e `SidebarNav.tsx`.
+### Phase 1: Core System Upgrades (Current Step)
+Focus on the immediate requests for "Leads Premium" and "Leads AGibank" while laying the foundation for global system improvements.
 
-### 2. Limpeza do Banco de Dados (Supabase)
-Criarei uma migração para deletar as tabelas e dados relacionados:
-- **Base OFF**: Deletar `baseoff`, `baseoff_requests`, `registrodiariobaseoff`, `baseoff_allowed_banks`, `baseoff_active_clients`, `baseoff_lead_tracking`, `baseoff_notifications`, `baseoff_import_batches`, `baseoff_clients`, `baseoff_contracts`, `baseoff_bank_rates`.
-- **Auto Lead**: Deletar `autolead_jobs`, `autolead_messages`.
-- **Radar de Oportunidade**: Deletar `radar_credits`, `radar_credits_usage`, `radar_credits_requests`, `radar_saved_filters`.
-- **Módulo Áudios**: Deletar `audio_generations`, `audio_variations`, `audio_files`.
-- **Módulos no Catálogo**: Remover as entradas correspondentes na tabela `modules` (usando os slugs `baseoff`, `autolead`, `meu-numero`, `radar`, `audios`).
+1. **Refine Leads Premium and Leads AGibank:**
+    - Improve the Export functionality to allow field selection and deeper filtering (User, Period, Status, etc.).
+    - Remove the "Simulations" field as requested.
+    - Implement a more robust "Performance-based Credit Request" system with a dedicated UI for both Users (to request) and Admins (to approve).
 
-### 3. Ordem de Execução
-1.  **Migração SQL**: Deletar tabelas e registros para liberar espaço e limpar o schema.
-2.  **Remoção de Código**: Deletar os diretórios dos módulos.
-3.  **Atualização de Configurações**: Limpar os arquivos de rotas, componentes lazy e menu lateral.
+2. **Advanced Data Management Foundation:**
+    - Create a framework for **Customizable Fields** starting with the Leads module. This involves a metadata-driven approach where fields can be added/removed by admins.
+    - Implement **Dynamic Forms** that adapt based on user roles or lead categories.
 
-### Detalhes Técnicos
-- As tabelas serão removidas com `DROP TABLE IF EXISTS ... CASCADE` para garantir que dependências (como chaves estrangeiras) não impeçam a remoção.
-- O arquivo `src/integrations/supabase/types.ts` será atualizado automaticamente após a migração.
-- Verificarei se existem permissões específicas (colunas em `profiles`) que também podem ser removidas.
+3. **Intelligent Automation (The "Monday.com" feel):**
+    - Scaffold a "Workflow Builder" prototype specifically for lead processing (e.g., "If status changes to X, notify user Y").
+    - Enhance notifications with real-time feedback and @mentions support.
 
----
-**Deseja que eu comece executando a migração do banco de dados primeiro?**
+4. **Premium UI/UX Enhancements:**
+    - Integrate `Aceternity UI` or `Magic UI` components for a modern, fluid feel (e.g., animated containers, better empty states, smoother transitions).
+    - Implement a **Global Search** overlay accessible via `Cmd/Ctrl+K`.
+
+### Technical Details (Implementation Plan)
+
+1. **Database Schema Enhancements:**
+    - Update `leads` table to support a `metadata` JSONB column for custom fields.
+    - Finalize `agibank_credit_requests` table (already approved).
+    - Create a `system_automations` table to store trigger-action rules.
+
+2. **Frontend Architecture:**
+    - Create a `CustomFieldRenderer` component to handle different data types (Select, Date, Multi-select, etc.).
+    - Update `LeadsListView` and `LeadsAgibankModule` to use this renderer.
+    - Refactor `ExportLeadsDialog` to include a checklist of fields to export.
+
+3. **Global Search Implementation:**
+    - Create a `CommandMenu` component using `cmdk` (already in `package.json`).
+    - Index key modules: Leads, Clients, Proposals, and Navigation.
+
+4. **Component Library Integration:**
+    - Use `shadcn/ui` for high-quality, accessible base components.
+    - Layer in `framer-motion` for meaningful UI transitions (the "Monday.com" polish).
+
+### Priority
+- **High:** Leads Export refinement, Credit Request UI, Removal of "Simulations".
+- **Medium:** Global Search, Custom Fields framework.
+- **Low:** Workflow Builder (Phase 2), External Integrations (Slack/Zapier).
