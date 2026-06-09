@@ -26,13 +26,15 @@ export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true 
     let mounted = true;
     (async () => {
       try {
-        const { data: res } = await (supabase as any).rpc('get_available_bancos');
+        const { data: res } = await (supabase as any).rpc('get_available_bancos', {
+          convenio_filter: tipoLeadToConvenio(data.tipoLead)
+        });
         if (!mounted) return;
         setBancos((res || []).map((b: any) => ({ value: b.banco, count: Number(b.available_count) })));
       } catch {/* opcional */}
     })();
     return () => { mounted = false; };
-  }, []);
+  }, [data.tipoLead]);
 
   const hasActive =
     !!data.banco || data.parcelaMin !== null || data.parcelaMax !== null ||
