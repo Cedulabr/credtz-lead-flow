@@ -70,6 +70,16 @@ export const DEFAULT_FIELDS_BY_CONVENIO: Record<Convenio, FieldDef[]> = {
     { key: 'ddd', label: 'DDD', required: false, group: 'contato' },
     { key: 'phone', label: 'Telefone', required: false, group: 'contato' },
   ],
+  CONVENIOS: [
+    { key: 'cpf', label: 'CPF', required: true, group: 'cadastro' },
+    { key: 'name', label: 'Nome', required: true, group: 'cadastro' },
+    { key: 'matricula', label: 'Matrícula', required: false, group: 'cadastro' },
+    { key: 'margem_total', label: 'Margem Total', required: true, group: 'margem' },
+    { key: 'margem_disponivel', label: 'Margem Disponível', required: true, group: 'margem' },
+    { key: 'emprestimos', label: 'Empréstimos (JSON)', required: false, group: 'emprestimo' },
+    { key: 'tag', label: 'Tag', required: false, group: 'cadastro' },
+    { key: 'phone', label: 'Telefone', required: false, group: 'contato' },
+  ],
 };
 
 // Compat: alias para código existente que importa FIELDS_BY_CONVENIO
@@ -200,7 +210,6 @@ export function autoMapHeaders(systemFields: FieldDef[], fileHeaders: string[]):
     tipo_beneficio: ['beneficio', 'tipobeneficio', 'orgao', 'organ'],
     tag: ['tag', 'tags', 'etiqueta', 'categoria', 'campanha'],
     emprestimos: ['emprestimos', 'loans', 'contratos'],
-    margem_disponivel: ['margemlivre', 'margemdisponivel', 'margem', 'margemdispo'],
   };
   const result: Record<string, string> = {};
   for (const f of systemFields) {
