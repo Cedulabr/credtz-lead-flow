@@ -109,9 +109,18 @@ Deno.serve(async (req) => {
         }),
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error("Failed to parse JSON response:", text);
+        throw new Error(`AbacatePay API Error: ${response.status} ${response.statusText}`);
+      }
+      
       if (!response.ok) {
-        throw new Error(data.message || "Erro ao criar cobrança no AbacatePay");
+        console.error("AbacatePay API Error Body:", data);
+        throw new Error(data.error || data.message || "Erro ao criar cobrança no AbacatePay");
       }
 
       const billing = data.data;
