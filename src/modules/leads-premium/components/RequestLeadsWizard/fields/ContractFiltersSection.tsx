@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { AvailableOption, LeadRequestData } from "../types";
+import { AvailableOption, LeadRequestData, tipoLeadToConvenio } from "../types";
 
 interface Props {
   data: LeadRequestData;
