@@ -366,7 +366,59 @@ export function LeadDetailDrawer({
             </div>
           )}
 
-          {/* Empréstimos em Cards */}
+          {/* Detalhes de Empréstimo Adicionais (Bases como Bahia) */}
+          {(lead.ade || lead.parcelas_pagas || lead.parcelas_em_aberto || lead.parcela || lead.deferimento) && (
+            <div className="space-y-4 mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="h-5 w-5 text-primary" />
+                <h3 className="font-bold text-lg">Detalhes da Proposta</h3>
+              </div>
+              <Card className="bg-primary/5 border-primary/10">
+                <CardContent className="p-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    {lead.ade && (
+                      <div className="space-y-1">
+                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Status ADE</Label>
+                        <p className="text-sm font-bold text-primary">{lead.ade}</p>
+                      </div>
+                    )}
+                    {lead.deferimento && (
+                      <div className="space-y-1">
+                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Deferimento</Label>
+                        <p className="text-sm font-bold">{format(new Date(lead.deferimento), 'dd/MM/yyyy')}</p>
+                      </div>
+                    )}
+                    {lead.parcela && (
+                      <div className="space-y-1">
+                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Valor Parcela</Label>
+                        <p className="text-sm font-bold text-green-700">R$ {Number(lead.parcela).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      </div>
+                    )}
+                    {(lead.parcelas_pagas !== undefined || lead.parcelas_em_aberto !== undefined) && (
+                      <div className="space-y-1">
+                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Parcelas (Pagas/Total)</Label>
+                        <p className="text-sm font-bold">{lead.parcelas_pagas ?? 0} / {lead.parcelas_em_aberto ?? '-'}</p>
+                      </div>
+                    )}
+                    {lead.ultimo_desconto && (
+                      <div className="space-y-1">
+                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Último Desconto</Label>
+                        <p className="text-sm font-bold">{format(new Date(lead.ultimo_desconto), 'dd/MM/yyyy')}</p>
+                      </div>
+                    )}
+                    {lead.ultima_parcela && (
+                      <div className="space-y-1">
+                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Última Parcela</Label>
+                        <p className="text-sm font-bold">{format(new Date(lead.ultima_parcela), 'dd/MM/yyyy')}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Empréstimos em Cards (Lista Multi-contratos) */}
           {Array.isArray(lead.emprestimos) && lead.emprestimos.length > 0 && (
             <div className="space-y-4 mb-6">
               <div className="flex items-center gap-2 mb-2">
