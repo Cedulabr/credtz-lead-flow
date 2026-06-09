@@ -1,8 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Home, User, Share2, Settings, ChevronDown, Menu, X, LogOut,
-  Store, Receipt, Clock, type LucideIcon,
+  Store, Receipt, Clock, PanelLeftClose, PanelLeftOpen,
+  ChevronRight,
+  Shield,
+  Bell
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWhitelabel } from "@/hooks/useWhitelabel";
@@ -10,74 +14,39 @@ import { useUserMenu } from "@/hooks/useUserMenu";
 import { getIcon } from "@/config/modules";
 import easynLogo from "@/assets/easyn-logo.png";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ConnectionStatus } from "@/components/ConnectionStatus";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 interface SidebarNavProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
 }
 
-type FlatItem = { id: string; label: string; icon: LucideIcon };
-
-const STORAGE_KEY = "easyn_sidebar_state_v2";
-
-function loadOpenState(): Record<string, boolean> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-// Always-visible top items (no permission gating)
-const TOP_ITEMS: FlatItem[] = [
-  { id: "dashboard", label: "Início", icon: Home },
-  { id: "my-data", label: "Meus Dados", icon: User },
-  { id: "time-clock", label: "Controle de Ponto", icon: Clock },
-];
-
-const BOTTOM_ITEMS: FlatItem[] = [
-  { id: "marketplace", label: "Marketplace", icon: Store },
-  { id: "billing", label: "Faturamento", icon: Receipt },
-  { id: "indicate", label: "Indicar", icon: Share2 },
-];
+const STORAGE_KEY = "easyn_sidebar_state_v3";
 
 export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
   const { user, profile, isAdmin, signOut } = useAuth();
   const { companyName, logoUrl } = useWhitelabel();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(loadOpenState);
-  const { sections } = useUserMenu();
-  const visibleSections = useMemo(
-    () => sections
-      .map((section) => ({
-        ...section,
-        items: section.items.filter((item) => item.moduleKey !== "time-clock"),
-      }))
-      .filter((section) => section.items.length > 0),
-    [sections]
-  );
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebar-collapsed-v3');
+    return saved === 'true';
+  });
+  
+  const { sections, isLoading } = useUserMenu();
 
+  // Close mobile menu on route change
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(openGroups)); } catch {}
-  }, [openGroups]);
-
-  // Auto-expand section containing the current route
-  useEffect(() => {
-    setOpenGroups((prev) => {
-      const next = { ...prev };
-      let changed = false;
-      for (const s of visibleSections) {
-        if (s.items.some((it) => it.moduleKey === activeTab) && !prev[s.categoryKey]) {
-          next[s.categoryKey] = true;
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [visibleSections, activeTab]);
-
-  useEffect(() => { setMobileOpen(false); }, [activeTab]);
+    setMobileOpen(false);
+  }, [activeTab]);
 
   const userInitials = useMemo(() => {
     const name = profile?.name || user?.email || "";
@@ -85,196 +54,310 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
       .map((n) => n[0]?.toUpperCase() ?? "").join("") || "?";
   }, [profile, user]);
 
-  const roleBadge = useMemo(() => {
-    if (isAdmin) return { label: "Admin", className: "bg-emerald-100 text-emerald-700" };
-    const r = (profile as any)?.role as string | undefined;
-    if (!r) return null;
-    return { label: r.charAt(0).toUpperCase() + r.slice(1), className: "bg-blue-100 text-blue-700" };
-  }, [isAdmin, profile]);
-
-  const toggleGroup = useCallback((id: string) =>
-    setOpenGroups((s) => ({ ...s, [id]: !s[id] })), []);
-
   const handleSignOut = async () => {
     await signOut();
     toast.success("Sessão encerrada");
   };
 
-  const renderFlatItem = (it: FlatItem, isSub = false) => {
-    const Icon = it.icon;
-    const active = activeTab === it.id;
-    return (
-      <button
-        key={it.id}
-        type="button"
-        onClick={() => onTabChange(it.id)}
-        className={cn(
-          "group w-full flex items-center gap-3 mx-1.5 rounded-lg transition-all duration-200 border border-transparent",
-          isSub ? "h-9 pl-[46px] pr-3 text-[13px]" : "h-[40px] px-4 text-[13.5px]",
-          active
-            ? "bg-primary/10 border-primary/20 text-primary font-semibold shadow-sm"
-            : "text-foreground/70 hover:bg-muted/60 hover:text-foreground"
-        )}
-        style={{ width: "calc(100% - 12px)" }}
-      >
-        {!isSub && <Icon className="shrink-0" size={18} strokeWidth={active ? 2.5 : 2} />}
-        <span className="flex-1 text-left truncate">{it.label}</span>
-      </button>
-    );
-  };
-
-  const renderSection = (section: typeof visibleSections[number]) => {
-    const Icon = getIcon(section.icon);
-    const isOpen = !!openGroups[section.categoryKey];
-    const hasActive = section.items.some((it) => it.moduleKey === activeTab);
-    return (
-      <div key={section.categoryKey}>
-        <button
-          type="button"
-          onClick={() => toggleGroup(section.categoryKey)}
+  const renderNavItems = (items: any[], isMobile = false) => {
+    return items.map((item) => {
+      const Icon = getIcon(item.icon);
+      const isActive = activeTab === item.moduleKey;
+      
+      if (isCollapsed && !isMobile) {
+        return (
+          <Tooltip key={item.moduleKey}>
+            <TooltipTrigger asChild>
+              <Button
+                variant={isActive ? "default" : "ghost"}
+                size="icon"
+                onClick={() => onTabChange(item.moduleKey)}
+                className={cn(
+                  "w-full h-10 mb-1 transition-all duration-200",
+                  isActive ? "shadow-md bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                )}
+              >
+                <Icon size={20} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="font-semibold">
+              {item.label}
+            </TooltipContent>
+          </Tooltip>
+        );
+      }
+      
+      return (
+        <Button
+          key={item.moduleKey}
+          variant={isActive ? "default" : "ghost"}
+          onClick={() => {
+            onTabChange(item.moduleKey);
+            if (isMobile) setMobileOpen(false);
+          }}
           className={cn(
-            "group w-full flex items-center gap-3 mx-1.5 rounded-lg transition-all duration-200 h-[40px] px-4 text-[13.5px]",
-            hasActive ? "text-foreground font-semibold bg-muted/40" : "text-foreground/70 hover:bg-muted/60"
+            "w-full justify-start space-x-3 transition-all mb-1 h-10 px-3 rounded-lg group",
+            isActive 
+              ? "shadow-sm bg-primary text-primary-foreground font-semibold" 
+              : "text-foreground/70 hover:bg-primary/5 hover:text-primary"
           )}
-          style={{ width: "calc(100% - 12px)" }}
-          aria-expanded={isOpen}
         >
-          <Icon className="shrink-0 text-primary/80" size={18} strokeWidth={2} />
-          <span className="flex-1 text-left truncate">{section.label}</span>
-          <ChevronDown size={16} className={cn("transition-transform duration-300 opacity-60", isOpen ? "rotate-0" : "-rotate-90")} />
-        </button>
-        <div
-          className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
-          style={{ maxHeight: isOpen ? `${section.items.length * 36 + 4}px` : "0px" }}
-        >
-          <div className="py-0.5 space-y-0.5">
-            {section.items.map((it) => {
-              const ItemIcon = getIcon(it.icon);
-              return renderFlatItem({ id: it.moduleKey, label: it.label, icon: ItemIcon }, true);
-            })}
-          </div>
-        </div>
-      </div>
-    );
+          <Icon size={18} className={cn(
+            "transition-colors",
+            isActive ? "text-primary-foreground" : "text-primary/60 group-hover:text-primary"
+          )} />
+          <span className="truncate text-[13px]">{item.label}</span>
+          {isActive && (
+            <motion.div layoutId="activeDot" className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-foreground" />
+          )}
+        </Button>
+      );
+    });
   };
 
   const sidebarContent = (
-    <>
-      <div className="px-4 pt-4 pb-3 flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-lg bg-[hsl(218_92%_50%)] flex items-center justify-center overflow-hidden shrink-0">
-          <img src={logoUrl || easynLogo} alt={`${companyName} logo`} className="w-7 h-7 object-contain" />
-        </div>
-        <div className="min-w-0">
-          <div className="text-[13px] font-semibold leading-tight truncate">{companyName || "Easyn"}</div>
-          <div className="text-[11px] text-muted-foreground leading-tight">Serviços</div>
-        </div>
-      </div>
-
-      {user && (
-        <div className="mx-3 mb-4 px-3 py-3 rounded-2xl bg-gradient-to-br from-primary/10 via-muted/50 to-muted/30 border border-primary/10 flex items-center gap-3 shadow-sm">
-          <div className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[12px] font-bold shrink-0 border-2 border-primary/20 shadow-inner">
-            {userInitials}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-bold text-foreground truncate">{profile?.name || user.email}</div>
-            <div className="text-[11px] font-medium text-muted-foreground truncate opacity-80">{companyName}</div>
-          </div>
-          {roleBadge && (
-            <span className={cn("text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter shadow-sm", roleBadge.className)}>
-              {roleBadge.label}
-            </span>
+    <div className="flex flex-col h-full bg-card">
+      {/* Brand Header */}
+      <div className={cn(
+        "h-16 flex items-center border-b px-4 transition-all duration-300",
+        isCollapsed ? "justify-center" : "justify-between"
+      )}>
+        <AnimatePresence mode="wait">
+          {!isCollapsed ? (
+            <motion.div 
+              key="expanded-logo"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              className="flex items-center gap-3 overflow-hidden"
+            >
+              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center p-1 border border-primary/20 shrink-0">
+                <img src={logoUrl || easynLogo} alt="Logo" className="w-full h-full object-contain" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-foreground text-sm leading-tight truncate">{companyName || "Easyn"}</span>
+                <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">Workspace</span>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="collapsed-logo"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center p-1 border border-primary/20"
+            >
+              <img src={logoUrl || easynLogo} alt="Logo" className="w-full h-full object-contain" />
+            </motion.div>
           )}
-        </div>
-      )}
-
-      <nav className="flex-1 overflow-y-auto pb-2 sidebar-scroll" style={{ scrollbarWidth: "thin" }}>
-        {/* Always visible top */}
-        <div className="space-y-0.5">
-          {TOP_ITEMS.map((it) => renderFlatItem(it))}
-        </div>
-
-        {/* Dynamic sections */}
-        {visibleSections.length > 0 && (
-          <div className="mx-3.5 my-1.5 border-t border-border/60" style={{ borderTopWidth: "0.5px" }} />
-        )}
-        <div className="space-y-0.5">
-          {visibleSections.map(renderSection)}
-        </div>
-
-        {/* Always visible bottom utilities */}
-        <div className="mx-3.5 my-1.5 border-t border-border/60" style={{ borderTopWidth: "0.5px" }} />
-        <div className="space-y-0.5">
-          {BOTTOM_ITEMS.map((it) => renderFlatItem(it))}
-        </div>
-      </nav>
-
-      <div className="border-t border-border/60 p-2 space-y-0.5" style={{ borderTopWidth: "0.5px" }}>
-        {isAdmin && (
-          <button
-            type="button"
-            onClick={() => (window.location.href = "/admin")}
-            className="w-full flex items-center gap-3 mx-1.5 rounded-lg h-[40px] px-4 text-[13.5px] text-foreground/70 hover:bg-muted/60 transition-all duration-200"
-            style={{ width: "calc(100% - 12px)" }}
-          >
-            <Settings className="shrink-0 text-primary/60" size={18} strokeWidth={2} />
-            <span className="flex-1 text-left">Admin</span>
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={handleSignOut}
-          className="w-full flex items-center gap-3 mx-1.5 rounded-lg h-[40px] px-4 text-[13.5px] text-destructive/80 hover:bg-destructive/10 transition-all duration-200"
-          style={{ width: "calc(100% - 12px)" }}
+        </AnimatePresence>
+        
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => {
+            const next = !isCollapsed;
+            setIsCollapsed(next);
+            localStorage.setItem('sidebar-collapsed-v3', String(next));
+          }}
+          className="h-8 w-8 hover:bg-secondary hidden md:flex shrink-0 ml-1"
         >
-          <LogOut className="shrink-0" size={18} strokeWidth={2} />
-          <span className="flex-1 text-left font-medium">Sair</span>
-        </button>
+          {isCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </Button>
       </div>
-    </>
+
+      {/* Navigation Menu */}
+      <ScrollArea className="flex-1 px-3 py-4">
+        {isLoading ? (
+          <div className="space-y-3 animate-pulse">
+            {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-10 bg-muted/50 rounded-lg w-full" />)}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {isCollapsed ? (
+              <div className="flex flex-col items-center space-y-4">
+                {sections.map(section => (
+                  <div key={section.categoryKey} className="w-full flex flex-col items-center space-y-2 pt-4 border-t first:border-t-0 first:pt-0 border-border/40">
+                    {renderNavItems(section.items)}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Accordion type="multiple" defaultValue={["principal"]} className="w-full space-y-2">
+                {sections.map((section) => (
+                  <AccordionItem key={section.categoryKey} value={section.categoryKey} className="border-none">
+                    <AccordionTrigger className="hover:no-underline py-2 px-3 rounded-lg hover:bg-muted/50 group text-left">
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70 group-hover:text-primary transition-colors">
+                          {section.label}
+                        </span>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-1 pb-2">
+                      <div className="space-y-0.5">
+                        {renderNavItems(section.items)}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            )}
+          </div>
+        )}
+      </ScrollArea>
+
+      {/* User & Utils Footer */}
+      <div className={cn(
+        "mt-auto border-t bg-muted/20 transition-all duration-300",
+        isCollapsed ? "p-2" : "p-4"
+      )}>
+        {isAdmin && (
+          <div className="mb-4">
+            {isCollapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={() => window.location.href = '/admin'} className="h-10 w-10 mx-auto bg-card border-primary/20 hover:bg-primary/10">
+                    <Settings size={18} className="text-primary" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Administração</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => window.location.href = '/admin'}
+                className="w-full justify-start space-x-3 h-10 rounded-lg bg-card border-primary/20 hover:bg-primary/10 group"
+              >
+                <Shield size={16} className="text-primary group-hover:rotate-12 transition-transform" />
+                <span className="font-bold text-xs text-primary">Painel Admin</span>
+              </Button>
+            )}
+          </div>
+        )}
+
+        {user && (
+          <div className="space-y-4">
+            {!isCollapsed ? (
+              <>
+                <div className="flex items-center gap-3 p-2 rounded-xl bg-card border shadow-sm group">
+                  <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20 group-hover:bg-primary/20 transition-colors">
+                    <span className="text-xs font-bold">{userInitials}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-xs truncate text-foreground leading-tight">{profile?.name || user.email}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold opacity-70">
+                      {isAdmin ? "Administrador" : (profile?.role || "Usuário")}
+                    </p>
+                  </div>
+                </div>
+                <div className="px-1">
+                  <ConnectionStatus />
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleSignOut} 
+                  className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors h-9 px-2 rounded-lg"
+                >
+                  <LogOut className="h-4 w-4 mr-3" />
+                  <span className="font-medium text-xs">Sair da conta</span>
+                </Button>
+              </>
+            ) : (
+              <div className="flex flex-col items-center space-y-4">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 cursor-pointer hover:bg-primary/20 transition-colors">
+                      <span className="text-xs font-bold text-primary">{userInitials}</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <div className="flex flex-col">
+                      <span className="font-bold">{profile?.name || user.email}</span>
+                      <span className="text-xs text-muted-foreground capitalize">{profile?.role}</span>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-10 w-10 hover:text-destructive hover:bg-destructive/10 text-muted-foreground">
+                      <LogOut className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Sair</TooltipContent>
+                </Tooltip>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 
   return (
-    <>
+    <TooltipProvider delayDuration={0}>
       <style>{`
-        .sidebar-scroll::-webkit-scrollbar { width: 6px; }
+        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
         .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
         .sidebar-scroll::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 999px; }
-        .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.5); }
       `}</style>
 
-      <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b z-40 flex items-center justify-between px-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-[hsl(218_92%_50%)] flex items-center justify-center overflow-hidden">
-            <img src={logoUrl || easynLogo} alt="logo" className="w-6 h-6 object-contain" />
+      {/* Mobile Trigger & Header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b z-[60] flex items-center justify-between px-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center p-1 border border-primary/20">
+            <img src={logoUrl || easynLogo} alt="logo" className="w-full h-full object-contain" />
           </div>
-          <span className="font-semibold text-sm">{companyName || "Easyn"}</span>
+          <div className="flex flex-col">
+             <span className="font-bold text-sm leading-tight">{companyName || "Easyn"}</span>
+             <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Portal</span>
+          </div>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => setMobileOpen((v) => !v)}
-          className="h-9 w-9 inline-flex items-center justify-center rounded-lg hover:bg-secondary"
-          aria-label="Abrir menu"
+          className="h-10 w-10"
         >
           {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+        </Button>
       </div>
 
-      {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-[260px] bg-card border-r flex flex-col">
-            {sidebarContent}
-          </aside>
-        </div>
-      )}
+      {/* Mobile Sidebar */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <div className="md:hidden fixed inset-0 z-[70]">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-background/80 backdrop-blur-sm" 
+              onClick={() => setMobileOpen(false)} 
+            />
+            <motion.aside 
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="absolute left-0 top-0 bottom-0 w-[280px] bg-card border-r flex flex-col shadow-2xl"
+            >
+              {sidebarContent}
+            </motion.aside>
+          </div>
+        )}
+      </AnimatePresence>
 
+      {/* Desktop Sidebar */}
       <aside
-        className="hidden md:flex md:flex-col md:sticky md:top-0 md:h-screen bg-card border-r"
-        style={{ width: 220, minWidth: 220 }}
+        className={cn(
+          "hidden md:flex md:flex-col md:sticky md:top-0 md:h-screen transition-all duration-300 border-r z-50",
+          isCollapsed ? "w-20" : "w-[280px]"
+        )}
       >
         {sidebarContent}
       </aside>
-    </>
+    </TooltipProvider>
   );
 }
 
