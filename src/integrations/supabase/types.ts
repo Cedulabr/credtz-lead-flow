@@ -7785,8 +7785,10 @@ export type Database = {
       sdr_campaigns: {
         Row: {
           ai_aggressiveness_level: number | null
+          ai_auto_opt_out_enabled: boolean | null
           ai_custom_instructions: string | null
           ai_negotiation_rules: Json | null
+          ai_opt_out_keywords: string[] | null
           ai_persona: string | null
           ai_script_base: string | null
           ai_template_id: string | null
@@ -7806,6 +7808,7 @@ export type Database = {
           delay_minutes: number
           escalation_trigger: string | null
           follow_up_sequence: Json
+          followup_configs: Json | null
           forbidden_to_ask: Json | null
           id: string
           instance_id: string
@@ -7842,8 +7845,10 @@ export type Database = {
         }
         Insert: {
           ai_aggressiveness_level?: number | null
+          ai_auto_opt_out_enabled?: boolean | null
           ai_custom_instructions?: string | null
           ai_negotiation_rules?: Json | null
+          ai_opt_out_keywords?: string[] | null
           ai_persona?: string | null
           ai_script_base?: string | null
           ai_template_id?: string | null
@@ -7863,6 +7868,7 @@ export type Database = {
           delay_minutes?: number
           escalation_trigger?: string | null
           follow_up_sequence?: Json
+          followup_configs?: Json | null
           forbidden_to_ask?: Json | null
           id?: string
           instance_id: string
@@ -7899,8 +7905,10 @@ export type Database = {
         }
         Update: {
           ai_aggressiveness_level?: number | null
+          ai_auto_opt_out_enabled?: boolean | null
           ai_custom_instructions?: string | null
           ai_negotiation_rules?: Json | null
+          ai_opt_out_keywords?: string[] | null
           ai_persona?: string | null
           ai_script_base?: string | null
           ai_template_id?: string | null
@@ -7920,6 +7928,7 @@ export type Database = {
           delay_minutes?: number
           escalation_trigger?: string | null
           follow_up_sequence?: Json
+          followup_configs?: Json | null
           forbidden_to_ask?: Json | null
           id?: string
           instance_id?: string
@@ -8293,6 +8302,48 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "sdr_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_opt_out_list: {
+        Row: {
+          campaign_id: string | null
+          company_id: string
+          created_at: string
+          id: string
+          opted_out_at: string
+          phone: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          opted_out_at?: string
+          phone: string
+        }
+        Update: {
+          campaign_id?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          opted_out_at?: string
+          phone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_opt_out_list_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_opt_out_list_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
