@@ -109,6 +109,7 @@ export function useLeadsAgibank() {
           agibank_is_onboarded, agibank_last_interaction_type, agibank_last_interaction_date
         `)
         .order('created_at', { ascending: false })
+        .eq('origem_lead', 'leads_agibank')
         .limit(500);
 
       if (!isAdmin) {
