@@ -42,19 +42,11 @@ export const StepResumo = memo(function StepResumo({
     },
     {
       icon: MapPin,
-      label: "Estado",
-      value: data.uf ? `${UF_NOMES[data.uf] || data.uf} (${data.uf})` : "—",
-      step: 1,
-      hasValue: !!data.uf,
-      show: isServidor,
-    },
-    {
-      icon: MapPin,
       label: "Regiões (DDD)",
       value: data.ddds.length > 0 ? data.ddds.join(", ") : "Todas",
       step: 1,
       hasValue: data.ddds.length > 0,
-      show: !isServidor,
+      show: true,
     },
     {
       icon: Tag,
@@ -62,7 +54,7 @@ export const StepResumo = memo(function StepResumo({
       value: data.tags.length > 0 ? data.tags.join(", ") : "Nenhuma",
       step: 1,
       hasValue: data.tags.length > 0,
-      show: !isServidor,
+      show: true,
     },
     {
       icon: FileText,
@@ -70,20 +62,18 @@ export const StepResumo = memo(function StepResumo({
       value: contratoParts.length > 0 ? contratoParts.join(" • ") : "Padrão",
       step: 1,
       hasValue: contratoParts.length > 0,
-      show: isServidor,
+      show: true,
     },
     {
       icon: Phone,
       label: "Leads com telefone",
-      value: isServidor
-        ? "Não aplicável"
-        : data.requireTelefone === true
+      value: data.requireTelefone === true
           ? "Sim"
           : data.requireTelefone === false
             ? "Não"
             : "—",
       step: 1,
-      hasValue: data.requireTelefone !== null && !isServidor,
+      hasValue: data.requireTelefone !== null,
       show: true,
     },
     {
