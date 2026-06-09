@@ -127,6 +127,14 @@ export function useUserMenu(userId?: string) {
       return true;
     })];
 
+    sections.push({
+      categoryKey: "principal",
+      label: "Principal",
+      icon: "Home",
+      position: -1,
+      items: CORE_ITEMS,
+    });
+
     // Admin viewing own menu → sees every module in the catalog.
     if (!userId && isAdmin && profile) {
       const activeKeys = new Set(activePerms.map((p) => p.module_key));
