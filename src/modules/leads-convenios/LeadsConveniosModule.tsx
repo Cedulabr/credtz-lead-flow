@@ -5,7 +5,8 @@ import { ConvenioLeadCard } from "./components/ConvenioLeadCard";
 import { LeadDetailDrawer } from "../leads-premium/components/LeadDetailDrawer";
 import { Button } from "@/components/ui/button";
 import { ImportBase } from "@/components/ImportBase";
-import { Upload, RefreshCw, Loader2 } from "lucide-react";
+import { RequestLeadsWizard } from "../leads-premium/components/RequestLeadsWizard";
+import { Upload, RefreshCw, Loader2, Plus, CreditCard } from "lucide-react";
 
 export function LeadsConveniosModule() {
   const { profile } = useAuth();
