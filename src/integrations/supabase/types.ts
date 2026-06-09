@@ -7422,8 +7422,13 @@ export type Database = {
       }
       sdr_campaigns: {
         Row: {
+          ai_aggressiveness_level: number | null
+          ai_custom_instructions: string | null
+          ai_negotiation_rules: Json | null
           ai_persona: string | null
+          ai_script_base: string | null
           ai_template_id: string | null
+          ai_tone_of_voice: string | null
           allowed_to_ask: Json | null
           auto_reply_enabled: boolean
           closing_goal: string | null
@@ -7443,6 +7448,7 @@ export type Database = {
           instance_id: string
           interval_between_attempts_hours: number
           is_active: boolean
+          kpis_goals: Json | null
           last_sync_at: string | null
           max_attempts: number
           mode: string
@@ -7458,6 +7464,7 @@ export type Database = {
           schedule_days: string[] | null
           schedule_end_time: string | null
           schedule_start_time: string | null
+          sdr_product_id: string | null
           send_delay_seconds: number
           status: string
           target_type: string
@@ -7468,8 +7475,13 @@ export type Database = {
           working_hours_start: string
         }
         Insert: {
+          ai_aggressiveness_level?: number | null
+          ai_custom_instructions?: string | null
+          ai_negotiation_rules?: Json | null
           ai_persona?: string | null
+          ai_script_base?: string | null
           ai_template_id?: string | null
+          ai_tone_of_voice?: string | null
           allowed_to_ask?: Json | null
           auto_reply_enabled?: boolean
           closing_goal?: string | null
@@ -7489,6 +7501,7 @@ export type Database = {
           instance_id: string
           interval_between_attempts_hours?: number
           is_active?: boolean
+          kpis_goals?: Json | null
           last_sync_at?: string | null
           max_attempts?: number
           mode?: string
@@ -7504,6 +7517,7 @@ export type Database = {
           schedule_days?: string[] | null
           schedule_end_time?: string | null
           schedule_start_time?: string | null
+          sdr_product_id?: string | null
           send_delay_seconds?: number
           status?: string
           target_type: string
@@ -7514,8 +7528,13 @@ export type Database = {
           working_hours_start?: string
         }
         Update: {
+          ai_aggressiveness_level?: number | null
+          ai_custom_instructions?: string | null
+          ai_negotiation_rules?: Json | null
           ai_persona?: string | null
+          ai_script_base?: string | null
           ai_template_id?: string | null
+          ai_tone_of_voice?: string | null
           allowed_to_ask?: Json | null
           auto_reply_enabled?: boolean
           closing_goal?: string | null
@@ -7535,6 +7554,7 @@ export type Database = {
           instance_id?: string
           interval_between_attempts_hours?: number
           is_active?: boolean
+          kpis_goals?: Json | null
           last_sync_at?: string | null
           max_attempts?: number
           mode?: string
@@ -7550,6 +7570,7 @@ export type Database = {
           schedule_days?: string[] | null
           schedule_end_time?: string | null
           schedule_start_time?: string | null
+          sdr_product_id?: string | null
           send_delay_seconds?: number
           status?: string
           target_type?: string
@@ -7586,6 +7607,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_campaigns_sdr_product_id_fkey"
+            columns: ["sdr_product_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_products"
             referencedColumns: ["id"]
           },
         ]
@@ -7888,6 +7916,131 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "sdr_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_platform_audit: {
+        Row: {
+          action: string
+          campaign_id: string | null
+          company_id: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          campaign_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          campaign_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_platform_audit_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_platform_audit_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_products: {
+        Row: {
+          benefits: Json | null
+          category: string | null
+          company_id: string
+          conditions_commercial: string | null
+          created_at: string | null
+          description_long: string | null
+          description_short: string | null
+          faq: Json | null
+          id: string
+          name: string
+          objections_handlers: Json | null
+          price_base: number | null
+          pricing_model: string | null
+          sku: string | null
+          subcategory: string | null
+          support_links: Json | null
+          target_persona: Json | null
+          technical_features: Json | null
+          updated_at: string | null
+          value_proposition: string | null
+          variations: Json | null
+        }
+        Insert: {
+          benefits?: Json | null
+          category?: string | null
+          company_id: string
+          conditions_commercial?: string | null
+          created_at?: string | null
+          description_long?: string | null
+          description_short?: string | null
+          faq?: Json | null
+          id?: string
+          name: string
+          objections_handlers?: Json | null
+          price_base?: number | null
+          pricing_model?: string | null
+          sku?: string | null
+          subcategory?: string | null
+          support_links?: Json | null
+          target_persona?: Json | null
+          technical_features?: Json | null
+          updated_at?: string | null
+          value_proposition?: string | null
+          variations?: Json | null
+        }
+        Update: {
+          benefits?: Json | null
+          category?: string | null
+          company_id?: string
+          conditions_commercial?: string | null
+          created_at?: string | null
+          description_long?: string | null
+          description_short?: string | null
+          faq?: Json | null
+          id?: string
+          name?: string
+          objections_handlers?: Json | null
+          price_base?: number | null
+          pricing_model?: string | null
+          sku?: string | null
+          subcategory?: string | null
+          support_links?: Json | null
+          target_persona?: Json | null
+          technical_features?: Json | null
+          updated_at?: string | null
+          value_proposition?: string | null
+          variations?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
