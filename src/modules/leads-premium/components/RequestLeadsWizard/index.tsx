@@ -27,6 +27,7 @@ interface RequestLeadsWizardProps {
     parcelaMin?: number | null;
     parcelaMax?: number | null;
     margemMin?: number | null;
+    margemMax?: number | null;
     parcelasPagasMin?: number | null;
     requireTelefone?: boolean | null;
   }) => Promise<boolean>;
@@ -101,6 +102,7 @@ export function RequestLeadsWizard({
         parcelaMin: data.parcelaMin,
         parcelaMax: data.parcelaMax,
         margemMin: data.margemMin,
+        margemMax: data.margemMax,
         parcelasPagasMin: data.parcelasPagasMin,
         requireTelefone: data.requireTelefone,
       });

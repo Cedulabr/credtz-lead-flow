@@ -15,6 +15,7 @@ export interface LeadRequestData {
   parcelaMin: number | null;
   parcelaMax: number | null;
   margemMin: number | null;
+  margemMax: number | null;
   parcelasPagasMin: number | null;
 
   // Etapa 3: Quantidade e prioridade
@@ -45,7 +46,8 @@ export const INITIAL_DATA: LeadRequestData = {
   banco: null,
   parcelaMin: null,
   parcelaMax: null,
-  margemMin: null,
+  margemMin: 0,
+  margemMax: 500,
   parcelasPagasMin: null,
   quantidade: 10,
   prioridade: 'recentes',

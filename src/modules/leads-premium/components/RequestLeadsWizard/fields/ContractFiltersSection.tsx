@@ -36,7 +36,7 @@ export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true 
 
   const hasActive =
     !!data.banco || data.parcelaMin !== null || data.parcelaMax !== null ||
-    data.margemMin !== null || data.parcelasPagasMin !== null;
+    data.margemMin !== null || data.margemMax !== null || data.parcelasPagasMin !== null;
 
   const parcMin = data.parcelaMin ?? 0;
   const parcMax = data.parcelaMax ?? 2000;
@@ -116,24 +116,29 @@ export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true 
                 />
               </div>
 
-              {/* Margem mínima */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  <Banknote className="h-4 w-4 text-muted-foreground" />
-                  Margem disponível mínima (R$)
+              {/* Margem Mínima e Máxima */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Banknote className="h-4 w-4 text-muted-foreground" />
+                    Margem disponível
+                  </span>
+                  <span className="text-xs text-muted-foreground font-normal">
+                    {fmtBRL(data.margemMin ?? 0)} — {fmtBRL(data.margemMax ?? 500)}
+                  </span>
                 </Label>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step={50}
-                  placeholder="Ex.: 200"
-                  value={data.margemMin ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value.trim();
-                    onUpdate({ margemMin: v === "" ? null : Number(v) });
-                  }}
-                  className="h-10"
+                <Slider
+                  min={-100}
+                  max={500}
+                  step={10}
+                  value={[data.margemMin ?? 0, data.margemMax ?? 500]}
+                  onValueChange={([min, max]) =>
+                    onUpdate({
+                      margemMin: min,
+                      margemMax: max,
+                    })
+                  }
+                  className="py-2"
                 />
               </div>
 
@@ -169,6 +174,7 @@ export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true 
                       parcelaMin: null,
                       parcelaMax: null,
                       margemMin: null,
+                      margemMax: null,
                       parcelasPagasMin: null,
                     })
                   }
