@@ -7807,6 +7807,7 @@ export type Database = {
           daily_send_limit: number | null
           delay_minutes: number
           escalation_trigger: string | null
+          excluded_holidays: Json | null
           follow_up_sequence: Json
           followup_configs: Json | null
           forbidden_to_ask: Json | null
@@ -7818,6 +7819,7 @@ export type Database = {
           kpis_goals: Json | null
           last_sync_at: string | null
           max_attempts: number
+          min_delay_seconds: number | null
           mode: string
           name: string
           notification_on_conversion: boolean
@@ -7867,6 +7869,7 @@ export type Database = {
           daily_send_limit?: number | null
           delay_minutes?: number
           escalation_trigger?: string | null
+          excluded_holidays?: Json | null
           follow_up_sequence?: Json
           followup_configs?: Json | null
           forbidden_to_ask?: Json | null
@@ -7878,6 +7881,7 @@ export type Database = {
           kpis_goals?: Json | null
           last_sync_at?: string | null
           max_attempts?: number
+          min_delay_seconds?: number | null
           mode?: string
           name: string
           notification_on_conversion?: boolean
@@ -7927,6 +7931,7 @@ export type Database = {
           daily_send_limit?: number | null
           delay_minutes?: number
           escalation_trigger?: string | null
+          excluded_holidays?: Json | null
           follow_up_sequence?: Json
           followup_configs?: Json | null
           forbidden_to_ask?: Json | null
@@ -7938,6 +7943,7 @@ export type Database = {
           kpis_goals?: Json | null
           last_sync_at?: string | null
           max_attempts?: number
+          min_delay_seconds?: number | null
           mode?: string
           name?: string
           notification_on_conversion?: boolean
