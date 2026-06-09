@@ -4654,6 +4654,56 @@ export type Database = {
           },
         ]
       }
+      import_executions: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          error_details: string | null
+          filter_applied: Json | null
+          id: string
+          module: string
+          processed_rows: number | null
+          status: string
+          total_rows: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          error_details?: string | null
+          filter_applied?: Json | null
+          id?: string
+          module: string
+          processed_rows?: number | null
+          status?: string
+          total_rows?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          error_details?: string | null
+          filter_applied?: Json | null
+          id?: string
+          module?: string
+          processed_rows?: number | null
+          status?: string
+          total_rows?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_executions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_jobs: {
         Row: {
           chunk_metadata: Json | null
