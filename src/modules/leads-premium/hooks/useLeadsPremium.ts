@@ -336,7 +336,17 @@ export function useLeadsPremium() {
           margem_min: options.margemMin ?? null,
         } as any);
 
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes('No leads available')) {
+          toast({
+            title: "Leads indisponíveis",
+            description: "Não há leads disponíveis com esses filtros no momento. Alguns lotes podem estar bloqueados na lista negra.",
+            variant: "destructive",
+          });
+          return false;
+        }
+        throw error;
+      }
 
       // Filtro client-side: leads com telefone (se solicitado)
       let filtered = data || [];
