@@ -7698,6 +7698,7 @@ export type Database = {
           ai_template_id: string | null
           ai_tone_of_voice: string | null
           allowed_to_ask: Json | null
+          apologies_message: string | null
           auto_reply_enabled: boolean
           closing_goal: string | null
           company_id: string
@@ -7714,6 +7715,7 @@ export type Database = {
           forbidden_to_ask: Json | null
           id: string
           instance_id: string
+          instance_ids: string[] | null
           interval_between_attempts_hours: number
           is_active: boolean
           kpis_goals: Json | null
@@ -7733,6 +7735,8 @@ export type Database = {
           schedule_end_time: string | null
           schedule_start_time: string | null
           sdr_product_id: string | null
+          send_delay_max_seconds: number | null
+          send_delay_min_seconds: number | null
           send_delay_seconds: number
           status: string
           target_type: string
@@ -7751,6 +7755,7 @@ export type Database = {
           ai_template_id?: string | null
           ai_tone_of_voice?: string | null
           allowed_to_ask?: Json | null
+          apologies_message?: string | null
           auto_reply_enabled?: boolean
           closing_goal?: string | null
           company_id: string
@@ -7767,6 +7772,7 @@ export type Database = {
           forbidden_to_ask?: Json | null
           id?: string
           instance_id: string
+          instance_ids?: string[] | null
           interval_between_attempts_hours?: number
           is_active?: boolean
           kpis_goals?: Json | null
@@ -7786,6 +7792,8 @@ export type Database = {
           schedule_end_time?: string | null
           schedule_start_time?: string | null
           sdr_product_id?: string | null
+          send_delay_max_seconds?: number | null
+          send_delay_min_seconds?: number | null
           send_delay_seconds?: number
           status?: string
           target_type: string
@@ -7804,6 +7812,7 @@ export type Database = {
           ai_template_id?: string | null
           ai_tone_of_voice?: string | null
           allowed_to_ask?: Json | null
+          apologies_message?: string | null
           auto_reply_enabled?: boolean
           closing_goal?: string | null
           company_id?: string
@@ -7820,6 +7829,7 @@ export type Database = {
           forbidden_to_ask?: Json | null
           id?: string
           instance_id?: string
+          instance_ids?: string[] | null
           interval_between_attempts_hours?: number
           is_active?: boolean
           kpis_goals?: Json | null
@@ -7839,6 +7849,8 @@ export type Database = {
           schedule_end_time?: string | null
           schedule_start_time?: string | null
           sdr_product_id?: string | null
+          send_delay_max_seconds?: number | null
+          send_delay_min_seconds?: number | null
           send_delay_seconds?: number
           status?: string
           target_type?: string
