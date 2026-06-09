@@ -280,7 +280,8 @@ export function LeadsPremiumModule() {
                   onLeadSelect={handleLeadSelect}
                   onRefresh={fetchLeads}
                   onSalesPanel={handleOpenSalesPanel}
-                  onTyping={handleListTyping}
+                  onTyping={() => {}}
+
                   onStatusChange={handleListStatusChange}
                   canEditLead={canEditLead}
                 />
@@ -420,7 +421,8 @@ export function LeadsPremiumModule() {
             onLeadSelect={handleLeadSelect}
             onRefresh={fetchLeads}
             onSalesPanel={handleOpenSalesPanel}
-            onTyping={handleListTyping}
+            onTyping={() => {}}
+
             onStatusChange={handleListStatusChange}
             canEditLead={canEditLead}
           />

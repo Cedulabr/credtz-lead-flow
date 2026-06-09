@@ -239,7 +239,7 @@ export function AgibankLeadsModule() {
                   onLeadSelect={handleLeadSelect}
                   onRefresh={fetchLeads}
                   onSalesPanel={handleOpenSalesPanel}
-                  onTyping={handleListTyping}
+                  onTyping={() => {}}
                   onStatusChange={handleListStatusChange}
                   canEditLead={canEditLead}
                 />
@@ -308,7 +308,8 @@ export function AgibankLeadsModule() {
           isOpen={isSalesPanelOpen}
           onClose={() => setIsSalesPanelOpen(false)}
           onStatusChange={handleStatusChange}
-          onTyping={handleListTyping}
+                  onTyping={() => {}}
+
         />
       </div>
     );
@@ -382,7 +383,8 @@ export function AgibankLeadsModule() {
             onLeadSelect={handleLeadSelect}
             onRefresh={fetchLeads}
             onSalesPanel={handleOpenSalesPanel}
-            onTyping={handleListTyping}
+          onTyping={() => {}}
+
             onStatusChange={handleListStatusChange}
             canEditLead={canEditLead}
           />
