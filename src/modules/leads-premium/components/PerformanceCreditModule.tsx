@@ -45,7 +45,7 @@ export function PerformanceCreditModule() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setRequests(data || []);
+      setRequests((data as any) || []);
     } catch (error) {
       console.error("Error fetching credit requests:", error);
     } finally {

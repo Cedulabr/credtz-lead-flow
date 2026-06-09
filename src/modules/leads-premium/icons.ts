@@ -1,4 +1,4 @@
-import { CreditCard, Download, Filter, List, Plus, Search, Settings, TrendingUp, Users, Zap, BarChart3, PieChart, Clock, Target, Wallet, MessageSquare, AudioLines, RefreshCw, PanelLeftOpen, LayoutPanelLeft, FileText } from "lucide-react";
+import { Home, CreditCard, Download, Filter, List, Plus, Search, Settings, TrendingUp, Users, Zap, BarChart3, PieChart, Clock, Target, Wallet, MessageSquare, AudioLines, RefreshCw, PanelLeftOpen, LayoutPanelLeft, FileText } from "lucide-react";
 
 export const FridayIcons = {
   monday: {

@@ -100,7 +100,7 @@ export function useLeadsPremium() {
       setIsLoading(true);
       let query = supabase
         .from('leads')
-        .select('id, name, cpf, phone, phone2, convenio, tag, status, created_at, updated_at, assigned_to, created_by, is_rework, notes, future_contact_date, rejection_reason, banco_operacao, valor_operacao, history, metadata')
+        .select('id, name, cpf, phone, phone2, convenio, tag, status, created_at, updated_at, assigned_to, created_by, is_rework, notes, future_contact_date, rejection_reason, banco_operacao, valor_operacao, history, simulation_status, simulation_id')
         .order('created_at', { ascending: false })
         .limit(500);
 
@@ -116,7 +116,7 @@ export function useLeadsPremium() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setLeads(data || []);
+      setLeads((data as any) || []);
     } catch (error) {
       console.error('Error fetching leads:', error);
       toast({

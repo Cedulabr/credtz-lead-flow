@@ -9,7 +9,9 @@ import { MetricsDashboard } from "./views/MetricsDashboard";
 import { LeadDetailDrawer } from "./components/LeadDetailDrawer";
 import { MobileActionBar } from "./components/MobileActionBar";
 import { RequestLeadsWizard } from "./components/RequestLeadsWizard";
+import { PerformanceCreditModule } from "./components/PerformanceCreditModule";
 import { OverdueBlockBanner } from "./components/OverdueBlockBanner";
+
 import { useLeadsPremium } from "./hooks/useLeadsPremium";
 import { useOverdueLeads } from "./hooks/useOverdueLeads";
 import { LeadSalesPanel } from "./components/LeadSalesPanel";
@@ -417,13 +419,21 @@ export function LeadsPremiumModule() {
         </TabsContent>
 
         <TabsContent value="metrics" className="mt-6">
-          <MetricsDashboard 
-            leads={leads}
-            stats={stats}
-            userCredits={userCredits}
-            users={users}
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <MetricsDashboard 
+                leads={leads}
+                stats={stats}
+                userCredits={userCredits}
+                users={users}
+              />
+            </div>
+            <div className="lg:col-span-1">
+              <PerformanceCreditModule />
+            </div>
+          </div>
         </TabsContent>
+
 
       </Tabs>
 
