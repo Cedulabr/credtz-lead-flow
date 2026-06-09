@@ -88,9 +88,9 @@ export function LeadDetailDrawer({
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   
-  const [showTypingModal, setShowTypingModal] = useState(false);
   const [showTreatmentDialog, setShowTreatmentDialog] = useState(false);
   const [pendingNewStatus, setPendingNewStatus] = useState("");
+
   const [rejectionForm, setRejectionForm] = useState({
     reason: "",
     offeredValue: "",
@@ -99,12 +99,6 @@ export function LeadDetailDrawer({
   });
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
-  const [typingForm, setTypingForm] = useState({
-    banco: "",
-    valor: "",
-    parcela: "",
-    notes: ""
-  });
 
   if (!lead) return null;
 
@@ -255,60 +249,6 @@ export function LeadDetailDrawer({
 
 
 
-  const handleTypingRequest = async () => {
-    if (!typingForm.banco) {
-      toast({
-        title: "Erro",
-        description: "Selecione o banco",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      // Create typing/proposal request in propostas table
-      const { error } = await supabase
-        .from('propostas')
-        .insert({
-          "Nome do cliente": lead.name,
-          cpf: lead.cpf,
-          telefone: lead.phone,
-          convenio: lead.convenio,
-          banco: typingForm.banco,
-          valor_operacao: typingForm.valor ? parseFloat(typingForm.valor) : null,
-          parcela: typingForm.parcela || null,
-          pipeline_stage: "digitacao",
-          client_status: "aguardando_digitacao",
-          origem_lead: "leads_premium",
-          created_by_id: user?.id,
-          assigned_to: user?.id,
-          notes: typingForm.notes || `Digitação solicitada de Leads Premium`
-        });
-
-      if (error) throw error;
-
-      // Update lead status
-      await onStatusChange(lead.id, 'cliente_fechado');
-
-      toast({
-        title: "Digitação solicitada!",
-        description: "Lead convertido para proposta em digitação."
-      });
-
-      setShowTypingModal(false);
-      setTypingForm({ banco: "", valor: "", parcela: "", notes: "" });
-    } catch (error: any) {
-      console.error('Error requesting typing:', error);
-      toast({
-        title: "Erro",
-        description: error.message || "Erro ao solicitar digitação",
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   // Parse history
   const history: HistoryEntry[] = lead.history 
