@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Lead, UserProfile, LeadStats, PIPELINE_STAGES } from "../types";
+import { Lead, UserProfile, LeadStats, PIPELINE_STAGES } from "../../leads-premium/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";

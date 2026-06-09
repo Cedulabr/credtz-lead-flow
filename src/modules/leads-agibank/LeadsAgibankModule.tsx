@@ -14,7 +14,7 @@ import { useLeadsAgibank } from "./hooks/useLeadsAgibank";
 import { useOverdueLeads } from "../leads-premium/hooks/useOverdueLeads";
 import { LeadSalesPanel } from "../leads-premium/components/LeadSalesPanel";
 import { CreditRequestModal } from "./components/CreditRequestModal";
-import { Lead, LeadFilters, BANKS_LIST } from "./types";
+import { Lead, LeadFilters, BANKS_LIST } from "../leads-premium/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
