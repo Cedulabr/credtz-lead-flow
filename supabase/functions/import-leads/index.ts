@@ -150,15 +150,6 @@ Deno.serve(async (req) => {
       const margem_disponivel = toNumber(get(row, 'margem_disponivel'));
       const margem_total = toNumber(get(row, 'margem_total'));
       const matricula = String(get(row, 'matricula') ?? '').trim() || null;
-      const emprestimosRaw = get(row, 'emprestimos');
-      let emprestimos: any[] = [];
-      if (emprestimosRaw) {
-        try {
-          emprestimos = typeof emprestimosRaw === 'string' ? JSON.parse(emprestimosRaw) : (Array.isArray(emprestimosRaw) ? emprestimosRaw : []);
-        } catch (e) {
-          console.error('Error parsing emprestimos', e);
-        }
-      }
       const tagVal = String(get(row, 'tag') ?? '').trim() || null;
 
       // Outras validações dinâmicas comuns
@@ -188,10 +179,11 @@ Deno.serve(async (req) => {
         matricula,
         margem_disponivel,
         margem_total,
-        emprestimos,
         situacao: String(get(row, 'situacao') ?? '').trim() || null,
         ade: String(get(row, 'ade') ?? '').trim() || null,
+        servico_servidor: String(get(row, 'servico_servidor') ?? '').trim() || null,
         tipo_servico_servidor: String(get(row, 'tipo_servico_servidor') ?? '').trim() || null,
+        servico_consignataria: String(get(row, 'servico_consignataria') ?? '').trim() || null,
         tipo_beneficio: String(get(row, 'tipo_beneficio') ?? '').trim() || null,
         tag: tagVal,
         parcela,
@@ -202,7 +194,6 @@ Deno.serve(async (req) => {
         ultima_parcela: toDate(get(row, 'ultima_parcela')),
         data_nascimento: toDate(get(row, 'data_nascimento')),
         origem_base: convenio,
-        origem_lead: convenio === 'CONVENIOS' ? 'leads_convenios' : (convenio === 'leads_agibank' ? 'leads_agibank' : 'leads_premium'),
         subtipo: subtipo ?? null,
         estado: estado ?? null,
         is_available: true,
