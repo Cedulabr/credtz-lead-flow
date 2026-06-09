@@ -39,7 +39,7 @@ export interface Lead {
   matricula?: string | null;
   margem_total?: number | null;
   margem_disponivel?: number | null;
-  emprestimos?: any[] | null;
+  emprestimos?: any | null;
 }
 
 export interface UserProfile {
