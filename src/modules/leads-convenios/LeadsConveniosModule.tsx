@@ -166,6 +166,7 @@ export function LeadsConveniosModule() {
         onClose={() => setIsDetailOpen(false)}
         onStatusChange={updateLeadStatus}
         users={users}
+        canEdit={true}
       />
 
       <LeadSalesPanel
