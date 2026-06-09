@@ -49,10 +49,6 @@ export function AgibankLeadsModule() {
 
 
   // Inline Typing Modal
-  const [showTypingModal, setShowTypingModal] = useState(false);
-  const [typingLead, setTypingLead] = useState<Lead | null>(null);
-  const [typingForm, setTypingForm] = useState({ banco: "", valor: "", parcela: "", notes: "" });
-  const [isTypProcessing, setIsTypProcessing] = useState(false);
 
   // Future Contact Modal
   const [showFutureContactModal, setShowFutureContactModal] = useState(false);
