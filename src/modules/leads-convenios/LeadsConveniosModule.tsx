@@ -39,13 +39,25 @@ export function LeadsConveniosModule() {
           <h1 className="text-3xl font-bold">Convênios</h1>
           <p className="text-muted-foreground">Gestão de leads com visualização avançada de margem e empréstimos</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-4 items-center">
+          <div className="text-right px-4 py-2 rounded-lg bg-primary/5 border border-primary/20">
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-primary" />
+              <p className="text-2xl font-bold text-primary">{userCredits}</p>
+            </div>
+            <p className="text-xs text-muted-foreground">créditos</p>
+          </div>
+          
+          <Button onClick={() => setIsRequestModalOpen(true)} disabled={userCredits <= 0}>
+            <Plus className="h-4 w-4 mr-2" /> Pedir Leads
+          </Button>
+
           <Button variant="outline" size="icon" onClick={() => fetchLeads()} disabled={isLoading}>
             <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
           </Button>
           {isAdmin && (
-            <Button onClick={() => setShowImport(true)}>
-              <Upload className="h-4 w-4 mr-2" /> Importar Base
+            <Button variant="outline" onClick={() => setShowImport(true)}>
+              <Upload className="h-4 w-4 mr-2" /> Importar
             </Button>
           )}
         </div>
