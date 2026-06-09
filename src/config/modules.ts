@@ -35,11 +35,9 @@ export const MODULE_CATALOG: ModuleDef[] = [
   // Gestão Whatsapp / Comunicação
   { key: "easyn-flow", defaultLabel: "Easyn Flow", defaultIcon: "Zap", defaultCategory: "gestao_whatsapp" },
   { key: "whatsapp", defaultLabel: "WhatsApp Config", defaultIcon: "MessageCircle", defaultCategory: "gestao_whatsapp" },
-  { key: "sms", defaultLabel: "SMS", defaultIcon: "MessageSquare", defaultCategory: "gestao_whatsapp" },
-  { key: "telefonia", defaultLabel: "Telefonia", defaultIcon: "PhoneOutgoing", defaultCategory: "gestao_whatsapp" },
-  { key: "voicer", defaultLabel: "Easyn Voicer", defaultIcon: "Mic", defaultCategory: "gestao_whatsapp" },
 
   // Captação
+  { key: "sms", defaultLabel: "SMS", defaultIcon: "MessageSquare", defaultCategory: "captacao" },
   { key: "proposal-generator", defaultLabel: "Gerador de Proposta", defaultIcon: "FileText", defaultCategory: "captacao" },
   { key: "activate-leads", defaultLabel: "Activate Leads", defaultIcon: "Zap", defaultCategory: "captacao" },
   { key: "leads", defaultLabel: "Leads Premium", defaultIcon: "TrendingUp", defaultCategory: "captacao" },
