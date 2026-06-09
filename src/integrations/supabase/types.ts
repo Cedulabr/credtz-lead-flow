@@ -3883,6 +3883,7 @@ export type Database = {
           improvement_suggestions: Json | null
           instance_breakdown: Json | null
           likely_to_close: Json | null
+          productivity_metrics: Json | null
           report_date: string
           seller_breakdown: Json | null
           team_quality_score: number | null
@@ -3909,6 +3910,7 @@ export type Database = {
           improvement_suggestions?: Json | null
           instance_breakdown?: Json | null
           likely_to_close?: Json | null
+          productivity_metrics?: Json | null
           report_date: string
           seller_breakdown?: Json | null
           team_quality_score?: number | null
@@ -3935,6 +3937,7 @@ export type Database = {
           improvement_suggestions?: Json | null
           instance_breakdown?: Json | null
           likely_to_close?: Json | null
+          productivity_metrics?: Json | null
           report_date?: string
           seller_breakdown?: Json | null
           team_quality_score?: number | null
