@@ -4737,6 +4737,9 @@ export type Database = {
       }
       import_logs: {
         Row: {
+          blacklist_reason: string | null
+          blacklisted_at: string | null
+          blacklisted_by: string | null
           company_id: string | null
           convenio: string | null
           created_at: string
@@ -4750,6 +4753,7 @@ export type Database = {
           file_size_bytes: number | null
           id: string
           imported_by: string
+          is_blacklisted: boolean | null
           module: string
           skipped_detail: Json | null
           status: string
@@ -4759,6 +4763,9 @@ export type Database = {
           total_records: number
         }
         Insert: {
+          blacklist_reason?: string | null
+          blacklisted_at?: string | null
+          blacklisted_by?: string | null
           company_id?: string | null
           convenio?: string | null
           created_at?: string
@@ -4772,6 +4779,7 @@ export type Database = {
           file_size_bytes?: number | null
           id?: string
           imported_by: string
+          is_blacklisted?: boolean | null
           module: string
           skipped_detail?: Json | null
           status?: string
@@ -4781,6 +4789,9 @@ export type Database = {
           total_records?: number
         }
         Update: {
+          blacklist_reason?: string | null
+          blacklisted_at?: string | null
+          blacklisted_by?: string | null
           company_id?: string | null
           convenio?: string | null
           created_at?: string
@@ -4794,6 +4805,7 @@ export type Database = {
           file_size_bytes?: number | null
           id?: string
           imported_by?: string
+          is_blacklisted?: boolean | null
           module?: string
           skipped_detail?: Json | null
           status?: string
@@ -5395,6 +5407,7 @@ export type Database = {
         Row: {
           assigned_to: string | null
           banco_operacao: string | null
+          batch_id: string | null
           company_id: string | null
           convenio: string | null
           cpf: string
@@ -5433,6 +5446,7 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           banco_operacao?: string | null
+          batch_id?: string | null
           company_id?: string | null
           convenio?: string | null
           cpf: string
@@ -5471,6 +5485,7 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           banco_operacao?: string | null
+          batch_id?: string | null
           company_id?: string | null
           convenio?: string | null
           cpf?: string
@@ -5507,6 +5522,13 @@ export type Database = {
           withdrawn_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "leads_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_logs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "leads_company_id_fkey"
             columns: ["company_id"]
@@ -12672,17 +12694,50 @@ export type Database = {
           tag_filter?: string[]
         }
         Returns: {
-          banco: string
-          convenio: string
+          assigned_to: string | null
+          banco_operacao: string | null
+          batch_id: string | null
+          company_id: string | null
+          convenio: string | null
           cpf: string
+          created_at: string | null
+          created_by: string | null
+          future_contact_date: string | null
+          history: Json | null
           id: string
-          margem_disponivel: number
+          is_rework: boolean | null
           name: string
-          parcela: number
+          notes: string | null
+          origem_lead: string | null
+          original_status: string | null
           phone: string
-          phone2: string
-          tag: string
+          phone2: string | null
+          priority: string | null
+          rejection_bank: string | null
+          rejection_description: string | null
+          rejection_offered_value: number | null
+          rejection_reason: string | null
+          requested_at: string | null
+          requested_by: string | null
+          rework_date: string | null
+          simulation_id: string | null
+          simulation_status: string | null
+          stage: string | null
+          status: string | null
+          tag: string | null
+          treated_at: string | null
+          treatment_deadline: string | null
+          treatment_status: string | null
+          updated_at: string | null
+          valor_operacao: number | null
+          withdrawn_at: string | null
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "leads"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       sanitize_activate_lead: { Args: { lead_id: string }; Returns: Json }
       scan_activate_leads_duplicates: {
