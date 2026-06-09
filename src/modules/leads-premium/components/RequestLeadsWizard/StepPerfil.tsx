@@ -60,10 +60,13 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCan
     registerCanAdvance(async () => {
       const d = dataRef.current;
 
-      // Servidor Público: estado é obrigatório (mas continua para o check de telefone)
-      if (d.tipoLead === 'servidor' && !d.uf) {
-        // Para o GOV BA, podemos pular a obrigatoriedade de UF se quisermos, 
-        // ou deixar como opcional já que o convênio já está fixado.
+      // Servidor Público: estado é obrigatório
+      if (d.tipoLead === 'servidor') {
+        if (!d.uf) {
+          setEstadoError('Selecione o estado para continuar');
+          return false;
+        }
+        setEstadoError(null);
       }
 
       // INSS/SIAPE/CLT: alerta de telefone
