@@ -442,8 +442,8 @@ export function LeadDetailDrawer({
                           <p className="text-sm font-bold">{loan.parcelas_pagas || 0}</p>
                         </div>
                         <div className="bg-white/60 p-2 rounded-md border border-primary/5">
-                          <p className="text-[10px] text-muted-foreground">Total Parcelas</p>
-                          <p className="text-sm font-bold">{loan.parcelas_totais || '-'}</p>
+                          <p className="text-[10px] text-muted-foreground">Parcelas em Aberto</p>
+                          <p className="text-sm font-bold">{loan.parcelas_em_aberto || '-'}</p>
                         </div>
                       </div>
                     </CardContent>

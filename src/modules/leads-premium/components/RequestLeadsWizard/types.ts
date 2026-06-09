@@ -120,7 +120,7 @@ export const UF_NOMES: Record<string, string> = {
 export const TIPOS_LEAD: { id: TipoLead; label: string; description: string; icon: string }[] = [
   { id: 'inss',     label: 'INSS',             description: 'Aposentados e pensionistas INSS', icon: '💛' },
   { id: 'siape',    label: 'SIAPE',            description: 'Servidores federais (folha federal)', icon: '🔵' },
-  { id: 'servidor', label: 'Servidor Público', description: 'Estadual e municipal — escolha o estado', icon: '🏛️' },
+  { id: 'servidor', label: 'Convênios (GOV BA)', description: 'Servidores estaduais da Bahia', icon: '🏛️' },
   { id: 'clt',      label: 'CLT / Privado',    description: 'Trabalhadores com carteira assinada', icon: '📋' },
 ];
 

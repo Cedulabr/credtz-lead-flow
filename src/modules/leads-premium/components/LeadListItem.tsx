@@ -130,7 +130,37 @@ export function LeadListItem({ lead, onClick, onSalesPanel, onTyping, onStatusCh
               {lead.tag}
             </Badge>
           )}
+
+          {lead.matricula && (
+            <Badge variant="outline" className="px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-md border-orange-200 text-orange-700 bg-orange-50">
+              Matrícula: {lead.matricula}
+            </Badge>
+          )}
+
+          {lead.cpf && (
+            <Badge variant="outline" className="px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-md border-muted text-muted-foreground">
+              CPF: {lead.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}
+            </Badge>
+          )}
         </div>
+
+        {/* Loan Cards Summary (Horizontal) */}
+        {lead.emprestimos && Array.isArray(lead.emprestimos) && lead.emprestimos.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-3 mb-1 no-scrollbar">
+            {lead.emprestimos.slice(0, 4).map((loan: any, idx: number) => (
+              <div key={idx} className="shrink-0 min-w-[140px] p-2 rounded-lg border bg-muted/20 flex flex-col gap-0.5">
+                <span className="text-[9px] font-bold text-primary truncate uppercase">{loan.banco || 'Banco'}</span>
+                <span className="text-xs font-black">R$ {Number(loan.parcela || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                <span className="text-[9px] text-muted-foreground">{loan.parcelas_pagas || 0} / {loan.parcelas_em_aberto || '-'} pagas</span>
+              </div>
+            ))}
+            {lead.emprestimos.length > 4 && (
+              <div className="shrink-0 flex items-center px-2 text-[10px] font-bold text-muted-foreground">
+                +{lead.emprestimos.length - 4} mais
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Row 3: Action Buttons & Status Selector */}
         <div className="flex items-center gap-2 flex-wrap">
