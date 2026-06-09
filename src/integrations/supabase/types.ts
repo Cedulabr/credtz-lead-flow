@@ -7110,11 +7110,15 @@ export type Database = {
           forbidden_phrases: string[]
           human_escalation_message: string | null
           id: string
+          knowledge_base_summary: string | null
           max_discount_percent: number | null
           max_followups: number
+          pricing_details: Json | null
           pricing_info: string | null
+          pricing_type: string | null
           product_description: string | null
           product_id: number | null
+          product_main_name: string | null
           schedule_days: string[]
           schedule_end_time: string | null
           schedule_start_time: string | null
@@ -7139,11 +7143,15 @@ export type Database = {
           forbidden_phrases?: string[]
           human_escalation_message?: string | null
           id?: string
+          knowledge_base_summary?: string | null
           max_discount_percent?: number | null
           max_followups?: number
+          pricing_details?: Json | null
           pricing_info?: string | null
+          pricing_type?: string | null
           product_description?: string | null
           product_id?: number | null
+          product_main_name?: string | null
           schedule_days?: string[]
           schedule_end_time?: string | null
           schedule_start_time?: string | null
@@ -7168,11 +7176,15 @@ export type Database = {
           forbidden_phrases?: string[]
           human_escalation_message?: string | null
           id?: string
+          knowledge_base_summary?: string | null
           max_discount_percent?: number | null
           max_followups?: number
+          pricing_details?: Json | null
           pricing_info?: string | null
+          pricing_type?: string | null
           product_description?: string | null
           product_id?: number | null
+          product_main_name?: string | null
           schedule_days?: string[]
           schedule_end_time?: string | null
           schedule_start_time?: string | null
