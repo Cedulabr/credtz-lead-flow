@@ -32,6 +32,7 @@ export function ModuleConfigDrawer({ moduleKey, userId, current, categories, ope
   const [displayName, setDisplayName] = useState(current?.display_name ?? def?.defaultLabel ?? "");
   const [icon, setIcon] = useState(current?.icon ?? def?.defaultIcon ?? "Folder");
   const [position, setPosition] = useState<number>(current?.position ?? 0);
+  const [expiresAt, setExpiresAt] = useState<string>(current?.expires_at ? current.expires_at.split('T')[0] : "");
 
   useEffect(() => {
     setIsActive(current?.is_active ?? false);
@@ -39,6 +40,7 @@ export function ModuleConfigDrawer({ moduleKey, userId, current, categories, ope
     setDisplayName(current?.display_name ?? def?.defaultLabel ?? "");
     setIcon(current?.icon ?? def?.defaultIcon ?? "Folder");
     setPosition(current?.position ?? 0);
+    setExpiresAt(current?.expires_at ? current.expires_at.split('T')[0] : "");
   }, [current, def]);
 
   const save = useMutation({
@@ -51,6 +53,7 @@ export function ModuleConfigDrawer({ moduleKey, userId, current, categories, ope
         display_name: displayName || null,
         icon,
         position,
+        expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
       };
       const { error } = await supabase
         .from("module_permissions" as any)
@@ -155,6 +158,19 @@ export function ModuleConfigDrawer({ moduleKey, userId, current, categories, ope
               value={position}
               onChange={(e) => setPosition(parseInt(e.target.value || "0", 10))}
             />
+          </div>
+
+          <div>
+            <Label className="text-sm">Expira em</Label>
+            <Input
+              type="date"
+              className="mt-1.5"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Deixe vazio para acesso permanente.
+            </p>
           </div>
         </div>
 
