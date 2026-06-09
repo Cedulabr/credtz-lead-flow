@@ -5964,6 +5964,7 @@ export type Database = {
           category_key: string
           created_at: string
           display_name: string | null
+          expires_at: string | null
           icon: string | null
           id: string
           is_active: boolean
@@ -5976,6 +5977,7 @@ export type Database = {
           category_key: string
           created_at?: string
           display_name?: string | null
+          expires_at?: string | null
           icon?: string | null
           id?: string
           is_active?: boolean
@@ -5988,6 +5990,7 @@ export type Database = {
           category_key?: string
           created_at?: string
           display_name?: string | null
+          expires_at?: string | null
           icon?: string | null
           id?: string
           is_active?: boolean
@@ -7891,6 +7894,7 @@ export type Database = {
           extracted_text: string | null
           extraction_error: string | null
           extraction_status: string
+          extraction_summary: string | null
           file_type: string
           filename: string
           id: string
@@ -7905,6 +7909,7 @@ export type Database = {
           extracted_text?: string | null
           extraction_error?: string | null
           extraction_status?: string
+          extraction_summary?: string | null
           file_type: string
           filename: string
           id?: string
@@ -7919,6 +7924,7 @@ export type Database = {
           extracted_text?: string | null
           extraction_error?: string | null
           extraction_status?: string
+          extraction_summary?: string | null
           file_type?: string
           filename?: string
           id?: string
