@@ -40,6 +40,16 @@ export interface Lead {
   margem_total?: number | null;
   margem_disponivel?: number | null;
   emprestimos?: any | null;
+  origem_base?: string | null;
+  tipo_servico_servidor?: string | null;
+  tipo_beneficio?: string | null;
+  ade?: string | null;
+  parcelas_pagas?: number | null;
+  parcelas_em_aberto?: number | null;
+  parcela?: number | null;
+  deferimento?: string | null;
+  ultimo_desconto?: string | null;
+  ultima_parcela?: string | null;
 }
 
 export interface UserProfile {
