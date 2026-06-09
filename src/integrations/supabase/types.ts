@@ -5405,6 +5405,9 @@ export type Database = {
       }
       leads: {
         Row: {
+          agibank_account_type: string | null
+          agibank_link_date: string | null
+          agibank_products: string | null
           assigned_to: string | null
           banco_operacao: string | null
           batch_id: string | null
@@ -5444,6 +5447,9 @@ export type Database = {
           withdrawn_at: string | null
         }
         Insert: {
+          agibank_account_type?: string | null
+          agibank_link_date?: string | null
+          agibank_products?: string | null
           assigned_to?: string | null
           banco_operacao?: string | null
           batch_id?: string | null
@@ -5483,6 +5489,9 @@ export type Database = {
           withdrawn_at?: string | null
         }
         Update: {
+          agibank_account_type?: string | null
+          agibank_link_date?: string | null
+          agibank_products?: string | null
           assigned_to?: string | null
           banco_operacao?: string | null
           batch_id?: string | null
@@ -5575,6 +5584,9 @@ export type Database = {
       leads_database: {
         Row: {
           ade: string | null
+          agibank_account_type: string | null
+          agibank_link_date: string | null
+          agibank_products: string | null
           banco: string | null
           convenio: string
           cpf: string | null
@@ -5614,6 +5626,9 @@ export type Database = {
         }
         Insert: {
           ade?: string | null
+          agibank_account_type?: string | null
+          agibank_link_date?: string | null
+          agibank_products?: string | null
           banco?: string | null
           convenio: string
           cpf?: string | null
@@ -5653,6 +5668,9 @@ export type Database = {
         }
         Update: {
           ade?: string | null
+          agibank_account_type?: string | null
+          agibank_link_date?: string | null
+          agibank_products?: string | null
           banco?: string | null
           convenio?: string
           cpf?: string | null
@@ -12727,6 +12745,9 @@ export type Database = {
           tag_filter?: string[]
         }
         Returns: {
+          agibank_account_type: string | null
+          agibank_link_date: string | null
+          agibank_products: string | null
           assigned_to: string | null
           banco_operacao: string | null
           batch_id: string | null
