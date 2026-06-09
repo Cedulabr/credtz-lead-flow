@@ -23,6 +23,7 @@ export interface ModulePermission {
   display_name: string | null;
   icon: string | null;
   position: number;
+  expires_at: string | null;
 }
 
 export interface MenuItem {
@@ -109,7 +110,12 @@ export function useUserMenu(userId?: string) {
 
   const sections: MenuSection[] = [];
   if (!isLoading && cats.data && perms.data) {
-    const activePerms = [...perms.data.filter((p) => p.is_active)];
+    const now = new Date();
+    const activePerms = [...perms.data.filter((p) => {
+      if (!p.is_active) return false;
+      if (p.expires_at && new Date(p.expires_at) < now) return false;
+      return true;
+    })];
 
     // Admin viewing own menu → sees every module in the catalog.
     if (!userId && isAdmin && profile) {

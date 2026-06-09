@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Search, Eye, Settings2 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { MODULE_CATALOG, getIcon } from "@/config/modules";
 import { MODULE_TO_PROFILE_FLAG } from "@/config/permissionFlags";
 import { useMenuCategories, useUserModulePermissions, type ModulePermission } from "@/hooks/useUserMenu";
@@ -334,9 +335,19 @@ export default function PermissionsAdmin() {
                           <div className="font-medium truncate">{p?.display_name || m.defaultLabel}</div>
                           <div className="text-xs text-muted-foreground truncate">{catLabel}</div>
                         </div>
-                        <Badge variant={active ? "default" : "secondary"} className="shrink-0">
-                          {active ? "Ativo" : "Inativo"}
-                        </Badge>
+                        <div className="flex flex-col items-end shrink-0">
+                          <Badge variant={active ? "default" : "secondary"}>
+                            {active ? "Ativo" : "Inativo"}
+                          </Badge>
+                          {active && p?.expires_at && (
+                            <div className={cn(
+                              "text-[10px] mt-1",
+                              new Date(p.expires_at) < new Date() ? "text-destructive font-bold" : "text-muted-foreground"
+                            )}>
+                              Exp: {new Date(p.expires_at).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center justify-between pt-2 border-t">
                         <div className="flex items-center gap-2">
