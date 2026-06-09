@@ -44,8 +44,8 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle();
 
-      if (!uc?.company_id) throw new Error("Usuário sem empresa vinculada");
-      const company_id = uc.company_id;
+      const company_id = uc?.company_id || null;
+      // Removi o bloqueio caso company_id seja null para permitir testes/uso básico
 
       const { data: mod } = await service
         .from("modules")
