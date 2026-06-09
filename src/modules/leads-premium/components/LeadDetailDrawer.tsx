@@ -37,7 +37,8 @@ import {
   AlertCircle,
   Edit,
   Calculator,
-  Loader2
+  Loader2,
+  Briefcase
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProductSelectCard } from "./ProductEducationPopover";
@@ -45,6 +46,7 @@ import { LeadTelefoniaModal } from "./LeadTelefoniaModal";
 import { LeadTelefonesEncontrados } from "./LeadTelefonesEncontrados";
 import { Search as SearchIcon, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface LeadDetailDrawerProps {
   lead: Lead | null;
@@ -342,6 +344,63 @@ export function LeadDetailDrawer({
 
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4">
+          {/* Informações de Margem (Convênios) */}
+          {(lead.margem_total || lead.margem_disponivel || lead.matricula) && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl bg-orange-50 border border-orange-100 mb-6">
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase tracking-wider text-orange-600 font-bold">Margem Total</Label>
+                <p className="text-xl font-black text-orange-700">
+                  R$ {Number(lead.margem_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase tracking-wider text-orange-600 font-bold">Margem Disponível</Label>
+                <p className="text-xl font-black text-orange-700">
+                  R$ {Number(lead.margem_disponivel || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase tracking-wider text-orange-600 font-bold">Matrícula</Label>
+                <p className="text-lg font-bold text-orange-900">{lead.matricula || '-'}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Empréstimos em Cards */}
+          {Array.isArray(lead.emprestimos) && lead.emprestimos.length > 0 && (
+            <div className="space-y-4 mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <Briefcase className="h-5 w-5 text-primary" />
+                <h3 className="font-bold text-lg">Empréstimos Ativos</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {lead.emprestimos.map((loan: any, idx: number) => (
+                  <Card key={idx} className="bg-primary/5 border-primary/10 overflow-hidden">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="text-xs font-semibold text-primary uppercase tracking-wider">{loan.banco || 'Banco não informado'}</p>
+                          <p className="text-lg font-bold">R$ {Number(loan.parcela || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                        <Badge variant="outline" className="bg-white/50">Contrato {idx + 1}</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 mt-3">
+                        <div className="bg-white/60 p-2 rounded-md border border-primary/5">
+                          <p className="text-[10px] text-muted-foreground">Parcelas Pagas</p>
+                          <p className="text-sm font-bold">{loan.parcelas_pagas || 0}</p>
+                        </div>
+                        <div className="bg-white/60 p-2 rounded-md border border-primary/5">
+                          <p className="text-[10px] text-muted-foreground">Total Parcelas</p>
+                          <p className="text-sm font-bold">{loan.parcelas_totais || '-'}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Quick Contact Actions */}
           <div className="grid grid-cols-2 gap-3">
             <Button 

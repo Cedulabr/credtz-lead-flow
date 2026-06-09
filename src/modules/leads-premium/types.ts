@@ -35,6 +35,11 @@ export interface Lead {
   agibank_is_onboarded?: boolean | null;
   agibank_last_interaction_type?: string | null;
   agibank_last_interaction_date?: string | null;
+  // Convenios specific fields
+  matricula?: string | null;
+  margem_total?: number | null;
+  margem_disponivel?: number | null;
+  emprestimos?: any[] | null;
 }
 
 export interface UserProfile {

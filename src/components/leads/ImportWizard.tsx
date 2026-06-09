@@ -173,6 +173,7 @@ export function ImportWizard({ open, onOpenChange, onCompleted }: ImportWizardPr
               <OptionCard icon="💛" title="INSS" description="Aposentados e pensionistas INSS" selected={convenio === 'INSS'} onClick={() => { setConvenio('INSS'); setSubtipo(null); setEstado(null); }} />
               <OptionCard icon="🔵" title="SIAPE" description="Servidores federais (folha federal)" selected={convenio === 'SIAPE'} onClick={() => { setConvenio('SIAPE'); setSubtipo(null); setEstado(null); }} />
               <OptionCard icon="🏛️" title="Servidor Público" description="Estadual e municipal" selected={convenio === 'SERVIDOR_PUBLICO'} onClick={() => setConvenio('SERVIDOR_PUBLICO')} />
+              <OptionCard icon="💼" title="Convênios" description="Módulo Convênios" selected={convenio === 'CONVENIOS'} onClick={() => { setConvenio('CONVENIOS'); setSubtipo(null); setEstado(null); }} />
             </div>
           ) : currentStep === 'subtipo' ? (
             <div className="space-y-3">

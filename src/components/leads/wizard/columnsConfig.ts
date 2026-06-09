@@ -1,6 +1,6 @@
 // Catálogo de campos por convênio para o wizard de importação/atualização
 
-export type Convenio = 'INSS' | 'SIAPE' | 'SERVIDOR_PUBLICO';
+export type Convenio = 'INSS' | 'SIAPE' | 'SERVIDOR_PUBLICO' | 'CONVENIOS';
 export type Subtipo = 'federal' | 'estadual' | 'municipal';
 
 export interface FieldDef {
@@ -68,6 +68,16 @@ export const DEFAULT_FIELDS_BY_CONVENIO: Record<Convenio, FieldDef[]> = {
     { key: 'ultima_parcela', label: 'Última Parcela', required: true, group: 'parcelas' },
     { key: 'convenio', label: 'Convênio', required: true, group: 'emprestimo' },
     { key: 'ddd', label: 'DDD', required: false, group: 'contato' },
+    { key: 'phone', label: 'Telefone', required: false, group: 'contato' },
+  ],
+  CONVENIOS: [
+    { key: 'cpf', label: 'CPF', required: true, group: 'cadastro' },
+    { key: 'name', label: 'Nome', required: true, group: 'cadastro' },
+    { key: 'matricula', label: 'Matrícula', required: false, group: 'cadastro' },
+    { key: 'margem_total', label: 'Margem Total', required: true, group: 'margem' },
+    { key: 'margem_disponivel', label: 'Margem Disponível', required: true, group: 'margem' },
+    { key: 'emprestimos', label: 'Empréstimos (JSON)', required: false, group: 'emprestimo' },
+    { key: 'tag', label: 'Tag', required: false, group: 'cadastro' },
     { key: 'phone', label: 'Telefone', required: false, group: 'contato' },
   ],
 };
@@ -159,6 +169,7 @@ export const CONVENIO_LABELS: Record<Convenio, string> = {
   INSS: 'INSS',
   SIAPE: 'SIAPE',
   SERVIDOR_PUBLICO: 'Servidor Público',
+  CONVENIOS: 'Convênios',
 };
 
 export const SUBTIPO_LABELS: Record<Subtipo, string> = {
@@ -198,6 +209,7 @@ export function autoMapHeaders(systemFields: FieldDef[], fileHeaders: string[]):
     data_nascimento: ['datanascimento', 'nascimento', 'dtnascimento'],
     tipo_beneficio: ['beneficio', 'tipobeneficio', 'orgao', 'organ'],
     tag: ['tag', 'tags', 'etiqueta', 'categoria', 'campanha'],
+    emprestimos: ['emprestimos', 'loans', 'contratos'],
   };
   const result: Record<string, string> = {};
   for (const f of systemFields) {

@@ -86,6 +86,9 @@ export const EasynFlowModule = lazy(() => import('@/modules/easyn-flow/EasynFlow
 // Leads Agibank
 export const AgibankLeadsModule = lazy(() => import('@/modules/leads-agibank/LeadsAgibankModule').then(m => ({ default: m.AgibankLeadsModule })));
 
+// Leads Convênios
+export const ConveniosLeadsModule = lazy(() => import('@/modules/leads-convenios/LeadsConveniosModule').then(m => ({ default: m.LeadsConveniosModule })));
+
 // Base OFF legacy — removido
 
 export const MyClientsKanban = lazy(() => import('./MyClientsKanban').then(m => ({ default: m.MyClientsKanban })));
@@ -207,3 +210,4 @@ export const LazyTelefoniaModule = withLazyLoading(TelefoniaModule, FormSkeleton
 export const LazyReaproveitamentoModule = withLazyLoading(ReaproveitamentoModule, TableSkeleton);
 export const LazyEasynFlowModule = withLazyLoading(EasynFlowModule, FormSkeleton);
 export const LazyAgibankLeadsModule = withLazyLoading(AgibankLeadsModule, TableSkeleton);
+export const LazyConveniosLeadsModule = withLazyLoading(ConveniosLeadsModule, TableSkeleton);

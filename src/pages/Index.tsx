@@ -47,6 +47,7 @@ import {
   LazyReaproveitamentoModule,
   LazyEasynFlowModule,
   LazyAgibankLeadsModule,
+  LazyConveniosLeadsModule,
 } from "@/components/LazyComponents";
 import { useActiveModuleMap } from "@/hooks/useUserMenu";
 import { MODULE_BY_KEY } from "@/config/modules";
@@ -221,6 +222,7 @@ const Index = () => {
     billing: <Billing />,
     'easyn-flow': <LazyEasynFlowModule />,
     'leads-agibank': <LazyAgibankLeadsModule />,
+    'leads-convenios': <LazyConveniosLeadsModule />,
   }), [setActiveTab]);
 
   // ── Render active tab ──────────────────────────────────────────────

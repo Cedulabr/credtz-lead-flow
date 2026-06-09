@@ -5561,10 +5561,13 @@ export type Database = {
           cpf: string
           created_at: string | null
           created_by: string | null
+          emprestimos: Json | null
           future_contact_date: string | null
           history: Json | null
           id: string
           is_rework: boolean | null
+          margem_total: number | null
+          matricula: string | null
           name: string
           notes: string | null
           origem_lead: string | null
@@ -5607,10 +5610,13 @@ export type Database = {
           cpf: string
           created_at?: string | null
           created_by?: string | null
+          emprestimos?: Json | null
           future_contact_date?: string | null
           history?: Json | null
           id?: string
           is_rework?: boolean | null
+          margem_total?: number | null
+          matricula?: string | null
           name: string
           notes?: string | null
           origem_lead?: string | null
@@ -5653,10 +5659,13 @@ export type Database = {
           cpf?: string
           created_at?: string | null
           created_by?: string | null
+          emprestimos?: Json | null
           future_contact_date?: string | null
           history?: Json | null
           id?: string
           is_rework?: boolean | null
+          margem_total?: number | null
+          matricula?: string | null
           name?: string
           notes?: string | null
           origem_lead?: string | null

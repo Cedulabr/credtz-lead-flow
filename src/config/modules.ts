@@ -42,6 +42,7 @@ export const MODULE_CATALOG: ModuleDef[] = [
   { key: "activate-leads", defaultLabel: "Activate Leads", defaultIcon: "Zap", defaultCategory: "captacao" },
   { key: "leads", defaultLabel: "Leads Premium", defaultIcon: "TrendingUp", defaultCategory: "captacao" },
   { key: "leads-agibank", defaultLabel: "Leads Agibank", defaultIcon: "TrendingUp", defaultCategory: "captacao" },
+  { key: "leads-convenios", defaultLabel: "Convênios", defaultIcon: "Users", defaultCategory: "captacao" },
   { key: "reaproveitamento", defaultLabel: "Reaproveitamento", defaultIcon: "RefreshCw", defaultCategory: "captacao" },
   { key: "reuse-alerts", defaultLabel: "Painel de Oportunidades", defaultIcon: "Target", defaultCategory: "captacao" },
 
