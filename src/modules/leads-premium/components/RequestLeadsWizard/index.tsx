@@ -94,7 +94,7 @@ export function RequestLeadsWizard({
     setIsSubmitting(true);
     try {
       const success = await onRequestLeads({
-        convenio: tipoLeadToConvenio(data.tipoLead) || undefined,
+        convenio: data.tipoLead === 'servidor' ? 'GOVERNO BA' : (tipoLeadToConvenio(data.tipoLead) || undefined),
         count: data.quantidade,
         ddds: data.ddds.length > 0 ? data.ddds : undefined,
         tags: data.tags.length > 0 ? data.tags : undefined,
