@@ -100,7 +100,7 @@ export function useLeadsPremium() {
       setIsLoading(true);
       let query = supabase
         .from('leads')
-        .select('id, name, cpf, phone, phone2, convenio, tag, status, created_at, updated_at, assigned_to, created_by, is_rework, notes, future_contact_date, rejection_reason, banco_operacao, valor_operacao, history, simulation_status, simulation_id')
+        .select('id, name, cpf, phone, phone2, convenio, tag, status, created_at, updated_at, assigned_to, created_by, is_rework, notes, future_contact_date, rejection_reason, banco_operacao, valor_operacao, history, simulation_status, simulation_id, matricula, margem_total, margem_disponivel, emprestimos')
         .order('created_at', { ascending: false })
         .limit(500);
 
