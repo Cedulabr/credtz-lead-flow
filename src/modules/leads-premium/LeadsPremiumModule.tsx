@@ -294,12 +294,20 @@ export function LeadsPremiumModule() {
                 exit={{ opacity: 0, x: 20 }}
                 className="h-full overflow-auto"
               >
-                <MetricsDashboard 
-                  leads={leads}
-                  stats={stats}
-                  userCredits={userCredits}
-                  users={users}
-                />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2">
+                    <MetricsDashboard 
+                      leads={leads}
+                      stats={stats}
+                      userCredits={userCredits}
+                      users={users}
+                    />
+                  </div>
+                  <div className="lg:col-span-1 p-4">
+                    <PerformanceCreditModule />
+                  </div>
+                </div>
+
               </motion.div>
             )}
           </AnimatePresence>
