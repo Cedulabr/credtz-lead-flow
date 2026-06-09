@@ -1629,30 +1629,33 @@ export type Database = {
       }
       billing_events: {
         Row: {
+          abacatepay_event_id: string | null
           created_at: string
           error: string | null
           id: string
           payload: Json
           processed_at: string | null
-          stripe_event_id: string
+          stripe_event_id: string | null
           type: string
         }
         Insert: {
+          abacatepay_event_id?: string | null
           created_at?: string
           error?: string | null
           id?: string
           payload: Json
           processed_at?: string | null
-          stripe_event_id: string
+          stripe_event_id?: string | null
           type: string
         }
         Update: {
+          abacatepay_event_id?: string | null
           created_at?: string
           error?: string | null
           id?: string
           payload?: Json
           processed_at?: string | null
-          stripe_event_id?: string
+          stripe_event_id?: string | null
           type?: string
         }
         Relationships: []
@@ -6650,6 +6653,7 @@ export type Database = {
       }
       payments: {
         Row: {
+          abacatepay_id: string | null
           amount: number
           created_at: string
           currency: string
@@ -6663,6 +6667,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          abacatepay_id?: string | null
           amount: number
           created_at?: string
           currency?: string
@@ -6676,6 +6681,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          abacatepay_id?: string | null
           amount?: number
           created_at?: string
           currency?: string
