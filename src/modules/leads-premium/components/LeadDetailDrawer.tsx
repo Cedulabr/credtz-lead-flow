@@ -88,8 +88,10 @@ export function LeadDetailDrawer({
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   
+  const [showTypingModal, setShowTypingModal] = useState(false);
   const [showTreatmentDialog, setShowTreatmentDialog] = useState(false);
   const [pendingNewStatus, setPendingNewStatus] = useState("");
+
 
   const [rejectionForm, setRejectionForm] = useState({
     reason: "",
@@ -99,6 +101,13 @@ export function LeadDetailDrawer({
   });
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
+  const [typingForm, setTypingForm] = useState({
+    banco: "",
+    valor: "",
+    parcela: "",
+    notes: ""
+  });
+
 
   if (!lead) return null;
 
