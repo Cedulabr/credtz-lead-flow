@@ -84,7 +84,7 @@ export const ReaproveitamentoModule = lazy(() => import('@/modules/reaproveitame
 export const EasynFlowModule = lazy(() => import('@/modules/easyn-flow/EasynFlowModule').then(m => ({ default: m.EasynFlowModule })));
 
 // Leads Agibank
-export const AgibankLeadsModule = lazy(() => import('@/modules/leads-agibank/AgibankLeadsModule').then(m => ({ default: m.AgibankLeadsModule })));
+export const AgibankLeadsModule = lazy(() => import('@/modules/leads-agibank/LeadsAgibankModule').then(m => ({ default: m.AgibankLeadsModule })));
 
 // Base OFF legacy — removido
 
