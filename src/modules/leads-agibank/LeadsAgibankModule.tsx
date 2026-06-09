@@ -300,7 +300,8 @@ export function AgibankLeadsModule() {
 
         {/* Lead Sales Panel */}
         <LeadSalesPanel
-          lead={typingLead}
+          lead={selectedLead}
+
           isOpen={isSalesPanelOpen}
           onClose={() => setIsSalesPanelOpen(false)}
           onStatusChange={handleStatusChange}
