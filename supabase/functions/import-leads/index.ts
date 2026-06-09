@@ -196,6 +196,7 @@ Deno.serve(async (req) => {
         estado: estado ?? null,
         is_available: true,
         import_log_id: importLogId,
+        batch_id: importLogId, // Adicionando batch_id para vincular o lead ao lote
       };
 
       const dedupKey = (cpf && banco && parcela != null && parcelas_em_aberto != null)
