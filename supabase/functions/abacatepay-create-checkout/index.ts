@@ -12,23 +12,34 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header");
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const API_KEY = Deno.env.get("ABACATEPAY_API_KEY");
+
+    if (!API_KEY) {
+      console.error("ABACATEPAY_API_KEY is not set");
+      throw new Error("Configuração do AbacatePay pendente.");
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
 
     const { data: { user }, error: userErr } = await supabase.auth.getUser();
-    if (userErr || !user?.email) throw new Error("User not authenticated");
+    if (userErr || !user?.email) {
+      console.error("Auth error:", userErr);
+      throw new Error("Usuário não autenticado");
+    }
 
     const body = await req.json();
+    console.log("Request Body:", JSON.stringify(body));
+
     const { module_slug, package_id, custom_credits, customer } = body;
 
-    const service = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-      { auth: { persistSession: false } }
-    );
+    const service = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false }
+    });
 
     let amount = 0;
     let credits = 0;
@@ -45,13 +56,17 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       const company_id = uc?.company_id || null;
-      // Removi o bloqueio caso company_id seja null para permitir testes/uso básico
 
-      const { data: mod } = await service
+      const { data: mod, error: modError } = await service
         .from("modules")
         .select("name, credit_price_cents, monthly_price_cents, billing_type")
         .eq("slug", module_slug)
         .single();
+
+      if (modError || !mod) {
+        console.error("Module error:", modError);
+        throw new Error("Módulo não encontrado");
+      }
 
       if (package_id) {
         const { data: pkg } = await service
@@ -62,12 +77,12 @@ Deno.serve(async (req) => {
         if (!pkg) throw new Error("Pacote inválido");
         amount = pkg.price_cents;
         credits = pkg.credits;
-        description = `${mod?.name ?? module_slug} — ${pkg.name}`;
+        description = `${mod.name} — ${pkg.name}`;
       } else if (custom_credits) {
         credits = parseInt(String(custom_credits), 10);
-        amount = credits * (mod?.credit_price_cents ?? 0);
-        description = `${mod?.name ?? module_slug} — ${credits} créditos`;
-      } else if (mod?.billing_type === "subscription") {
+        amount = credits * (mod.credit_price_cents ?? 0);
+        description = `${mod.name} — ${credits} créditos`;
+      } else if (mod.billing_type === "subscription") {
         amount = mod.monthly_price_cents;
         description = `Assinatura Módulo: ${mod.name}`;
         isSubscription = true;
@@ -75,10 +90,7 @@ Deno.serve(async (req) => {
         throw new Error("Parâmetros de cobrança inválidos");
       }
 
-      const API_KEY = Deno.env.get("ABACATEPAY_API_KEY");
-      const origin = req.headers.get("origin") || "http://localhost:5173";
-
-      // Product ID for marketplace (from user prompt)
+      const origin = req.headers.get("origin") || "https://easyn.lovable.app";
       const externalProductId = "prod_Y0mn4nhzgjzAwuyHjPEMkD3W";
 
       const checkoutBody = {
@@ -96,13 +108,14 @@ Deno.serve(async (req) => {
         completionUrl: `${origin}/marketplace?status=success`,
         customerId: user.id,
         customer: {
-          name: customer?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || "Cliente",
+          name: customer?.name || user.user_metadata?.full_name || "Cliente",
           email: customer?.email || user.email,
-          taxId: customer?.taxId || user.user_metadata?.cpf || "",
+          taxId: customer?.taxId || "",
+          phone: customer?.phone || "",
         }
       };
 
-      console.log("Creating AbacatePay checkout with body:", JSON.stringify(checkoutBody, null, 2));
+      console.log("Calling AbacatePay with:", JSON.stringify(checkoutBody));
 
       const response = await fetch("https://api.abacatepay.com/v1/billing/create", {
         method: "POST",
@@ -113,23 +126,17 @@ Deno.serve(async (req) => {
         body: JSON.stringify(checkoutBody),
       });
 
-      const text = await response.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        console.error("Failed to parse JSON response:", text);
-        throw new Error(`AbacatePay API Error: ${response.status} ${response.statusText}`);
-      }
-      
+      const responseText = await response.text();
+      console.log("AbacatePay Response:", responseText);
+
       if (!response.ok) {
-        console.error("AbacatePay API Error Body:", data);
-        throw new Error(data.error || data.message || "Erro ao criar cobrança no AbacatePay");
+        throw new Error(`Erro na API AbacatePay: ${responseText}`);
       }
 
-      const billing = data.data;
+      const responseData = JSON.parse(responseText);
+      const billing = responseData.data;
 
-      // Registrar o pagamento pendente
+      // Log the payment
       await service.from("payments").insert({
         user_id: user.id,
         email: user.email,
@@ -141,9 +148,8 @@ Deno.serve(async (req) => {
         metadata: {
           company_id,
           module_slug,
-          credits: isSubscription ? "0" : String(credits),
+          credits: String(credits),
           is_subscription: isSubscription,
-          user_id: user.id,
         },
       });
 
@@ -155,6 +161,7 @@ Deno.serve(async (req) => {
 
     throw new Error("module_slug é obrigatório");
   } catch (err) {
+    console.error("Edge Function Error:", err.message);
     return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,
