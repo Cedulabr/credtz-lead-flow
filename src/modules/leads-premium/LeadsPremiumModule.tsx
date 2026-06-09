@@ -9,7 +9,9 @@ import { MetricsDashboard } from "./views/MetricsDashboard";
 import { LeadDetailDrawer } from "./components/LeadDetailDrawer";
 import { MobileActionBar } from "./components/MobileActionBar";
 import { RequestLeadsWizard } from "./components/RequestLeadsWizard";
+import { PerformanceCreditModule } from "./components/PerformanceCreditModule";
 import { OverdueBlockBanner } from "./components/OverdueBlockBanner";
+
 import { useLeadsPremium } from "./hooks/useLeadsPremium";
 import { useOverdueLeads } from "./hooks/useOverdueLeads";
 import { LeadSalesPanel } from "./components/LeadSalesPanel";
@@ -44,11 +46,7 @@ export function LeadsPremiumModule() {
   const isAdmin = profile?.role === 'admin';
 
 
-  // Inline Typing Modal
-  const [showTypingModal, setShowTypingModal] = useState(false);
-  const [typingLead, setTypingLead] = useState<Lead | null>(null);
-  const [typingForm, setTypingForm] = useState({ banco: "", valor: "", parcela: "", notes: "" });
-  const [isTypProcessing, setIsTypProcessing] = useState(false);
+
 
   // Future Contact Modal
   const [showFutureContactModal, setShowFutureContactModal] = useState(false);
@@ -70,7 +68,6 @@ export function LeadsPremiumModule() {
 
   const { overdueLeads, isBlocked: isOverdueBlocked } = useOverdueLeads();
 
-  // Fetch pending simulations count
 
   const handleLeadSelect = (lead: Lead) => {
     setSelectedLead(lead);
@@ -110,54 +107,9 @@ export function LeadsPremiumModule() {
 
   // Inline handlers for sales panel
   const handleOpenSalesPanel = (lead: Lead) => {
-    setTypingLead(lead);
     setIsSalesPanelOpen(true);
   };
 
-  // Inline handlers for list-level typing
-  const handleListTyping = (lead: Lead) => {
-    setTypingLead(lead);
-    setTypingForm({ banco: "", valor: "", parcela: "", notes: "" });
-    setShowTypingModal(true);
-  };
-
-  const handleTypingSubmit = async () => {
-    if (!typingLead || !typingForm.banco) {
-      toast({ title: "Selecione o banco", variant: "destructive" });
-      return;
-    }
-
-    setIsTypProcessing(true);
-    try {
-      const { error } = await supabase
-        .from('propostas')
-        .insert({
-          "Nome do cliente": typingLead.name,
-          cpf: typingLead.cpf,
-          telefone: typingLead.phone,
-          convenio: typingLead.convenio,
-          banco: typingForm.banco,
-          valor_proposta: typingForm.valor ? parseFloat(typingForm.valor) : null,
-          installments: typingForm.parcela ? parseInt(typingForm.parcela.replace(/\D/g, '')) : null,
-          pipeline_stage: "digitacao",
-          client_status: "aguardando_digitacao",
-          origem_lead: "leads_premium",
-          created_by_id: user?.id,
-          assigned_to: user?.id,
-          notes: typingForm.notes || 'Digitação solicitada de Leads Premium'
-        });
-
-      if (error) throw error;
-      await updateLeadStatus(typingLead.id, 'cliente_fechado');
-      toast({ title: "Digitação solicitada!", description: "Lead convertido para proposta." });
-      setShowTypingModal(false);
-      fetchLeads();
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    } finally {
-      setIsTypProcessing(false);
-    }
-  };
 
   // Future contact submit
   const handleFutureContactSubmit = async () => {
@@ -279,7 +231,8 @@ export function LeadsPremiumModule() {
                   onLeadSelect={handleLeadSelect}
                   onRefresh={fetchLeads}
                   onSalesPanel={handleOpenSalesPanel}
-                  onTyping={handleListTyping}
+                  onTyping={() => {}}
+
                   onStatusChange={handleListStatusChange}
                   canEditLead={canEditLead}
                 />
@@ -293,12 +246,20 @@ export function LeadsPremiumModule() {
                 exit={{ opacity: 0, x: 20 }}
                 className="h-full overflow-auto"
               >
-                <MetricsDashboard 
-                  leads={leads}
-                  stats={stats}
-                  userCredits={userCredits}
-                  users={users}
-                />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2">
+                    <MetricsDashboard 
+                      leads={leads}
+                      stats={stats}
+                      userCredits={userCredits}
+                      users={users}
+                    />
+                  </div>
+                  <div className="lg:col-span-1 p-4">
+                    <PerformanceCreditModule />
+                  </div>
+                </div>
+
               </motion.div>
             )}
           </AnimatePresence>
@@ -333,24 +294,14 @@ export function LeadsPremiumModule() {
         />
 
 
-        {/* Inline Typing Modal */}
-        <TypingModal
-          open={showTypingModal}
-          onOpenChange={setShowTypingModal}
-          lead={typingLead}
-          form={typingForm}
-          onFormChange={setTypingForm}
-          onSubmit={handleTypingSubmit}
-           isProcessing={isTypProcessing}
-        />
-
         {/* Lead Sales Panel */}
         <LeadSalesPanel
-          lead={typingLead}
+          lead={selectedLead}
+
           isOpen={isSalesPanelOpen}
           onClose={() => setIsSalesPanelOpen(false)}
           onStatusChange={handleStatusChange}
-          onTyping={handleListTyping}
+          onTyping={() => {}}
         />
       </div>
     );
@@ -422,20 +373,29 @@ export function LeadsPremiumModule() {
             onLeadSelect={handleLeadSelect}
             onRefresh={fetchLeads}
             onSalesPanel={handleOpenSalesPanel}
-            onTyping={handleListTyping}
+            onTyping={() => {}}
+
             onStatusChange={handleListStatusChange}
             canEditLead={canEditLead}
           />
         </TabsContent>
 
         <TabsContent value="metrics" className="mt-6">
-          <MetricsDashboard 
-            leads={leads}
-            stats={stats}
-            userCredits={userCredits}
-            users={users}
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <MetricsDashboard 
+                leads={leads}
+                stats={stats}
+                userCredits={userCredits}
+                users={users}
+              />
+            </div>
+            <div className="lg:col-span-1">
+              <PerformanceCreditModule />
+            </div>
+          </div>
         </TabsContent>
+
 
       </Tabs>
 
@@ -457,17 +417,6 @@ export function LeadsPremiumModule() {
         onRequestLeads={handleRequestLeads}
       />
 
-
-      {/* Inline Typing Modal */}
-      <TypingModal
-        open={showTypingModal}
-        onOpenChange={setShowTypingModal}
-        lead={typingLead}
-        form={typingForm}
-        onFormChange={setTypingForm}
-        onSubmit={handleTypingSubmit}
-        isProcessing={isTypProcessing}
-      />
 
       {/* Future Contact Modal */}
       <Dialog open={showFutureContactModal} onOpenChange={setShowFutureContactModal}>

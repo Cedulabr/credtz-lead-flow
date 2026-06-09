@@ -91,6 +91,8 @@ export function LeadDetailDrawer({
   const [showTypingModal, setShowTypingModal] = useState(false);
   const [showTreatmentDialog, setShowTreatmentDialog] = useState(false);
   const [pendingNewStatus, setPendingNewStatus] = useState("");
+
+
   const [rejectionForm, setRejectionForm] = useState({
     reason: "",
     offeredValue: "",
@@ -105,6 +107,7 @@ export function LeadDetailDrawer({
     parcela: "",
     notes: ""
   });
+
 
   if (!lead) return null;
 
@@ -252,9 +255,6 @@ export function LeadDetailDrawer({
       setSavingCpf(false);
     }
   };
-
-
-
   const handleTypingRequest = async () => {
     if (!typingForm.banco) {
       toast({
@@ -276,8 +276,8 @@ export function LeadDetailDrawer({
           telefone: lead.phone,
           convenio: lead.convenio,
           banco: typingForm.banco,
-          valor_operacao: typingForm.valor ? parseFloat(typingForm.valor) : null,
-          parcela: typingForm.parcela || null,
+          valor_proposta: typingForm.valor ? parseFloat(typingForm.valor) : null,
+          installments: typingForm.parcela ? parseInt(typingForm.parcela.replace(/\D/g, '')) : null,
           pipeline_stage: "digitacao",
           client_status: "aguardando_digitacao",
           origem_lead: "leads_premium",

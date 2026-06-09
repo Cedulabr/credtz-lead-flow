@@ -116,7 +116,7 @@ export function useLeadsPremium() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setLeads(data || []);
+      setLeads((data as any) || []);
     } catch (error) {
       console.error('Error fetching leads:', error);
       toast({

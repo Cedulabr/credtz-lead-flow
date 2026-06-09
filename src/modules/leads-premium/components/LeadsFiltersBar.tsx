@@ -333,8 +333,14 @@ export function LeadsFiltersBar({
 
       {/* Clear Filters */}
       {hasActiveFilters && (
-        <Button variant="ghost" size="icon" onClick={clearFilters}>
-          <X className="h-4 w-4" />
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={clearFilters}
+          className="h-9 px-2 text-muted-foreground hover:text-foreground"
+        >
+          <X className="h-4 w-4 mr-1" />
+          Limpar
         </Button>
       )}
     </div>

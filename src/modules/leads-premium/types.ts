@@ -27,6 +27,7 @@ export interface Lead {
   history?: any;
   simulation_status?: string | null;
   simulation_id?: string | null;
+  metadata?: Record<string, any>;
 }
 
 export interface UserProfile {

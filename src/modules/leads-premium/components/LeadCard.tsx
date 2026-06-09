@@ -134,15 +134,8 @@ export function LeadCard({
                   >
                     Cliente Fechou
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={onRequestDigitacao}
-                    className="text-xs"
-                  >
-                    <Send className="h-3 w-3 mr-1" />
-                    Digitação
-                  </Button>
+                  {/* Botão de Digitação removido conforme solicitação */}
+
                 </>
               )}
             </div>
