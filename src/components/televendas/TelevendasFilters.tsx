@@ -78,9 +78,27 @@ export const STATUS_CONFIG = {
     userAllowed: true
   },
   pago_aguardando: { 
-    label: "💰 Pago (Aguardando Gestão)", 
-    shortLabel: "Aguardando",
+    label: "⏳ Aguardando Pagamento (PIX)", 
+    shortLabel: "Aguard. PIX",
     color: "bg-amber-500/10 text-amber-600 border-amber-300",
+    userAllowed: true
+  },
+  pago_confirmado: { 
+    label: "✅ Pagamento Confirmado", 
+    shortLabel: "Pago",
+    color: "bg-green-500/10 text-green-600 border-green-300",
+    userAllowed: true
+  },
+  pago_falhou: { 
+    label: "❌ Pagamento Falhou", 
+    shortLabel: "Falhou",
+    color: "bg-red-500/10 text-red-600 border-red-300",
+    userAllowed: true
+  },
+  pago_aguardando_gestao: { 
+    label: "💰 Pago (Aguardando Gestão)", 
+    shortLabel: "Aguard. Gestão",
+    color: "bg-indigo-500/10 text-indigo-600 border-indigo-300",
     userAllowed: true
   },
   cancelado_aguardando: { 
