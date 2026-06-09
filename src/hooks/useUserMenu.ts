@@ -214,7 +214,7 @@ export function useUserMenu(userId?: string) {
         label: "Outros",
         icon: "Folder",
         position: 9999,
-        items: orphanItems.sort((a, b) => a.position - b.position),
+        items: orphanItems.sort((a, b) => a.label.localeCompare(b.label)),
       });
     }
 
