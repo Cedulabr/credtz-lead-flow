@@ -5406,7 +5406,11 @@ export type Database = {
       leads: {
         Row: {
           agibank_account_type: string | null
+          agibank_is_onboarded: boolean | null
+          agibank_last_interaction_date: string | null
+          agibank_last_interaction_type: string | null
           agibank_link_date: string | null
+          agibank_monthly_income: number | null
           agibank_products: string | null
           assigned_to: string | null
           banco_operacao: string | null
@@ -5448,7 +5452,11 @@ export type Database = {
         }
         Insert: {
           agibank_account_type?: string | null
+          agibank_is_onboarded?: boolean | null
+          agibank_last_interaction_date?: string | null
+          agibank_last_interaction_type?: string | null
           agibank_link_date?: string | null
+          agibank_monthly_income?: number | null
           agibank_products?: string | null
           assigned_to?: string | null
           banco_operacao?: string | null
@@ -5490,7 +5498,11 @@ export type Database = {
         }
         Update: {
           agibank_account_type?: string | null
+          agibank_is_onboarded?: boolean | null
+          agibank_last_interaction_date?: string | null
+          agibank_last_interaction_type?: string | null
           agibank_link_date?: string | null
+          agibank_monthly_income?: number | null
           agibank_products?: string | null
           assigned_to?: string | null
           banco_operacao?: string | null
