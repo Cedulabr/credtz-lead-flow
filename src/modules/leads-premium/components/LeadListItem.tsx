@@ -158,7 +158,8 @@ export function LeadListItem({ lead, onClick, onSalesPanel, onTyping, onStatusCh
             </Button>
 
             {/* Digitar ao Cliente */}
-            {showActionButtons && onTyping && (
+            {false && showActionButtons && onTyping && (
+
               <Button
                 size="sm"
                 className="h-9 px-4 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm rounded-lg"

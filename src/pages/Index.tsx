@@ -10,8 +10,10 @@ import { SidebarNav } from "@/components/layout/SidebarNav";
 import LoadingAuth from "@/components/LoadingAuth";
 import { BlockedAccess } from "@/components/BlockedAccess";
 import { LoadingFallback } from "@/components/LoadingFallback";
+import { GlobalSearch } from "@/components/GlobalSearch";
 import { MarketplaceModule } from "@/modules/marketplace/MarketplaceModule";
 import Billing from "@/pages/Billing";
+
 
 // ── All heavy modules via lazy loading ────────────────────────────────
 import {
@@ -267,7 +269,9 @@ const Index = () => {
   // ── Authenticated layout ────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
+      <GlobalSearch />
       <div className="flex flex-col md:flex-row min-h-screen">
+
         <SidebarNav activeTab={activeTab} onTabChange={setActiveTab} />
         <main className="flex-1 w-full max-w-full overflow-x-auto pt-14 pb-20 md:pt-0 md:pb-0">
           <Suspense fallback={<LoadingFallback />}>
