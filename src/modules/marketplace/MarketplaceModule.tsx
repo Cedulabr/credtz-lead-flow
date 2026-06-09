@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMarketplace } from "./hooks/useMarketplace";
 import { ModuleCard } from "./components/ModuleCard";
 import { CreditPackagesDialog } from "./components/CreditPackagesDialog";
+import { AbacatePayCheckoutDialog } from "./components/AbacatePayCheckoutDialog";
 import { Loader2, Store } from "lucide-react";
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -18,6 +19,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 export function MarketplaceModule() {
   const { modules, companyModules, wallets, packages, loading, refresh } = useMarketplace();
   const [selected, setSelected] = useState<ModuleRow | null>(null);
+  const [subscribing, setSubscribing] = useState<ModuleRow | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -66,6 +68,7 @@ export function MarketplaceModule() {
                 companyModule={companyModules.find((c) => c.module_slug === m.slug)}
                 wallet={wallets.find((w) => w.module_slug === m.slug)}
                 onBuyCredits={() => setSelected(m)}
+                onSubscribe={() => setSubscribing(m)}
                 onRefresh={refresh}
               />
             ))}
@@ -79,6 +82,15 @@ export function MarketplaceModule() {
           packages={packages.filter((p) => p.module_slug === selected.slug)}
           open={!!selected}
           onOpenChange={(o) => !o && setSelected(null)}
+        />
+      )}
+
+      {subscribing && (
+        <AbacatePayCheckoutDialog
+          module={subscribing}
+          open={!!subscribing}
+          onOpenChange={(o) => !o && setSubscribing(null)}
+          onSuccess={refresh}
         />
       )}
     </div>

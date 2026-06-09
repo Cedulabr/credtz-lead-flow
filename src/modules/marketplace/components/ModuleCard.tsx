@@ -17,27 +17,20 @@ interface Props {
   companyModule?: CompanyModule;
   wallet?: WalletRow;
   onBuyCredits: () => void;
+  onSubscribe: () => void;
   onRefresh: () => void;
 }
 
-export function ModuleCard({ module, companyModule, wallet, onBuyCredits, onRefresh }: Props) {
+export function ModuleCard({ module, companyModule, wallet, onBuyCredits, onSubscribe, onRefresh }: Props) {
   const [loading, setLoading] = useState(false);
   const Icon = (module.icon && ICONS[module.icon]) || Sparkles;
   const status = companyModule?.status ?? "inactive";
 
   const subscribe = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("create-subscription", {
-        body: { module_slug: module.slug },
-      });
-      if (error) throw error;
-      if (data?.url) window.location.href = data.url;
-    } catch (e: any) {
-      toast.error(e.message || "Erro ao assinar");
-    } finally {
-      setLoading(false);
-    }
+    // If it's the specific product mentioned or if we want to use AbacatePay for PIX
+    // prod_Y0mn4nhzgjzAwuyHjPEMkD3W is likely the stripe product ID or a reference.
+    // If the user wants PIX (AbacatePay), we use the new dialog.
+    onSubscribe();
   };
 
   const portal = async () => {
