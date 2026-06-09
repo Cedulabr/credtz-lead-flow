@@ -134,11 +134,93 @@ export function useLeadsConvenios() {
     }
   }, [user, profile, leads, toast, fetchLeads]);
 
+  const fetchUserCredits = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase.rpc('get_user_credits', { target_user_id: user.id });
+      if (error) throw error;
+      setUserCredits(data || 0);
+    } catch (error) {
+      console.error('Error fetching user credits:', error);
+      setUserCredits(0);
+    }
+  }, [user]);
+
+  const requestLeads = useCallback(async (options: {
+    convenio?: string;
+    count: number;
+    ddds?: string[];
+    tags?: string[];
+    banco?: string | null;
+    parcelaMin?: number | null;
+    parcelaMax?: number | null;
+    margemMin?: number | null;
+  }): Promise<boolean> => {
+    if (!user) return false;
+    if (userCredits <= 0) {
+      toast({ title: "Sem créditos", description: "Seus créditos acabaram.", variant: "destructive" });
+      return false;
+    }
+    try {
+      const { data: filtered, error } = await supabase.rpc('request_leads_with_credits', {
+        convenio_filter: 'GOVERNO BA',
+        banco_filter: options.banco || null,
+        leads_requested: options.count,
+        ddd_filter: options.ddds?.length ? options.ddds : null,
+        tag_filter: options.tags?.length ? options.tags : null,
+        parcela_min: options.parcelaMin ?? null,
+        parcela_max: options.parcelaMax ?? null,
+        margem_min: options.margemMin ?? null,
+      } as any);
+
+      if (error) throw error;
+
+      if (filtered?.length > 0) {
+        const requestedAt = new Date().toISOString();
+        const leadsToInsert = filtered.map((lead: any) => ({
+          name: lead.name,
+          cpf: lead.cpf ?? '',
+          phone: lead.phone,
+          phone2: lead.phone2 || null,
+          convenio: lead.convenio,
+          tag: lead.tag || null,
+          status: 'new_lead',
+          created_by: user.id,
+          assigned_to: user.id,
+          origem_lead: 'leads_convenios',
+          banco_operacao: lead.banco,
+          matricula: lead.matricula,
+          emprestimos: lead.emprestimos,
+          requested_at: requestedAt,
+          requested_by: user.id,
+          history: JSON.stringify([{
+            action: 'created',
+            timestamp: requestedAt,
+            user_id: user.id,
+            user_name: profile?.name || user?.email,
+            note: 'Lead solicitado do sistema'
+          }])
+        }));
+
+        await supabase.from('leads').insert(leadsToInsert);
+        toast({ title: "Leads solicitados!", description: `${filtered.length} leads adicionados.` });
+        fetchLeads();
+        fetchUserCredits();
+        return true;
+      }
+      return false;
+    } catch (error: any) {
+      toast({ title: "Erro", description: error.message || "Erro ao solicitar leads", variant: "destructive" });
+      return false;
+    }
+  }, [user, profile, userCredits, toast, fetchLeads, fetchUserCredits]);
+
   useEffect(() => {
     if (user) {
       fetchLeads();
+      fetchUserCredits();
     }
-  }, [user, fetchLeads]);
+  }, [user, fetchLeads, fetchUserCredits]);
 
-  return { leads, stats, isLoading, fetchLeads, updateLeadStatus };
+  return { leads, stats, isLoading, userCredits, fetchLeads, updateLeadStatus, requestLeads };
 }
