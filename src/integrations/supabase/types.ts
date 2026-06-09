@@ -7247,59 +7247,77 @@ export type Database = {
       }
       sdr_campaign_contacts: {
         Row: {
+          ai_handoff_requested: boolean | null
+          ai_intent: string | null
           campaign_id: string
           company_id: string
           contact_id: string | null
           conversation_id: string | null
           converted_at: string | null
           created_at: string
+          current_stage: string | null
           error: string | null
           extra_data: Json
           follow_up_count: number
           id: string
+          last_ai_action: string | null
           last_contacted_at: string | null
           last_inbound_at: string | null
+          last_sync_at: string | null
           name: string | null
           next_attempt_at: string | null
           phone: string
+          sdr_config: Json | null
           status: string
           updated_at: string
         }
         Insert: {
+          ai_handoff_requested?: boolean | null
+          ai_intent?: string | null
           campaign_id: string
           company_id: string
           contact_id?: string | null
           conversation_id?: string | null
           converted_at?: string | null
           created_at?: string
+          current_stage?: string | null
           error?: string | null
           extra_data?: Json
           follow_up_count?: number
           id?: string
+          last_ai_action?: string | null
           last_contacted_at?: string | null
           last_inbound_at?: string | null
+          last_sync_at?: string | null
           name?: string | null
           next_attempt_at?: string | null
           phone: string
+          sdr_config?: Json | null
           status?: string
           updated_at?: string
         }
         Update: {
+          ai_handoff_requested?: boolean | null
+          ai_intent?: string | null
           campaign_id?: string
           company_id?: string
           contact_id?: string | null
           conversation_id?: string | null
           converted_at?: string | null
           created_at?: string
+          current_stage?: string | null
           error?: string | null
           extra_data?: Json
           follow_up_count?: number
           id?: string
+          last_ai_action?: string | null
           last_contacted_at?: string | null
           last_inbound_at?: string | null
+          last_sync_at?: string | null
           name?: string | null
           next_attempt_at?: string | null
           phone?: string
+          sdr_config?: Json | null
           status?: string
           updated_at?: string
         }
