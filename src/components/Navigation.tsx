@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Users, TrendingUp, DollarSign, LogOut, User, Settings, Phone, FileText, UserPlus, Wallet, Zap, Bell, Menu, X, Database, BarChart3, Users2, UserCircle, Clock, ChevronRight, ChevronLeft, Target, MessageSquare, MessageCircle, Radar, CreditCard, Mic, ArrowRightLeft, AudioLines, PanelLeftClose, PanelLeftOpen, NotebookPen, RefreshCcwDot } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { 
+  LogOut, User, Settings, Menu, X, ChevronRight, 
+  PanelLeftClose, PanelLeftOpen, LogIn
+} from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,53 +12,20 @@ import easynLogo from "@/assets/easyn-logo.png";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { useWhitelabel } from "@/hooks/useWhitelabel";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
+import { useUserMenu } from "@/hooks/useUserMenu";
+import { getIcon } from "@/config/modules";
+import { ScrollArea } from "./ui/scroll-area";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 interface NavigationProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
 }
-
-// Navigation items with permission keys - MANTENHA SINCRONIZADO COM PERMISSION_MODULES em UsersList.tsx
-const navItems = [
-  { id: "dashboard", label: "Início", icon: Home, permissionKey: null },
-  { id: "my-data", label: "Meus Dados", icon: UserCircle, permissionKey: null },
-  { id: "indicate", label: "Indicar", icon: UserPlus, permissionKey: "can_access_indicar" },
-  { id: "proposal-generator", label: "Gerador de Propostas", icon: FileText, permissionKey: "can_access_gerador_propostas" },
-  { id: "activate-leads", label: "Activate Leads", icon: Zap, permissionKey: "can_access_activate_leads" },
-  { id: "leads", label: "Leads Premium", icon: TrendingUp, permissionKey: "can_access_premium_leads" },
-  { id: "telefonia", label: "Telefonia", icon: Phone, permissionKey: "can_access_telefonia" },
-  { id: "baseoff-consulta", label: "Consulta Base OFF", icon: Database, permissionKey: "can_access_baseoff_consulta" },
-  { id: "my-clients", label: "Meus Clientes", icon: Users, permissionKey: "can_access_meus_clientes" },
-  { id: "televendas", label: "Televendas", icon: Phone, permissionKey: "can_access_televendas" },
-  { id: "televendas-manage", label: "Gestão Televendas", icon: Settings, permissionKey: "can_access_gestao_televendas" },
-  { id: "reaproveitamento", label: "Reaproveitamento", icon: RefreshCcwDot, permissionKey: "can_access_reaproveitamento" },
-  { id: "finances", label: "Finanças", icon: Wallet, permissionKey: "can_access_financas" },
-  { id: "documents", label: "Documentos", icon: FileText, permissionKey: "can_access_documentos" },
-  { id: "reuse-alerts", label: "Oportunidades", icon: Target, permissionKey: "can_access_alertas" },
-  { id: "commission-table", label: "Tabela de Comissões", icon: DollarSign, permissionKey: "can_access_tabela_comissoes" },
-  { id: "commissions", label: "Minhas Comissões", icon: DollarSign, permissionKey: "can_access_minhas_comissoes" },
-  { id: "performance-report", label: "Relatório de Desempenho", icon: BarChart3, permissionKey: "can_access_relatorio_desempenho" },
-  { id: "collaborative", label: "Colaborativo", icon: Users2, permissionKey: "can_access_colaborativo" },
-  { id: "time-clock", label: "Controle de Ponto", icon: Clock, permissionKey: "can_access_controle_ponto" },
-  { id: "sms", label: "Comunicação SMS", icon: MessageSquare, permissionKey: "can_access_sms" },
-  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle, permissionKey: "can_access_whatsapp" },
-  { id: "meu-numero", label: "Meu Número", icon: Phone, permissionKey: "can_access_meu_numero" },
-  { id: "radar", label: "Radar de Oportunidades", icon: Radar, permissionKey: "can_access_radar" },
-  { id: "autolead", label: "AutoLead", icon: Zap, permissionKey: "can_access_autolead" },
-  { id: "digitacao", label: "Digitação", icon: CreditCard, permissionKey: "can_access_digitacao" },
-  { id: "audios", label: "Áudios", icon: Mic, permissionKey: "can_access_audios" },
-  { id: "portflow", label: "PortFlow", icon: ArrowRightLeft, permissionKey: "can_access_portflow" },
-  { id: "voicer", label: "Easyn Voicer", icon: AudioLines, permissionKey: "can_access_voicer" },
-  { id: "notas", label: "Notas & Workspace", icon: NotebookPen, permissionKey: "can_access_notas" },
-];
-
-// Mobile priority items - only icons
-const mobileNavItems = [
-  { id: "indicate", label: "Indicar", icon: UserPlus, permissionKey: "can_access_indicar" },
-  { id: "leads", label: "Leads Premium", icon: TrendingUp, permissionKey: "can_access_premium_leads" },
-  { id: "finances", label: "Finanças", icon: Wallet, permissionKey: "can_access_financas" },
-  { id: "commissions", label: "Minhas Comissões", icon: DollarSign, permissionKey: "can_access_minhas_comissoes" },
-];
 
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -66,26 +35,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
   });
   const { user, profile, signOut, isAdmin } = useAuth();
   const { companyName, logoUrl } = useWhitelabel();
-
-  const [isGestor, setIsGestor] = useState(false);
-
-  useEffect(() => {
-    const checkGestorAccess = async () => {
-      if (!user?.id) return;
-      
-      const { data } = await supabase
-        .from("user_companies")
-        .select("company_role")
-        .eq("user_id", user.id)
-        .eq("company_role", "gestor")
-        .eq("is_active", true)
-        .limit(1);
-      
-      setIsGestor(data && data.length > 0);
-    };
-    
-    checkGestorAccess();
-  }, [user?.id]);
+  const { sections, isLoading } = useUserMenu();
 
   // Close menu on route change
   useEffect(() => {
@@ -106,40 +56,64 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
 
   const handleSignOut = async () => {
     await signOut();
-    toast.success("Signed out successfully");
+    toast.success("Saiu com sucesso");
   };
 
-  // Check if user has access to a specific section
-  const hasAccess = (permissionKey: string | null): boolean => {
-    if (!permissionKey) return true;
-    if (isAdmin) return true;
-    
-    if (permissionKey === "admin_or_gestor") {
-      return isAdmin || isGestor;
-    }
-    
-    const profileData = profile as any;
-    return profileData?.[permissionKey] !== false;
+  // Find current item for mobile title
+  const currentItemLabel = sections
+    .flatMap(s => s.items)
+    .find(i => i.moduleKey === activeTab)?.label || "Dashboard";
+
+  const renderNavItems = (items: any[], isMobile = false) => {
+    return items.map((item) => {
+      const Icon = getIcon(item.icon);
+      const isActive = activeTab === item.moduleKey;
+      
+      if (isCollapsed && !isMobile) {
+        return (
+          <Tooltip key={item.moduleKey}>
+            <TooltipTrigger asChild>
+              <Button
+                variant={isActive ? "default" : "ghost"}
+                size="icon"
+                onClick={() => onTabChange(item.moduleKey)}
+                className={cn(
+                  "w-full h-10 mb-1",
+                  isActive && "shadow-md"
+                )}
+              >
+                <Icon size={20} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {item.label}
+            </TooltipContent>
+          </Tooltip>
+        );
+      }
+      
+      return (
+        <Button
+          key={item.moduleKey}
+          variant={isActive ? "default" : "ghost"}
+          onClick={() => {
+            onTabChange(item.moduleKey);
+            if (isMobile) setIsMobileMenuOpen(false);
+          }}
+          className={cn(
+            "w-full justify-start space-x-3 transition-all mb-1 h-10 px-3",
+            isActive ? "shadow-md" : "hover:bg-secondary/50"
+          )}
+        >
+          <Icon size={18} className={cn(isActive ? "text-primary-foreground" : "text-muted-foreground")} />
+          <span className="truncate text-sm font-medium">{item.label}</span>
+        </Button>
+      );
+    });
   };
-
-  // Filter visible items based on permissions
-  const visibleNavItems = navItems.filter(item => {
-    if (!item.permissionKey) return true;
-    if (isAdmin) return true;
-    return hasAccess(item.permissionKey);
-  });
-
-  // Filter mobile items based on permissions
-  const visibleMobileItems = mobileNavItems.filter(item => {
-    if (isAdmin) return true;
-    return hasAccess(item.permissionKey);
-  });
-
-  // Get current page title
-  const currentPageTitle = navItems.find(item => item.id === activeTab)?.label || "Dashboard";
 
   return (
-    <>
+    <TooltipProvider delayDuration={0}>
       {/* Mobile Header */}
       <motion.div 
         initial={{ y: -20, opacity: 0 }}
@@ -155,7 +129,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
           />
           <div className="flex flex-col">
             <span className="font-semibold text-foreground text-sm leading-tight">{companyName}</span>
-            <span className="text-xs text-muted-foreground leading-tight">{currentPageTitle}</span>
+            <span className="text-xs text-muted-foreground leading-tight">{currentItemLabel}</span>
           </div>
         </div>
         <motion.button
@@ -165,23 +139,11 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         >
           <AnimatePresence mode="wait">
             {isMobileMenuOpen ? (
-              <motion.div
-                key="close"
-                initial={{ rotate: -90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ rotate: 90, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-              >
+              <motion.div key="close" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.15 }}>
                 <X size={22} />
               </motion.div>
             ) : (
-              <motion.div
-                key="menu"
-                initial={{ rotate: 90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ rotate: -90, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-              >
+              <motion.div key="menu" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.15 }}>
                 <Menu size={22} />
               </motion.div>
             )}
@@ -189,83 +151,56 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         </motion.button>
       </motion.div>
 
-      {/* Mobile Full Menu Overlay */}
+      {/* Mobile Menu Overlay */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <>
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
               className="md:hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-40"
               onClick={() => setIsMobileMenuOpen(false)}
             />
-            
-            {/* Menu Panel */}
             <motion.div
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="md:hidden fixed top-14 right-0 bottom-0 w-[85%] max-w-sm bg-card z-40 shadow-xl overflow-y-auto"
+              className="md:hidden fixed top-14 right-0 bottom-0 w-[85%] max-w-sm bg-card z-40 shadow-xl overflow-hidden flex flex-col"
             >
-              <nav className="p-4 space-y-1.5">
-                {visibleNavItems.map((item, index) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  
-                  return (
-                    <motion.button
-                      key={item.id}
-                      initial={{ x: 20, opacity: 0 }}
-                      animate={{ x: 0, opacity: 1 }}
-                      transition={{ delay: index * 0.03 }}
-                      onClick={() => {
-                        onTabChange(item.id);
-                        setIsMobileMenuOpen(false);
-                      }}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all",
-                        isActive
-                          ? "bg-primary text-primary-foreground shadow-md"
-                          : "hover:bg-secondary/70 active:bg-secondary"
-                      )}
-                    >
-                      <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-                      <span className="flex-1 text-left font-medium">{item.label}</span>
-                      {isActive && (
-                        <motion.div layoutId="activeIndicator">
-                          <ChevronRight size={18} />
-                        </motion.div>
-                      )}
-                    </motion.button>
-                  );
-                })}
+              <ScrollArea className="flex-1 p-4">
+                <Accordion type="multiple" defaultValue={["principal"]} className="w-full space-y-2">
+                  {sections.map((section) => (
+                    <AccordionItem key={section.categoryKey} value={section.categoryKey} className="border-none">
+                      <AccordionTrigger className="hover:no-underline py-2 px-3 rounded-lg hover:bg-secondary/50 text-muted-foreground text-xs uppercase tracking-wider font-semibold">
+                        <div className="flex items-center gap-2">
+                          {section.label}
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-1 pb-2">
+                        <div className="space-y-1 pl-2 border-l ml-2 mt-1">
+                          {renderNavItems(section.items, true)}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
                 
                 {isAdmin && (
-                  <motion.button
-                    initial={{ x: 20, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    transition={{ delay: visibleNavItems.length * 0.03 }}
+                  <Button
+                    variant="ghost"
                     onClick={() => window.location.href = '/admin'}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl hover:bg-secondary/70 active:bg-secondary transition-all"
+                    className="w-full justify-start space-x-3 mt-4 h-12 rounded-xl border border-dashed"
                   >
-                    <Settings size={20} />
-                    <span className="flex-1 text-left font-medium">Admin</span>
-                  </motion.button>
+                    <Settings size={20} className="text-primary" />
+                    <span className="font-bold">Painel Administrativo</span>
+                  </Button>
                 )}
-              </nav>
+              </ScrollArea>
               
-              {/* User Section */}
               {user && (
-                <motion.div 
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                  className="p-4 border-t mt-4 mx-4 rounded-xl bg-secondary/30"
-                >
+                <div className="p-4 border-t bg-secondary/10">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                       <User className="h-5 w-5 text-primary" />
@@ -278,20 +213,12 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                     </div>
                   </div>
                   <ConnectionStatus />
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleSignOut}
-                    className="w-full mt-4"
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Sair
+                  <Button variant="destructive" size="sm" onClick={handleSignOut} className="w-full mt-4 rounded-xl">
+                    <LogOut className="h-4 w-4 mr-2" /> Sair
                   </Button>
-                </motion.div>
+                </div>
               )}
-              
-              {/* Bottom spacing for safe area */}
-              <div className="h-24" />
+              <div className="h-safe-bottom" />
             </motion.div>
           </>
         )}
@@ -299,283 +226,158 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
 
       {/* Desktop Sidebar */}
       <div className={cn(
-        "hidden md:flex md:flex-col md:bg-card md:border-r md:h-screen md:sticky md:top-0 transition-all duration-200",
-        isCollapsed ? "md:w-16" : "md:w-64"
+        "hidden md:flex md:flex-col md:bg-card md:border-r md:h-screen md:sticky md:top-0 transition-all duration-300 ease-in-out z-40 shadow-sm",
+        isCollapsed ? "md:w-20" : "md:w-72"
       )}>
-        <div className={cn("border-b flex items-center", isCollapsed ? "p-3 justify-center" : "p-6")}>
-          {isCollapsed ? (
-            <img 
-              src={logoUrl || easynLogo} 
-              alt={`${companyName} Logo`} 
-              className="w-8 h-8 rounded-xl object-contain"
-            />
-          ) : (
-            <div className="flex items-center space-x-3 flex-1">
-              <img 
+        {/* Header */}
+        <div className={cn("h-20 flex items-center border-b px-4 transition-all duration-300", isCollapsed ? "justify-center" : "justify-between")}>
+          {!isCollapsed && (
+            <div className="flex items-center gap-3 overflow-hidden">
+              <motion.img 
                 src={logoUrl || easynLogo} 
-                alt={`${companyName} Logo`} 
-                className="w-10 h-10 rounded-xl object-contain"
+                alt="Logo" 
+                className="w-10 h-10 rounded-xl object-contain shadow-sm border bg-white"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
               />
-              <div className="min-w-0">
-                <h1 className="text-xl font-bold text-foreground truncate">{companyName}</h1>
-                <p className="text-sm text-muted-foreground">Serviços</p>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-foreground text-lg leading-tight truncate">{companyName}</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">Sistema de Gestão</span>
               </div>
             </div>
+          )}
+          {isCollapsed && (
+             <img src={logoUrl || easynLogo} alt="Logo" className="w-10 h-10 rounded-xl object-contain shadow-sm border bg-white" />
           )}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => {
-              setIsCollapsed(prev => {
-                const next = !prev;
-                localStorage.setItem('sidebar-collapsed', String(next));
-                return next;
-              });
+              const next = !isCollapsed;
+              setIsCollapsed(next);
+              localStorage.setItem('sidebar-collapsed', String(next));
             }}
-            className={cn("h-8 w-8 flex-shrink-0", isCollapsed ? "mt-2" : "ml-2")}
+            className={cn("h-8 w-8 hover:bg-secondary shrink-0", !isCollapsed && "ml-2")}
           >
-            {isCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </Button>
         </div>
 
-        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-          {visibleNavItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            
-            if (isCollapsed) {
-              return (
-                <Tooltip key={item.id}>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={isActive ? "default" : "ghost"}
-                      size="icon"
-                      onClick={() => onTabChange(item.id)}
-                      className={cn(
-                        "w-full h-10",
-                        isActive && "shadow-md"
-                      )}
-                    >
-                      <Icon size={20} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    {item.label}
-                  </TooltipContent>
-                </Tooltip>
-              );
-            }
-            
-            return (
+        {/* Navigation Content */}
+        <ScrollArea className="flex-1 px-3 py-4">
+          {isLoading ? (
+            <div className="space-y-4 animate-pulse">
+              {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-10 bg-secondary/50 rounded-lg w-full" />)}
+            </div>
+          ) : (
+            <>
+              {isCollapsed ? (
+                <div className="flex flex-col items-center space-y-2">
+                  {sections.map(section => (
+                    <div key={section.categoryKey} className="w-full flex flex-col items-center space-y-2 pt-2 border-t first:border-t-0 mt-2 first:mt-0">
+                      {renderNavItems(section.items)}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Accordion type="multiple" defaultValue={["principal"]} className="w-full space-y-4">
+                  {sections.map((section) => (
+                    <AccordionItem key={section.categoryKey} value={section.categoryKey} className="border-none">
+                      <AccordionTrigger className="hover:no-underline py-2 px-3 rounded-lg hover:bg-secondary/50 group">
+                        <div className="flex items-center gap-3">
+                          <div className="text-muted-foreground group-hover:text-primary transition-colors">
+                            {section.label}
+                          </div>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-1 pb-2">
+                        <div className="space-y-1 pl-3 border-l ml-4 mt-1 border-primary/20">
+                          {renderNavItems(section.items)}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              )}
+            </>
+          )}
+
+          {!isCollapsed && isAdmin && (
+            <div className="mt-8 pt-4 border-t">
               <Button
-                key={item.id}
-                variant={isActive ? "default" : "ghost"}
-                onClick={() => onTabChange(item.id)}
-                className={cn(
-                  "w-full justify-start space-x-3 transition-all",
-                  isActive && "shadow-md"
-                )}
+                variant="outline"
+                onClick={() => window.location.href = '/admin'}
+                className="w-full justify-start space-x-3 h-12 rounded-xl bg-primary/5 hover:bg-primary/10 border-primary/20 group transition-all"
               >
-                <Icon size={20} />
-                <span className="truncate">{item.label}</span>
+                <Settings size={18} className="text-primary group-hover:rotate-45 transition-transform" />
+                <span className="font-bold text-primary">Admin</span>
               </Button>
-            );
-          })}
-          {isAdmin && (
-            isCollapsed ? (
+            </div>
+          )}
+          {isCollapsed && isAdmin && (
+            <div className="mt-4 pt-4 border-t w-full flex justify-center">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => window.location.href = '/admin'}
-                    className="w-full h-10"
-                  >
-                    <Settings size={20} />
+                  <Button variant="outline" size="icon" onClick={() => window.location.href = '/admin'} className="h-10 w-10 bg-primary/5 border-primary/20">
+                    <Settings size={18} className="text-primary" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="right">Admin</TooltipContent>
               </Tooltip>
-            ) : (
-              <Button
-                variant="ghost"
-                onClick={() => window.location.href = '/admin'}
-                className="w-full justify-start space-x-3"
-              >
-                <Settings size={20} />
-                <span>Admin</span>
-              </Button>
-            )
+            </div>
           )}
-        </nav>
+        </ScrollArea>
 
-        <div className="p-3 border-t">
+        {/* Footer / User Profile */}
+        <div className={cn("p-4 border-t bg-secondary/5 transition-all duration-300", isCollapsed && "items-center")}>
           {user && (
-            <div className="space-y-3">
-              {isCollapsed ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex justify-center">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center cursor-default">
-                        <User className="h-4 w-4 text-primary" />
-                      </div>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p>{profile?.name || user.email}</p>
-                    {profile?.role && <p className="text-xs capitalize">{profile.role}</p>}
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
+            <div className="space-y-4">
+              {!isCollapsed ? (
                 <>
-                  <div className="flex items-center space-x-2 text-sm">
-                    <User className="h-4 w-4 flex-shrink-0" />
+                  <div className="flex items-center gap-3 p-2 rounded-xl bg-card border shadow-sm">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
+                      <User className="h-5 w-5 text-primary" />
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">
-                        {profile?.name || user.email}
-                      </p>
-                      {profile?.role && (
-                        <p className="text-xs text-muted-foreground capitalize">
-                          {profile.role}
-                        </p>
-                      )}
+                      <p className="font-bold text-sm truncate text-foreground">{profile?.name || user.email}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">{profile?.role || "Usuário"}</p>
                     </div>
                   </div>
-                  
-                  <div className="flex justify-center">
-                    <ConnectionStatus />
-                  </div>
+                  <ConnectionStatus />
+                  <Button variant="ghost" size="sm" onClick={handleSignOut} className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors h-10 px-3">
+                    <LogOut className="h-4 w-4 mr-3" />
+                    <span className="font-medium">Sair da conta</span>
+                  </Button>
                 </>
-              )}
-              
-              {isCollapsed ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleSignOut}
-                      className="w-full h-8"
-                    >
-                      <LogOut className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">Sair</TooltipContent>
-                </Tooltip>
               ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleSignOut}
-                  className="w-full justify-start"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Sair
-                </Button>
+                <div className="flex flex-col items-center space-y-4">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 cursor-pointer">
+                        <User className="h-5 w-5 text-primary" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <div className="flex flex-col">
+                        <span className="font-bold">{profile?.name || user.email}</span>
+                        <span className="text-xs text-muted-foreground">{profile?.role}</span>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-10 w-10 hover:text-destructive hover:bg-destructive/10">
+                        <LogOut className="h-5 w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">Sair</TooltipContent>
+                  </Tooltip>
+                </div>
               )}
             </div>
           )}
         </div>
       </div>
-
-      {/* Bottom Navigation for Mobile */}
-      <TooltipProvider delayDuration={0}>
-        <motion.div 
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="md:hidden fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-md border-t z-50 safe-area-inset-bottom"
-        >
-          <div className="flex justify-around items-center px-1 py-1.5">
-            {/* Home button */}
-            <motion.button
-              onClick={() => onTabChange("dashboard")}
-              className={cn(
-                "flex flex-col items-center justify-center min-w-[56px] h-12 px-2 rounded-xl transition-all duration-200",
-                activeTab === "dashboard"
-                  ? "text-primary bg-primary/15"
-                  : "text-muted-foreground active:bg-muted/50"
-              )}
-              whileTap={{ scale: 0.92 }}
-            >
-              <Home size={22} strokeWidth={activeTab === "dashboard" ? 2.5 : 2} />
-              <span className={cn(
-                "text-[10px] font-medium mt-0.5 leading-tight",
-                activeTab === "dashboard" ? "text-primary" : "text-muted-foreground"
-              )}>
-                Início
-              </span>
-            </motion.button>
-
-            {/* Dynamic mobile items */}
-            {visibleMobileItems.slice(0, 3).map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              
-              return (
-                <motion.button
-                  key={item.id}
-                  onClick={() => onTabChange(item.id)}
-                  className={cn(
-                    "flex flex-col items-center justify-center min-w-[56px] h-12 px-2 rounded-xl transition-all duration-200",
-                    isActive
-                      ? "text-primary bg-primary/15"
-                      : "text-muted-foreground active:bg-muted/50"
-                  )}
-                  whileTap={{ scale: 0.92 }}
-                >
-                  <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
-                  <span className={cn(
-                    "text-[10px] font-medium mt-0.5 leading-tight truncate max-w-[48px]",
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  )}>
-                    {item.label.split(' ')[0]}
-                  </span>
-                </motion.button>
-              );
-            })}
-
-            {/* More menu button */}
-            <motion.button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className={cn(
-                "flex flex-col items-center justify-center min-w-[56px] h-12 px-2 rounded-xl transition-all duration-200",
-                isMobileMenuOpen
-                  ? "text-primary bg-primary/15"
-                  : "text-muted-foreground active:bg-muted/50"
-              )}
-              whileTap={{ scale: 0.92 }}
-            >
-              <AnimatePresence mode="wait">
-                {isMobileMenuOpen ? (
-                  <motion.div
-                    key="close"
-                    initial={{ rotate: -90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: 90, opacity: 0 }}
-                  >
-                    <X size={22} strokeWidth={2.5} />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="menu"
-                    initial={{ rotate: 90, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: -90, opacity: 0 }}
-                  >
-                    <Menu size={22} strokeWidth={2} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              <span className={cn(
-                "text-[10px] font-medium mt-0.5 leading-tight",
-                isMobileMenuOpen ? "text-primary" : "text-muted-foreground"
-              )}>
-                Menu
-              </span>
-            </motion.button>
-          </div>
-        </motion.div>
-      </TooltipProvider>
-    </>
+    </TooltipProvider>
   );
 }
