@@ -3841,6 +3841,97 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_import_executions: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          error_message: string | null
+          filter_config: Json
+          id: string
+          import_type: string
+          module: string
+          processed_leads: number | null
+          status: string
+          target_id: string | null
+          total_leads: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          error_message?: string | null
+          filter_config?: Json
+          id?: string
+          import_type: string
+          module: string
+          processed_leads?: number | null
+          status?: string
+          target_id?: string | null
+          total_leads?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          error_message?: string | null
+          filter_config?: Json
+          id?: string
+          import_type?: string
+          module?: string
+          processed_leads?: number | null
+          status?: string
+          target_id?: string | null
+          total_leads?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_import_executions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_import_logs: {
+        Row: {
+          created_at: string | null
+          details: Json | null
+          execution_id: string
+          id: string
+          level: string | null
+          message: string
+        }
+        Insert: {
+          created_at?: string | null
+          details?: Json | null
+          execution_id: string
+          id?: string
+          level?: string | null
+          message: string
+        }
+        Update: {
+          created_at?: string | null
+          details?: Json | null
+          execution_id?: string
+          id?: string
+          level?: string | null
+          message?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_import_logs_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "crm_import_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_limits: {
         Row: {
           created_at: string
