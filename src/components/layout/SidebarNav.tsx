@@ -30,8 +30,6 @@ interface SidebarNavProps {
   onTabChange: (tab: string) => void;
 }
 
-const STORAGE_KEY = "easyn_sidebar_state_v3";
-
 export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
   const { user, profile, isAdmin, signOut } = useAuth();
   const { companyName, logoUrl } = useWhitelabel();
@@ -319,6 +317,8 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
           size="icon"
           onClick={() => setMobileOpen((v) => !v)}
           className="h-10 w-10"
+          aria-expanded={mobileOpen}
+          aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"}
         >
           {mobileOpen ? <X size={20} /> : <Menu size={20} />}
         </Button>
@@ -327,7 +327,7 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
       {/* Mobile Sidebar */}
       <AnimatePresence>
         {mobileOpen && (
-          <div className="md:hidden fixed inset-0 z-[70]">
+          <div className="md:hidden fixed inset-0 z-[70]" role="dialog" aria-modal="true">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -341,6 +341,7 @@ export function SidebarNav({ activeTab, onTabChange }: SidebarNavProps) {
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
               className="absolute left-0 top-0 bottom-0 w-[280px] bg-card border-r flex flex-col shadow-2xl"
+              aria-label="Menu de navegação lateral"
             >
               {sidebarContent}
             </motion.aside>
