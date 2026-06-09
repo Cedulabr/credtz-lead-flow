@@ -81,32 +81,36 @@ Deno.serve(async (req) => {
       // Product ID for marketplace (from user prompt)
       const externalProductId = "prod_Y0mn4nhzgjzAwuyHjPEMkD3W";
 
+      const checkoutBody = {
+        frequency: isSubscription ? "RECURRING" : "ONE_TIME",
+        methods: ["PIX"],
+        products: [
+          {
+            externalId: externalProductId,
+            name: description,
+            quantity: 1,
+            priceUnit: amount,
+          },
+        ],
+        returnUrl: `${origin}/marketplace?status=success`,
+        completionUrl: `${origin}/marketplace?status=success`,
+        customerId: user.id,
+        customer: {
+          name: customer?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || "Cliente",
+          email: customer?.email || user.email,
+          taxId: customer?.taxId || user.user_metadata?.cpf || "",
+        }
+      };
+
+      console.log("Creating AbacatePay checkout with body:", JSON.stringify(checkoutBody, null, 2));
+
       const response = await fetch("https://api.abacatepay.com/v1/billing/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${API_KEY}`,
         },
-        body: JSON.stringify({
-          frequency: isSubscription ? "RECURRING" : "ONE_TIME",
-          methods: ["PIX"],
-          products: [
-            {
-              externalId: externalProductId,
-              name: description,
-              quantity: 1,
-              priceUnit: amount,
-            },
-          ],
-          returnUrl: `${origin}/marketplace?status=success`,
-          completionUrl: `${origin}/marketplace?status=success`,
-          customerId: user.id,
-          customer: {
-            name: customer?.name || user.user_metadata?.full_name || user.email.split('@')[0],
-            email: customer?.email || user.email,
-            taxId: customer?.taxId || user.user_metadata?.cpf || "",
-          }
-        }),
+        body: JSON.stringify(checkoutBody),
       });
 
       const text = await response.text();
