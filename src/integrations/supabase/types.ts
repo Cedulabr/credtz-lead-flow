@@ -7838,6 +7838,7 @@ export type Database = {
           send_delay_min_seconds: number | null
           send_delay_seconds: number
           status: string
+          tags: string[] | null
           target_type: string
           timezone: string
           updated_at: string
@@ -7900,6 +7901,7 @@ export type Database = {
           send_delay_min_seconds?: number | null
           send_delay_seconds?: number
           status?: string
+          tags?: string[] | null
           target_type: string
           timezone?: string
           updated_at?: string
@@ -7962,6 +7964,7 @@ export type Database = {
           send_delay_min_seconds?: number | null
           send_delay_seconds?: number
           status?: string
+          tags?: string[] | null
           target_type?: string
           timezone?: string
           updated_at?: string
@@ -12797,13 +12800,21 @@ export type Database = {
           tag: string
         }[]
       }
-      get_available_bancos: {
-        Args: never
-        Returns: {
-          available_count: number
-          banco: string
-        }[]
-      }
+      get_available_bancos:
+        | {
+            Args: never
+            Returns: {
+              available_count: number
+              banco: string
+            }[]
+          }
+        | {
+            Args: { convenio_filter?: string }
+            Returns: {
+              available_count: number
+              banco: string
+            }[]
+          }
       get_available_banks: {
         Args: never
         Returns: {
