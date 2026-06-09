@@ -7097,6 +7097,7 @@ export type Database = {
       sdr_agent_config: {
         Row: {
           agent_name: string
+          agent_segment: string | null
           allowed_actions_text: string | null
           can_ask_location: boolean
           can_ask_name: boolean
@@ -7130,6 +7131,7 @@ export type Database = {
         }
         Insert: {
           agent_name?: string
+          agent_segment?: string | null
           allowed_actions_text?: string | null
           can_ask_location?: boolean
           can_ask_name?: boolean
@@ -7163,6 +7165,7 @@ export type Database = {
         }
         Update: {
           agent_name?: string
+          agent_segment?: string | null
           allowed_actions_text?: string | null
           can_ask_location?: boolean
           can_ask_name?: boolean
@@ -8025,6 +8028,7 @@ export type Database = {
       }
       sdr_products: {
         Row: {
+          access_link: string | null
           benefits: Json | null
           category: string | null
           company_id: string
@@ -8034,10 +8038,12 @@ export type Database = {
           description_short: string | null
           faq: Json | null
           id: string
+          media_urls: Json | null
           name: string
           objections_handlers: Json | null
           price_base: number | null
           pricing_model: string | null
+          product_type: string | null
           sku: string | null
           subcategory: string | null
           support_links: Json | null
@@ -8046,8 +8052,10 @@ export type Database = {
           updated_at: string | null
           value_proposition: string | null
           variations: Json | null
+          video_urls: Json | null
         }
         Insert: {
+          access_link?: string | null
           benefits?: Json | null
           category?: string | null
           company_id: string
@@ -8057,10 +8065,12 @@ export type Database = {
           description_short?: string | null
           faq?: Json | null
           id?: string
+          media_urls?: Json | null
           name: string
           objections_handlers?: Json | null
           price_base?: number | null
           pricing_model?: string | null
+          product_type?: string | null
           sku?: string | null
           subcategory?: string | null
           support_links?: Json | null
@@ -8069,8 +8079,10 @@ export type Database = {
           updated_at?: string | null
           value_proposition?: string | null
           variations?: Json | null
+          video_urls?: Json | null
         }
         Update: {
+          access_link?: string | null
           benefits?: Json | null
           category?: string | null
           company_id?: string
@@ -8080,10 +8092,12 @@ export type Database = {
           description_short?: string | null
           faq?: Json | null
           id?: string
+          media_urls?: Json | null
           name?: string
           objections_handlers?: Json | null
           price_base?: number | null
           pricing_model?: string | null
+          product_type?: string | null
           sku?: string | null
           subcategory?: string | null
           support_links?: Json | null
@@ -8092,6 +8106,7 @@ export type Database = {
           updated_at?: string | null
           value_proposition?: string | null
           variations?: Json | null
+          video_urls?: Json | null
         }
         Relationships: [
           {
