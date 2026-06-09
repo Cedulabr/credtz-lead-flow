@@ -28,6 +28,13 @@ export interface Lead {
   simulation_status?: string | null;
   simulation_id?: string | null;
   metadata?: Record<string, any>;
+  // Agibank specific fields
+  agibank_account_type?: string | null;
+  agibank_link_date?: string | null;
+  agibank_monthly_income?: number | null;
+  agibank_is_onboarded?: boolean | null;
+  agibank_last_interaction_type?: string | null;
+  agibank_last_interaction_date?: string | null;
 }
 
 export interface UserProfile {
