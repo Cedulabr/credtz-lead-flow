@@ -60,10 +60,13 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCan
     registerCanAdvance(async () => {
       const d = dataRef.current;
 
-      // Servidor Público: estado é obrigatório (mas continua para o check de telefone)
-      if (d.tipoLead === 'servidor' && !d.uf) {
-        // Para o GOV BA, podemos pular a obrigatoriedade de UF se quisermos, 
-        // ou deixar como opcional já que o convênio já está fixado.
+      // Servidor Público: estado é obrigatório
+      if (d.tipoLead === 'servidor') {
+        if (!d.uf) {
+          setEstadoError('Selecione o estado para continuar');
+          return false;
+        }
+        setEstadoError(null);
       }
 
       // INSS/SIAPE/CLT: alerta de telefone
@@ -117,6 +120,17 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCan
 
       {isServidor ? (
         <>
+          <EstadoField
+            value={data.uf}
+            onChange={(uf) => {
+              setEstadoError(null);
+              onUpdate({
+                uf,
+                ddds: uf ? (UF_TO_DDDS[uf] || []) : [],
+              });
+            }}
+            error={estadoError}
+          />
           <TagsField selected={data.tags} onChange={(tags) => onUpdate({ tags })} />
           <DDDField selected={data.ddds} onChange={(ddds) => onUpdate({ ddds })} />
           <ContractFiltersSection data={data} onUpdate={onUpdate} defaultExpanded />

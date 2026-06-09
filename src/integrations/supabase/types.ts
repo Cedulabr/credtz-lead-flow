@@ -7806,7 +7806,7 @@ export type Database = {
           created_by: string | null
           daily_send_limit: number | null
           delay_minutes: number
-          escalation_trigger: string | null
+          escalation_trigger: string[] | null
           excluded_holidays: Json | null
           follow_up_sequence: Json
           followup_configs: Json | null
@@ -7869,7 +7869,7 @@ export type Database = {
           created_by?: string | null
           daily_send_limit?: number | null
           delay_minutes?: number
-          escalation_trigger?: string | null
+          escalation_trigger?: string[] | null
           excluded_holidays?: Json | null
           follow_up_sequence?: Json
           followup_configs?: Json | null
@@ -7932,7 +7932,7 @@ export type Database = {
           created_by?: string | null
           daily_send_limit?: number | null
           delay_minutes?: number
-          escalation_trigger?: string | null
+          escalation_trigger?: string[] | null
           excluded_holidays?: Json | null
           follow_up_sequence?: Json
           followup_configs?: Json | null

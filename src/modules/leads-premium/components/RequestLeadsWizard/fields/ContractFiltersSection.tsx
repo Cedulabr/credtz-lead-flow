@@ -132,7 +132,7 @@ export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true 
                 <Slider
                   min={-100}
                   max={500}
-                  step={10}
+                  step={1}
                   value={[data.margemMin ?? 0, data.margemMax ?? 500]}
                   onValueChange={([min, max]) =>
                     onUpdate({
