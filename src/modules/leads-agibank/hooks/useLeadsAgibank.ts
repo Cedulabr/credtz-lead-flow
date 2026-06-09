@@ -100,7 +100,14 @@ export function useLeadsAgibank() {
       setIsLoading(true);
       let query = supabase
         .from('leads')
-        .select('id, name, cpf, phone, phone2, convenio, tag, status, created_at, updated_at, assigned_to, created_by, is_rework, notes, future_contact_date, rejection_reason, banco_operacao, valor_operacao, history, simulation_status, simulation_id')
+        .select(`
+          id, name, cpf, phone, phone2, convenio, tag, status, 
+          created_at, updated_at, assigned_to, created_by, is_rework, 
+          notes, future_contact_date, rejection_reason, banco_operacao, 
+          valor_operacao, history, simulation_status, simulation_id,
+          agibank_account_type, agibank_link_date, agibank_monthly_income,
+          agibank_is_onboarded, agibank_last_interaction_type, agibank_last_interaction_date
+        `)
         .order('created_at', { ascending: false })
         .limit(500);
 
