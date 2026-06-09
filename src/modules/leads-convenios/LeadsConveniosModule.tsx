@@ -88,6 +88,12 @@ export function LeadsConveniosModule() {
         canEdit={true}
         users={[]}
       />
+      <RequestLeadsWizard
+        isOpen={isRequestModalOpen}
+        onClose={() => setIsRequestModalOpen(false)}
+        userCredits={userCredits}
+        onRequestLeads={handleRequestLeads}
+      />
     </div>
   );
 }
