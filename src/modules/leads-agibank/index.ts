@@ -1,1 +1,1 @@
-export { AgibankLeadsModule } from "./AgibankLeadsModule";
+export * from './LeadsAgibankModule';

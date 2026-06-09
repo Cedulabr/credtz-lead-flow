@@ -586,6 +586,45 @@ export type Database = {
         }
         Relationships: []
       }
+      agibank_credit_requests: {
+        Row: {
+          admin_note: string | null
+          amount: number
+          created_at: string | null
+          id: string
+          performance_snapshot: Json | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          amount: number
+          created_at?: string | null
+          id?: string
+          performance_snapshot?: Json | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          amount?: number
+          created_at?: string | null
+          id?: string
+          performance_snapshot?: Json | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       agibank_credits: {
         Row: {
           balance: number
