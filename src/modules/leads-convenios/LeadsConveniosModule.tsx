@@ -11,10 +11,17 @@ import { Upload, RefreshCw, Loader2, Plus, CreditCard } from "lucide-react";
 export function LeadsConveniosModule() {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
-  const { leads, isLoading, fetchLeads, updateLeadStatus } = useLeadsConvenios();
+  const { leads, isLoading, userCredits, fetchLeads, updateLeadStatus, requestLeads } = useLeadsConvenios();
   const [selectedLead, setSelectedLead] = useState<any>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+
+  const handleRequestLeads = async (options: any) => {
+    const success = await requestLeads(options);
+    if (success) setIsRequestModalOpen(false);
+    return success;
+  };
 
   const handleLeadClick = (lead: any) => {
     setSelectedLead(lead);
