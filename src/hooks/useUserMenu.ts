@@ -117,7 +117,11 @@ export function useUserMenu(userId?: string) {
     { moduleKey: "indicate", label: "Indicar", icon: "Share2", position: -8 },
     { moduleKey: "marketplace", label: "Marketplace", icon: "Store", position: -7 },
     { moduleKey: "billing", label: "Faturamento", icon: "Receipt", position: -6 },
-  ].sort((a, b) => a.label.localeCompare(b.label));
+  ].sort((a, b) => {
+    if (a.moduleKey === "dashboard") return -1;
+    if (b.moduleKey === "dashboard") return 1;
+    return a.label.localeCompare(b.label);
+  });
 
   if (!isLoading && cats.data && perms.data) {
     const now = new Date();
