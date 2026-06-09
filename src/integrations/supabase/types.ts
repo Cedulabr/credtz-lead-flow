@@ -12745,50 +12745,50 @@ export type Database = {
           tag_filter?: string[]
         }
         Returns: {
+          ade: string | null
           agibank_account_type: string | null
           agibank_link_date: string | null
           agibank_products: string | null
-          assigned_to: string | null
-          banco_operacao: string | null
-          batch_id: string | null
-          company_id: string | null
-          convenio: string | null
-          cpf: string
-          created_at: string | null
-          created_by: string | null
-          future_contact_date: string | null
-          history: Json | null
+          banco: string | null
+          convenio: string
+          cpf: string | null
+          cpf_added_at: string | null
+          cpf_added_by: string | null
+          created_at: string
+          data_nascimento: string | null
+          deferimento: string | null
+          estado: string | null
           id: string
-          is_rework: boolean | null
+          idade: number | null
+          import_log_id: string | null
+          is_available: boolean
+          margem_anterior: number | null
+          margem_atualizada_em: string | null
+          margem_disponivel: number | null
+          margem_total: number | null
+          matricula: string | null
           name: string
-          notes: string | null
-          origem_lead: string | null
-          original_status: string | null
+          origem_base: string | null
+          parcela: number | null
+          parcelas_em_aberto: number | null
+          parcelas_pagas: number | null
           phone: string
           phone2: string | null
-          priority: string | null
-          rejection_bank: string | null
-          rejection_description: string | null
-          rejection_offered_value: number | null
-          rejection_reason: string | null
-          requested_at: string | null
-          requested_by: string | null
-          rework_date: string | null
-          simulation_id: string | null
-          simulation_status: string | null
-          stage: string | null
-          status: string | null
+          quitacao: string | null
+          servico_consignataria: string | null
+          servico_servidor: string | null
+          situacao: string | null
+          subtipo: string | null
           tag: string | null
-          treated_at: string | null
-          treatment_deadline: string | null
-          treatment_status: string | null
-          updated_at: string | null
-          valor_operacao: number | null
-          withdrawn_at: string | null
+          tipo_beneficio: string | null
+          tipo_servico_servidor: string | null
+          ultima_parcela: string | null
+          ultimo_desconto: string | null
+          updated_at: string
         }[]
         SetofOptions: {
           from: "*"
-          to: "leads"
+          to: "leads_database"
           isOneToOne: false
           isSetofReturn: true
         }
