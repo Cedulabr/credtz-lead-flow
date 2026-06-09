@@ -151,9 +151,16 @@ export const TelevendasProposalList = ({
                   <Calendar className="h-4 w-4" />
                   <span className="font-medium text-foreground">{formatDate(tv.data_venda)}</span>
                 </span>
-                <span className="font-bold text-lg sm:text-base text-primary">
-                  {formatCurrency(tv.parcela)}
-                </span>
+                <div className="flex flex-col items-end">
+                  <span className="font-bold text-lg sm:text-base text-primary">
+                    {formatCurrency(tv.parcela)}
+                  </span>
+                  {tv.status.includes('pago') && (
+                    <span className="text-[10px] text-muted-foreground font-mono">
+                      Ref: {tv.id.slice(0, 8)}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Meta Row: Type + User + Time */}

@@ -19,7 +19,8 @@ import {
   Trash2,
   Save,
   X,
-  Bell
+  Bell,
+  CreditCard
 } from "lucide-react";
 import { UsersList } from "./UsersList";
 import { ContaCorrente } from "./ContaCorrente";
@@ -32,6 +33,7 @@ import { AdminBankReuseSettings } from "./AdminBankReuseSettings";
 import { AdminCreditsManagement } from "./AdminCreditsManagement";
 import { AdminDuplicatesManager } from "./AdminDuplicatesManager";
 import { AdminInactivitySettings } from "./AdminInactivitySettings";
+import { AdminAbacatePayLogs } from "./admin/AdminAbacatePayLogs";
 
 interface Announcement {
   id: number;
@@ -346,6 +348,7 @@ export function AdminPanel() {
             <TabsTrigger value="announcements">Avisos</TabsTrigger>
             {isAdmin && <TabsTrigger value="duplicates">🗑️ Duplicatas</TabsTrigger>}
             {isAdmin && <TabsTrigger value="credits">💰 Créditos</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="abacatepay">🥑 AbacatePay</TabsTrigger>}
             {isAdmin && <TabsTrigger value="commission-rules">Regras Flexíveis</TabsTrigger>}
             {isAdmin && <TabsTrigger value="companies">Empresas</TabsTrigger>}
             {isAdmin && <TabsTrigger value="televendas-banks">Banco Televendas</TabsTrigger>}
@@ -465,6 +468,13 @@ export function AdminPanel() {
         {isAdmin && (
           <TabsContent value="credits" className="space-y-4">
             <AdminCreditsManagement />
+          </TabsContent>
+        )}
+
+        {/* AbacatePay Logs Tab */}
+        {isAdmin && (
+          <TabsContent value="abacatepay" className="space-y-4">
+            <AdminAbacatePayLogs />
           </TabsContent>
         )}
 

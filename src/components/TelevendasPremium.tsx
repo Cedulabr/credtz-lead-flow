@@ -61,6 +61,9 @@ const USER_ALLOWED_STATUSES = [
   "solicitado_digitacao",
   "proposta_digitada", 
   "pago_aguardando",
+  "pago_confirmado",
+  "pago_falhou",
+  "pago_aguardando_gestao",
   "cancelado_aguardando"
 ];
 

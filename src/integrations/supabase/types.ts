@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      abacatepay_webhook_logs: {
+        Row: {
+          error: string | null
+          event_id: string | null
+          event_type: string | null
+          id: string
+          payload: Json | null
+          processed_at: string | null
+          status: string | null
+        }
+        Insert: {
+          error?: string | null
+          event_id?: string | null
+          event_type?: string | null
+          id?: string
+          payload?: Json | null
+          processed_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          error?: string | null
+          event_id?: string | null
+          event_type?: string | null
+          id?: string
+          payload?: Json | null
+          processed_at?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       activate_leads: {
         Row: {
           assigned_to: string | null
@@ -561,6 +591,47 @@ export type Database = {
           target_user_id?: string | null
         }
         Relationships: []
+      }
+      affiliate_commissions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          lead_id: string | null
+          metadata: Json | null
+          released_at: string | null
+          status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          lead_id?: string | null
+          metadata?: Json | null
+          released_at?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          lead_id?: string | null
+          metadata?: Json | null
+          released_at?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "affiliate_commissions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       agibank_blacklist: {
         Row: {
@@ -5549,6 +5620,7 @@ export type Database = {
       }
       leads: {
         Row: {
+          abacatepay_id: string | null
           ade: string | null
           agibank_account_type: string | null
           agibank_is_onboarded: boolean | null
@@ -5581,8 +5653,11 @@ export type Database = {
           parcela: number | null
           parcelas_em_aberto: number | null
           parcelas_pagas: number | null
+          payment_status: string | null
           phone: string
           phone2: string | null
+          pix_amount: number | null
+          pix_paid_at: string | null
           priority: string | null
           rejection_bank: string | null
           rejection_description: string | null
@@ -5606,6 +5681,7 @@ export type Database = {
           withdrawn_at: string | null
         }
         Insert: {
+          abacatepay_id?: string | null
           ade?: string | null
           agibank_account_type?: string | null
           agibank_is_onboarded?: boolean | null
@@ -5638,8 +5714,11 @@ export type Database = {
           parcela?: number | null
           parcelas_em_aberto?: number | null
           parcelas_pagas?: number | null
+          payment_status?: string | null
           phone: string
           phone2?: string | null
+          pix_amount?: number | null
+          pix_paid_at?: string | null
           priority?: string | null
           rejection_bank?: string | null
           rejection_description?: string | null
@@ -5663,6 +5742,7 @@ export type Database = {
           withdrawn_at?: string | null
         }
         Update: {
+          abacatepay_id?: string | null
           ade?: string | null
           agibank_account_type?: string | null
           agibank_is_onboarded?: boolean | null
@@ -5695,8 +5775,11 @@ export type Database = {
           parcela?: number | null
           parcelas_em_aberto?: number | null
           parcelas_pagas?: number | null
+          payment_status?: string | null
           phone?: string
           phone2?: string | null
+          pix_amount?: number | null
+          pix_paid_at?: string | null
           priority?: string | null
           rejection_bank?: string | null
           rejection_description?: string | null
