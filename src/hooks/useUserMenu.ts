@@ -23,7 +23,7 @@ export interface ModulePermission {
   display_name: string | null;
   icon: string | null;
   position: number;
-  expires_at: string | null;
+  expires_at?: string | null;
 }
 
 export interface MenuItem {
