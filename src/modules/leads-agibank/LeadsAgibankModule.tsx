@@ -9,7 +9,9 @@ import { MetricsDashboard } from "../leads-premium/views/MetricsDashboard";
 import { LeadDetailDrawer } from "../leads-premium/components/LeadDetailDrawer";
 import { MobileActionBar } from "../leads-premium/components/MobileActionBar";
 import { RequestLeadsWizard } from "../leads-premium/components/RequestLeadsWizard";
+import { PerformanceCreditModule } from "../leads-premium/components/PerformanceCreditModule";
 import { OverdueBlockBanner } from "../leads-premium/components/OverdueBlockBanner";
+
 import { useLeadsAgibank } from "./hooks/useLeadsAgibank";
 import { useOverdueLeads } from "../leads-premium/hooks/useOverdueLeads";
 import { LeadSalesPanel } from "../leads-premium/components/LeadSalesPanel";
@@ -116,50 +118,6 @@ export function AgibankLeadsModule() {
     setIsSalesPanelOpen(true);
   };
 
-  // Inline handlers for list-level typing
-  const handleListTyping = (lead: Lead) => {
-    setTypingLead(lead);
-    setTypingForm({ banco: "", valor: "", parcela: "", notes: "" });
-    setShowTypingModal(true);
-  };
-
-  const handleTypingSubmit = async () => {
-    if (!typingLead || !typingForm.banco) {
-      toast({ title: "Selecione o banco", variant: "destructive" });
-      return;
-    }
-
-    setIsTypProcessing(true);
-    try {
-      const { error } = await supabase
-        .from('propostas')
-        .insert({
-          "Nome do cliente": typingLead.name,
-          cpf: typingLead.cpf,
-          telefone: typingLead.phone,
-          convenio: typingLead.convenio,
-          banco: typingForm.banco,
-          valor_proposta: typingForm.valor ? parseFloat(typingForm.valor) : null,
-          installments: typingForm.parcela ? parseInt(typingForm.parcela.replace(/\D/g, '')) : null,
-          pipeline_stage: "digitacao",
-          client_status: "aguardando_digitacao",
-          origem_lead: "leads_agibank",
-          created_by_id: user?.id,
-          assigned_to: user?.id,
-          notes: typingForm.notes || 'Digitação solicitada de Leads AGibank'
-        });
-
-      if (error) throw error;
-      await updateLeadStatus(typingLead.id, 'cliente_fechado');
-      toast({ title: "Digitação solicitada!", description: "Lead convertido para proposta." });
-      setShowTypingModal(false);
-      fetchLeads();
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    } finally {
-      setIsTypProcessing(false);
-    }
-  };
 
   // Future contact submit
   const handleFutureContactSubmit = async () => {
@@ -295,12 +253,20 @@ export function AgibankLeadsModule() {
                 exit={{ opacity: 0, x: 20 }}
                 className="h-full overflow-auto"
               >
-                <MetricsDashboard 
-                  leads={leads}
-                  stats={stats}
-                  userCredits={userCredits}
-                  users={users}
-                />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2">
+                    <MetricsDashboard 
+                      leads={leads}
+                      stats={stats}
+                      userCredits={userCredits}
+                      users={users}
+                    />
+                  </div>
+                  <div className="lg:col-span-1 p-4">
+                    <PerformanceCreditModule />
+                  </div>
+                </div>
+
               </motion.div>
             )}
           </AnimatePresence>
@@ -335,16 +301,6 @@ export function AgibankLeadsModule() {
         />
 
 
-        {/* Inline Typing Modal */}
-        <TypingModal
-          open={showTypingModal}
-          onOpenChange={setShowTypingModal}
-          lead={typingLead}
-          form={typingForm}
-          onFormChange={setTypingForm}
-          onSubmit={handleTypingSubmit}
-           isProcessing={isTypProcessing}
-        />
 
         {/* Lead Sales Panel */}
         <LeadSalesPanel
@@ -381,10 +337,8 @@ export function AgibankLeadsModule() {
             <Plus className="h-4 w-4 mr-2" />
             {isOverdueBlocked ? 'Bloqueado' : 'Pedir Leads'}
           </Button>
-          <Button variant="outline" onClick={() => setIsCreditRequestModalOpen(true)}>
-            <CreditCard className="h-4 w-4 mr-2" />
-            Solicitar Crédito
-          </Button>
+          {/* Botão legado removido em favor do novo módulo unificado */}
+
           {isAdmin && (
             <Button variant="outline" onClick={() => setShowImportBase(true)}>
               <Upload className="h-4 w-4 mr-2" />
@@ -435,13 +389,21 @@ export function AgibankLeadsModule() {
         </TabsContent>
 
         <TabsContent value="metrics" className="mt-6">
-          <MetricsDashboard 
-            leads={leads}
-            stats={stats}
-            userCredits={userCredits}
-            users={users}
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <MetricsDashboard 
+                leads={leads}
+                stats={stats}
+                userCredits={userCredits}
+                users={users}
+              />
+            </div>
+            <div className="lg:col-span-1">
+              <PerformanceCreditModule />
+            </div>
+          </div>
         </TabsContent>
+
 
       </Tabs>
 
@@ -471,16 +433,6 @@ export function AgibankLeadsModule() {
       />
 
 
-      {/* Inline Typing Modal */}
-      <TypingModal
-        open={showTypingModal}
-        onOpenChange={setShowTypingModal}
-        lead={typingLead}
-        form={typingForm}
-        onFormChange={setTypingForm}
-        onSubmit={handleTypingSubmit}
-        isProcessing={isTypProcessing}
-      />
 
       {/* Future Contact Modal */}
       <Dialog open={showFutureContactModal} onOpenChange={setShowFutureContactModal}>
