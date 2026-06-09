@@ -349,7 +349,7 @@ export function LeadsPremiumModule() {
           isOpen={isSalesPanelOpen}
           onClose={() => setIsSalesPanelOpen(false)}
           onStatusChange={handleStatusChange}
-          onTyping={handleListTyping}
+          onTyping={() => {}}
         />
       </div>
     );
