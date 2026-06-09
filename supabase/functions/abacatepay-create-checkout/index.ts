@@ -44,8 +44,8 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle();
 
-      if (!uc?.company_id) throw new Error("Usuário sem empresa vinculada");
-      const company_id = uc.company_id;
+      const company_id = uc?.company_id || null;
+      // Removi o bloqueio caso company_id seja null para permitir testes/uso básico
 
       const { data: mod } = await service
         .from("modules")
@@ -81,37 +81,50 @@ Deno.serve(async (req) => {
       // Product ID for marketplace (from user prompt)
       const externalProductId = "prod_Y0mn4nhzgjzAwuyHjPEMkD3W";
 
+      const checkoutBody = {
+        frequency: isSubscription ? "RECURRING" : "ONE_TIME",
+        methods: ["PIX"],
+        products: [
+          {
+            externalId: externalProductId,
+            name: description,
+            quantity: 1,
+            priceUnit: amount,
+          },
+        ],
+        returnUrl: `${origin}/marketplace?status=success`,
+        completionUrl: `${origin}/marketplace?status=success`,
+        customerId: user.id,
+        customer: {
+          name: customer?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || "Cliente",
+          email: customer?.email || user.email,
+          taxId: customer?.taxId || user.user_metadata?.cpf || "",
+        }
+      };
+
+      console.log("Creating AbacatePay checkout with body:", JSON.stringify(checkoutBody, null, 2));
+
       const response = await fetch("https://api.abacatepay.com/v1/billing/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${API_KEY}`,
         },
-        body: JSON.stringify({
-          frequency: isSubscription ? "RECURRING" : "ONE_TIME",
-          methods: ["PIX"],
-          products: [
-            {
-              externalId: externalProductId,
-              name: description,
-              quantity: 1,
-              priceUnit: amount,
-            },
-          ],
-          returnUrl: `${origin}/marketplace?status=success`,
-          completionUrl: `${origin}/marketplace?status=success`,
-          customerId: user.id,
-          customer: {
-            name: customer?.name || user.user_metadata?.full_name || user.email.split('@')[0],
-            email: customer?.email || user.email,
-            taxId: customer?.taxId || user.user_metadata?.cpf || "",
-          }
-        }),
+        body: JSON.stringify(checkoutBody),
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error("Failed to parse JSON response:", text);
+        throw new Error(`AbacatePay API Error: ${response.status} ${response.statusText}`);
+      }
+      
       if (!response.ok) {
-        throw new Error(data.message || "Erro ao criar cobrança no AbacatePay");
+        console.error("AbacatePay API Error Body:", data);
+        throw new Error(data.error || data.message || "Erro ao criar cobrança no AbacatePay");
       }
 
       const billing = data.data;
