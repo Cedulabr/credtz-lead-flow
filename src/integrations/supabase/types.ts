@@ -5546,6 +5546,7 @@ export type Database = {
       }
       leads: {
         Row: {
+          ade: string | null
           agibank_account_type: string | null
           agibank_is_onboarded: boolean | null
           agibank_last_interaction_date: string | null
@@ -5561,6 +5562,7 @@ export type Database = {
           cpf: string
           created_at: string | null
           created_by: string | null
+          deferimento: string | null
           emprestimos: Json | null
           future_contact_date: string | null
           history: Json | null
@@ -5573,6 +5575,9 @@ export type Database = {
           notes: string | null
           origem_lead: string | null
           original_status: string | null
+          parcela: number | null
+          parcelas_em_aberto: number | null
+          parcelas_pagas: number | null
           phone: string
           phone2: string | null
           priority: string | null
@@ -5591,11 +5596,14 @@ export type Database = {
           treated_at: string | null
           treatment_deadline: string | null
           treatment_status: string | null
+          ultima_parcela: string | null
+          ultimo_desconto: string | null
           updated_at: string | null
           valor_operacao: number | null
           withdrawn_at: string | null
         }
         Insert: {
+          ade?: string | null
           agibank_account_type?: string | null
           agibank_is_onboarded?: boolean | null
           agibank_last_interaction_date?: string | null
@@ -5611,6 +5619,7 @@ export type Database = {
           cpf: string
           created_at?: string | null
           created_by?: string | null
+          deferimento?: string | null
           emprestimos?: Json | null
           future_contact_date?: string | null
           history?: Json | null
@@ -5623,6 +5632,9 @@ export type Database = {
           notes?: string | null
           origem_lead?: string | null
           original_status?: string | null
+          parcela?: number | null
+          parcelas_em_aberto?: number | null
+          parcelas_pagas?: number | null
           phone: string
           phone2?: string | null
           priority?: string | null
@@ -5641,11 +5653,14 @@ export type Database = {
           treated_at?: string | null
           treatment_deadline?: string | null
           treatment_status?: string | null
+          ultima_parcela?: string | null
+          ultimo_desconto?: string | null
           updated_at?: string | null
           valor_operacao?: number | null
           withdrawn_at?: string | null
         }
         Update: {
+          ade?: string | null
           agibank_account_type?: string | null
           agibank_is_onboarded?: boolean | null
           agibank_last_interaction_date?: string | null
@@ -5661,6 +5676,7 @@ export type Database = {
           cpf?: string
           created_at?: string | null
           created_by?: string | null
+          deferimento?: string | null
           emprestimos?: Json | null
           future_contact_date?: string | null
           history?: Json | null
@@ -5673,6 +5689,9 @@ export type Database = {
           notes?: string | null
           origem_lead?: string | null
           original_status?: string | null
+          parcela?: number | null
+          parcelas_em_aberto?: number | null
+          parcelas_pagas?: number | null
           phone?: string
           phone2?: string | null
           priority?: string | null
@@ -5691,6 +5710,8 @@ export type Database = {
           treated_at?: string | null
           treatment_deadline?: string | null
           treatment_status?: string | null
+          ultima_parcela?: string | null
+          ultimo_desconto?: string | null
           updated_at?: string | null
           valor_operacao?: number | null
           withdrawn_at?: string | null
