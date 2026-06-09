@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
     if (userErr || !user?.email) throw new Error("User not authenticated");
 
     const body = await req.json();
-    const { module_slug, package_id, custom_credits, custom_price_cents } = body;
+    const { module_slug, package_id, custom_credits, customer } = body;
 
     const service = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -32,7 +32,8 @@ Deno.serve(async (req) => {
 
     let amount = 0;
     let credits = 0;
-    let description = "Pagamento Easyn (PIX)";
+    let description = "Assinatura Easyn (PIX)";
+    let isSubscription = false;
 
     if (module_slug) {
       const { data: uc } = await service
@@ -48,7 +49,7 @@ Deno.serve(async (req) => {
 
       const { data: mod } = await service
         .from("modules")
-        .select("name, credit_price_cents")
+        .select("name, credit_price_cents, monthly_price_cents, billing_type")
         .eq("slug", module_slug)
         .single();
 
@@ -66,12 +67,19 @@ Deno.serve(async (req) => {
         credits = parseInt(String(custom_credits), 10);
         amount = credits * (mod?.credit_price_cents ?? 0);
         description = `${mod?.name ?? module_slug} — ${credits} créditos`;
+      } else if (mod?.billing_type === "subscription") {
+        amount = mod.monthly_price_cents;
+        description = `Assinatura Módulo: ${mod.name}`;
+        isSubscription = true;
       } else {
-        throw new Error("package_id ou custom_credits obrigatório");
+        throw new Error("Parâmetros de cobrança inválidos");
       }
 
       const API_KEY = Deno.env.get("ABACATEPAY_API_KEY");
       const origin = req.headers.get("origin") || "http://localhost:5173";
+
+      // Product ID for marketplace (from user prompt)
+      const externalProductId = "prod_Y0mn4nhzgjzAwuyHjPEMkD3W";
 
       const response = await fetch("https://api.abacatepay.com/v1/billing/create", {
         method: "POST",
@@ -80,23 +88,23 @@ Deno.serve(async (req) => {
           "Authorization": `Bearer ${API_KEY}`,
         },
         body: JSON.stringify({
-          frequency: "ONE_TIME",
+          frequency: isSubscription ? "RECURRING" : "ONE_TIME",
           methods: ["PIX"],
           products: [
             {
-              externalId: `${module_slug}-${Date.now()}`,
+              externalId: externalProductId,
               name: description,
               quantity: 1,
-              priceUnit: amount, // Em centavos se a API seguir o padrão Stripe, verificar docs.
+              priceUnit: amount,
             },
           ],
           returnUrl: `${origin}/marketplace?status=success`,
           completionUrl: `${origin}/marketplace?status=success`,
-          customerId: user.id, // Opcional se já cadastrado no AbacatePay
+          customerId: user.id,
           customer: {
-            name: user.user_metadata?.full_name || user.email.split('@')[0],
-            email: user.email,
-            taxId: user.user_metadata?.cpf || "", // Se tiver CPF no metadata
+            name: customer?.name || user.user_metadata?.full_name || user.email.split('@')[0],
+            email: customer?.email || user.email,
+            taxId: customer?.taxId || user.user_metadata?.cpf || "",
           }
         }),
       });
@@ -120,7 +128,8 @@ Deno.serve(async (req) => {
         metadata: {
           company_id,
           module_slug,
-          credits: String(credits),
+          credits: isSubscription ? "0" : String(credits),
+          is_subscription: isSubscription,
           user_id: user.id,
         },
       });
