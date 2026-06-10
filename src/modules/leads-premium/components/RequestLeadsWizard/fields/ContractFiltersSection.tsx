@@ -39,7 +39,8 @@ export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true,
 
   const hasActive =
     !!data.banco || data.parcelaMin !== null || data.parcelaMax !== null ||
-    data.margemMin !== null || data.margemMax !== null || data.parcelasPagasMin !== null;
+    data.margemMin !== null || data.margemMax !== null || 
+    data.parcelasPagasMin !== null || data.parcelasPagasMax !== null;
 
   const parcMin = data.parcelaMin ?? 0;
   const parcMax = data.parcelaMax ?? 2000;
