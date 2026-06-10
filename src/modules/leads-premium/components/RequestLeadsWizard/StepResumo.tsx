@@ -30,8 +30,12 @@ export const StepResumo = memo(function StepResumo({
   if (data.parcelaMin !== null || data.parcelaMax !== null) {
     contratoParts.push(`Parcela: R$ ${data.parcelaMin ?? 0} – R$ ${data.parcelaMax ?? 2000}`);
   }
-  if (data.margemMin !== null) contratoParts.push(`Margem mín: R$ ${data.margemMin}`);
-  if (data.parcelasPagasMin !== null) contratoParts.push(`Parcelas pagas mín: ${data.parcelasPagasMin}`);
+  if (data.margemMin !== null || data.margemMax !== null) {
+    contratoParts.push(`Margem: R$ ${data.margemMin ?? 0} – R$ ${data.margemMax ?? 500}`);
+  }
+  if (data.parcelasPagasMin !== null || data.parcelasPagasMax !== null) {
+    contratoParts.push(`Parcelas pagas: ${data.parcelasPagasMin ?? 0} – ${data.parcelasPagasMax ?? '∞'}`);
+  }
 
   const items: { icon: any; label: string; value: string; step: number; hasValue: boolean; show: boolean }[] = [
     {
