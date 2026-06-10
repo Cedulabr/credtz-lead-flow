@@ -244,6 +244,7 @@ export function RequestLeadsWizard({
                 data={data}
                 onUpdate={handleUpdate}
                 registerCanAdvance={(fn) => { perfilCanAdvanceRef.current = fn; }}
+                isConvenioModule={isConvenioModule}
               />
             )}
             {currentStep === 2 && (
