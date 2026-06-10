@@ -6,7 +6,8 @@ import { LeadDetailDrawer } from "../leads-premium/components/LeadDetailDrawer";
 import { Button } from "@/components/ui/button";
 import { ImportBase } from "@/components/ImportBase";
 import { RequestLeadsWizard } from "../leads-premium/components/RequestLeadsWizard";
-import { Upload, RefreshCw, Loader2, Plus, CreditCard } from "lucide-react";
+import { Upload, RefreshCw, Loader2, Plus, CreditCard, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 export function LeadsConveniosModule() {
   const { profile } = useAuth();
@@ -16,6 +17,13 @@ export function LeadsConveniosModule() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredLeads = leads.filter(lead => 
+    lead.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (lead.cpf && lead.cpf.includes(searchTerm)) ||
+    (lead.matricula && lead.matricula.includes(searchTerm))
+  );
 
   const handleRequestLeads = async (options: any) => {
     const success = await requestLeads(options);
