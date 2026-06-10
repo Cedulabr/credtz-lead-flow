@@ -103,12 +103,15 @@ export function RequestLeadsWizard({
   }, [currentStep, isConvenioModule]);
 
   const handleSubmit = useCallback(async () => {
-    if (data.quantidade > userCredits) return;
+    const finalQuantity = Math.min(data.quantidade, data.availableLeadsCount ?? data.quantidade);
+    if (finalQuantity <= 0) return;
+    if (finalQuantity > userCredits) return;
+
     setIsSubmitting(true);
     try {
       const success = await onRequestLeads({
         convenio: data.tipoLead === 'servidor' ? 'GOVERNO BA' : (tipoLeadToConvenio(data.tipoLead) || undefined),
-        count: data.quantidade,
+        count: finalQuantity,
         ddds: data.ddds.length > 0 ? data.ddds : undefined,
         tags: data.tags.length > 0 ? data.tags : undefined,
         banco: data.banco,
