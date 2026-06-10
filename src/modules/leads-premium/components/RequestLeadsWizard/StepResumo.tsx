@@ -10,6 +10,7 @@ import { StepProps, TIPOS_LEAD, PRIORIDADES, UF_NOMES } from "./types";
 interface StepResumoProps extends StepProps {
   onGoToStep: (step: number) => void;
   userCredits: number;
+  isConvenioModule?: boolean;
 }
 
 export const StepResumo = memo(function StepResumo({
