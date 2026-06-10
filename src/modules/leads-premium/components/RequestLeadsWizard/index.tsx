@@ -96,9 +96,11 @@ export function RequestLeadsWizard({
   }, [currentStep, isConvenioModule]);
 
   const handleGoToStep = useCallback((step: number) => {
+    const minStep = isConvenioModule ? 1 : 0;
+    if (step < minStep) return;
     setDirection(step > currentStep ? 1 : -1);
     setCurrentStep(step);
-  }, [currentStep]);
+  }, [currentStep, isConvenioModule]);
 
   const handleSubmit = useCallback(async () => {
     if (data.quantidade > userCredits) return;
