@@ -252,6 +252,7 @@ export function RequestLeadsWizard({
                 onUpdate={handleUpdate}
                 onGoToStep={handleGoToStep}
                 userCredits={userCredits}
+                isConvenioModule={isConvenioModule}
               />
             )}
             {currentStep === 4 && (
