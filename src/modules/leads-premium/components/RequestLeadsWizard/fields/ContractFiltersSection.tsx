@@ -146,25 +146,46 @@ export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true,
                 />
               </div>
 
-              {/* Parcelas pagas mín */}
+              {/* Parcelas pagas range */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium flex items-center gap-2">
                   <ListChecks className="h-4 w-4 text-muted-foreground" />
-                  Parcelas pagas (mínimo)
+                  Parcelas pagas
                 </Label>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  step={1}
-                  placeholder="Ex.: 6"
-                  value={data.parcelasPagasMin ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value.trim();
-                    onUpdate({ parcelasPagasMin: v === "" ? null : Number(v) });
-                  }}
-                  className="h-10"
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-muted-foreground">Mínimo</span>
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      placeholder="Mín."
+                      value={data.parcelasPagasMin ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value.trim();
+                        onUpdate({ parcelasPagasMin: v === "" ? null : Number(v) });
+                      }}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-muted-foreground">Máximo</span>
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      placeholder="Máx."
+                      value={data.parcelasPagasMax ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value.trim();
+                        onUpdate({ parcelasPagasMax: v === "" ? null : Number(v) });
+                      }}
+                      className="h-9"
+                    />
+                  </div>
+                </div>
               </div>
 
               {hasActive && (
