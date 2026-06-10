@@ -132,9 +132,14 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCan
             }}
             error={estadoError}
           />
-          <TagsField selected={data.tags} onChange={(tags) => onUpdate({ tags })} />
-          <DDDField selected={data.ddds} onChange={(ddds) => onUpdate({ ddds })} />
-          <ContractFiltersSection data={data} onUpdate={onUpdate} defaultExpanded />
+          {!isConvenioModule && <TagsField selected={data.tags} onChange={(tags) => onUpdate({ tags })} />}
+          {!isConvenioModule && <DDDField selected={data.ddds} onChange={(ddds) => onUpdate({ ddds })} />}
+          <ContractFiltersSection 
+            data={data} 
+            onUpdate={onUpdate} 
+            defaultExpanded 
+            isConvenioModule={isConvenioModule}
+          />
         </>
       ) : (
         <>
