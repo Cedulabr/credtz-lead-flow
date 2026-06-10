@@ -201,6 +201,7 @@ export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true,
                       margemMin: null,
                       margemMax: null,
                       parcelasPagasMin: null,
+                      parcelasPagasMax: null,
                     })
                   }
                   className="text-xs h-7"
