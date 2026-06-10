@@ -4308,6 +4308,50 @@ export type Database = {
           },
         ]
       }
+      evolution_webhook_logs: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          error_message: string | null
+          event_type: string | null
+          id: string
+          instance_name: string | null
+          payload: Json
+          processed_at: string | null
+          status: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          event_type?: string | null
+          id?: string
+          instance_name?: string | null
+          payload: Json
+          processed_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          event_type?: string | null
+          id?: string
+          instance_name?: string | null
+          payload?: Json
+          processed_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evolution_webhook_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       financial_transactions: {
         Row: {
           company_id: string
@@ -12667,6 +12711,7 @@ export type Database = {
         Args: { user_id_param: string }
         Returns: number
       }
+      check_cpf_availability: { Args: { cpf_to_check: string }; Returns: Json }
       check_daily_lead_limit: {
         Args: { user_id_param: string }
         Returns: number
@@ -13041,6 +13086,21 @@ export type Database = {
           phone_masked: string
           total_available: number
         }[]
+      }
+      preview_requested_leads_count: {
+        Args: {
+          banco_filter?: string
+          convenio_filter?: string
+          ddd_filter?: string[]
+          margem_max?: number
+          margem_min?: number
+          parcela_max?: number
+          parcela_min?: number
+          parcelas_pagas_max?: number
+          parcelas_pagas_min?: number
+          tag_filter?: string[]
+        }
+        Returns: number
       }
       process_expired_future_contacts: { Args: never; Returns: number }
       recalc_history: {
