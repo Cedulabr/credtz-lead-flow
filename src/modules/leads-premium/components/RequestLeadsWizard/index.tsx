@@ -146,7 +146,7 @@ export function RequestLeadsWizard({
   }, [currentStep, data, userCredits]);
 
   const isLastStep = currentStep === STEPS.length - 1;
-  const isFirstStep = currentStep === 0;
+  const isFirstStep = currentStep === (isConvenioModule ? 1 : 0);
 
   const stepVariants = {
     enter: (dir: number) => ({ x: dir > 0 ? 30 : -30, opacity: 0 }),
