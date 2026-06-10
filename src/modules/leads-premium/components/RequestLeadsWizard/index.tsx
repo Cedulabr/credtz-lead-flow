@@ -47,6 +47,7 @@ export function RequestLeadsWizard({
   isOpen,
   onClose,
   userCredits,
+  isConvenioModule,
   onRequestLeads
 }: RequestLeadsWizardProps) {
   const isMobile = useIsMobile();
