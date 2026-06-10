@@ -13104,9 +13104,12 @@ export type Database = {
           convenio_filter?: string
           ddd_filter?: string[]
           leads_requested?: number
+          margem_max?: number
           margem_min?: number
           parcela_max?: number
           parcela_min?: number
+          parcelas_pagas_max?: number
+          parcelas_pagas_min?: number
           produto_filter?: string
           tag_filter?: string[]
         }

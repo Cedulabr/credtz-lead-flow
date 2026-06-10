@@ -88,16 +88,19 @@ export function RequestLeadsWizard({
   }, [currentStep]);
 
   const handleBack = useCallback(() => {
-    if (currentStep > 0) {
+    const minStep = isConvenioModule ? 1 : 0;
+    if (currentStep > minStep) {
       setDirection(-1);
       setCurrentStep(prev => prev - 1);
     }
-  }, [currentStep]);
+  }, [currentStep, isConvenioModule]);
 
   const handleGoToStep = useCallback((step: number) => {
+    const minStep = isConvenioModule ? 1 : 0;
+    if (step < minStep) return;
     setDirection(step > currentStep ? 1 : -1);
     setCurrentStep(step);
-  }, [currentStep]);
+  }, [currentStep, isConvenioModule]);
 
   const handleSubmit = useCallback(async () => {
     if (data.quantidade > userCredits) return;
@@ -145,7 +148,7 @@ export function RequestLeadsWizard({
   }, [currentStep, data, userCredits]);
 
   const isLastStep = currentStep === STEPS.length - 1;
-  const isFirstStep = currentStep === 0;
+  const isFirstStep = currentStep === (isConvenioModule ? 1 : 0);
 
   const stepVariants = {
     enter: (dir: number) => ({ x: dir > 0 ? 30 : -30, opacity: 0 }),
@@ -252,6 +255,7 @@ export function RequestLeadsWizard({
                 onUpdate={handleUpdate}
                 onGoToStep={handleGoToStep}
                 userCredits={userCredits}
+                isConvenioModule={isConvenioModule}
               />
             )}
             {currentStep === 4 && (

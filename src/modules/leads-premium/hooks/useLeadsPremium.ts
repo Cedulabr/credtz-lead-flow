@@ -300,6 +300,8 @@ export function useLeadsPremium() {
     parcelaMax?: number | null;
     margemMin?: number | null;
     parcelasPagasMin?: number | null;
+    parcelasPagasMax?: number | null;
+    margemMax?: number | null;
     requireTelefone?: boolean | null;
   }): Promise<boolean> => {
     if (!user) return false;
@@ -334,6 +336,9 @@ export function useLeadsPremium() {
           parcela_min: options.parcelaMin ?? null,
           parcela_max: options.parcelaMax ?? null,
           margem_min: options.margemMin ?? null,
+          margem_max: options.margemMax ?? null,
+          parcelas_pagas_min: options.parcelasPagasMin ?? null,
+          parcelas_pagas_max: options.parcelasPagasMax ?? null,
         } as any);
 
       if (error) {

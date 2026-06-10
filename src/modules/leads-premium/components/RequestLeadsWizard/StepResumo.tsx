@@ -10,12 +10,14 @@ import { StepProps, TIPOS_LEAD, PRIORIDADES, UF_NOMES } from "./types";
 interface StepResumoProps extends StepProps {
   onGoToStep: (step: number) => void;
   userCredits: number;
+  isConvenioModule?: boolean;
 }
 
 export const StepResumo = memo(function StepResumo({
   data,
   onGoToStep,
-  userCredits
+  userCredits,
+  isConvenioModule
 }: StepResumoProps) {
   const tipoLead = TIPOS_LEAD.find(t => t.id === data.tipoLead);
   const prioridade = PRIORIDADES.find(p => p.id === data.prioridade);
@@ -28,8 +30,12 @@ export const StepResumo = memo(function StepResumo({
   if (data.parcelaMin !== null || data.parcelaMax !== null) {
     contratoParts.push(`Parcela: R$ ${data.parcelaMin ?? 0} – R$ ${data.parcelaMax ?? 2000}`);
   }
-  if (data.margemMin !== null) contratoParts.push(`Margem mín: R$ ${data.margemMin}`);
-  if (data.parcelasPagasMin !== null) contratoParts.push(`Parcelas pagas mín: ${data.parcelasPagasMin}`);
+  if (data.margemMin !== null || data.margemMax !== null) {
+    contratoParts.push(`Margem: R$ ${data.margemMin ?? 0} – R$ ${data.margemMax ?? 500}`);
+  }
+  if (data.parcelasPagasMin !== null || data.parcelasPagasMax !== null) {
+    contratoParts.push(`Parcelas pagas: ${data.parcelasPagasMin ?? 0} – ${data.parcelasPagasMax ?? '∞'}`);
+  }
 
   const items: { icon: any; label: string; value: string; step: number; hasValue: boolean; show: boolean }[] = [
     {
@@ -38,7 +44,15 @@ export const StepResumo = memo(function StepResumo({
       value: tipoLead ? `${tipoLead.icon} ${tipoLead.label}` : "—",
       step: 0,
       hasValue: !!data.tipoLead,
-      show: true,
+      show: !isConvenioModule,
+    },
+    {
+      icon: MapPin,
+      label: "Estado (UF)",
+      value: data.uf || "Todos",
+      step: 1,
+      hasValue: !!data.uf,
+      show: isConvenioModule,
     },
     {
       icon: MapPin,
@@ -46,7 +60,7 @@ export const StepResumo = memo(function StepResumo({
       value: data.ddds.length > 0 ? data.ddds.join(", ") : "Todas",
       step: 1,
       hasValue: data.ddds.length > 0,
-      show: true,
+      show: !isConvenioModule,
     },
     {
       icon: Tag,
@@ -54,7 +68,7 @@ export const StepResumo = memo(function StepResumo({
       value: data.tags.length > 0 ? data.tags.join(", ") : "Nenhuma",
       step: 1,
       hasValue: data.tags.length > 0,
-      show: true,
+      show: !isConvenioModule,
     },
     {
       icon: FileText,

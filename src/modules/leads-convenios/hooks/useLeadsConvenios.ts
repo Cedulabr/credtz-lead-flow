@@ -155,6 +155,9 @@ export function useLeadsConvenios() {
     parcelaMin?: number | null;
     parcelaMax?: number | null;
     margemMin?: number | null;
+    margemMax?: number | null;
+    parcelasPagasMin?: number | null;
+    parcelasPagasMax?: number | null;
   }): Promise<boolean> => {
     if (!user) return false;
     if (userCredits <= 0) {
@@ -163,7 +166,7 @@ export function useLeadsConvenios() {
     }
     try {
       const { data: filtered, error } = await supabase.rpc('request_leads_with_credits', {
-        convenio_filter: 'GOVERNO BA',
+        convenio_filter: 'GOV BA',
         banco_filter: options.banco || null,
         leads_requested: options.count,
         ddd_filter: options.ddds?.length ? options.ddds : null,
@@ -171,6 +174,9 @@ export function useLeadsConvenios() {
         parcela_min: options.parcelaMin ?? null,
         parcela_max: options.parcelaMax ?? null,
         margem_min: options.margemMin ?? null,
+        margem_max: options.margemMax ?? null,
+        parcelas_pagas_min: options.parcelasPagasMin ?? null,
+        parcelas_pagas_max: options.parcelasPagasMax ?? null,
       } as any);
 
       if (error) throw error;
