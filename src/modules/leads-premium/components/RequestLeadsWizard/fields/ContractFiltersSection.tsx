@@ -120,7 +120,7 @@ export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true,
                 />
               </div>
 
-              {/* Margem Mínima e Máxima */}
+              {/* Margem disponível */}
               <div className="space-y-3">
                 <Label className="text-sm font-medium flex items-center justify-between gap-2">
                   <span className="flex items-center gap-2">
@@ -128,18 +128,20 @@ export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true,
                     Margem disponível
                   </span>
                   <span className="text-xs text-muted-foreground font-normal">
-                    {fmtBRL(data.margemMin ?? 0)} — {fmtBRL(data.margemMax ?? 500)}
+                    {data.margemMin !== null || data.margemMax !== null 
+                      ? `${fmtBRL(data.margemMin ?? -100)} — ${fmtBRL(data.margemMax ?? 1000)}`
+                      : "Qualquer margem"}
                   </span>
                 </Label>
                 <Slider
                   min={-100}
-                  max={500}
-                  step={1}
-                  value={[data.margemMin ?? 0, data.margemMax ?? 500]}
+                  max={1000}
+                  step={10}
+                  value={[data.margemMin ?? -100, data.margemMax ?? 1000]}
                   onValueChange={([min, max]) =>
                     onUpdate({
-                      margemMin: min,
-                      margemMax: max,
+                      margemMin: min > -100 ? min : null,
+                      margemMax: max < 1000 ? max : null,
                     })
                   }
                   className="py-2"
