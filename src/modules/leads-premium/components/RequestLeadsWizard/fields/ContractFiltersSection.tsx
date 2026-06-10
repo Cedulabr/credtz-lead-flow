@@ -14,6 +14,7 @@ interface Props {
   data: LeadRequestData;
   onUpdate: (updates: Partial<LeadRequestData>) => void;
   defaultExpanded?: boolean;
+  isConvenioModule?: boolean;
 }
 
 const fmtBRL = (n: number) => `R$ ${n.toLocaleString('pt-BR')}`;
