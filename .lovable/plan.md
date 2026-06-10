@@ -1,46 +1,28 @@
-Transform the existing application into a high-end solution (comparable to Monday.com, HubSpot) by implementing advanced customization, automation, and enhanced UI/UX.
+The investigation revealed that the leads for "GOV BA" (Servidores da Bahia) in the database currently have invalid phone numbers (all starting with "0000..."). 
 
-### Phase 1: Core System Upgrades (Current Step)
-Focus on the immediate requests for "Leads Premium" and "Leads AGibank" while laying the foundation for global system improvements.
+The filtering logic in the `preview_requested_leads_count` RPC function uses the first 2 digits of the phone number as the DDD:
+```sql
+AND (ddd_filter IS NULL OR LEFT(ld.phone, 2) = ANY(ddd_filter))
+```
 
-1. **Refine Leads Premium and Leads AGibank:**
-    - Improve the Export functionality to allow field selection and deeper filtering (User, Period, Status, etc.).
-    - Remove the "Simulations" field as requested.
-    - Implement a more robust "Performance-based Credit Request" system with a dedicated UI for both Users (to request) and Admins (to approve).
+When a user selects "Bahia (BA)", the system automatically applies a DDD filter (e.g., ['71', '73', '74', '75', '77']). Since all leads have phones starting with '00', they are all filtered out, resulting in "0 encontrados".
 
-2. **Advanced Data Management Foundation:**
-    - Create a framework for **Customizable Fields** starting with the Leads module. This involves a metadata-driven approach where fields can be added/removed by admins.
-    - Implement **Dynamic Forms** that adapt based on user roles or lead categories.
+**Plan:**
+1.  **Persist Uploads**: Save the new images to `/public/uploads/`.
+2.  **Fix Database Function**: Modify `preview_requested_leads_count` to only apply the DDD filter if the phone number appears valid (e.g., doesn't start with '00'). For "GOV BA" specifically, we should probably rely on the `estado` column if available, or allow the leads even if the DDD doesn't match the state when the data is clearly placeholder data.
+3.  **Adjust Wizard Logic**: In `StepPerfil.tsx`, when selecting an state (UF), we will still set the DDDs for other modules, but I'll ensure the `isConvenioModule` path doesn't strictly block leads based on DDD if the data is incomplete.
+4.  **Database Migration**: Update the RPC to be more flexible with DDD filtering when data quality is low.
 
-3. **Intelligent Automation (The "Monday.com" feel):**
-    - Scaffold a "Workflow Builder" prototype specifically for lead processing (e.g., "If status changes to X, notify user Y").
-    - Enhance notifications with real-time feedback and @mentions support.
+### Technical Details
 
-4. **Premium UI/UX Enhancements:**
-    - Integrate `Aceternity UI` or `Magic UI` components for a modern, fluid feel (e.g., animated containers, better empty states, smoother transitions).
-    - Implement a **Global Search** overlay accessible via `Cmd/Ctrl+K`.
+**1. File Persistence**
+*   Save `colado-1781103135153.png` and `colado-1781103165196.png` to `/public/uploads/`.
 
-### Technical Details (Implementation Plan)
+**2. Update Database Function (SQL)**
+*   Update `preview_requested_leads_count` to handle the case where leads have invalid phones by ignoring the DDD filter for them if the filter is set but no leads match due to the '00' prefix. Or better, allow filtering by `estado` column which I saw exists in the table.
 
-1. **Database Schema Enhancements:**
-    - Update `leads` table to support a `metadata` JSONB column for custom fields.
-    - Finalize `agibank_credit_requests` table (already approved).
-    - Create a `system_automations` table to store trigger-action rules.
+**3. Update `src/modules/leads-premium/components/RequestLeadsWizard/StepPerfil.tsx`**
+*   Modify how `onUpdate` is called when `uf` changes for `isConvenioModule`. If it's the convenio module, we might want to pass `uf` to the RPC instead of just relying on derived DDDs.
 
-2. **Frontend Architecture:**
-    - Create a `CustomFieldRenderer` component to handle different data types (Select, Date, Multi-select, etc.).
-    - Update `LeadsListView` and `LeadsAgibankModule` to use this renderer.
-    - Refactor `ExportLeadsDialog` to include a checklist of fields to export.
-
-3. **Global Search Implementation:**
-    - Create a `CommandMenu` component using `cmdk` (already in `package.json`).
-    - Index key modules: Leads, Clients, Proposals, and Navigation.
-
-4. **Component Library Integration:**
-    - Use `shadcn/ui` for high-quality, accessible base components.
-    - Layer in `framer-motion` for meaningful UI transitions (the "Monday.com" polish).
-
-### Priority
-- **High:** Leads Export refinement, Credit Request UI, Removal of "Simulations".
-- **Medium:** Global Search, Custom Fields framework.
-- **Low:** Workflow Builder (Phase 2), External Integrations (Slack/Zapier).
+**4. Update `src/modules/leads-premium/components/RequestLeadsWizard/types.ts`**
+*   Add `uf` as an optional parameter to the `preview_requested_leads_count` RPC call.
