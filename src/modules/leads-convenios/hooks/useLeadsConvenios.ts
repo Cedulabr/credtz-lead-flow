@@ -155,6 +155,9 @@ export function useLeadsConvenios() {
     parcelaMin?: number | null;
     parcelaMax?: number | null;
     margemMin?: number | null;
+    margemMax?: number | null;
+    parcelasPagasMin?: number | null;
+    parcelasPagasMax?: number | null;
   }): Promise<boolean> => {
     if (!user) return false;
     if (userCredits <= 0) {
