@@ -14,11 +14,12 @@ interface Props {
   data: LeadRequestData;
   onUpdate: (updates: Partial<LeadRequestData>) => void;
   defaultExpanded?: boolean;
+  isConvenioModule?: boolean;
 }
 
 const fmtBRL = (n: number) => `R$ ${n.toLocaleString('pt-BR')}`;
 
-export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true }: Props) {
+export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true, isConvenioModule }: Props) {
   const [open, setOpen] = useState(defaultExpanded);
   const [bancos, setBancos] = useState<AvailableOption[]>([]);
 
@@ -38,7 +39,8 @@ export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true 
 
   const hasActive =
     !!data.banco || data.parcelaMin !== null || data.parcelaMax !== null ||
-    data.margemMin !== null || data.margemMax !== null || data.parcelasPagasMin !== null;
+    data.margemMin !== null || data.margemMax !== null || 
+    data.parcelasPagasMin !== null || data.parcelasPagasMax !== null;
 
   const parcMin = data.parcelaMin ?? 0;
   const parcMax = data.parcelaMax ?? 2000;
@@ -144,25 +146,46 @@ export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true 
                 />
               </div>
 
-              {/* Parcelas pagas mín */}
+              {/* Parcelas pagas range */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium flex items-center gap-2">
                   <ListChecks className="h-4 w-4 text-muted-foreground" />
-                  Parcelas pagas (mínimo)
+                  Parcelas pagas
                 </Label>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  step={1}
-                  placeholder="Ex.: 6"
-                  value={data.parcelasPagasMin ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value.trim();
-                    onUpdate({ parcelasPagasMin: v === "" ? null : Number(v) });
-                  }}
-                  className="h-10"
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-muted-foreground">Mínimo</span>
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      placeholder="Mín."
+                      value={data.parcelasPagasMin ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value.trim();
+                        onUpdate({ parcelasPagasMin: v === "" ? null : Number(v) });
+                      }}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-muted-foreground">Máximo</span>
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      placeholder="Máx."
+                      value={data.parcelasPagasMax ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value.trim();
+                        onUpdate({ parcelasPagasMax: v === "" ? null : Number(v) });
+                      }}
+                      className="h-9"
+                    />
+                  </div>
+                </div>
               </div>
 
               {hasActive && (
@@ -178,6 +201,7 @@ export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true 
                       margemMin: null,
                       margemMax: null,
                       parcelasPagasMin: null,
+                      parcelasPagasMax: null,
                     })
                   }
                   className="text-xs h-7"

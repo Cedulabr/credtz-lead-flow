@@ -11,9 +11,10 @@ import { PhoneAlertBanner } from "./fields/PhoneAlertBanner";
 interface StepPerfilProps extends StepProps {
   /** Sinalizado pelo wrapper quando o usuário clicou Próximo. Retorna se pode avançar. */
   registerCanAdvance?: (fn: () => Promise<boolean>) => void;
+  isConvenioModule?: boolean;
 }
-
-export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCanAdvance }: StepPerfilProps) {
+ 
+export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCanAdvance, isConvenioModule }: StepPerfilProps) {
   const [estadoError, setEstadoError] = useState<string | null>(null);
   const [phoneCheck, setPhoneCheck] = useState<{ total: number; with_phone: number } | null>(null);
   const [phoneLoading, setPhoneLoading] = useState(false);
@@ -131,9 +132,14 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCan
             }}
             error={estadoError}
           />
-          <TagsField selected={data.tags} onChange={(tags) => onUpdate({ tags })} />
-          <DDDField selected={data.ddds} onChange={(ddds) => onUpdate({ ddds })} />
-          <ContractFiltersSection data={data} onUpdate={onUpdate} defaultExpanded />
+          {!isConvenioModule && <TagsField selected={data.tags} onChange={(tags) => onUpdate({ tags })} />}
+          {!isConvenioModule && <DDDField selected={data.ddds} onChange={(ddds) => onUpdate({ ddds })} />}
+          <ContractFiltersSection 
+            data={data} 
+            onUpdate={onUpdate} 
+            defaultExpanded 
+            isConvenioModule={isConvenioModule}
+          />
         </>
       ) : (
         <>

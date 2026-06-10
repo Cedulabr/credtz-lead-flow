@@ -17,6 +17,7 @@ export interface LeadRequestData {
   margemMin: number | null;
   margemMax: number | null;
   parcelasPagasMin: number | null;
+  parcelasPagasMax: number | null;
 
   // Etapa 3: Quantidade e prioridade
   quantidade: number;
@@ -49,6 +50,7 @@ export const INITIAL_DATA: LeadRequestData = {
   margemMin: 0,
   margemMax: 500,
   parcelasPagasMin: null,
+  parcelasPagasMax: null,
   quantidade: 10,
   prioridade: 'recentes',
   convenio: null,
@@ -137,7 +139,7 @@ export function tipoLeadToConvenio(tipo: TipoLead | null): string | null {
   switch (tipo) {
     case 'inss': return 'INSS';
     case 'siape': return 'SIAPE';
-    case 'servidor': return 'GOVERNO BA';
+    case 'servidor': return 'GOV BA';
     case 'clt': return 'CLT';
     default: return null;
   }
