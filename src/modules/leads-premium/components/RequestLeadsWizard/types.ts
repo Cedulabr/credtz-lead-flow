@@ -139,7 +139,7 @@ export function tipoLeadToConvenio(tipo: TipoLead | null): string | null {
   switch (tipo) {
     case 'inss': return 'INSS';
     case 'siape': return 'SIAPE';
-    case 'servidor': return 'GOVERNO BA';
+    case 'servidor': return 'GOV BA';
     case 'clt': return 'CLT';
     default: return null;
   }
