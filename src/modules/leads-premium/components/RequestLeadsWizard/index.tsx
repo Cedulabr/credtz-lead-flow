@@ -29,6 +29,7 @@ interface RequestLeadsWizardProps {
     margemMin?: number | null;
     margemMax?: number | null;
     parcelasPagasMin?: number | null;
+    parcelasPagasMax?: number | null;
     requireTelefone?: boolean | null;
   }) => Promise<boolean>;
 }
