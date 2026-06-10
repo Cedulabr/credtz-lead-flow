@@ -16,7 +16,8 @@ interface StepResumoProps extends StepProps {
 export const StepResumo = memo(function StepResumo({
   data,
   onGoToStep,
-  userCredits
+  userCredits,
+  isConvenioModule
 }: StepResumoProps) {
   const tipoLead = TIPOS_LEAD.find(t => t.id === data.tipoLead);
   const prioridade = PRIORIDADES.find(p => p.id === data.prioridade);
