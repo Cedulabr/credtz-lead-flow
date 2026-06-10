@@ -71,16 +71,31 @@ export function LeadsConveniosModule() {
         </div>
       </div>
 
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-card p-4 rounded-xl border">
+        <div className="relative w-full md:max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Buscar por nome, CPF ou matrícula..." 
+            className="pl-10"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          Mostrando <strong>{filteredLeads.length}</strong> de <strong>{leads.length}</strong> leads
+        </div>
+      </div>
+
       {isLoading ? (
         <div className="flex justify-center p-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {leads.map(lead => (
+          {filteredLeads.map(lead => (
             <ConvenioLeadCard key={lead.id} lead={lead} onClick={() => handleLeadClick(lead)} />
           ))}
-          {leads.length === 0 && (
+          {filteredLeads.length === 0 && (
             <div className="col-span-full py-20 text-center border-2 border-dashed rounded-xl">
               <p className="text-muted-foreground">Nenhum lead encontrado neste módulo.</p>
             </div>
