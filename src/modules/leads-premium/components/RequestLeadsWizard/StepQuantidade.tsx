@@ -22,7 +22,7 @@ export const StepQuantidade = memo(function StepQuantidade({ data, onUpdate, use
       setLoadingPreview(true);
       try {
         const { data: count, error } = await supabase.rpc('preview_requested_leads_count', {
-          convenio_filter: data.tipoLead === 'servidor' ? 'GOVERNO BA' : tipoLeadToConvenio(data.tipoLead),
+          convenio_filter: data.tipoLead === 'servidor' ? 'GOV BA' : tipoLeadToConvenio(data.tipoLead),
           banco_filter: data.banco,
           ddd_filter: data.ddds.length ? data.ddds : null,
           tag_filter: data.tags.length ? data.tags : null,

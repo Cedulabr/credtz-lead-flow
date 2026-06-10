@@ -27,7 +27,7 @@ export function StepConfirmacao({ data, userCredits }: StepConfirmacaoProps) {
       setIsLoading(true);
       try {
         const { data: result, error } = await supabase.rpc('preview_available_leads', {
-          convenio_filter: data.tipoLead === 'servidor' ? 'GOVERNO BA' : (data.convenio || null),
+          convenio_filter: data.tipoLead === 'servidor' ? 'GOV BA' : (data.convenio || null),
           ddd_filter: data.ddds.length > 0 ? data.ddds : null,
           tag_filter: data.tags.length > 0 ? data.tags : null,
           max_count: Math.min(data.quantidade, 20),
