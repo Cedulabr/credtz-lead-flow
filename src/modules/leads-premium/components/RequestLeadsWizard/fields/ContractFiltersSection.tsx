@@ -19,7 +19,7 @@ interface Props {
 
 const fmtBRL = (n: number) => `R$ ${n.toLocaleString('pt-BR')}`;
 
-export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true }: Props) {
+export function ContractFiltersSection({ data, onUpdate, defaultExpanded = true, isConvenioModule }: Props) {
   const [open, setOpen] = useState(defaultExpanded);
   const [bancos, setBancos] = useState<AvailableOption[]>([]);
 
