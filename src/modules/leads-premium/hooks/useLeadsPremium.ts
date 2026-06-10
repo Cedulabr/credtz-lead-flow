@@ -300,6 +300,8 @@ export function useLeadsPremium() {
     parcelaMax?: number | null;
     margemMin?: number | null;
     parcelasPagasMin?: number | null;
+    parcelasPagasMax?: number | null;
+    margemMax?: number | null;
     requireTelefone?: boolean | null;
   }): Promise<boolean> => {
     if (!user) return false;
