@@ -60,7 +60,7 @@ export const StepResumo = memo(function StepResumo({
       value: data.ddds.length > 0 ? data.ddds.join(", ") : "Todas",
       step: 1,
       hasValue: data.ddds.length > 0,
-      show: true,
+      show: !isConvenioModule,
     },
     {
       icon: Tag,
@@ -68,7 +68,7 @@ export const StepResumo = memo(function StepResumo({
       value: data.tags.length > 0 ? data.tags.join(", ") : "Nenhuma",
       step: 1,
       hasValue: data.tags.length > 0,
-      show: true,
+      show: !isConvenioModule,
     },
     {
       icon: FileText,
