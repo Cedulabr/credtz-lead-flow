@@ -114,6 +114,7 @@ export function RequestLeadsWizard({
         margemMin: data.margemMin,
         margemMax: data.margemMax,
         parcelasPagasMin: data.parcelasPagasMin,
+        parcelasPagasMax: data.parcelasPagasMax,
         requireTelefone: data.requireTelefone,
       });
       if (success) {
