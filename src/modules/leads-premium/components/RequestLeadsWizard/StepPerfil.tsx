@@ -7,6 +7,7 @@ import { DDDField } from "./fields/DDDField";
 import { EstadoField } from "./fields/EstadoField";
 import { ContractFiltersSection } from "./fields/ContractFiltersSection";
 import { PhoneAlertBanner } from "./fields/PhoneAlertBanner";
+import { CPFSearchField } from "./fields/CPFSearchField";
 
 interface StepPerfilProps extends StepProps {
   /** Sinalizado pelo wrapper quando o usuário clicou Próximo. Retorna se pode avançar. */
@@ -106,6 +107,12 @@ export const StepPerfil = memo(function StepPerfil({ data, onUpdate, registerCan
           {isServidor ? 'O estado é obrigatório' : 'Todos os filtros são opcionais'}
         </p>
       </div>
+
+      {/* Busca por CPF (Sempre visível para conferência) */}
+      <CPFSearchField 
+        value={data.cpf} 
+        onChange={(cpf) => onUpdate({ cpf })} 
+      />
 
       {/* Banner de telefone (apenas após query, INSS/SIAPE/CLT) */}
       {usesPhoneAlert && (phoneLoading || (phoneCheck && phoneCheck.with_phone > 0 && data.requireTelefone === null)) && (
