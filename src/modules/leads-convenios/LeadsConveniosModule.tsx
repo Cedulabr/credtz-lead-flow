@@ -92,6 +92,7 @@ export function LeadsConveniosModule() {
         isOpen={isRequestModalOpen}
         onClose={() => setIsRequestModalOpen(false)}
         userCredits={userCredits}
+        isConvenioModule={true}
         onRequestLeads={handleRequestLeads}
       />
     </div>
