@@ -88,11 +88,12 @@ export function RequestLeadsWizard({
   }, [currentStep]);
 
   const handleBack = useCallback(() => {
-    if (currentStep > 0) {
+    const minStep = isConvenioModule ? 1 : 0;
+    if (currentStep > minStep) {
       setDirection(-1);
       setCurrentStep(prev => prev - 1);
     }
-  }, [currentStep]);
+  }, [currentStep, isConvenioModule]);
 
   const handleGoToStep = useCallback((step: number) => {
     setDirection(step > currentStep ? 1 : -1);
