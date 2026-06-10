@@ -17,6 +17,7 @@ export interface LeadRequestData {
   margemMin: number | null;
   margemMax: number | null;
   parcelasPagasMin: number | null;
+  parcelasPagasMax: number | null;
 
   // Etapa 3: Quantidade e prioridade
   quantidade: number;
