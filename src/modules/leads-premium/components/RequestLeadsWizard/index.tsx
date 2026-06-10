@@ -18,6 +18,7 @@ interface RequestLeadsWizardProps {
   isOpen: boolean;
   onClose: () => void;
   userCredits: number;
+  isConvenioModule?: boolean;
   onRequestLeads: (options: {
     convenio?: string;
     count: number;
