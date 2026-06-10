@@ -6,6 +6,7 @@ export interface LeadRequestData {
 
   // Etapa 2: Perfil
   uf: string | null;          // obrigatório para servidor
+  cpf: string;                // busca por CPF
   ddds: string[];
   tags: string[];
   requireTelefone: boolean | null; // null = não perguntado
@@ -21,6 +22,7 @@ export interface LeadRequestData {
 
   // Etapa 3: Quantidade e prioridade
   quantidade: number;
+  availableLeadsCount: number | null; // pré-visualização de leads
   prioridade: 'recentes' | 'antigos' | 'aleatorio';
 
   // Compatibilidade com hook (derivado de tipoLead)
@@ -41,6 +43,7 @@ export interface StepProps {
 export const INITIAL_DATA: LeadRequestData = {
   tipoLead: null,
   uf: null,
+  cpf: '',
   ddds: [],
   tags: [],
   requireTelefone: null,
@@ -52,6 +55,7 @@ export const INITIAL_DATA: LeadRequestData = {
   parcelasPagasMin: null,
   parcelasPagasMax: null,
   quantidade: 10,
+  availableLeadsCount: null,
   prioridade: 'recentes',
   convenio: null,
 };
