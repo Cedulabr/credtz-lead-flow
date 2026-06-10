@@ -50,8 +50,15 @@ export function RequestLeadsWizard({
   onRequestLeads
 }: RequestLeadsWizardProps) {
   const isMobile = useIsMobile();
-  const [currentStep, setCurrentStep] = useState(0);
-  const [data, setData] = useState<LeadRequestData>(INITIAL_DATA);
+  const initialData = useMemo(() => {
+    if (isConvenioModule) {
+      return { ...INITIAL_DATA, tipoLead: 'servidor' as const };
+    }
+    return INITIAL_DATA;
+  }, [isConvenioModule]);
+
+  const [currentStep, setCurrentStep] = useState(isConvenioModule ? 1 : 0);
+  const [data, setData] = useState<LeadRequestData>(initialData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [direction, setDirection] = useState(1);
