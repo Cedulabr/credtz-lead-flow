@@ -7834,6 +7834,7 @@ export type Database = {
           ai_negotiation_rules: Json | null
           ai_opt_out_keywords: string[] | null
           ai_persona: string | null
+          ai_reply_enabled: boolean
           ai_script_base: string | null
           ai_template_id: string | null
           ai_tone_of_voice: string | null
@@ -7897,6 +7898,7 @@ export type Database = {
           ai_negotiation_rules?: Json | null
           ai_opt_out_keywords?: string[] | null
           ai_persona?: string | null
+          ai_reply_enabled?: boolean
           ai_script_base?: string | null
           ai_template_id?: string | null
           ai_tone_of_voice?: string | null
@@ -7960,6 +7962,7 @@ export type Database = {
           ai_negotiation_rules?: Json | null
           ai_opt_out_keywords?: string[] | null
           ai_persona?: string | null
+          ai_reply_enabled?: boolean
           ai_script_base?: string | null
           ai_template_id?: string | null
           ai_tone_of_voice?: string | null
@@ -11980,6 +11983,7 @@ export type Database = {
           last_message_type: string | null
           lead_score: string | null
           sdr_score: number | null
+          source: string | null
           status: string
           unread_count: number
           updated_at: string
@@ -12017,6 +12021,7 @@ export type Database = {
           last_message_type?: string | null
           lead_score?: string | null
           sdr_score?: number | null
+          source?: string | null
           status?: string
           unread_count?: number
           updated_at?: string
@@ -12054,6 +12059,7 @@ export type Database = {
           last_message_type?: string | null
           lead_score?: string | null
           sdr_score?: number | null
+          source?: string | null
           status?: string
           unread_count?: number
           updated_at?: string
