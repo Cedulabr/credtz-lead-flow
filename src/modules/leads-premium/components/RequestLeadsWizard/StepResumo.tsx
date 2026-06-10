@@ -44,7 +44,15 @@ export const StepResumo = memo(function StepResumo({
       value: tipoLead ? `${tipoLead.icon} ${tipoLead.label}` : "—",
       step: 0,
       hasValue: !!data.tipoLead,
-      show: true,
+      show: !isConvenioModule,
+    },
+    {
+      icon: MapPin,
+      label: "Estado (UF)",
+      value: data.uf || "Todos",
+      step: 1,
+      hasValue: !!data.uf,
+      show: isConvenioModule,
     },
     {
       icon: MapPin,
