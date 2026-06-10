@@ -50,6 +50,7 @@ export const INITIAL_DATA: LeadRequestData = {
   margemMin: 0,
   margemMax: 500,
   parcelasPagasMin: null,
+  parcelasPagasMax: null,
   quantidade: 10,
   prioridade: 'recentes',
   convenio: null,
